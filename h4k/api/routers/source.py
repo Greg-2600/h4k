@@ -10,12 +10,25 @@ from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from schemas import (
+    AiRequest,
+    AiResult,
+    CustomRuleRequest,
+    ScaResult,
     SourceExploitRequest,
     SourceFinding,
     SourceScanRequest,
     SourceScanResult,
+    TriageRequest,
+    TriageResult,
 )
-from services import ingest, sast
+from services import (
+    ai as ai_service,
+    ingest,
+    sast,
+    sca as sca_service,
+    semgrep,
+    triage as triage_service,
+)
 
 logger = logging.getLogger("h4k.routers.source")
 
@@ -63,7 +76,7 @@ async def scan_upload(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/exploit", response_model=str)
+@router.post("/exploit")
 def make_exploit(req: SourceExploitRequest) -> str:
     """Generate a proof-of-concept / disclosure skeleton for a finding."""
     finding = _finding_from(req)
@@ -81,6 +94,83 @@ def download_exploit(req: SourceExploitRequest) -> Any:
         content=poc,
         media_type="text/plain",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@router.post("/sca", response_model=ScaResult)
+def software_composition(req: SourceScanRequest) -> ScaResult:
+    """Software Composition Analysis: SBOM + known-CVE check on the source."""
+    if not req.git_url:
+        raise HTTPException(status_code=400, detail="git_url required")
+    work = ingest.make_workdir()
+    try:
+        ingest.clone_git(req.git_url, work)
+        root = ingest.find_source_root(work)
+    except ingest.IngestError as exc:
+        shutil.rmtree(work, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        res = sca_service.sca_scan(root, with_sbom=True)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    # Map only the fields ScaResult declares (drop sbom_path/sbom_dir).
+    return ScaResult(
+        cves=res.get("cves", []),
+        vulnerabilities=res.get("vulnerabilities", []),
+        packages=res.get("packages", []),
+        sbom_available=bool(res.get("sbom_available")),
+    )
+
+
+@router.get("/sca/git")
+def sca_by_url(git_url: str) -> ScaResult:
+    return software_composition(SourceScanRequest(git_url=git_url))
+
+
+@router.post("/triage", response_model=TriageResult)
+def analyze_crash(req: TriageRequest) -> TriageResult:
+    """Analyze a fuzzer crash candidate or SAST finding -> triage + patch hint."""
+    finding = _finding_from_src(req.finding) if req.finding else None
+    if not req.candidate and finding:
+        candidate = finding.code or str(finding.line)
+    else:
+        candidate = req.candidate
+    report = triage_service.build_triage(candidate, finding)
+    return TriageResult(**report.to_dict())
+
+
+@router.post("/ai", response_model=AiResult)
+def ai_analysis(req: AiRequest) -> AiResult:
+    """Ask the configured LLM for a root-cause + patch candidate."""
+    result = ai_service.ai_analyze(req.text)
+    return AiResult(**result)
+
+
+@router.post("/rules/test")
+def test_custom_rule(req: CustomRuleRequest) -> dict[str, Any]:
+    """Validate a custom Semgrep-style rule against sample code."""
+    return semgrep.test_rule(req)
+
+
+@router.post("/triage/minimize")
+def minimize(req: TriageRequest) -> dict[str, Any]:
+    """Automatically minimize a crash candidate (best-effort)."""
+    best = triage_service._attempt_minimize(
+        req.candidate, req.finding.cwe if req.finding else "unknown"
+    )
+    return {"original": req.candidate, "minimized": best}
+
+
+def _finding_from_src(f: SourceFinding) -> sast.Finding:
+    return sast.Finding(
+        rule_id=f.rule_id,
+        name=f.name,
+        severity=f.severity,
+        cwe=f.cwe,
+        file=f.file,
+        line=f.line,
+        code=f.code,
+        description=f.description,
     )
 
 

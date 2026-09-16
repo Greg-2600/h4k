@@ -133,6 +133,16 @@
             <input type="text" id="source-url" class="full-input" placeholder="or git URL (https://gitlab.com/org/repo.git)" />
             <button type="button" id="source-run" class="btn-sub">analyze</button>
           </div>
+          <div class="btn-row">
+            <button type="button" id="sca-btn" class="btn-sub">SBOM / SCA (dependencies→CVEs)</button>
+            <button type="button" id="ai-btn" class="btn-sub">AI root-cause + patch</button>
+          </div>
+          <div class="deep-row" id="custom-rule">
+            <input type="text" id="rule-pattern" class="full-input" placeholder="custom semgrep pattern, e.g. exec(request.GET[&quot;cmd&quot;])" />
+            <div class="btn-row">
+              <button type="button" id="rule-test" class="btn-sub">test custom rule</button>
+            </div>
+          </div>
         </form>
       </section>
 
@@ -212,6 +222,18 @@
     <section class="pane results" id="exploit-panel" hidden>
       <div class="pane-head"><span class="pane-title">/poc disclosure skeleton</span></div>
       <pre class="notes" id="tab-exploit"></pre>
+    </section>
+
+    <!-- SCA / SBOM -->
+    <section class="pane results" id="sca-panel" hidden>
+      <div class="pane-head"><span class="pane-title">/sbom · supply-chain</span></div>
+      <div id="tab-sca">analyze a project's dependencies for known CVEs</div>
+    </section>
+
+    <!-- AI root-cause / patch -->
+    <section class="pane results" id="ai-panel" hidden>
+      <div class="pane-head"><span class="pane-title">/ai root-cause · patch</span></div>
+      <pre class="notes" id="tab-ai"></pre>
     </section>
 
   </div>

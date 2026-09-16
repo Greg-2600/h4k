@@ -44,6 +44,18 @@ RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \
 RUN python3 -m pip install --break-system-packages --no-cache-dir \
     pymetasploit3 fastapi uvicorn python-multipart semgrep
 
+# SCA / supply-chain tools: osv-scanner (Google) validates a repo/SBOM against
+# the OSV vulnerability DB; trivy (Aqua) can emit a CycloneDX SBOM.
+RUN OSV_VER=$(\
+      curl -s https://api.github.com/repos/google/osv-scanner/releases/latest \
+      | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
+    && curl -sSfL "https://github.com/google/osv-scanner/releases/download/${OSV_VER}/osv-scanner_linux_amd64" \
+       -o /usr/local/bin/osv-scanner \
+    && chmod +x /usr/local/bin/osv-scanner
+RUN curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+    | sh -s -- -b /usr/local/bin
+
+
 WORKDIR /opt/h4k
 COPY api /opt/h4k/api
 COPY web /opt/h4k/web

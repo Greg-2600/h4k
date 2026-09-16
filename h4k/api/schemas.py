@@ -260,3 +260,51 @@ class SourceExploitRequest(BaseModel):
 
     rule_id: str
     finding: SourceFinding | None = None
+
+
+class ScaResult(BaseModel):
+    cves: list[str] = []
+    vulnerabilities: list[dict] = []
+    packages: list[str] = []
+    sbom_available: bool = False
+
+
+class TriageRequest(BaseModel):
+    """Analyze a fuzzer crash candidate or SAST finding into a triage."""
+
+    candidate: str = ""
+    finding: SourceFinding | None = None
+
+
+class TriageResult(BaseModel):
+    candidate: str
+    bug_class: str
+    cwe: str
+    minimized_trigger: str
+    suggested_patch: str
+    steps: list[str] = []
+
+
+class AiRequest(BaseModel):
+    """Ask the configured LLM for root-cause + patch-candidate on this input."""
+
+    text: str
+
+
+class AiResult(BaseModel):
+    ok: bool
+    provider: str = ""
+    raw: str = ""
+    error: str | None = None
+
+
+class CustomRuleRequest(BaseModel):
+    """Author & test a custom Semgrep-style rule."""
+
+    rule_id: str
+    name: str
+    severity: str = "medium"  # low | medium | high | critical
+    languages: list[str] = ["python"]
+    pattern: str
+    message: str = ""
+    test_code: str = ""  # sample code to validate the rule against

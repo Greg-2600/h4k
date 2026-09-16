@@ -10,6 +10,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger("h4k.semgrep")
 
@@ -127,3 +128,83 @@ def _rule_id(cid: str, message: str) -> str:
         m = re.search(r"([A-Za-z_\-]+)", message or "")
         base = (m.group(1) if m else "semgrep").lower()
     return f"sast-semgrep-{base}"
+
+
+def test_rule(req: Any) -> dict[str, Any]:
+    """Validate a custom Semgrep-style rule against sample code.
+
+    Builds a temporary YAML rule + test file and runs `semgrep scan`. Returns
+    whether the pattern matched the sample and any semgrep error output.
+    """
+    import tempfile
+
+    rule_yaml = _build_rule_yaml(req)
+    tmp = Path(tempfile.mkdtemp(prefix="h4k-rule-"))
+    rule_file = tmp / "rule.yml"
+    test_file = tmp / ("test." + _ext_for(req))
+    rule_file.write_text(rule_yaml, encoding="utf-8")
+    test_file.write_text(req.test_code or "", encoding="utf-8")
+
+    binary = _semgrep_bin()
+    env = dict(os.environ)
+    venv_bin = str(Path(sys.prefix) / "bin")
+    if venv_bin not in env.get("PATH", ""):
+        env["PATH"] = venv_bin + os.pathsep + env.get("PATH", "")
+
+    try:
+        proc = subprocess.run(  # nosec B603 B607 - fixed argv, no shell
+            [
+                binary,
+                "scan",
+                "--config",
+                str(rule_file),
+                "--json",
+                "--quiet",
+                str(test_file),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+            env=env,
+        )
+    except FileNotFoundError:
+        return {"ok": False, "error": "semgrep not installed"}
+    stdout = proc.stdout or ""
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError:
+        return {"ok": False, "error": (proc.stderr or stdout)[:300]}
+    matched = len(data.get("results", [])) > 0
+    return {
+        "ok": True,
+        "matched": matched,
+        "results": data.get("results", []),
+        "rule_id": req.rule_id,
+    }
+
+
+def _build_rule_yaml(req: Any) -> str:
+    # A minimal valid Semgrep YAML rule from the request fields.
+    sev = (req.severity or "medium").upper()
+    lang = '"' + '", "'.join(req.languages or ["python"]) + '"'
+    return (
+        "rules:\n"
+        "  - id: " + req.rule_id + "\n"
+        "    languages: [" + lang + "]\n"
+        "    message: " + (req.message or req.name or req.rule_id) + "\n"
+        "    severity: " + sev + "\n"
+        "    pattern: " + (req.pattern or "eval(...)") + "\n"
+    )
+
+
+def _ext_for(req: Any) -> str:
+    langs = req.languages or ["python"]
+    base = {lang.lower() for lang in langs}
+    if "python" in base:
+        return "py"
+    if "javascript" in base or "js" in base:
+        return "js"
+    if "c" in base:
+        return "c"
+    return "py"

@@ -554,6 +554,77 @@ async function downloadExploit(finding) {
   } catch (err) { log("PoC download error " + err.message, "err"); }
 }
 
+/* ---------- SCA / SBOM ---------- */
+$("sca-btn").addEventListener("click", async () => {
+  const url = $("source-url").value.trim();
+  if (!url) { log("[!] enter a git URL for SCA", "err"); return; }
+  $("sca-panel").hidden = false;
+  $("tab-sca").innerHTML = "<p class='msg'>building SBOM + checking dependencies…</p>";
+  log(`[*] SCA on ${url}`, "info");
+  try {
+    const resp = await fetch("/api/source/sca/git?git_url=" + encodeURIComponent(url));
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const d = await resp.json();
+    renderSca(d);
+  } catch (err) { $("tab-sca").innerHTML = "<p class='err'>" + esc(err.message) + "</p>"; log("SCA error " + err.message, "err"); }
+});
+
+function renderSca(d) {
+  const el = $("tab-sca");
+  const cves = d.cves || [];
+  const pkgs = d.packages || [];
+  let h = `<p class='msg'>SBOM available: ${esc(d.sbom_available ? "yes" : "no")} · packages: ${esc(pkgs.length)} · known CVEs: ${esc(cves.length)}</p>`;
+  if (cves.length) {
+    h += "<table><tr><th>CVE</th></tr>";
+    for (const c of cves) h += `<tr><td>${esc(c)}</td></tr>`;
+    h += "</table>";
+  } else if (pkgs.length) {
+    h += "<p class='ok'>no known CVEs across " + esc(pkgs.length) + " package(s)</p>";
+  } else {
+    h += "<p class='msg'>no lockfiles/manifests found to scan</p>";
+  }
+  el.innerHTML = h;
+  log("[+] SCA done", "ok");
+}
+
+/* ---------- AI root-cause + patch ---------- */
+$("ai-btn").addEventListener("click", async () => {
+  const target = $("target").value.trim() || "the last SAST finding";
+  $("ai-panel").hidden = false;
+  $("tab-ai").textContent = "asking model…";
+  const text = "Analyze this authorized lab finding:\nTarget: " + target +
+    "\nPlease give ROOT_CAUSE, PATCH_CANDIDATE, CONFIRM_STEPS.";
+  try {
+    const resp = await fetch("/api/source/ai", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    const d = await resp.json();
+    if (d.ok) { $("tab-ai").textContent = d.raw; log("[+] AI analysis returned", "ok"); }
+    else { $("tab-ai").textContent = "AI unavailable: " + (d.error || "no provider").replace(/^"|"$/g, ""); log("[!] AI: " + d.error, "err"); }
+  } catch (err) { $("tab-ai").textContent = "error: " + err.message; }
+});
+
+/* ---------- custom rule test ---------- */
+$("rule-test").addEventListener("click", async () => {
+  const pattern = $("rule-pattern").value.trim();
+  if (!pattern) { log("[!] enter a semgrep pattern to test", "err"); return; }
+  try {
+    const resp = await fetch("/api/source/rules/test", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rule_id: "custom-rule-" + Math.random().toString(36).slice(2, 6),
+        name: "Custom rule", severity: "medium", languages: ["python"],
+        pattern, message: "custom rule hit", test_code: "exec('id')",
+      }),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const d = await resp.json();
+    if (d.ok) log("[+] custom rule " + (d.matched ? "matched (vuln found)" : "did not match") + " sample code", d.matched ? "err" : "ok");
+    else log("[!] rule test error: " + (d.error || "").slice(0, 120), "err");
+  } catch (err) { log("rule test error " + err.message, "err"); }
+});
+
 /* ---------- session indicator toggling ---------- */
 (async () => {
   try {
