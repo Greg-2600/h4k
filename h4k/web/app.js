@@ -44,6 +44,14 @@ form.addEventListener("submit", async (e) => {
   const useCve = $("cve-toggle").checked;
   const tryCreds = $("creds-toggle").checked;
   const doAttack = $("attack-toggle").checked;
+  if ((tryCreds || doAttack) && !window.confirm(
+    "You are about to run an ACTIVE action against " + target +
+    " (default-cred test / exploit attempt).\n\n" +
+    "Only proceed if you own this system or have WRITTEN permission to test it.\n\nProceed?"
+  )) {
+    log("scan cancelled — active action not confirmed", "err");
+    return;
+  }
   $("target").value = "";
   scanBtn.disabled = true;
   $("stop-btn").disabled = false;
@@ -327,6 +335,11 @@ let deepTimer = null;
 $("deep-attack-btn").addEventListener("click", async () => {
   const target = $("target").value.trim();
   if (!target) { log("[!] enter a target first for deep attack", "err"); return; }
+  if (!window.confirm(
+    "DEEP TOOLKIT attack on " + target + "\n" +
+    "Runs brute-force (hydra), web vuln (nikto/sqlmap), smb & dns tools.\n\n" +
+    "Only proceed if you own this system or have WRITTEN permission to test it.\n\nProceed?"
+  )) { log("deep toolkit attack cancelled — not confirmed", "err"); return; }
   const services = [];
   if ($("deep-ssh").checked) services.push("ssh");
   if ($("deep-http").checked) services.push("http");

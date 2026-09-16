@@ -46,8 +46,10 @@ authorized lab target:
   *What is broken?     (scan + local CVE cross-ref)
   *Where do I hit next?(prioritized recommendations)
 
-**This build stops short of auto-exploitation.** It advises; it does not fire
-the shells. You pull the trigger, on your own lab range, on your own terms.
+Every aggressive action — default-credential testing, Metasploit exploitation,
+and the deep toolkit (brute force, web vuln, SQLi) sweep — is **opt-in and off
+by default**. A plain scan only reconnoiters, fingerprints, and advises. You
+flip the switches, on your own lab range, on your own terms.
 
 ```
 +----------------------------------------------------------------------+
@@ -95,7 +97,7 @@ The same suite, three acoustic signatures:
 |-----------|--------------------------------------------------------|
 | `stealth` | `-sT -T2 --top-ports 100`, no OS detect, low retries.   |
 | `tor`     | `Proxies socks5:127.0.0.1:9050` + wrapped in proxychains.|
-| `overt`   | `-sT/-sS -T4 -sV -O --top-ports 1000`. Fast and loud.    |
+| `overt`   | `-sS -T4 -sV -O --top-ports 500 --min-rate 1000`. Fast. |
 
 Metasploit's native `Proxies` datastore option routes module outbound traffic
 through Tor's SOCKS listener — no wrapper re-jiggering needed for the modules.
@@ -112,10 +114,12 @@ target  ─► normalize (ip / cidr / hostname)
    ├─ [port scan]      db_nmap → hosts/services into the MSF database    (-sV -O)
    ├─ [fingerprint]    nmap banners + whatweb → make/model/os/technology
    ├─ [traceroute]     path/authority mapping when present
-   ├─ [aux scanners]  scanner/<svc>_version · smb_enumshares · ...       (jobs awaited)
+   ├─ [aux scanners]  scanner/<svc>_version · smb_enumshares · netbios · ldap ·
+   │                  msrpc/dcerpc · smb_enum_users · smb_login         (jobs awaited)
    ├─ [collect]        services + vulns from the DB, scoped to target
    ├─ [posture]        traceroute + exposure → security level/score/confidence
    ├─ [opt-in creds]   default/known creds vs matched services (verify/session)
+   ├─ [opt-in attack]  Metasploit exploit modules vs fingerprinted services
    └─ [advise]         local CVE archive match  →  ranked recommendations
 ```
 
@@ -196,8 +200,10 @@ GET   /api/report/{id}               the full report
 POST  /api/scan/{id}/abort           stop an in-progress scan
 GET   /api/export/{id}?fmt=json|md    download report as json or markdown
 GET   /api/neighbors?cidr=...         ARP neighbor sweep (arp-scan / msf / cache)
-POST  /api/attack                    opt-in exploit run against a target
+POST  /api/attack                    opt-in Metasploit exploit run
 GET   /api/attack/{job_id}           poll attack results
+POST  /api/deepattack                opt-in toolkit sweep (hydra/nikto/sqlmap/...)
+GET   /api/deepattack/{id}           poll toolkit results
 GET   /api/health                    msfrpcd reachability + job + cache counts
 ```
 
@@ -218,7 +224,8 @@ Buttons in the operation pane: **stop** (abort in-progress scan), **export .json
 export .md** (download the report), **find neighbors (arp)** (sweep the local
 segment and list IP/MAC/vendor), plus toggles for **default credentials** and
 **active exploit attempts** — both opt-in, off by default, authorized scope
-only.
+only. A separate **deep toolkit attack** button (with per-service checkboxes for
+ssh/http/smb/dns) drives the non-Metasploit sweep.
 
 ---
 
@@ -232,7 +239,7 @@ make setup      build a .venv with the dev toolchain
 make fmt        black + isort in place
 make fix        ruff --fix
 make lint       black · ruff · isort · flake8 · mypy · pylint · bandit
-make test       pytest (47 tests)
+make test       pytest (85 tests)
 make coverage   pytest --cov  (70% gate)
 ```
 
@@ -241,8 +248,8 @@ Current status: **all green.**
 - **ruff** — `E F W I B UP C4 SIM RUF ASYNC`, clean.
 - **flake8** — clean (with `E402` scoped to `main.py` for the sys.path trick).
 - **black / isort** — both `--check` clean at line-length 88.
-- **mypy** — `Success: no issues found in 12 source files` (strict untyped-defs).
-- **pylint** — rated **9.90/10**.
+- **mypy** — `Success: no issues found in 17 source files` (strict untyped-defs).
+- **pylint** — rated **9.91/10**.
 - **bandit** — no issues; deliberate subprocess/urlopen calls are audited and
   `# nosec`-annotated with rationale.
 - **safety** — flags 5 advisories: 3 are toolchain-transitives (`setuptools`,
@@ -250,11 +257,11 @@ Current status: **all green.**
   (**CVE-2026-5463**, command injection). It is pinned in the lock/requirements
   and the RPC calls it exposes are only fed internally-constructed arguments.
 
-The tests live in `tests/` (78 passing) and cover the schemas, the OPSEC mode
-matrix, the CVE matcher (including the CherryPy not-included guard) and the
-default-credential archive, recommendation scoring/ranking, the pipeline's pure
-helpers, and the HTTP API via a mocked Metasploit backend — no live daemon
-needed to run them.
+The tests live in `tests/` (85 passing) and cover the schemas, the OPSEC mode
+matrix, the CVE matcher (including the CherryPy not-included guard), the
+default-credential archive and attempt flow, recommendation scoring/ranking,
+the pipeline's pure helpers, the attack/toolkit plan, and the HTTP API via a
+mocked Metasploit backend — no live daemon needed to run them.
 
 ---
 
@@ -273,7 +280,8 @@ api/
   services/
     msfrpc.py       thin pymetasploit3 wrapper
     scan_pipeline.py orchestrator: recon → fingerprint → scan → creds → attack
-    attack.py       opt-in exploit execution + module mapping
+    attack.py       opt-in Metasploit exploit execution + module mapping
+    toolkit.py      opt-in non-Metasploit tool sweep (hydra/nikto/sqlmap/...)
     discovery.py    ARP neighbor discovery (arp-scan / arp cache / msf)
     security.py     traceroute + exposure → security posture heuristic
     modes.py        stealth / tor / overt config
@@ -282,9 +290,11 @@ api/
     creds.py        default-credential archive matching
 data/cves.json      curated CVE archive
 data/creds.json     default-credential archive (opt-in use)
+data/users.txt      deep-toolkit username list
+data/passwords.txt  deep-toolkit password list
 web/                term-style UI (html/css/js) + phrack ezine README view
 scripts/            DNS recon bash tools (from the author's toolbox)
-tests/              78 unit + API tests
+tests/              85 unit + API tests
 ```
 
 ---
@@ -301,5 +311,48 @@ tests/              78 unit + API tests
 - This is a **learning weapon**. Learn the trade, not just the keystrokes: read
   the module names it suggests, understand each CVE's root cause, and defend
   against these same patterns on your own systems.
+
+---
+
+## 8 · For the class — quick start & ethics
+
+This is a **school capstone demonstration**, not a real-world weapon. It runs
+against your own lab (VMs, a test router, metasploitable boxes). Presenting it
+well is about the *process*: enumeration, fingerprinting, CVE cross-reference,
+and responsible reporting.
+
+### A safe demo walkthrough (10 minutes)
+
+1. Launch the container, open `http://localhost:3137`.
+2. In the operation pane enter a **lab target you control** (e.g. a Raspberry Pi
+   with SSH, a Linux VM, or a Metasploitable instance you provisioned).
+   Keep the mode on **overt**.
+3. Click **find neighbors (arp)** — show it maps your local segment to vendor
+   (Raspberry Pi, VMware, Netgear, ...).
+4. Click **run scan** (leave the two toggles off). Walk the report tabs:
+   hosts → fingerprint → vulns (CVE cross-refs) → security posture → recs.
+5. To demo credential testing, tick **try default credentials** and re-run a
+   scan — it will enumerate default/known pairs on your lab box.
+6. Export to `.md` / `.json` to show the clean written report.
+
+### Ethics you should say out loud in the demo
+
+- **You can only run this against systems you own or have written permission to
+  test.** A proxy or Tor chain never makes a scan legal.
+- **Nothing here is "hacking for the sake of it."** The point is assessment:
+  find the exposure, understand the CVE, and write a defensible recommendation.
+- **The aggressive knobs (creds / attacks / deep toolkit) are off by default**
+  and are disabled in the UI until you explicitly switch them on — that is a
+  feature, not a limitation.
+
+### Suggested lab targets (all free, all authorized)
+
+- **Metasploitable 2/3** — intentionally vulnerable Linux VM (ssh, samba, http,
+  mysql...). The single best demo target.
+- **A Raspberry Pi you own** with SSH enabled — shows fingerprinting + the
+  `pi/raspberry` default-cred path.
+- **An old home router** (Linksys, Netgear, TP-Link...) you no longer use —
+  excellent for the make/model fingerprint + vendor cred entries.
+- **A throwaway Linux VM** you provision yourself.
 
 **h4k**, out.

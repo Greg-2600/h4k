@@ -1,6 +1,7 @@
 # Builds the human-facing vulnerability report and prioritized attack
-# recommendations from raw Metasploit findings. Stops at "what to attack" —
-# it never launches exploitation.
+# recommendations from raw Metasploit findings. Purely declarative: it formats
+# findings, credentials, attacks (if any ran), and posture — it never itself
+# launches anything (exploitation is opt-in upstream in the pipeline).
 import logging
 from datetime import UTC, datetime
 
