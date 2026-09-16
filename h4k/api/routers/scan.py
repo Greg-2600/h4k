@@ -23,6 +23,14 @@ def _get_msf() -> MsfClient:
     return msf_client
 
 
+def _get_cve_db():
+    try:
+        from app_state import cve_db
+        return cve_db
+    except Exception:
+        return None
+
+
 def _run_scan(job: dict, req: ScanRequest):
     msf = _get_msf()
     pipeline = ScanPipeline(
@@ -37,6 +45,7 @@ def _run_scan(job: dict, req: ScanRequest):
             hosts=raw.get("hosts", []),
             vulns=raw.get("vulns", []),
             notes=raw.get("notes", []),
+            cve_db=_get_cve_db(),
         )
         _update(job, status="done", progress=100.0, report=report,
                 message="scan complete")

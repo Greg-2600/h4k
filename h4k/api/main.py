@@ -24,6 +24,12 @@ async def lifespan(app: FastAPI):
     import app_state
     from services.msfrpc import MsfClient
     app_state.msf_client = MsfClient(host, port, password)
+    # Load the local CVE database.
+    from services.cve_lookup import CveDb
+    app_state.cve_db = CveDb()
+    # Optional refresh if network is available (keeps bundled snapshot otherwise).
+    if os.environ.get("H4K_REFRESH_CVE", "1") == "1":
+        app_state.cve_db.refresh()
     yield
 
 

@@ -3,9 +3,10 @@
 # it never launches exploitation.
 import logging
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from schemas import Host, Recommendation, Report, Service, Vuln
+from services.cve_lookup import CveDb
 
 logger = logging.getLogger("h4k.report")
 
@@ -27,34 +28,18 @@ SEVERITY_HINTS = [
      "Exposes version banner useful for further exploitation."),
 ]
 
-DIFFICULTY = {
-    10: "trivial",
-    8: "easy",
-    6: "moderate",
-    4: "hard",
-    2: "hard",
-}
-
-
-def score_vuln(vuln: Vuln, svc: str | None = None) -> int:
-    name = (vuln.name or "").lower()
-    info = (vuln.info or "").lower()
-    svc = (svc or "").lower()
-    joined = f"{name} {info}"
-    best = 0
-    for keyword, score, _title, _why in SEVERITY_HINTS:
-        if keyword in joined or keyword in svc:
-            best = max(best, score)
-    return best
-
-
 def build_report(target: str, mode: str, hosts: List[dict],
-                 vulns: List[dict], notes: List[str]) -> Report:
+                 vulns: List[dict], notes: List[str],
+                 cve_db: Optional[CveDb] = None) -> Report:
     host_models = [_host_from_dict(h) for h in hosts]
     vuln_models = [_vuln_from_dict(v) for v in vulns]
 
-    # Match each vuln to a service on a host for contextual recommendations.
-    recommendations = _recommendations(host_models, vuln_models)
+    # Match each vuln and each host's services against the local CVE database.
+    enriched = (cve_db or CveDb()).enrich(host_models, vuln_models)
+
+    recommendations = _recommendations(
+        host_models, vuln_models, enriched
+    )
 
     return Report(
         target=target,
@@ -63,7 +48,7 @@ def build_report(target: str, mode: str, hosts: List[dict],
         hosts=host_models,
         vulns=vuln_models,
         recommendations=recommendations,
-        notes=notes,
+        notes=notes + _cve_notes(enriched),
     )
 
 
@@ -100,22 +85,48 @@ def _vuln_from_dict(v: dict) -> Vuln:
     )
 
 
-def _recommendations(hosts: List[Host], vulns: List[Vuln]) -> List[Recommendation]:
+def _recommendations(hosts: List[Host], vulns: List[Vuln],
+                     enriched: dict) -> List[Recommendation]:
     recs: List[Recommendation] = []
-    scored: List[tuple[int, str, str, List[str], int, Host, Vuln]] = []
+    scored: List[tuple[int, str, str, List[str], int, Host, str | None]] = []
 
+    seen_cve = set()
+    for host in hosts:
+        svc_map = enriched.get("services", {}).get(host.address, {})
+        for key, cves in svc_map.items():
+            for cve in cves:
+                cid = cve.get("id", "")
+                if cid in seen_cve:
+                    continue
+                seen_cve.add(cid)
+                port = None
+                if ":" in key:
+                    try:
+                        port = int(key.rsplit(":", 1)[1])
+                    except ValueError:
+                        port = None
+                refs = [cve.get("id", "")]
+                scored.append((
+                    float(cve.get("cvss", 0.0)) * 10,
+                    cve.get("title", cid),
+                    cve.get("description", ""),
+                    refs,
+                    port or 0,
+                    host,
+                    cve.get("msf_module"),
+                ))
     for vuln in vulns:
         host = _host_by_port(hosts, vuln.port) or (hosts[0] if hosts else None)
         if host is None:
             continue
-        port_desc = f" (port {vuln.port})" if vuln.port else ""
         title, why, score = _describe(vuln)
-        scored.append((score, title, why, vuln.refs, vuln.port or 0, host, vuln))
+        scored.append((score, title, why, list(vuln.refs),
+                       vuln.port or 0, host, _module_for_vuln(title)))
 
     scored.sort(key=lambda x: (-x[0], x[1]))
     rank = 1
     taken = set()
-    for score, title, why, refs, port, host, vuln in scored[:10]:
+    for score, title, why, refs, port, host, module in scored[:15]:
         key = (title, port)
         if key in taken:
             continue
@@ -123,13 +134,49 @@ def _recommendations(hosts: List[Host], vulns: List[Vuln]) -> List[Recommendatio
         recs.append(Recommendation(
             rank=rank,
             title=title,
-            module=_module_for_vuln(title),
+            module=module,
             why=f"{host.address}: {why}",
-            difficulty=DIFFICULTY.get(score, "hard"),
-            refs=refs,
+            difficulty=_difficulty(score),
+            refs=list(dict.fromkeys(refs)),
         ))
         rank += 1
     return recs
+
+
+def _difficulty(score: float) -> str:
+    s = int(score)
+    if s > 10:  # it was cvss*10
+        cvss = s / 10.0
+        if cvss >= 9.0:
+            return "easy"
+        if cvss >= 7.0:
+            return "trivial"
+        if cvss >= 4.0:
+            return "moderate"
+        return "hard"
+    # vuln hint scale (0..10)
+    if s >= 9:
+        return "easy"
+    if s >= 7:
+        return "trivial"
+    if s >= 5:
+        return "moderate"
+    return "hard"
+
+
+def _cve_notes(enriched: dict) -> List[str]:
+    notes = []
+    for addr, svc_map in enriched.get("services", {}).items():
+        for key, cves in svc_map.items():
+            names = ", ".join(
+                f"{c.get('id')}({c.get('cvss','?')})"
+                for c in cves[:6]
+            )
+            notes.append(f"[CVE] {addr} {key}: {names}")
+    for idx, cves in enriched.get("vulns", {}).items():
+        names = ", ".join(c.get("id", "") for c in cves)
+        notes.append(f"[CVE] finding#{idx} refs matched: {names}")
+    return notes
 
 
 def _host_by_port(hosts: List[Host], port: int | None) -> Host | None:

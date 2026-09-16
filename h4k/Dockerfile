@@ -39,6 +39,7 @@ WORKDIR /opt/h4k
 COPY api /opt/h4k/api
 COPY web /opt/h4k/web
 COPY scripts /opt/h4k/scripts
+COPY data /opt/h4k/data
 
 # Proxychains config -> tor SOCKS (mirror of Greg-2600/proxy_scan)
 RUN printf 'strict_chain\nproxy_dns\ntcp_read_time_out 15000\ntcp_connect_time_out 8000\n[ProxyList]\nsocks5 127.0.0.1 9050\n' > /etc/proxychains.conf
