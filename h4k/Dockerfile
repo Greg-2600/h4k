@@ -6,7 +6,12 @@ ENV MSF_HOST=127.0.0.1 \
     MSF_PORT=55553 \
     MSF_PASSWORD=h4k_msf_rocks \
     TOR_PORT=9050 \
-    API_PORT=3137
+    API_PORT=3137 \
+    # Local LLM (root-cause/patch assist). Point OLLAMA_BASE_URL at a host
+    # Ollama, or a sidecar container later (e.g. http://ollama:11434).
+    H4K_AI_PROVIDER=ollama \
+    OLLAMA_BASE_URL=http://127.0.0.1:11434 \
+    H4K_AI_MODEL=qwen2.5:latest
 
 LABEL org.opencontainers.image.title="h4k" \
       org.opencontainers.image.description="Metasploit Framework automation tool (web UI -> API -> MSFRPC)" \
