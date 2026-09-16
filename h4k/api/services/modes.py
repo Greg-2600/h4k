@@ -115,8 +115,23 @@ MODES = {
     "overt": ScanModeConfig(
         name="overt",
         proxies=None,
-        # Fast, full: OS detection + service versions.
-        nmap_args=["-Pn", "-sS", "-T4", "-sV", "-O", "--top-ports", "1000"],
+        # Fast, full: OS detection + service versions. Speeds: top-500 ports,
+        # a floor on send rate, retries off, short host timeout, few parallel.
+        nmap_args=[
+            "-Pn",
+            "-sS",
+            "-T4",
+            "-sV",
+            "-O",
+            "--top-ports",
+            "500",
+            "--min-rate",
+            "1000",
+            "--max-retries",
+            "0",
+            "--host-timeout",
+            "120s",
+        ],
     ),
 }
 

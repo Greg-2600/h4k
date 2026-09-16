@@ -21,6 +21,17 @@ class ScanRequest(BaseModel):
     # a successful login opens an interactive session (default: verify only).
     try_default_creds: bool = False
     open_sessions: bool = False
+    # OPT-IN: after scanning, attempt active exploitation (metasploit exploits)
+    # against discovered services. Defaults off.
+    do_attack: bool = False
+
+
+class AttackRequest(BaseModel):
+    target: str
+    mode: ScanMode = ScanMode.overt
+    host: str | None = None  # specific host to attack, else all
+    services: list[str] = []  # services to attack (ssh/http/smb/...)
+    open_sessions: bool = False
 
 
 class Service(BaseModel):
@@ -76,6 +87,17 @@ class Fingerprint(BaseModel):
     source: list[str] = []
 
 
+class Attack(BaseModel):
+    host: str
+    service: str
+    port: int | None = None
+    module: str
+    result: str  # success | failed | skipped | error
+    detail: str = ""
+    session_id: int | None = None
+    credential: str | None = None
+
+
 class Report(BaseModel):
     target: str
     mode: ScanMode
@@ -87,12 +109,36 @@ class Report(BaseModel):
     raw: dict[str, Any] | None = None
     fingerprints: list[Fingerprint] = []
     credentials: list[Credential] = []
+    attacks: list[Attack] = []
+    log: list[str] = []
 
 
 class Job(BaseModel):
     id: str
-    status: str  # queued | running | done | error
+    status: str  # queued | running | done | error | aborted
     progress: float = 0.0
     message: str = ""
     report: Report | None = None
     error: str | None = None
+    cached: bool = False
+
+
+class Neighbor(BaseModel):
+    ip: str
+    mac: str | None = None
+    vendor: str | None = None
+    hostname: str | None = None
+
+
+class ScanSummary(BaseModel):
+    target: str
+    mode: ScanMode
+    status: str
+    created_at: str
+    cached: bool = False
+
+
+class ExportResult(BaseModel):
+    job_id: str
+    formats: list[str] = []
+    filenames: dict[str, str] = {}

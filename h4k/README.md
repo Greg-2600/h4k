@@ -186,11 +186,22 @@ serving the UI on **0.0.0.0:3137**.
 ### The REST surface
 
 ```
-POST  /api/scan                    {target, mode, do_dns_recon, do_vuln_scan}
-GET   /api/jobs/{id}               status · progress · message · report
-GET   /api/report/{id}             the full report
-GET   /api/health                  msfrpcd reachability + job count
+POST  /api/scan                      {target, mode, do_dns_recon, do_vuln_scan,
+                                      try_default_creds, open_sessions, do_attack}
+GET   /api/jobs/{id}                 status · progress · message · log · report
+GET   /api/report/{id}               the full report
+POST  /api/scan/{id}/abort           stop an in-progress scan
+GET   /api/export/{id}?fmt=json|md    download report as json or markdown
+GET   /api/neighbors?cidr=...         ARP neighbor sweep (arp-scan / msf / cache)
+POST  /api/attack                    opt-in exploit run against a target
+GET   /api/attack/{job_id}           poll attack results
+GET   /api/health                    msfrpcd reachability + job + cache counts
 ```
+
+Scans are **cached for 5 minutes** per `target+mode`: re-scanning the same box
+soon after returns the stored report instead of re-probing. Long scans can be
+**aborted** mid-flight via the stop button; the job reports `aborted` with the
+log kept.
 
 ### Drive it from the terminal UI
 
@@ -199,6 +210,12 @@ h4k ➜ ~ scan 192.168.1.248 overt
 h4k ➜ ~ status
 h4k ➜ ~ clear
 ```
+
+Buttons in the operation pane: **stop** (abort in-progress scan), **export .json /
+export .md** (download the report), **find neighbors (arp)** (sweep the local
+segment and list IP/MAC/vendor), plus toggles for **default credentials** and
+**active exploit attempts** — both opt-in, off by default, authorized scope
+only.
 
 ---
 
@@ -252,7 +269,9 @@ api/
   routers/scan.py   REST endpoints + job runner
   services/
     msfrpc.py       thin pymetasploit3 wrapper
-    scan_pipeline.py orchestrator: recon → fingerprint → scan → creds → analyze
+    scan_pipeline.py orchestrator: recon → fingerprint → scan → creds → attack
+    attack.py       opt-in exploit execution + module mapping
+    discovery.py    ARP neighbor discovery (arp-scan / arp cache / msf)
     modes.py        stealth / tor / overt config
     report.py       scoring + recommendations
     cve_lookup.py   offline archive + matching + refresh
@@ -261,15 +280,18 @@ data/cves.json      curated CVE archive
 data/creds.json     default-credential archive (opt-in use)
 web/                term-style UI (html/css/js) + phrack ezine README view
 scripts/            DNS recon bash tools (from the author's toolbox)
-tests/              64 unit + API tests
+tests/              71 unit + API tests
 ```
 
 ---
 
 ## 7 · The fine print
 
-- **No auto-exploitation.** The suite reports and recommends; you decide whether
-  a lab target is in scope and whether to pursue a vector.
+- **Exploitation is opt-in and off by default.** The suite never auto-attacks on
+  a normal scan. Only when **active exploit attempts** is toggled (or `/api/attack`
+  is called) does it run Metasploit exploit modules, and only against services it
+  fingerprinted on targets you authorize. Credential login attempts are likewise
+  opt-in.
 - **OPSEC is a tool, not a license.** Stealth and Tor keep your *own* footprint
   quiet in a sanctioned lab; they do not make an unauthorized scan permissible.
 - This is a **learning weapon**. Learn the trade, not just the keystrokes: read

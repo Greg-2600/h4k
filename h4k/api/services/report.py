@@ -4,7 +4,16 @@
 import logging
 from datetime import UTC, datetime
 
-from schemas import Credential, Fingerprint, Host, Recommendation, Report, Service, Vuln
+from schemas import (
+    Attack,
+    Credential,
+    Fingerprint,
+    Host,
+    Recommendation,
+    Report,
+    Service,
+    Vuln,
+)
 from services.cve_lookup import CveDb
 
 logger = logging.getLogger("h4k.report")
@@ -65,6 +74,8 @@ def build_report(
     cve_db: CveDb | None = None,
     fingerprints: list[dict] | None = None,
     credentials: list[dict] | None = None,
+    attacks: list[dict] | None = None,
+    log: list[str] | None = None,
 ) -> Report:
     host_models = [_host_from_dict(h) for h in hosts]
     vuln_models = [_vuln_from_dict(v) for v in vulns]
@@ -76,12 +87,17 @@ def build_report(
 
     fp_models = [_fingerprint_from_dict(f or {}) for f in fingerprints or []]
     cred_models = [_credential_from_dict(c or {}) for c in credentials or []]
+    attack_models = [_attack_from_dict(a or {}) for a in attacks or []]
 
     notes_out = notes + _cve_notes(enriched)
     if cred_models:
         notes_out.append(
             f"[creds] {len(cred_models)} default/known credential(s) verified "
             f"(opt-in). Review before use."
+        )
+    if attack_models:
+        notes_out.append(
+            f"[attacks] {len(attack_models)} exploit attempt(s) run (opt-in)."
         )
 
     return Report(
@@ -94,6 +110,21 @@ def build_report(
         notes=notes_out,
         fingerprints=fp_models,
         credentials=cred_models,
+        attacks=attack_models,
+        log=log or [],
+    )
+
+
+def _attack_from_dict(a: dict) -> Attack:
+    return Attack(
+        host=a.get("host", ""),
+        service=a.get("service", ""),
+        port=a.get("port"),
+        module=a.get("module", ""),
+        result=a.get("result", "failed"),
+        detail=a.get("detail", "") or "",
+        session_id=a.get("session_id"),
+        credential=a.get("credential"),
     )
 
 

@@ -147,6 +147,14 @@ button {
 button:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* button rows within the operation pane */
+.btn-row { display: flex; gap: 8px; margin-top: 10px; }
+.btn-row button { flex: 1; }
+.btn-stop { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.btn-sub { border-color: var(--line-hi); color: var(--fg-dim); background: color-mix(in srgb, var(--line-hi) 15%, transparent); font-size: 12px; }
+.err { color: var(--danger); }
+.ok { color: var(--green); }
+
 /* ---------- progress ---------- */
 .pct { font-size: 24px; color: var(--green); margin-bottom: 4px; }
 .bar { height: 8px; background: #0f0f12; border-radius: 4px; overflow: hidden; }
@@ -164,6 +172,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 .tab:hover { background: transparent; color: var(--fg); }
 .tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
 table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }

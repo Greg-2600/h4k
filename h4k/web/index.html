@@ -68,10 +68,26 @@
 
           <label class="field inline">
             <input type="checkbox" id="creds-toggle" />
-            <span>try default credentials <em class="danger">(opt-in, authorized scope)</em></span>
+            <span>try default credentials <em class="danger">(opt-in)</em></span>
           </label>
 
-          <button type="submit" id="scan-btn">run scan</button>
+          <label class="field inline">
+            <input type="checkbox" id="attack-toggle" />
+            <span>active exploit attempts <em class="danger">(opt-in)</em></span>
+          </label>
+
+          <div class="btn-row">
+            <button type="submit" id="scan-btn">run scan</button>
+            <button type="button" id="stop-btn" class="btn-stop" disabled>stop</button>
+          </div>
+          <div class="btn-row">
+            <button type="button" id="export-json" class="btn-sub">export .json</button>
+            <button type="button" id="export-md" class="btn-sub">export .md</button>
+          </div>
+
+          <div class="btn-row">
+            <button type="button" id="neighbors-btn" class="btn-sub">find neighbors (arp)</button>
+          </div>
         </form>
       </section>
 
@@ -95,6 +111,7 @@
         <button class="tab" data-tab="fp">fingerprint</button>
         <button class="tab" data-tab="vulns">vulns</button>
         <button class="tab" data-tab="creds">creds</button>
+        <button class="tab" data-tab="attacks">attacks</button>
         <button class="tab" data-tab="recs">recommended attack</button>
         <button class="tab" data-tab="notes">raw notes</button>
       </nav>
@@ -102,8 +119,15 @@
       <div id="tab-fp" class="tab-panel"></div>
       <div id="tab-vulns" class="tab-panel"></div>
       <div id="tab-creds" class="tab-panel"></div>
+      <div id="tab-attacks" class="tab-panel"></div>
       <div id="tab-recs" class="tab-panel"></div>
       <div id="tab-notes" class="tab-panel"></div>
+    </section>
+
+    <!-- neighbor discovery results -->
+    <section class="pane results" id="neighbors-panel" hidden>
+      <div class="pane-head"><span class="pane-title">/neighbors</span></div>
+      <div id="tab-neighbors">click "find neighbors" to sweep the local net</div>
     </section>
 
   </div>

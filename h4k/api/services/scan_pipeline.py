@@ -14,6 +14,11 @@ from services.msfrpc import MsfClient
 
 logger = logging.getLogger("h4k.pipeline")
 
+
+class _ScanAbort(Exception):
+    """Raised when a scan is requested to stop mid-run."""
+
+
 # Token hints used to fingerprint make/model/os/technology from banners.
 VENDOR_HINTS: list[tuple[str, str]] = [
     # (vendor keyword, vendor name)
@@ -92,15 +97,28 @@ class ScanPipeline:
         self,
         msf: MsfClient,
         progress: Callable[[str, float], None] | None = None,
+        log: Callable[[str], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ):
         self.msf = msf
         self.progress = progress or (lambda msg, pct: None)
+        self._log = log or (lambda msg: None)
+        self._should_stop = should_stop or (lambda: False)
 
     # ---- helpers -----------------------------------------------------------
 
     def _tick(self, message: str, pct: float) -> None:
         logger.info("%s (%.0f%%)", message, pct)
+        self._log(message)
         self.progress(message, pct)
+
+    def _check_abort(self) -> bool:
+        """Return True and log if the run has been requested to stop."""
+        if self._should_stop():
+            logger.info("abort requested mid-scan")
+            self._log("abort requested — stopping scan")
+            return True
+        return False
 
     @staticmethod
     def normalize_target(target: str) -> str:
@@ -128,12 +146,16 @@ class ScanPipeline:
         # 1. Optional DNS recon enrichment (your GitHub bash tools).
         dns_notes: list[str] = []
         if req.do_dns_recon and _looks_like_domain(req.target):
+            self._raises_if_aborted()
             dns_notes = self._dns_recon(req.target)
             self._tick("DNS recon complete", 15)
+
+        self._raises_if_aborted()
 
         # 2. Port scan into the DB.
         self._tick("starting port scan (db_nmap)", 20)
         self._db_nmap(target, mode.nmap_args)
+        self._raises_if_aborted()
 
         # 3. Pull hosts + services from DB.
         hosts = self._collect_hosts_and_services(target)
@@ -141,14 +163,17 @@ class ScanPipeline:
         # 4. Fingerprint make/model/os/technology from banners + whatweb.
         self._tick("fingerprinting hosts", 35)
         fingerprints = self._fingerprint(hosts, mode)
+        self._raises_if_aborted()
 
         # 5. Run auxiliary scanners per detected service.
         self._tick("running auxiliary vuln/enum scanners", 45)
         self._run_aux_scanners(hosts, mode)
+        self._raises_if_aborted()
 
         # 6. Collect vulnerabilities.
         vulns = self._collect_vulns(target)
         self._tick("collecting vulnerability findings", 80)
+        self._raises_if_aborted()
 
         # 7. OPT-IN: try default/known credentials against matched services.
         credentials: list[dict] = []
@@ -157,9 +182,16 @@ class ScanPipeline:
             credentials = self._try_default_creds(
                 hosts, fingerprints, req.open_sessions
             )
+            self._raises_if_aborted()
 
-        # 8. Metasploit's own "analyze" suggestions.
-        self._tick("running module analysis recommendations", 94)
+        # 8. OPT-IN: attempt active exploitation.
+        attacks: list[dict] = []
+        if req.do_attack:
+            self._tick("attempting active exploitation (opt-in)", 92)
+            attacks = self._do_attacks(hosts, req.open_sessions)
+
+        # 9. Metasploit's own "analyze" suggestions.
+        self._tick("running module analysis recommendations", 96)
         notes = dns_notes + self._analyze(target)
 
         report = {
@@ -170,9 +202,44 @@ class ScanPipeline:
             "notes": list(set(notes)),
             "fingerprints": fingerprints,
             "credentials": credentials,
+            "attacks": attacks,
         }
         self._tick("scan complete", 100)
         return report
+
+    def _raises_if_aborted(self) -> None:
+        if self._should_stop():
+            self._log("abort requested — stopping scan")
+            raise _ScanAbort()
+
+    def _do_attacks(self, hosts: list[dict], open_sessions: bool) -> list[dict]:
+        """Opt-in exploitation: run exploit modules against discovered services."""
+        from services.attack import AttackService
+
+        svc = AttackService(self.msf, progress=self._tick)
+        # Build an AttackRequest-style list of services per host.
+        attacks: list[dict] = []
+        for host in hosts:
+            addr = host["address"]
+            for s in host["services"]:
+                sname = s.get("service") or ""
+                module = AttackService._module_for_service(sname)
+                if not module:
+                    continue
+                self._log(f"[attack] {addr} {sname} -> {module}")
+                res = svc._try_exploit(module, addr, sname, open_sessions)
+                attacks.append(
+                    {
+                        "host": addr,
+                        "service": sname,
+                        "port": s.get("port"),
+                        "module": module,
+                        "result": "success" if res["ok"] else "failed",
+                        "detail": res["detail"],
+                        "session_id": res.get("session_id"),
+                    }
+                )
+        return attacks
 
     # ---- steps -------------------------------------------------------------
 
@@ -256,6 +323,7 @@ class ScanPipeline:
                     if mode.proxies:
                         opts["Proxies"] = mode.proxies
                     try:
+                        self._log(f"[scan] {module} {addr}")
                         res = self.msf.execute("auxiliary", module, opts)
                         if isinstance(res, dict) and res.get("job_id") is not None:
                             launched.append(
@@ -469,14 +537,20 @@ class ScanPipeline:
             "CreateSession": open_sessions,
             "StopOnSuccess": True,
         }
+        self._log(
+            f"[creds] try {user}:{password} on {addr}:{svc.get('port')} ({module})"
+        )
         try:
             res = self.msf.execute("auxiliary", module, opts)
-            # A verified login typically returns a session (if opened) or the
-            # module reports success in its output. We treat a non-error job
-            # result as a verified credential for reporting.
-            return bool(res)
+            ok = bool(res)
+            self._log(
+                f"[creds] {'VERIFIED' if ok else 'no match'} "
+                f"{user}:{password} on {addr}"
+            )
+            return ok
         except Exception as exc:
             logger.debug("cred %s:%s on %s failed: %s", user, password, addr, exc)
+            self._log(f"[creds] error {user} @ {addr}: {exc}")
             return False
 
     # ---- DNS recon via Greg's bash tools -----------------------------------
