@@ -1,0 +1,6 @@
+# container build artifacts
+h4k/*.build.log
+
+# docker
+docker.env
+*.pid
