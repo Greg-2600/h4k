@@ -1,62 +1,17 @@
 /* ============================================================
-   H4K // INTRUSION-SUITE frontend
+   h4k — terminal UI (zsh/opencode-style)
    ============================================================ */
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 }[c]));
 
-/* ---------- matrix rain backdrop ---------- */
-const canvas = $("bg"), ctx = canvas.getContext("2d");
-let cols, drops, glyphs = "01アイウエオカキクケコサシスセソタチツテト01<>/$#%";
-const resize = () => {
-  canvas.width = innerWidth; canvas.height = innerHeight;
-  cols = Math.floor(innerWidth / 18);
-  drops = Array(cols).fill(0).map(() => Math.random() * innerHeight / 20);
-};
-resize();
-addEventListener("resize", resize);
-function rain() {
-  ctx.fillStyle = "rgba(3, 9, 13, 0.12)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#0f0";
-  ctx.font = "16px monospace";
-  for (let i = 0; i < cols; i++) {
-    const ch = glyphs[(Math.random() * glyphs.length) | 0];
-    const y = drops[i] * 18;
-    ctx.fillText(ch, i * 18, y);
-    if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
-    drops[i]++;
-  }
+/* ---------- clock / status ---------- */
+function tick() {
+  $("clock").textContent = new Date().toLocaleTimeString("en-GB", { hour12: false });
 }
-setInterval(rain, 50);
-
-/* ---------- boot sequence ---------- */
-const BOOT_LINES = [
-  "[ OK ] INITIALIZING NEURO-STACK .............. DONE",
-  "[ OK ] MOUNTING /dev/msfrpc ................. 55553",
-  "[ OK ] HANDSHAKE WITH MSFROUTER .............. ACCEPTED",
-  "[ OK ] LOADING CVE-ARCHIVE .................. 31 RECORDS",
-  "[ OK ] SPINNING TOR CIRCUITS ..... (if routed) STANDBY",
-  "[ OK ] UPLINK BONDED 0.0.0.0:3137 ............... LIVE",
-  ">_ SYSTEM READY. ROUTE INPUT TO BEGIN."
-];
-const boot = $("boot"), bootText = $("boot-text");
-(async function runBoot() {
-  for (const l of BOOT_LINES) {
-    for (const ch of l) {
-      bootText.textContent += ch;
-      await new Promise(r => setTimeout(r, 12));
-    }
-    bootText.textContent += "\n";
-  }
-  boot.classList.add("done");
-})();
-
-/* ---------- clock ---------- */
-setInterval(() => {
-  $("clock").textContent = new Date().toLocaleTimeString("en-GB");
-}, 1000);
+tick();
+setInterval(tick, 1000);
 
 /* ---------- console ---------- */
 const consoleEl = $("console");
@@ -65,14 +20,20 @@ function log(msg, cls = "") {
   ln.className = "ln " + cls;
   ln.textContent = msg;
   consoleEl.appendChild(ln);
+  // keep a bounded scrollback so the TUI stays tight
+  while (consoleEl.childElementCount > 800) consoleEl.removeChild(consoleEl.firstChild);
   consoleEl.scrollTop = consoleEl.scrollHeight;
 }
-log("h4k :: intrusion-suite v1.0 booted", "sys");
+function boot() {
+  log("h4k terminal · metasploit recon suite", "sys");
+  log("type 'help' for commands · authorized scope only", "sys");
+}
+boot();
 
-/* ---------- form submit -> scan job ---------- */
+/* ---------- scan form ---------- */
 const form = $("scan-form"), scanBtn = $("scan-btn");
-const statusPanel = $("status-panel"), reportPanel = $("report-panel");
-const progressBar = $("progress-bar"), statusMsg = $("status-msg");
+const statusPane = $("status-pane"), results = $("results");
+const prog = $("prog"), pctEl = $("pct"), statusMsg = $("status-msg");
 let pollTimer = null;
 
 form.addEventListener("submit", async (e) => {
@@ -82,166 +43,164 @@ form.addEventListener("submit", async (e) => {
   const useCve = $("cve-toggle").checked;
   $("target").value = "";
   scanBtn.disabled = true;
-  statusPanel.hidden = false;
-  reportPanel.hidden = true;
-  resetProgress();
-  log(`[>] DEPLOY_SIGNAL to ${target} :: protocol=${mode.toUpperCase()}` + (useCve ? " :: CVE-ON" : ""), "info");
+  statusPane.hidden = false;
+  results.hidden = true;
+  prog.style.width = "0%"; pctEl.textContent = "0";
+  $("status-msg").textContent = "queued…";
+  $("status-tag").textContent = "queued";
+  log(`scan ${target} · mode=${mode}` + (useCve ? " · cve-db" : ""), "info");
   try {
     const resp = await fetch("/api/scan", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ target, mode, do_dns_recon: true, do_vuln_scan: true }),
     });
-    if (!resp.ok) throw new Error("uplink rejected (HTTP " + resp.status + ")");
+    if (!resp.ok) throw new Error("http " + resp.status);
     const job = await resp.json();
-    log(`[+] job ${job.id} accepted — tracking`, "ok");
+    log(`[tracking] job ${job.id}`, "ok");
+    $("job-ind").textContent = "job:" + job.id;
     poll(job.id);
   } catch (err) {
-    log("[!] ERROR " + err.message, "err");
+    log("error " + err.message, "err");
     scanBtn.disabled = false;
   }
 });
 
-function resetProgress() {
-  progressBar.style.width = "0%";
-  $("progress-pct").textContent = "0%";
-  $("status-msg").textContent = "uplink in progress…";
-}
-
-function poll(jobId) {
+function poll(id) {
   clearInterval(pollTimer);
-  let lastPct = -1;
+  let last = -1;
   pollTimer = setInterval(async () => {
     try {
-      const resp = await fetch("/api/jobs/" + jobId);
-      if (!resp.ok) { clearInterval(pollTimer); fail("job lookup failed"); return; }
-      const job = await resp.json();
-      const pct = Math.round(job.progress || 0);
-      progressBar.style.width = pct + "%";
-      $("progress-pct").textContent = pct + "%";
-      if (pct !== lastPct) {
-        lastPct = pct;
-        log(`[*] ${job.status.toUpperCase()} :: ${job.message} (${pct}%)`, "info");
-      }
-      if (job.status === "done") {
+      const resp = await fetch("/api/jobs/" + id);
+      if (!resp.ok) throw new Error("http " + resp.status);
+      const j = await resp.json();
+      const pct = Math.round(j.progress || 0);
+      prog.style.width = pct + "%";
+      pctEl.textContent = String(pct);
+      $("status-msg").textContent = j.message || "";
+      $("status-tag").textContent = j.status;
+      if (pct !== last) { last = pct; log(`[${pct}%] ${j.message}`, "info"); }
+      if (j.status === "done") {
         clearInterval(pollTimer);
-        $("status-tag").textContent = "✓";
-        log("[+] SIGINT COMPLETE — decrypting report", "ok");
-        renderReport(job.report);
+        log("scan complete", "ok");
+        $("job-ind").textContent = "idle";
+        render(j.report);
         scanBtn.disabled = false;
-      } else if (job.status === "error") {
+      } else if (j.status === "error") {
         clearInterval(pollTimer);
-        fail(job.error || "unknown fault");
+        log("error: " + (j.error || "unknown"), "err");
+        $("job-ind").textContent = "idle";
+        scanBtn.disabled = false;
       }
     } catch (err) {
-      clearInterval(pollTimer); fail(err.message);
+      clearInterval(pollTimer);
+      $("job-ind").textContent = "idle";
+      scanBtn.disabled = false;
     }
-  }, 1300);
-}
-function fail(msg) {
-  $("status-tag").textContent = "✗";
-  $("status-msg").textContent = "ERROR: " + msg;
-  log("[!] ERROR " + msg, "err");
-  scanBtn.disabled = false;
+  }, 1400);
 }
 
-/* ---------- report rendering ---------- */
-function renderReport(report) {
-  reportPanel.hidden = false;
-  const mode = (report.mode || "overt").toUpperCase();
-  $("report-meta").innerHTML =
-    "TARGET: <code>" + esc(report.target) + "</code> " +
-    '<span class="badge ' + esc(report.mode || "overt") + '">' + esc(mode) + "</span> " +
-    "&nbsp; T+<code>" + esc((report.created_at || "").slice(11, 19)) + "</code>";
-  renderHosts(report.hosts);
-  renderVulns(report.vulns);
-  renderRecs(report.recommendations);
-  renderNotes(report.notes);
+/* ---------- rendering ---------- */
+function render(r) {
+  results.hidden = false;
+  $("report-meta").textContent =
+    `${r.target} · ${r.mode} · ${(r.created_at || "").slice(11, 19)}`;
+  renderHosts(r.hosts);
+  renderVulns(r.vulns, r.mode);
+  renderRecs(r.recommendations);
+  renderNotes(r.notes);
 
-  document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach((x) => x.classList.remove("active"));
-    t.classList.add("active");
-    $("tab-" + t.dataset.tab).classList.add("active");
-  }));
-
-  log("[+] REPORT parsed: " + report.hosts.length + " host(s), "
-    + report.vulns.length + " vuln(s), "
-    + report.recommendations.length + " recommendation(s)", "ok");
+  document.querySelectorAll(".tab").forEach((t) =>
+    t.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach((x) => x.classList.remove("active"));
+      t.classList.add("active");
+      $("tab-" + t.dataset.tab).classList.add("active");
+    }));
+  log(`report: ${r.hosts.length} host(s) · ${r.vulns.length} vuln(s) · ${r.recommendations.length} vector(s)`, "ok");
 }
 
 function renderHosts(hosts) {
   const el = $("tab-hosts");
-  if (!hosts || !hosts.length) { el.innerHTML = "<p class='status-msg danger'>NO HOSTS RESPONDING</p>"; return; }
-  let h = "<table><tr><th>#</th><th>ADDRESS</th><th>OS</th><th>STATE</th><th>OPEN SERVICES</th></tr>";
-  hosts.forEach((hd, i) => {
-    const svcs = (hd.services || []).map((s) => s.port + "/" + (s.service || "?")).join(", ") || "—";
-    h += "<tr><td>" + (i + 1) + "</td><td>" + esc(hd.address) + "</td><td>" + esc(hd.os || "—")
-      + "</td><td>" + esc(hd.state || "—") + "</td><td>" + esc(svcs) + "</td></tr>";
-  });
+  if (!hosts || !hosts.length) { el.innerHTML = "<p class='msg'>no hosts responding</p>"; return; }
+  let h = "<table><tr><th>host</th><th>os</th><th>state</th><th>services</th></tr>";
+  for (const hd of hosts) {
+    const sv = (hd.services || []).map((s) => s.port + "/" + (s.service || "?")).join(", ") || "—";
+    h += `<tr><td>${esc(hd.address)}</td><td>${esc(hd.os || "—")}</td>` +
+         `<td>${esc(hd.state || "—")}</td><td>${esc(sv)}</td></tr>`;
+  }
   el.innerHTML = h + "</table>";
 }
 
-function renderVulns(vulns) {
+function renderVulns(vulns, mode) {
   const el = $("tab-vulns");
-  if (!vulns || !vulns.length) { el.innerHTML = "<p class='status-msg'>NO EXPLOITABLE FINDINGS LOGGED</p>"; return; }
-  let h = "<table><tr><th>SIGNATURE</th><th>PORT</th><th>REFS</th></tr>";
+  if (!vulns || !vulns.length) { el.innerHTML = "<p class='msg'>no logged findings</p>"; return; }
+  let h = "<table><tr><th>finding</th><th>port</th><th>refs</th></tr>";
   for (const v of vulns) {
-    const crit = /(eternal|critical|rce|bluekeep)/i.test(v.name || "");
     const refs = (v.refs || []).map(esc).join(" · ") || "—";
-    h += "<tr><td>" + (crit ? '<span class="badge badge-critical">' : "") + esc(v.name || "unknown")
-      + (crit ? "</span>" : "") + "</td><td>" + esc(v.port ?? "—") + "</td><td>" + refs + "</td></tr>";
+    h += `<tr><td>${esc(v.name || "unknown")}</td><td>${esc(v.port ?? "—")}</td><td>${refs}</td></tr>`;
   }
   el.innerHTML = h + "</table>";
 }
 
 function renderRecs(recs) {
   const el = $("tab-recs");
-  if (!recs || !recs.length) { el.innerHTML = "<p class='status-msg'>NO ATTACK VECTORS PRIORITIZED</p>"; return; }
-  let h = "";
-  for (const r of recs) {
+  if (!recs || !recs.length) { el.innerHTML = "<p class='msg'>no vectors prioritized</p>"; return; }
+  el.innerHTML = recs.map((r) => {
     const cve = (r.refs || []).find((x) => /CVE-\d/.test(x)) || "";
-    h += '<div class="rec-card"><span class="rec-rank">' + r.rank + '</span>' +
-      '<span class="rec-title">' + esc(r.title) + "</span>" +
-      (cve ? ' <code class="cvss">' + esc(cve) + "</code>" : "") +
-      ' <span class="rec-diff">// difficulty: ' + esc(r.difficulty || "hard") + "</span><br/>" +
-      (r.module ? '<span class="rec-modal">◈ ' + esc(r.module) + "</span><br/>" : "") +
-      '<div class="rec-why">' + esc(r.why) + "</div></div>";
-  }
-  el.innerHTML = h;
+    return `<div class="rec-card">
+      <span class="rec-rank">${r.rank}.</span>
+      <span class="rec-title">${esc(r.title)}</span>
+      ${cve ? ` <span class="cvss ${r.difficulty==="easy"?"max":""}">${esc(cve)}</span>` : ""}
+      ${r.difficulty ? ` <span class="rec-diff">// ${esc(r.difficulty)}</span>` : ""}<br/>
+      ${r.module ? `<span class="rec-modal">${esc(r.module)}</span><br/>` : ""}
+      <span class="rec-why">${esc(r.why)}</span>
+    </div>`;
+  }).join("");
 }
 
 function renderNotes(notes) {
   const el = $("tab-notes");
-  if (!notes || !notes.length) { el.innerHTML = "<p class='status-msg'>NO RAW NOTATIONS</p>"; return; }
+  if (!notes || !notes.length) { el.innerHTML = "<p class='msg'>no notes</p>"; return; }
   el.innerHTML = "<pre class='notes'>" + esc(notes.join("\n\n")) + "</pre>";
 }
 
-/* ---------- console command input ---------- */
-const cmdInput = $("console-cmd");
-cmdInput.addEventListener("keydown", async (e) => {
+/* ---------- command input ---------- */
+const cmd = $("cmd");
+cmd.addEventListener("keydown", async (e) => {
   if (e.key !== "Enter") return;
-  const raw = cmdInput.value.trim();
-  cmdInput.value = "";
+  const raw = cmd.value.trim();
+  cmd.value = "";
   if (!raw) return;
-  log("h4k:~$ " + raw);
+  log(raw, "ok");
   if (raw === "help" || raw === "?") {
-    log("[?] commands: help · status · scan <target> [mode] · clear", "info");
+    log("commands:  help · status · clear · scan <target> [stealth|tor|overt]");
   } else if (raw === "clear") {
     consoleEl.innerHTML = "";
   } else if (raw === "status") {
     try {
       const r = await (await fetch("/api/health")).json();
-      log("[*] MSF reachable: " + r.msf.reachable + " | v" + (r.msf.version ? r.msf.version.version.trim() : "?") + " | jobs: " + r.jobs, "info");
-    } catch (err) { log("[!] " + err.message, "err"); }
+      log(`msf: ${r.msf.reachable ? "up" : "down"} · v${r.msf.version ? r.msf.version.version.trim() : "?"} · ${r.jobs} jobs`, "info");
+    } catch (err) { log("error " + err.message, "err"); }
   } else if (raw.startsWith("scan ")) {
-    $("target").value = raw.slice(5).trim().split(/\s+/)[0] || "";
-    document.querySelector('input[name="mode"]:checked').checked = false;
-    const m = raw.replace("scan", "").trim().split(/\s+/)[1];
-    if (["stealth", "tor", "overt"].includes(m)) {
-      document.querySelector('input[value="' + m + '"]').checked = true;
-    }
+    const parts = raw.slice(5).trim().split(/\s+/);
+    $("target").value = parts[0] || "";
+    const m = parts[1];
+    if (["stealth", "tor", "overt"].includes(m))
+      document.querySelector(`input[value="${m}"]`).checked = true;
     form.requestSubmit();
   } else {
-    log("[!] unknown directive '" + raw + "'. type 'help'", "err");
+    log("unknown: '" + raw + "' — try 'help'", "err");
   }
 });
+
+/* ---------- session indicator toggling ---------- */
+(async () => {
+  try {
+    const r = await (await fetch("/api/health")).json();
+    if (r.msf.reachable) {
+      const m = $("msf-state");
+      m.classList.add("on");
+      m.textContent = "msf: up · v" + (r.msf.version ? r.msf.version.version.trim() : "?");
+    }
+  } catch (_) {}
+})();

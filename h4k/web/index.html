@@ -3,108 +3,104 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>H4K://INTRUSION-SUITE</title>
+  <title>h4k — metasploit recon tui</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <!-- Matrix rain / grid backdrop -->
-  <canvas id="bg"></canvas>
-  <div class="scanlines"></div>
-  <div class="vignette"></div>
+  <div class="app">
 
-  <!-- Boot overlay -->
-  <div id="boot">
-    <pre class="boot-ascii">__  __ _   ___  ___        _      _   ___ _____
-|  \/  | | | \ \/ / |      / \    | | |_ _|_   _|
-| |\/| | |_| |\  /| |     / _ \   | |  | |  | |  
-| |  | |  _  |/  \| |___ / ___ \  | |__| |  | |  
-|_|  |_|_| |_/_/\_\_____/_/   \_\ |_____|___| |_|  </pre>
-    <div id="boot-text" class="boot-text"></div>
-  </div>
-
-  <header>
-    <div class="brand">
-      <span class="brand-mark">◢</span>
-      <h1>H4K<span class="cursor">▋</span><span class="brand-sub">INTRUSION-SUITE</span></h1>
-    </div>
-    <div class="sysinfo">
-      <span class="pill" id="sess-pill"><span class="dot"></span> SESSION</span>
-      <span class="pill" id="msf-pill"><span class="dot"></span> MSF<span id="msf-state"></span></span>
-      <span class="pill">NODE: 0x3137</span>
-    </div>
-  </header>
-
-  <main>
-    <section class="panel" id="console-panel">
-      <div class="panel-head">
-        <span class="panel-title">// SYSTEM CONSOLE</span>
-        <span class="panel-time" id="clock"></span>
+    <!-- top status bar (zsh-ish info line) -->
+    <div class="statusbar">
+      <div class="seg left"><span class="dir">~/h4k</span></div>
+      <div class="seg center">
+        <span class="branch">● main</span>
+        <span class="job" id="job-ind">idle</span>
       </div>
-      <div class="console" id="console"></div>
-      <div class="console-input-row">
-        <span class="prompt">h4k:~$</span>
-        <input id="console-cmd" autocomplete="off" placeholder="type a command or target (e.g. 192.168.1.248)" />
+      <div class="seg right">
+        <span class="msf" id="msf-state">msf: —</span>
+        <span class="time" id="clock">--:--:--</span>
       </div>
-    </section>
+    </div>
 
-    <div class="grid2">
-      <section class="panel" id="scan-panel">
-        <div class="panel-head"><span class="panel-title">// OPERATION</span></div>
+    <header class="titlebar">
+      <div class="title-dots"><span></span><span></span><span></span></div>
+      <div class="title-label">h4k · zsh — recon</div>
+      <div class="title-right" id="sess">session: local</div>
+    </header>
+
+    <main>
+      <!-- console / main pane -->
+      <section class="pane">
+        <div class="pane-head"><span class="pane-title">console</span><span class="pane-caret">●</span></div>
+        <div class="console" id="console"></div>
+        <div class="prompt-row">
+          <span class="prompt-user">h4k</span>
+          <span class="prompt-sep">➜</span>
+          <span class="prompt-dir">~</span>
+          <input id="cmd" autocomplete="off" spellcheck="false" placeholder="scan 192.168.1.248 · help · status · clear" />
+        </div>
+      </section>
+
+      <!-- operation form -->
+      <section class="pane">
+        <div class="pane-head"><span class="pane-title">/operation</span></div>
         <form id="scan-form">
-          <div class="row">
-            <span class="row-label">&gt; TARGET</span>
-            <input id="target" name="target" placeholder="192.168.1.248 / hostname / cidr" required />
-          </div>
-          <div class="row">
-            <span class="row-label">&gt; PROTOCOL</span>
-            <div class="mode-select" id="mode-select">
-              <label class="mode-opt"><input type="radio" name="mode" value="stealth" /><span class="mode-name">STEALTH</span><span class="mode-desc">// slow · non-invasive probes</span></label>
-              <label class="mode-opt"><input type="radio" name="mode" value="tor" /><span class="mode-name">TOR</span><span class="mode-desc">// route via onion · socks5</span></label>
-              <label class="mode-opt"><input type="radio" name="mode" value="overt" checked /><span class="mode-name">OVERT</span><span class="mode-desc">// full · top-1000 · OS detect</span></label>
+          <label class="field">
+            <span class="field-lbl">target</span>
+            <input id="target" name="target" placeholder="ip · host · cidr" required />
+          </label>
+
+          <div class="field">
+            <span class="field-lbl">mode</span>
+            <div class="segmented" id="mode-select">
+              <label class="opt"><input type="radio" name="mode" value="stealth" /><span>stealth</span></label>
+              <label class="opt"><input type="radio" name="mode" value="tor" /><span>tor</span></label>
+              <label class="opt"><input type="radio" name="mode" value="overt" checked /><span>overt</span></label>
             </div>
           </div>
-          <div class="row">
-            <label class="chk"><input type="checkbox" id="cve-toggle" checked /> <span>enrich via local CVE DB</span></label>
-          </div>
-          <button type="submit" id="scan-btn">▶ DEPLOY_SIGNAL</button>
+
+          <label class="field inline">
+            <input type="checkbox" id="cve-toggle" checked />
+            <span>enrich from local cve db</span>
+          </label>
+
+          <button type="submit" id="scan-btn">run scan</button>
         </form>
       </section>
 
-      <section class="panel" id="status-panel" hidden>
-        <div class="panel-head">
-          <span class="panel-title">// SIGINT STATUS</span>
-          <span class="panel-tag" id="status-tag">&gt;_</span>
-        </div>
-        <div class="status-big" id="progress-pct">0%</div>
-        <span class="status-msg" id="status-msg">awaiting uplink…</span>
-        <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+      <!-- progress -->
+      <section class="pane" id="status-pane" hidden>
+        <div class="pane-head"><span class="pane-title">/job</span><span class="pane-status" id="status-tag">queued</span></div>
+        <div class="pct" id="pct">0</div>
+        <div class="bar"><div class="bar-fill" id="prog"></div></div>
+        <div class="msg" id="status-msg">waiting…</div>
       </section>
-    </div>
+    </main>
 
-    <section class="panel" id="report-panel" hidden>
-      <div class="panel-head">
-        <span class="panel-title">// RECON REPORT</span>
-        <span class="meta" id="report-meta"></span>
+    <!-- results -->
+    <section class="pane results" id="results" hidden>
+      <div class="pane-head">
+        <span class="pane-title">/report</span>
+        <span class="pane-meta" id="report-meta"></span>
       </div>
-      <div class="tabs">
-        <button class="tab active" data-tab="hosts">▤ HOSTS</button>
-        <button class="tab" data-tab="vulns">⚡ VULNS</button>
-        <button class="tab" data-tab="recs">◉ RECOMMENDED ATTACK</button>
-        <button class="tab" data-tab="notes">☰ RAW NOTES</button>
-      </div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="hosts">hosts</button>
+        <button class="tab" data-tab="vulns">vulns</button>
+        <button class="tab" data-tab="recs">recommended attack</button>
+        <button class="tab" data-tab="notes">raw notes</button>
+      </nav>
       <div id="tab-hosts" class="tab-panel active"></div>
       <div id="tab-vulns" class="tab-panel"></div>
       <div id="tab-recs" class="tab-panel"></div>
       <div id="tab-notes" class="tab-panel"></div>
     </section>
 
-    <section class="legal">
-      <strong>[!] AUTHORIZATION REQUIRED.</strong> Direct this suite only at systems you own or hold written
-      authorization to test (school lab range / owned VMs). Anonymity does not equal legality.
-    </section>
-  </main>
+  </div>
+  <div class="legal">
+    authorized-scope only · targets you own or have written permission to test (school lab / own VMs).
+  </div>
 
   <script src="/static/app.js"></script>
 </body>
