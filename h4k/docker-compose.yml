@@ -1,0 +1,12 @@
+services:
+  h4k:
+    build: .
+    image: h4k:latest
+    network_mode: host
+    environment:
+      MSF_HOST: 127.0.0.1
+      MSF_PORT: "55553"
+      MSF_PASSWORD: h4k_msf_rocks
+      TOR_PORT: "9050"
+      API_PORT: "3137"
+    restart: unless-stopped

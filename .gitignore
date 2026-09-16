@@ -4,3 +4,7 @@ h4k/*.build.log
 # docker
 docker.env
 *.pid
+
+# python
+__pycache__/
+*.py[co]
