@@ -8,7 +8,15 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from schemas import AttackRequest, DeepAttackRequest, Job, Report, ScanRequest
+from schemas import (
+    AttackRequest,
+    DeepAttackRequest,
+    FuzzRequest,
+    Job,
+    Report,
+    ScanRequest,
+    VulnLeadsRequest,
+)
 from services.cve_lookup import CveDb
 from services.discovery import NeighborFinder
 from services.msfrpc import MsfClient
@@ -336,6 +344,100 @@ def deep_attack_status(job_id: str) -> dict[str, Any]:
     if not job:
         raise HTTPException(status_code=404, detail="deep-attack job not found")
     return job
+
+
+_fuzz_jobs: dict[str, dict[str, Any]] = {}
+
+
+@router.post("/fuzz")
+def run_fuzz(req: FuzzRequest, background: BackgroundTasks) -> dict[str, Any]:
+    """LAB-ONLY: fuzz a service you own to surface NEW bug candidates.
+
+    Mutates input vectors toward the target and flags connection teardown,
+    server errors, hangs, or service-loss as potential bug candidates for
+    responsible disclosure. Must target a host you control.
+    """
+    if not (req.host or req.target):
+        raise HTTPException(status_code=400, detail="no target")
+    host = req.host or req.target
+    port = req.port or (443 if req.scheme == "https" else 80)
+    job_id = uuid.uuid4().hex[:12]
+    job = {
+        "id": job_id,
+        "target": req.target,
+        "host": host,
+        "service": req.service,
+        "port": port,
+        "status": "running",
+        "candidates": [],
+        "created": datetime.now(UTC).isoformat(),
+    }
+    _fuzz_jobs[job_id] = job
+    background.add_task(_run_fuzz, job, req, host, port)
+    return {"job_id": job_id, "status": "running"}
+
+
+def _run_fuzz(job: dict[str, Any], req: FuzzRequest, host: str, port: int) -> None:
+    from services.fuzzer import LabFuzzer
+
+    fuzzer = LabFuzzer(
+        progress=lambda msg, pct: job.update(message=msg),
+        timeout=req.timeout,
+    )
+    try:
+        candidates = fuzzer._fuzz_http(host, port, req.scheme)
+        job["candidates"] = candidates
+        job["count"] = len(candidates)
+        job["status"] = "done"
+    except Exception as exc:  # pragma: no cover - defensive
+        job["status"] = "error"
+        job["error"] = str(exc)
+
+
+@router.get("/fuzz/{job_id}")
+def fuzz_status(job_id: str) -> dict[str, Any]:
+    job = _fuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="fuzz job not found")
+    return job
+
+
+@router.post("/vulnleads")
+def vuln_leads(req: VulnLeadsRequest) -> dict[str, Any]:
+    """Scan discovered services for outdated / EOL / beta version leads."""
+    from services.vulnleads import analyze_service
+
+    msf = _get_msf()
+    leads: list[dict] = []
+    # pull hosts+services from the DB so we can inspect banners
+    if msf is not None:
+        try:
+            ws = msf.current_workspace() or "default"
+            for rec in msf.services(ws):
+                if not _target_matches_svc(rec, req.target):
+                    continue
+                leads.extend(
+                    analyze_service(
+                        str(rec.get("host") or ""),
+                        rec.get("name") or "",
+                        rec.get("info") or "",
+                    )
+                )
+        except Exception as exc:
+            logger.warning("vulnleads failed: %s", exc)
+    return {"target": req.target, "leads": leads, "count": len(leads)}
+
+
+def _target_matches_svc(rec: dict[str, Any], target: str) -> bool:
+    import ipaddress
+
+    try:
+        net = ipaddress.ip_network(target, strict=False)
+        return str(rec.get("host") or "") in {str(x) for x in net}  # pragma: no cover
+    except ValueError:
+        return str(rec.get("host") or "") == target or target in str(
+            rec.get("host") or ""
+        )
 
 
 @router.get("/health")

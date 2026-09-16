@@ -389,6 +389,89 @@ function renderDeep(results) {
   el.innerHTML = h + "</table>";
 }
 
+/* ---------- version-lead scan ---------- */
+$("vulnleads-btn").addEventListener("click", async () => {
+  const target = $("target").value.trim();
+  if (!target) { log("[!] enter a target first for version-lead scan", "err"); return; }
+  $("vulnleads-panel").hidden = false;
+  $("tab-vulnleads").innerHTML = "<p class='msg'>scanning for EOL/beta/old versions…</p>";
+  log(`[*] version-lead scan on ${target}`, "info");
+  try {
+    const resp = await fetch("/api/vulnleads", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const d = await resp.json();
+    const leads = d.leads || [];
+    if (!leads.length) { $("tab-vulnleads").innerHTML = "<p class='msg'>no outdated/EOL/beta version leads found</p>"; return; }
+    let h = "<table><tr><th>host</th><th>service</th><th>product</th><th>version</th><th>lead</th><th>why</th></tr>";
+    for (const l of leads) {
+      h += `<tr><td>${esc(l.host)}</td><td>${esc(l.service)}</td><td>${esc(l.product)}</td>` +
+        `<td>${esc(l.version)}</td><td>${esc(l.level)}</td><td>${esc(l.reason)} <a href="${esc(l.cve_link || "#")}" target="_blank">[ref]</a></td></tr>`;
+    }
+    $("tab-vulnleads").innerHTML = h + "</table>";
+    log(`[+] ${leads.length} version lead(s)`, "ok");
+  } catch (err) { log("version-lead error " + err.message, "err"); $("tab-vulnleads").innerHTML = "<p class='msg'>error: " + esc(err.message) + "</p>"; }
+});
+
+/* ---------- lab fuzzer ---------- */
+let fuzzTimer = null;
+$("fuzz-btn").addEventListener("click", async () => {
+  const target = $("target").value.trim();
+  if (!target) { log("[!] enter a lab target you OWN to fuzz", "err"); return; }
+  if (!window.confirm(
+    "LAB FUZZ " + target + "\n" +
+    "Mutates HTTP inputs toward this service to trip crashes/anomalies.\n\n" +
+    "This must be a system YOU OWN (it may crash or hang during fuzzing). Proceed?"
+  )) { log("fuzz cancelled — not confirmed", "err"); return; }
+  const portText = $("fuzz-port").value.trim();
+  const port = portText ? parseInt(portText, 10) : null;
+  const body = { target, host: target, service: "http" };
+  if (port) body.port = port;
+  $("fuzz-panel").hidden = false;
+  $("fuzz-status").textContent = "running";
+  $("tab-fuzz").innerHTML = "<p class='msg'>fuzzing…</p>";
+  log(`[!] lab fuzz on ${target}` + (port ? ":" + port : ""), "err");
+  try {
+    const resp = await fetch("/api/fuzz", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const job = await resp.json();
+    pollFuzz(job.job_id);
+  } catch (err) { log("fuzz error " + err.message, "err"); }
+});
+
+function pollFuzz(jobId) {
+  clearInterval(fuzzTimer);
+  fuzzTimer = setInterval(async () => {
+    try {
+      const resp = await fetch("/api/fuzz/" + jobId);
+      if (!resp.ok) { clearInterval(fuzzTimer); return; }
+      const job = await resp.json();
+      $("fuzz-status").textContent = job.status;
+      if (job.candidates && job.candidates.length) renderFuzz(job.candidates);
+      if (job.status === "done" || job.status === "error") {
+        clearInterval(fuzzTimer);
+        log("[+] fuzz complete — " + (job.count || 0) + " candidate(s)", "ok");
+      }
+    } catch (err) { clearInterval(fuzzTimer); }
+  }, 1600);
+}
+
+function renderFuzz(cands) {
+  const el = $("tab-fuzz");
+  if (!cands.length) { el.innerHTML = "<p class='msg'>no anomalies detected (clean)</p>"; return; }
+  let h = "<p class='msg'>Potential bug candidates — reproduce on a lab box, then disclose responsibly.</p><table><tr><th>vector</th><th>signal</th><th>evidence</th></tr>";
+  for (const c of cands) {
+    h += `<tr><td>${esc(c.vector)}</td><td><span class="${c.signal === "teardown" || c.signal === "resource" ? "err" : ""}">${esc(c.signal)}</span></td>` +
+      `<td>${esc((c.evidence || "").slice(0, 80))}</td></tr>`;
+  }
+  el.innerHTML = h + "</table>";
+}
+
 /* ---------- session indicator toggling ---------- */
 (async () => {
   try {

@@ -153,6 +153,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-stop { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .btn-sub { border-color: var(--line-hi); color: var(--fg-dim); background: color-mix(in srgb, var(--line-hi) 15%, transparent); font-size: 12px; }
 .btn-danger { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.tiny-input { width: 70px; padding: 6px 8px; background: #0f0f12; border: 1px solid var(--line); border-radius: 6px; color: var(--fg); font-family: var(--mono); font-size: 12px; }
+.field.inline input[type="checkbox"] { accent-color: var(--accent); }
 .deep-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; }
 .err { color: var(--danger); }
 .ok { color: var(--green); }

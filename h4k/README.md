@@ -170,6 +170,29 @@ enumeration CVEs; `postgresql` → the Postgres pair; a CherryPy box gets *no*
 stray Log4Shell). At startup the archive tries one best-effort online refresh
 and otherwise uses the bundled snapshot — it is fully operational offline.
 
+### Hunting for newer bugs (0-day research, lab-only)
+
+Two opt-in features move you from "known CVEs" toward finding **fresh**
+vulnerabilities — genuinely a research method that must run against a service
+you control:
+
+- **Version-lead scan (`/api/vulnleads`)** — inspects service banners and flags
+  **EOL / very old / beta / unusual** builds (OpenSSH, Apache, nginx, PHP, IIS,
+  Tomcat, vsftpd...). An outdated version is a strong lead: it's a candidate for
+  known-but-not-yet-patched *and* undisclosed bugs. This is where you start
+  reading the source and diffing versions.
+- **Lab fuzzer (`/api/fuzz`)** — mutates HTTP/network inputs (long headers,
+  null bytes, format strings, overflow integers, URL oddities...) toward a
+  service **you own** and watches for **anomalies**: server errors, stack
+  traces, connection teardown, hangs, or the service going away. Each anomaly is
+  recorded with the exact repro request and the mutation that caused it — the
+  raw material for a real bug write-up and **responsible disclosure**.
+
+> A 0-day is not a button. It is a *process*: fuzz your own running service,
+> capture the anomaly, minimize the repro, prove root cause, then disclose
+> responsibly (vendor first, advisory later). This tool automates the
+> capture-and-triage part of that process — against systems you own.
+
 ---
 
 ## 4 · Build, run, point it
@@ -204,6 +227,9 @@ POST  /api/attack                    opt-in Metasploit exploit run
 GET   /api/attack/{job_id}           poll attack results
 POST  /api/deepattack                opt-in toolkit sweep (hydra/nikto/sqlmap/...)
 GET   /api/deepattack/{id}           poll toolkit results
+POST  /api/vulnleads                 flag EOL/beta/old service versions (research)
+POST  /api/fuzz                      lab-only: fuzz a service you own (bug hunt)
+GET   /api/fuzz/{job_id}             poll fuzz candidates
 GET   /api/health                    msfrpcd reachability + job + cache counts
 ```
 
@@ -257,7 +283,7 @@ Current status: **all green.**
   (**CVE-2026-5463**, command injection). It is pinned in the lock/requirements
   and the RPC calls it exposes are only fed internally-constructed arguments.
 
-The tests live in `tests/` (85 passing) and cover the schemas, the OPSEC mode
+The tests live in `tests/` (99 passing) and cover the schemas, the OPSEC mode
 matrix, the CVE matcher (including the CherryPy not-included guard), the
 default-credential archive and attempt flow, recommendation scoring/ranking,
 the pipeline's pure helpers, the attack/toolkit plan, and the HTTP API via a
@@ -288,13 +314,15 @@ api/
     report.py       scoring + recommendations
     cve_lookup.py   offline archive + matching + refresh
     creds.py        default-credential archive matching
+    fuzzer.py       lab fuzzer → anomaly/bug-candidate triage
+    vulnleads.py    EOL/beta/old version flagging
 data/cves.json      curated CVE archive
 data/creds.json     default-credential archive (opt-in use)
 data/users.txt      deep-toolkit username list
 data/passwords.txt  deep-toolkit password list
 web/                term-style UI (html/css/js) + phrack ezine README view
 scripts/            DNS recon bash tools (from the author's toolbox)
-tests/              85 unit + API tests
+tests/              99 unit + API tests
 ```
 
 ---

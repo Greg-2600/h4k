@@ -109,6 +109,21 @@
               <span>dns</span>
             </label>
           </div>
+
+          <div class="btn-row">
+            <button type="button" id="vulnleads-btn" class="btn-sub">scan version leads (EOL/beta)</button>
+          </div>
+          <div class="btn-row">
+            <button type="button" id="fuzz-btn" class="btn-sub btn-danger">lab fuzz <em class="danger">(own target)</em></button>
+          </div>
+          <div class="deep-row">
+            <label class="field inline">
+              <input type="checkbox" id="fuzz-http" checked />
+              <span>http</span>
+            </label>
+            <span class="field inline">target port</span>
+            <input type="text" id="fuzz-port" class="tiny-input" placeholder="auto" />
+          </div>
         </form>
       </section>
 
@@ -160,6 +175,21 @@
         <span class="pane-status" id="deep-status">idle</span>
       </div>
       <div id="tab-deep">launch a deep toolkit sweep (hydra/nikto/gobuster/sqlmap/...) on an authorized target</div>
+    </section>
+
+    <!-- version leads -->
+    <section class="pane results" id="vulnleads-panel" hidden>
+      <div class="pane-head"><span class="pane-title">/version leads</span></div>
+      <div id="tab-vulnleads">scan a target to surface EOL / beta / unusual service versions to research</div>
+    </section>
+
+    <!-- lab fuzz -->
+    <section class="pane results" id="fuzz-panel" hidden>
+      <div class="pane-head">
+        <span class="pane-title">/lab fuzz</span>
+        <span class="pane-status" id="fuzz-status">idle</span>
+      </div>
+      <div id="tab-fuzz">mutate inputs toward a service YOU OWN and triage anomalies as potential bug candidates</div>
     </section>
 
   </div>

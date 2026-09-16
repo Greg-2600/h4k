@@ -53,6 +53,24 @@ class AttackRequest(BaseModel):
     open_sessions: bool = False
 
 
+class FuzzRequest(BaseModel):
+    """LAB-ONLY: mutate inputs to a service you OWN to surface bug candidates."""
+
+    target: str
+    host: str | None = None  # default = target address
+    service: str = "http"  # currently http vector
+    port: int | None = None  # default 80/443 by scheme
+    scheme: str = "http"
+    iterations: int = 1
+    timeout: float = 3.0
+
+
+class VulnLeadsRequest(BaseModel):
+    """Scan discovered services for outdated/EOL/beta version leads."""
+
+    target: str
+
+
 class Service(BaseModel):
     port: int
     proto: str = "tcp"
@@ -126,6 +144,42 @@ class SecurityAssessment(BaseModel):
     signals: list[str] = []
     rationale: list[str] = []
     confidence: str = "low"  # low | medium | high
+
+
+class VersionLead(BaseModel):
+    """A 'likely-unpatched / EOL / unusual build' lead from a service banner."""
+
+    host: str
+    service: str
+    version: str
+    product: str
+    level: str  # eol | old | beta | unusual | unknown
+    reason: str
+    cve_link: str | None = None
+
+
+class FuzzCandidate(BaseModel):
+    """A potential bug candidate from lab fuzzing (for responsible disclosure)."""
+
+    host: str
+    service: str
+    vector: str  # e.g. "GET /", "POST /login", "HTTP header X-Foo"
+    signal: str  # teardown | server_error | hang | resource | anomaly
+    repro: str  # the exact mutated request to reproduce
+    evidence: str = ""  # response tail / error text
+    severity: str = "low"  # low | medium | high
+    note: str = ""
+
+
+class FuzzResult(BaseModel):
+    host: str
+    service: str
+    port: int | None = None
+    vector: str
+    signal: str
+    repro: str
+    evidence: str = ""
+    payload_mutated: bool = True
 
 
 class Report(BaseModel):
