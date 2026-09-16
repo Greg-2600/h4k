@@ -70,6 +70,20 @@ def make_exploit(req: SourceExploitRequest) -> str:
     return sast.make_poc(finding)
 
 
+@router.post("/exploit/download")
+def download_exploit(req: SourceExploitRequest) -> Any:
+    """Generate a PoC skeleton and return it as a downloadable file."""
+    from fastapi.responses import PlainTextResponse
+
+    poc = sast.make_poc(_finding_from(req))
+    fname = f"h4k-poc-{req.rule_id or 'finding'}.txt"
+    return PlainTextResponse(
+        content=poc,
+        media_type="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 def _to_result(name: str, work: Path, findings: list[sast.Finding]) -> SourceScanResult:
     root = ingest.find_source_root(work)
     nfiles = sum(1 for p in root.rglob("*") if p.is_file())

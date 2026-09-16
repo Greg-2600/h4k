@@ -514,7 +514,10 @@ function renderSource(result) {
     html += `<tr><td class="${sev}">${esc(f.severity)}</td><td>${esc(f.cwe)}</td>` +
       `<td>${esc(f.file)}:${esc(f.line)}</td><td>${esc(f.code || "—").slice(0, 40)}</td>` +
       `<td>${esc(f.name)}</td>` +
-      `<td><button class="btn-sub" onclick="genExploit(${JSON.stringify(f)})">poc</button></td></tr>`;
+      `<td>` +
+      `<button class="btn-sub" onclick="genExploit(${JSON.stringify(f)})">poc</button> ` +
+      `<button class="btn-sub" onclick="downloadExploit(${JSON.stringify(f)})">dl</button>` +
+      `</td></tr>`;
   }
   el.innerHTML = html + "</table>";
 }
@@ -532,6 +535,23 @@ async function genExploit(finding) {
     $("tab-exploit").textContent = poc;
     log("[+] PoC skeleton generated for " + finding.rule_id, "ok");
   } catch (err) { $("tab-exploit").textContent = "error: " + err.message; }
+}
+
+async function downloadExploit(finding) {
+  try {
+    const resp = await fetch("/api/source/exploit/download", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rule_id: finding.rule_id, finding }),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const blob = await resp.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "h4k-poc-" + (finding.rule_id || "finding") + ".txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    log("[+] PoC downloaded for " + finding.rule_id, "ok");
+  } catch (err) { log("PoC download error " + err.message, "err"); }
 }
 
 /* ---------- session indicator toggling ---------- */

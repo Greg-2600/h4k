@@ -42,7 +42,7 @@ RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \
 
 # Python automation stack (container images: break-system-packages is fine)
 RUN python3 -m pip install --break-system-packages --no-cache-dir \
-    pymetasploit3 fastapi uvicorn python-multipart
+    pymetasploit3 fastapi uvicorn python-multipart semgrep
 
 WORKDIR /opt/h4k
 COPY api /opt/h4k/api

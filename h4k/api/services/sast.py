@@ -191,6 +191,19 @@ class SASTScanner:
     def scan_dir(self, root: str | Path) -> list[Finding]:
         findings: list[Finding] = []
         root = Path(root).resolve()
+
+        # Primary engine: Semgrep (real static-analysis tool with a rule set).
+        semgrep_hits = self._scan_semgrep(root)
+        if semgrep_hits:
+            findings.extend(semgrep_hits)
+
+        # Fallback / enrichment: regex heuristics (handles files Semgrep skips,
+        # and runs even when semgrep isn't installed).
+        findings.extend(self._scan_regex(root))
+        return findings
+
+    def _scan_regex(self, root: Path) -> list[Finding]:
+        findings: list[Finding] = []
         for path in root.rglob("*"):
             if not path.is_file():
                 continue
@@ -206,12 +219,33 @@ class SASTScanner:
                 continue
         return findings
 
+    def _scan_semgrep(self, root: Path) -> list[Finding]:
+        from services.semgrep import scan_semgrep
+
+        hits = []
+        try:
+            raw = scan_semgrep(root)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("semgrep unavailable, using regex only: %s", exc)
+            return []
+        for h in raw:
+            hits.append(
+                Finding(
+                    rule_id=h.rule_id,
+                    name=h.message or h.rule_id,
+                    severity=h.severity,
+                    cwe=h.cwe,
+                    file=_relpath(h.path, root),
+                    line=h.line,
+                    code="",
+                    description=h.message,
+                )
+            )
+        return hits
+
     def _match(self, path: Path, root: Path, lineno: int, line: str) -> list[Finding]:
         out: list[Finding] = []
-        try:
-            rel = str(path.relative_to(root))
-        except ValueError:
-            rel = str(path)
+        rel = _relpath(str(path), root)
         for rid, name, sev, cwe, rx, desc in self._compiled:
             if rx.search(line):
                 out.append(
@@ -303,3 +337,12 @@ def make_poc(finding: Finding, lang: str = "auto") -> str:
     )
     snip = POC_SNIPPETS.get(finding.rule_id, DEFAULT_POC)
     return head + snip
+
+
+def _relpath(path: str, root: Path) -> str:
+    """Return `path` relative to `root` (falls back to the raw string)."""
+    p = Path(path)
+    try:
+        return str(p.relative_to(root)) if p.is_absolute() else str(p)
+    except ValueError:
+        return str(p)
