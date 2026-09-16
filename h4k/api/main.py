@@ -1,5 +1,7 @@
 # h4k FastAPI application: serves the web UI and the JSON API.
 # Binds to 0.0.0.0:3137 (set via uvicorn in entrypoint.sh).
+import asyncio
+import logging
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -12,7 +14,11 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from routers import scan as scan_router, source as source_router
+from routers import (
+    scan as scan_router,
+    source as source_router,
+    update as update_router,
+)
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -34,13 +40,35 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Optional refresh if network is available (keeps bundled snapshot otherwise).
     if os.environ.get("H4K_REFRESH_CVE", "1") == "1":
         app_state.cve_db.refresh()
-    yield
+    # Start the periodic software-component updater (best-effort).
+    _task = None
+    if os.environ.get("H4K_AUTO_UPDATE", "1") == "1":
+        _interval = int(os.environ.get("H4K_UPDATE_INTERVAL", "21600"))
+
+        async def _periodic_updater() -> None:
+            from services import updater
+
+            while True:
+                try:
+                    if updater.should_run():
+                        await asyncio.to_thread(updater.run_update)
+                except Exception as exc:  # pragma: no cover - defensive
+                    logging.getLogger("h4k").warning("updater cycle failed: %s", exc)
+                await asyncio.sleep(_interval)
+
+        _task = asyncio.create_task(_periodic_updater())
+    try:
+        yield
+    finally:
+        if _task is not None:
+            _task.cancel()
 
 
 app = FastAPI(title="h4k", lifespan=lifespan)
 
 app.include_router(scan_router.router)
 app.include_router(source_router.router)
+app.include_router(update_router.router)
 
 # Serve the plain HTML/JS frontend.
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")

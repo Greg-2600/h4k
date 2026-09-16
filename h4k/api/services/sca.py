@@ -164,6 +164,7 @@ def sca_scan(root: Path, with_sbom: bool = True) -> dict[str, Any]:
     out_dir = _sbom_out_dir()
     sbom = generate_sbom(root) if with_sbom else None
     osv = scan_osv(root)
+    leaks = scan_secrets(root)
     return {
         "cves": osv.cve_ids,
         "vulnerabilities": osv.osv_vulns,
@@ -171,4 +172,56 @@ def sca_scan(root: Path, with_sbom: bool = True) -> dict[str, Any]:
         "sbom_available": sbom is not None,
         "sbom_path": str(sbom) if sbom else None,
         "sbom_dir": str(out_dir),
+        "secrets": leaks,
     }
+
+
+def scan_secrets(root: Path) -> list[dict]:
+    """Grep for common hardcoded-secret patterns (best-effort, opt-in).
+
+    Returns a list of {file, line, kind}. This is a lightweight heuristic on
+    top of the committed-code scan; real secret scanning uses dedicated tools.
+    """
+    import re
+
+    patterns = {
+        "aws-akid": r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b",
+        "private-key": r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
+        "github-token": r"\bgh[pousr]_[A-Za-z0-9]{20,}\b",
+        "slack-token": r"\bxox[baprs]-[A-Za-z0-9-]{20,}\b",
+        "generic-secret": r"(?:password|passwd|secret|api[_-]?key|token)\s*=\s*"
+        r"(?:\"|')?(?:\$\{)?[A-Za-z0-9_\-]{12,}",
+    }
+    found: list[dict] = []
+    compiled = {k: re.compile(v, re.IGNORECASE) for k, v in patterns.items()}
+    skip_dirs = {
+        ".git",
+        "node_modules",
+        ".venv",
+        "vendor",
+        "__pycache__",
+        "dist",
+        "build",
+    }
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if any(part in skip_dirs for part in path.parts):
+            continue
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as fh:
+                for lineno, line in enumerate(fh, 1):
+                    for kind, rx in compiled.items():
+                        if rx.search(line):
+                            found.append(
+                                {
+                                    "file": str(path.relative_to(root)),
+                                    "line": lineno,
+                                    "kind": kind,
+                                    "code": line.strip()[:80],
+                                }
+                            )
+                            break  # one finding per line is enough
+        except OSError:
+            continue
+    return found

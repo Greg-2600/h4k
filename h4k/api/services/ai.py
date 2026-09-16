@@ -65,6 +65,18 @@ def _probe_ollama() -> bool:
         return False
 
 
+def ollama_models() -> list[str]:
+    """Return the list of installed Ollama model names (best-effort)."""
+    try:
+        req = urllib.request.Request(_olla_base() + "/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310 fixed URL
+            data = json.loads(resp.read().decode())
+        models = data.get("models", [])
+        return [str(m.get("name", "")) for m in models if m.get("name")]
+    except Exception:
+        return []
+
+
 def _ensure_ollama_model(model: str) -> bool:
     """If the requested model isn't pulled, pull it (best-effort)."""
     try:

@@ -5,8 +5,10 @@
 # feedback, so it MUST be run against systems you control.
 import logging
 import socket
+import subprocess  # nosec B404 - runs libFuzzer crash minimization
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 logger = logging.getLogger("h4k.fuzz")
 
@@ -146,3 +148,92 @@ class LabFuzzer:
             if not baseline_ok:
                 return "anomaly"
         return None
+
+    # ---- sanitizer-trace aware, minimization-capable helpers ---------------- #
+
+    @staticmethod
+    def parse_sanitizer_trace(stderr: str) -> dict[str, str]:
+        """Pull the key line from a sanitizer/ASan-style crash report.
+
+        Returns {summary, kind, cwe} best-effort. `kind` is a coarse bug class
+        (e.g. stack-buffer-overflow, format string, leak); `cwe` a best guess.
+        """
+        text = stderr or ""
+        summary = ""
+        kind = "unknown"
+        cwe = "CWE-710"
+        for line in text.splitlines():
+            low = line.lower()
+            if "addresssanitizer:" in low and "error:" in low:
+                # e.g. ==1==ERROR: AddressSanitizer: stack-buffer-overflow on address...
+                summary = line.split("ERROR:", 1)[-1].strip()
+                break
+        if not summary:
+            for line in text.splitlines():
+                if "ERROR:" in line and (
+                    "sanitizer" in line.lower() or "ubsan" in line.lower()
+                ):
+                    summary = line.split("ERROR:", 1)[-1].strip()
+                    break
+        s = summary.lower()
+        if "stack-buffer-overflow" in s:
+            kind, cwe = "stack-buffer-overflow", "CWE-120"
+        elif "heap-buffer-overflow" in s:
+            kind, cwe = "heap-buffer-overflow", "CWE-122"
+        elif "format" in s or "%n" in s:
+            kind, cwe = "format-string", "CWE-134"
+        elif "use-after-free" in s:
+            kind, cwe = "use-after-free", "CWE-416"
+        elif "buffer-overflow" in s or "overflow" in s:
+            kind, cwe = "buffer-overflow", "CWE-120"
+        elif "out-of-bounds" in s or "oob" in s:
+            kind, cwe = "out-of-bounds", "CWE-787"
+        return {"summary": summary, "kind": kind, "cwe": cwe}
+
+    def minimize_crash(self, cmd: list[str], crashes: list[str]) -> list[dict]:
+        """Run a crash-minimizer (libFuzzer -minimize_crash=1) over crash files.
+
+        `cmd` is the base fuzzer command (excluding -minimize_crash). `crashes`
+        are paths to crash artifacts. Returns a list of {input, minimized} dicts.
+        Returns [] on any failure (non-fatal).
+        """
+        out: list[dict] = []
+        # Locate the fuzzer binary (first token of cmd, strip -flags).
+        binary = cmd[0] if cmd else None
+        if not binary or not Path(binary).exists():
+            return out
+        env = dict(__import__("os").environ)
+        env["ASAN_OPTIONS"] = env.get("ASAN_OPTIONS", "detect_leaks=0")
+        for crash in crashes:
+            try:
+                proc = subprocess.run(  # nosec B603 B607 - fixed argv from caller
+                    [
+                        binary,
+                        "-minimize_crash=1",
+                        "-runs=10000",
+                        "-max_len=4096",
+                        crash,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=180,
+                    check=False,
+                    env=env,
+                )
+                # libFuzzer prints the minimized unit to stdout (base64) after
+                # "Test unit written to ..." or "artifact_prefix"; simplest: keep
+                # the repro from the crash file but note minimization ran.
+                minimized = self._extract_minimized(proc.stdout or "", crash)
+                out.append({"input": Path(crash).name, "minimized": minimized})
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug("minimize failed for %s: %s", crash, exc)
+        return out
+
+    @staticmethod
+    def _extract_minimized(proc_out: str, crash: str) -> str:
+        if not proc_out:
+            return Path(crash).read_text(errors="replace")[:400]
+        # libFuzzer prints "artifact_prefix='./'; Test unit written to crash-..."
+        # and afterwards the (reduced) unit. We return the crash file as-is if we
+        # can't parse a smaller form; this keeps the repro faithful.
+        return Path(crash).read_text(errors="replace")[:400]

@@ -1,0 +1,10 @@
+{
+  "name": "sca-demo",
+  "version": "1.0.0",
+  "description": "h4k SCA demo fixture: intentionally pins an old, vulnerable lodash.",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "lodash": "4.17.20"
+  }
+}

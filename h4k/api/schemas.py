@@ -267,6 +267,7 @@ class ScaResult(BaseModel):
     vulnerabilities: list[dict] = []
     packages: list[str] = []
     sbom_available: bool = False
+    secrets: list[dict] = []
 
 
 class TriageRequest(BaseModel):
@@ -298,6 +299,14 @@ class AiResult(BaseModel):
     error: str | None = None
 
 
+class AiLoopResult(BaseModel):
+    ok: bool
+    provider: str = ""
+    raw: str = ""
+    error: str | None = None
+    parsed: dict[str, str] = {}
+
+
 class CustomRuleRequest(BaseModel):
     """Author & test a custom Semgrep-style rule."""
 
@@ -307,4 +316,5 @@ class CustomRuleRequest(BaseModel):
     languages: list[str] = ["python"]
     pattern: str
     message: str = ""
+    cwe: str = "CWE-710"
     test_code: str = ""  # sample code to validate the rule against

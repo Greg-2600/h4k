@@ -10,6 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from schemas import (
+    AiLoopResult,
     AiRequest,
     AiResult,
     CustomRuleRequest,
@@ -24,6 +25,8 @@ from schemas import (
 from services import (
     ai as ai_service,
     ingest,
+    merged_report,
+    rules as rules_service,
     sast,
     sca as sca_service,
     semgrep,
@@ -113,18 +116,45 @@ def software_composition(req: SourceScanRequest) -> ScaResult:
         res = sca_service.sca_scan(root, with_sbom=True)
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    # Map only the fields ScaResult declares (drop sbom_path/sbom_dir).
     return ScaResult(
         cves=res.get("cves", []),
         vulnerabilities=res.get("vulnerabilities", []),
         packages=res.get("packages", []),
         sbom_available=bool(res.get("sbom_available")),
+        secrets=res.get("secrets", []),
     )
 
 
 @router.get("/sca/git")
 def sca_by_url(git_url: str) -> ScaResult:
     return software_composition(SourceScanRequest(git_url=git_url))
+
+
+@router.get("/sca/sbom")
+def sca_sbom_download(git_url: str) -> Any:
+    """Build an SBOM for a git URL and return it as a downloadable CycloneDX file."""
+    from fastapi.responses import PlainTextResponse
+
+    work = ingest.make_workdir()
+    try:
+        ingest.clone_git(git_url, work)
+        root = ingest.find_source_root(work)
+        sbom = sca_service.generate_sbom(root)
+    except ingest.IngestError as exc:
+        shutil.rmtree(work, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        pass  # keep temp dir until we read the file
+    if not sbom or not sbom.exists():
+        shutil.rmtree(work, ignore_errors=True)
+        raise HTTPException(status_code=400, detail="could not generate SBOM")
+    content = sbom.read_text(encoding="utf-8")
+    shutil.rmtree(work, ignore_errors=True)
+    return PlainTextResponse(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="sbom.cdx.json"'},
+    )
 
 
 @router.post("/triage", response_model=TriageResult)
@@ -146,10 +176,77 @@ def ai_analysis(req: AiRequest) -> AiResult:
     return AiResult(**result)
 
 
+@router.post("/ai/loop", response_model=AiLoopResult)
+def ai_full_loop(req: AiRequest) -> AiLoopResult:
+    """AI full-loop: root cause + patch candidate + verify/re-fuzz steps."""
+    from services.ai_loop import ai_full_loop
+
+    result = ai_full_loop(req.text)
+    return AiLoopResult(
+        ok=result["ok"],
+        provider=result.get("provider", ""),
+        raw=result.get("raw", ""),
+        error=result.get("error"),
+        parsed=result.get("parsed", {}),
+    )
+
+
 @router.post("/rules/test")
 def test_custom_rule(req: CustomRuleRequest) -> dict[str, Any]:
     """Validate a custom Semgrep-style rule against sample code."""
     return semgrep.test_rule(req)
+
+
+@router.get("/rules")
+def list_custom_rules() -> dict[str, Any]:
+    """List saved custom rules."""
+    return {"rules": rules_service.list_rules()}
+
+
+@router.post("/rules/save")
+def save_custom_rule(req: CustomRuleRequest) -> dict[str, Any]:
+    """Save a user-authored rule to the rule library."""
+    rule = {
+        "rule_id": req.rule_id,
+        "name": req.name,
+        "severity": req.severity,
+        "languages": req.languages,
+        "pattern": req.pattern,
+        "message": req.message,
+        "cwe": req.cwe,
+    }
+    try:
+        saved = rules_service.save_rule(rule)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "rule": saved}
+
+
+@router.delete("/rules/{rule_id}")
+def delete_custom_rule(rule_id: str) -> dict[str, Any]:
+    """Delete a saved rule by id."""
+    removed = rules_service.delete_rule(rule_id)
+    return {"ok": removed, "rule_id": rule_id}
+
+
+@router.post("/rules/run")
+def run_custom_rules(req: SourceScanRequest) -> dict[str, Any]:
+    """Run all saved custom rules over a clonable git URL."""
+    if not req.git_url:
+        raise HTTPException(status_code=400, detail="git_url required")
+    work = ingest.make_workdir()
+    try:
+        ingest.clone_git(req.git_url, work)
+        root = ingest.find_source_root(work)
+    except ingest.IngestError as exc:
+        shutil.rmtree(work, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    rules = rules_service.list_rules()
+    findings: list[dict[str, Any]] = []
+    for r in rules:
+        findings.extend(rules_service.run_rule_via_regex(r, root))
+    shutil.rmtree(work, ignore_errors=True)
+    return {"findings": findings, "count": len(findings), "rules_run": len(rules)}
 
 
 @router.post("/triage/minimize")
@@ -216,3 +313,91 @@ def _finding_from(req: SourceExploitRequest) -> sast.Finding:
         if rid == req.rule_id:
             return sast.Finding(rid, name, sev, cwe, "", 0, "", desc)
     return sast.Finding(req.rule_id, "Unknown", "info", "CWE-710", "", 0, "", "")
+
+
+@router.get("/ai/models")
+def ai_models() -> dict[str, Any]:
+    """List locally available Ollama models + current provider/model."""
+    return {
+        "provider": ai_service._provider(),
+        "model": ai_service._model(),
+        "ollama_reachable": ai_service._probe_ollama(),
+        "models": ai_service.ollama_models(),
+    }
+
+
+@router.post("/report/merge")
+def build_merged_report(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Merge provided scan/SAST/SCA/fuzz/triage sections into one structured
+    report (the deliverable). Callers pass in their collected findings."""
+    body = body or {}
+    rep = merged_report.build_merged_report(
+        scan=body.get("scan"),
+        sast=body.get("sast"),
+        sca=body.get("sca"),
+        fuzz=body.get("fuzz"),
+        triage=body.get("triage"),
+    )
+    return rep
+
+
+@router.post("/report/md")
+def report_markdown(body: dict[str, Any] | None = None) -> str:
+    """Merge findings and return the assessment as markdown."""
+    body = body or {}
+    rep = merged_report.build_merged_report(
+        scan=body.get("scan"),
+        sast=body.get("sast"),
+        sca=body.get("sca"),
+        fuzz=body.get("fuzz"),
+        triage=body.get("triage"),
+    )
+    return merged_report.render_markdown(rep)
+
+
+@router.get("/report/md")
+def report_markdown_get() -> str:
+    return merged_report.render_markdown(merged_report.build_merged_report())
+
+
+@router.post("/fuzz/minimize")
+def fuzz_minimize(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Given a fuzzer binary + crash artifacts, minimize them (libFuzzer).
+    body = {cmd: [binary, ...flags], crashes: [paths]}."""
+    from services.fuzzer import LabFuzzer
+
+    body = body or {}
+    cmd = body.get("cmd") or []
+    crashes = body.get("crashes") or []
+    res = LabFuzzer().minimize_crash(cmd, crashes)
+    return {"minimized": res, "note": "libFuzzer -minimize_crash=1"}
+
+
+@router.post("/ossfuzz")
+def ossfuzz_runner(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Clone a repo and run an OSS-Fuzz-style auto run: build with ASan/UBSan,
+    fuzz (libFuzzer) for N seconds, return crash leads.
+    body = {git_url, target, build_cmd?, seconds?}."""
+    from services.ossfuzz import OssFuzzRunner
+
+    body = body or {}
+    git_url = body.get("git_url")
+    if not git_url:
+        raise HTTPException(status_code=400, detail="git_url required")
+    work = ingest.make_workdir()
+    try:
+        ingest.clone_git(git_url, work)
+        root = ingest.find_source_root(work)
+    except ingest.IngestError as exc:
+        shutil.rmtree(work, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        res = OssFuzzRunner().run(
+            repo=root,
+            build_cmd=body.get("build_cmd"),
+            fuzz_bin=body.get("target") or "parse_fuzzer",
+            seconds=int(body.get("seconds", 10)),
+        )
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    return res
