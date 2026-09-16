@@ -210,15 +210,43 @@ docker build -t h4k .
 
 # run it — --network host so the box can see your local lab hosts
 docker run --rm --network host -p 3137:3137 \
-  -e API_PORT=3137 -e MSF_PASSWORD=h4k_msf_rocks h4k
+  -e API_PORT=3137 -e MSF_PASSWORD=h4k_msf_rocks \
+  -e H4K_AI_PROVIDER=ollama -e OLLAMA_BASE_URL=http://127.0.0.1:11434 -e H4K_AI_MODEL=qwen2.5:latest \
+  h4k
 
 # open the terminal
 #     http://localhost:3137
 ```
 
+> **Heads-up:** `docker build` alone does **not** leave the container running.
+> You must `docker run` (or `docker compose up`) to start the service.
+
 `entrypoint.sh` orchestrates the boot: PostgreSQL up → `msfdb init` (as a
 dedicated `msf` user) → Tor on `:9050` → `msfrpcd` on `:55553` → FastAPI
 serving the UI on **0.0.0.0:3137**.
+
+### First-run walkthrough (new users)
+
+1. **Open `http://localhost:3137`.** You'll see a terminal-style UI with a
+   status bar, console, and an "operation" pane.
+2. **Scan a lab target** — enter an IP you own (e.g. a Raspberry Pi or a VM) in
+   the **target** box, keep mode on **Overt**, hit **run scan**. The console
+   streams progress; the report populates under **hosts / fingerprint / vulns /
+   security / recs**.
+3. **Find neighbors** — click **find neighbors (arp)** to list IP/MAC/vendor on
+   your local segment.
+4. **Analyze source** — click **SAST source analysis**, paste a git URL (or
+   upload a `.zip`), and hit **analyze**. Findings appear with severity/CWE.
+5. **Scan supply chain** — click **SBOM / SCA**, paste a git URL **that has a
+   committed lockfile** (see `demos/sca-demo/`) — you'll see known-CVE hits.
+6. **Generate a PoC** — in any SAST finding row, hit **poc** (view) or **dl**
+   (download the disclosure skeleton).
+7. **Fuzz a lab target you own** — start the `vulnlab` container and aim the
+   **lab fuzz** button at `127.0.0.1:8080` to watch anomaly detection.
+
+> **Safety:** default-cred testing, Metasploit exploits, the deep toolkit, and
+> the fuzzer are **all opt-in** and only for systems you own or have written
+> permission to test.
 
 ### The REST surface
 
