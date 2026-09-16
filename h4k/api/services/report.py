@@ -91,9 +91,10 @@ def build_report(
 
     notes_out = notes + _cve_notes(enriched)
     if cred_models:
+        verified = sum(1 for c in cred_models if c.verified)
         notes_out.append(
-            f"[creds] {len(cred_models)} default/known credential(s) verified "
-            f"(opt-in). Review before use."
+            f"[creds] {len(cred_models)} default/known pair(s) tested "
+            f"(opt-in), {verified} verified. Review before use."
         )
     if attack_models:
         notes_out.append(

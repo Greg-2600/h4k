@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql postgresql-contrib \
     tor proxychains4 \
     python3 python3-pip python3-venv python3-dev \
-    dnsutils whois prips iputils-ping \
+    dnsutils whois prips iputils-ping traceroute dnstracer \
     nmap whatweb arp-scan \
     && rm -rf /var/lib/apt/lists/*
 

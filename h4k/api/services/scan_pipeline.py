@@ -160,7 +160,14 @@ class ScanPipeline:
         # 3. Pull hosts + services from DB.
         hosts = self._collect_hosts_and_services(target)
 
-        # 4. Fingerprint make/model/os/technology from banners + whatweb.
+        # 4. Reverse-DNS (PTR) lookups for every discovered IP.
+        self._tick("reverse DNS (PTR) lookups", 28)
+        try:
+            dns_notes += self._reverse_dns([h["address"] for h in hosts])
+        except Exception as exc:
+            logger.debug("reverse dns failed: %s", exc)
+
+        # 5. Fingerprint make/model/os/technology from banners + whatweb.
         self._tick("fingerprinting hosts", 35)
         fingerprints = self._fingerprint(hosts, mode)
         self._raises_if_aborted()
@@ -495,29 +502,33 @@ class ScanPipeline:
                 candidates = archive.vendor_for_service(
                     vendor_creds, svc_model
                 ) + archive.universal_for_service(svc_model)
+                # dedupe identical (user,pass) across vendor+universal
+                seen_pr = set()
+                _BLANK = "blank"  # sentinel for blank-cred marker  # nosec B105
                 for cred in candidates:
-                    _BLANK = "blank"  # sentinel for blank-cred marker
                     user = str(cred.get("user") or "").strip("()")
                     password = str(cred.get("pass") or "").strip("()")
                     if user == _BLANK or password == _BLANK or not user:  # nosec B105
                         continue  # skip blank-cred fallbacks in automation
+                    if (user, password) in seen_pr:
+                        continue
+                    seen_pr.add((user, password))
                     res = self._try_one(
                         module, addr, svc, user, password, open_sessions
                     )
-                    if res:
-                        found.append(
-                            {
-                                "vendor": _cred_vendor(fp, vendor_creds, cred),
-                                "service": svc.get("service") or svc["port"],
-                                "host": addr,
-                                "port": svc.get("port"),
-                                "user": user,
-                                "password": password,
-                                "module": module,
-                                "verified": True,
-                                "note": cred.get("desc") or "",
-                            }
-                        )
+                    found.append(
+                        {
+                            "vendor": _cred_vendor(fp, vendor_creds, cred),
+                            "service": svc.get("service") or svc["port"],
+                            "host": addr,
+                            "port": svc.get("port"),
+                            "user": user,
+                            "password": password,
+                            "module": module,
+                            "verified": bool(res),
+                            "note": cred.get("desc") or "",
+                        }
+                    )
         return found
 
     def _try_one(
@@ -529,19 +540,30 @@ class ScanPipeline:
         password: str,
         open_sessions: bool,
     ) -> bool:
-        opts = {
+        port = svc.get("port")
+        opts: dict[str, object] = {
             "RHOSTS": addr,
-            "RPORT": svc.get("port"),
+            "RPORT": port,
             "USERNAME": user,
             "PASSWORD": password,
-            "CreateSession": open_sessions,
             "StopOnSuccess": True,
         }
-        self._log(
-            f"[creds] try {user}:{password} on {addr}:{svc.get('port')} ({module})"
-        )
+        if open_sessions:
+            opts["CreateSession"] = True
+        # http_login requires a web path to POST to; default to /.
+        if "http_login" in module:
+            opts.setdefault("URI", "/")
+        self._log(f"[creds] try {user}:{password} on {addr}:{port} ({module})")
         try:
-            res = self.msf.execute("auxiliary", module, opts)
+            try:
+                res = self.msf.execute("auxiliary", module, opts)
+            except Exception as exc:
+                # retry without CreateSession if a module rejects it
+                if "CreateSession" in str(exc):
+                    opts.pop("CreateSession", None)
+                    res = self.msf.execute("auxiliary", module, opts)
+                else:
+                    raise
             ok = bool(res)
             self._log(
                 f"[creds] {'VERIFIED' if ok else 'no match'} "
@@ -550,12 +572,14 @@ class ScanPipeline:
             return ok
         except Exception as exc:
             logger.debug("cred %s:%s on %s failed: %s", user, password, addr, exc)
-            self._log(f"[creds] error {user} @ {addr}: {exc}")
+            self._log(f"[creds] error {user} {password} @ {addr}: {exc}")
             return False
 
     # ---- DNS recon via Greg's bash tools -----------------------------------
 
     def _dns_recon(self, domain: str) -> list:
+        """DNS footprinting for a domain: dig records, subdomain enum, and
+        dnstracer/traceroute for path/authority mapping (all best-effort)."""
         notes = []
         tool_map = {
             "dns_dumpster.sh": ["dns_dumpster.sh", domain],
@@ -577,7 +601,79 @@ class ScanPipeline:
                     notes.append(f"[{name}] {proc.stdout.strip()[:300]}")
             except Exception as exc:
                 logger.warning("dns tool %s failed: %s", name, exc)
+
+        # dig records (A/AAAA/MX/NS/TXT) via the bundled bash tools' output
+        notes.extend(
+            self._run_shell_tool("dig_any", ["dig", "+noall", "+answer", domain])
+        )
+        # trace the authoritative path / network route
+        notes.extend(self._run_shell_tool("dnstracer", ["dnstracer", domain]))
+        notes.extend(
+            self._run_shell_tool("traceroute", ["traceroute", "-m", "15", domain])
+        )
         return notes
+
+    def _run_shell_tool(self, name: str, argv: list[str]) -> list:
+        """Run a recon shell tool best-effort and return capped notes."""
+        try:
+            proc = subprocess.run(  # nosec B603 - bare argv, no shell
+                argv, capture_output=True, text=True, timeout=120, check=False
+            )
+            out = (proc.stdout or proc.stderr or "").strip()
+            if out:
+                return [f"[{name}] {out[:300]}"]
+        except FileNotFoundError:
+            logger.debug("%s not installed; skipping", name)
+        except Exception as exc:
+            logger.warning("%s failed: %s", name, exc)
+        return []
+
+    def _reverse_dns(self, ips: list[str]) -> list:
+        """PTR lookups for discovered IPs using dig (best-effort)."""
+        notes: list[str] = []
+        seen = set()
+        for ip in ips:
+            if ip in seen:
+                continue
+            seen.add(ip)
+            names = self._reverse_dns_one(ip)
+            if names:
+                notes.append(f"[ptr] {ip} -> {', '.join(names[:3])}")
+        return notes
+
+    @staticmethod
+    def _reverse_dns_resolvers() -> list[str]:
+        return ["8.8.8.8", "9.9.9.9", "1.1.1.1"]
+
+    @classmethod
+    def _reverse_dns_one(cls, ip: str) -> list[str]:
+        """PTR lookup for one IP via dig, with public-resolver fallback."""
+        last_err: Exception | None = None
+        for resolver in cls._reverse_dns_resolvers():
+            try:
+                proc = subprocess.run(  # nosec B603 B607 - bare argv
+                    ["dig", "@" + resolver, "+short", "-x", ip],
+                    capture_output=True,
+                    text=True,
+                    timeout=8,
+                    check=False,
+                )
+                out = (proc.stdout or "").strip().splitlines()
+                # filter out resolution errors like 'REFUSED' or 'not found'
+                names = [
+                    ln for ln in out if "." in ln and "not found" not in ln.lower()
+                ]
+                if names:
+                    return names
+            except FileNotFoundError:
+                logger.debug("dig not installed; skipping PTR")
+                return []
+            except Exception as exc:
+                last_err = exc
+                logger.debug("PTR %s via %s failed: %s", ip, resolver, exc)
+        if last_err:
+            return []  # all resolvers failed
+        return []
 
 
 def _is_ip(value: str) -> bool:
