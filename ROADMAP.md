@@ -1,0 +1,64 @@
+# h4k — Roadmap
+
+Prioritized by **wow-factor for a class demo × real-world value × effort**. Each
+item is a self-contained, live-demonstrable increment on the current release.
+
+---
+
+## Tier 1 — polish & airtightness (small effort, big payoff)
+
+- [ ] **Sanitizer-first everywhere** — surface ASan/UBSan flags in *every*
+      finding (fuzz + SAST), not just line numbers, so each one shows a clean
+      crash/error trace.
+- [ ] **True crash minimization** — wrap libFuzzer `-minimize_crash=1` /
+      `afl-tmin` behind `/api/fuzz` so a crash auto-reduces to the smallest
+      repro, then feed it straight into triage. ("Here's the exact 12-byte
+      trigger.")
+- [ ] **One-click report from all sources** — merge SAST + SCA + fuzz + scan
+      findings into a single exportable `.md`/`.json` (already partly wired).
+- [ ] **AI hookup toggle in the UI** — surface Ollama reachability + model picker
+      + a "verify" button so the AI section is obviously live vs. fallback.
+
+## Tier 2 — bring real tools in (what pros use)
+
+- [ ] **SCA demo fixture** — ship a small repo *with a committed lockfile* that
+      reliably trips osv-scanner (e.g. pins an old log4j / requests) so the
+      "dependencies are broken" demo never depends on network luck.
+- [ ] **SBOM export** — expose the generated CycloneDX SBOM for download.
+- [ ] **Custom SAST rules library** — let the user save their Semgrep rule and
+      re-run it over a whole tree (already validated per-file).
+- [ ] **License/secret scanning step** — trivy license + secret findings surfaced
+      alongside CVEs (tool already installed).
+- [ ] **Semgrep offline registry** — pre-bundle the rules so SAST works fully
+      offline (avoids a network fetch on first scan).
+
+## Tier 3 — the actual frontier (big wow, more work)
+
+- [ ] **AI full-loop** — fuzzer crash → AI root-cause → AI patch → re-fuzz to
+      verify the fix removed it. One button.
+- [ ] **Local TLS interception lab** — mkcert + local CA so the fuzzer/SAST can
+      target HTTPS web apps you own.
+- [ ] **OSS-Fuzz-style auto-runner** — pull repo → build w/ sanitizers → fuzz N
+      minutes → triaged report + patch diff (mirrors Google's public bug-hunting).
+- [ ] **SBOM → supply-chain map** — render dependency graph + reachability (which
+      vulnerable call paths are actually hit).
+
+## Infra / shipping
+
+- [ ] **Ollama sidecar in compose** — run Ollama in its own container on a
+      non-standard port; `OLLAMA_BASE_URL` already makes this a config change.
+- [ ] **CI**: GitHub Actions running lint + tests on push (reproducible quality
+      gate for the class).
+- [ ] **Release packaging** — tagged image + one-line `docker run` for classmates.
+
+---
+
+## Suggested order for a 10-minute class demo
+
+1. **Crash → minimize → patch** (Tier 1): fuzz vulnlab → ASan hit → minimized
+   repro → patch candidate → re-fuzz clean.
+2. **Custom Semgrep rule** (Tier 2) matching a pattern you invent live.
+3. **SCA on the fixture repo** (Tier 2) → instant CVE hits from the lockfile.
+4. **AI root-cause + patch** via local Ollama (Tier 1/3), noting the ethics gate.
+
+**h4k**, out.
