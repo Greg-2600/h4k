@@ -102,3 +102,9 @@ def test_job_not_found(client):
 def test_report_not_ready(client):
     r = client.get("/api/report/doesnotexist")
     assert r.status_code == 404
+
+
+def test_readme_renders(client):
+    r = client.get("/readme")
+    assert r.status_code == 200
+    assert "PHrack" in r.text or "PHRACK" in r.text or "h4k" in r.text.lower()

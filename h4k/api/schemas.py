@@ -16,6 +16,11 @@ class ScanRequest(BaseModel):
     mode: ScanMode = ScanMode.overt
     do_dns_recon: bool = True
     do_vuln_scan: bool = True
+    # OPT-IN only: attempt default/known credentials against fingerprinted
+    # services. Off by default. When enabled, `open_sessions` controls whether
+    # a successful login opens an interactive session (default: verify only).
+    try_default_creds: bool = False
+    open_sessions: bool = False
 
 
 class Service(BaseModel):
@@ -50,6 +55,27 @@ class Recommendation(BaseModel):
     refs: list[str] = []
 
 
+class Credential(BaseModel):
+    vendor: str = "common"
+    service: str
+    host: str
+    port: int | None = None
+    user: str
+    password: str
+    module: str | None = None
+    verified: bool = False
+    note: str | None = None
+
+
+class Fingerprint(BaseModel):
+    host: str
+    vendor: str | None = None
+    model: str | None = None
+    os: str | None = None
+    technology: list[str] = []
+    source: list[str] = []
+
+
 class Report(BaseModel):
     target: str
     mode: ScanMode
@@ -59,6 +85,8 @@ class Report(BaseModel):
     recommendations: list[Recommendation] = []
     notes: list[str] = []
     raw: dict[str, Any] | None = None
+    fingerprints: list[Fingerprint] = []
+    credentials: list[Credential] = []
 
 
 class Job(BaseModel):

@@ -2,4 +2,4 @@
 max-line-length = 88
 extend-ignore = E203
 per-file-ignores =
-    h4k/api/main.py:E402
+    h4k/api/main.py:E402,E501

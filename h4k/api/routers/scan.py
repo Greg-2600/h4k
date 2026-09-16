@@ -57,6 +57,8 @@ def _run_scan(job: dict[str, Any], req: ScanRequest) -> None:
             vulns=raw.get("vulns", []),
             notes=raw.get("notes", []),
             cve_db=_get_cve_db(),
+            fingerprints=raw.get("fingerprints", []),
+            credentials=raw.get("credentials", []),
         )
         _update(
             job, status="done", progress=100.0, report=report, message="scan complete"

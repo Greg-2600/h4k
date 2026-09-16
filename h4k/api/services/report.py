@@ -4,7 +4,7 @@
 import logging
 from datetime import UTC, datetime
 
-from schemas import Host, Recommendation, Report, Service, Vuln
+from schemas import Credential, Fingerprint, Host, Recommendation, Report, Service, Vuln
 from services.cve_lookup import CveDb
 
 logger = logging.getLogger("h4k.report")
@@ -63,6 +63,8 @@ def build_report(
     vulns: list[dict],
     notes: list[str],
     cve_db: CveDb | None = None,
+    fingerprints: list[dict] | None = None,
+    credentials: list[dict] | None = None,
 ) -> Report:
     host_models = [_host_from_dict(h) for h in hosts]
     vuln_models = [_vuln_from_dict(v) for v in vulns]
@@ -72,6 +74,16 @@ def build_report(
 
     recommendations = _recommendations(host_models, vuln_models, enriched)
 
+    fp_models = [_fingerprint_from_dict(f or {}) for f in fingerprints or []]
+    cred_models = [_credential_from_dict(c or {}) for c in credentials or []]
+
+    notes_out = notes + _cve_notes(enriched)
+    if cred_models:
+        notes_out.append(
+            f"[creds] {len(cred_models)} default/known credential(s) verified "
+            f"(opt-in). Review before use."
+        )
+
     return Report(
         target=target,
         mode=mode,  # type: ignore[arg-type]
@@ -79,7 +91,34 @@ def build_report(
         hosts=host_models,
         vulns=vuln_models,
         recommendations=recommendations,
-        notes=notes + _cve_notes(enriched),
+        notes=notes_out,
+        fingerprints=fp_models,
+        credentials=cred_models,
+    )
+
+
+def _fingerprint_from_dict(f: dict) -> Fingerprint:
+    return Fingerprint(
+        host=f.get("host", ""),
+        vendor=f.get("vendor"),
+        model=f.get("model"),
+        os=f.get("os"),
+        technology=list(f.get("technology") or []),
+        source=list(f.get("source") or []),
+    )
+
+
+def _credential_from_dict(c: dict) -> Credential:
+    return Credential(
+        vendor=c.get("vendor", "common"),
+        service=c.get("service", ""),
+        host=c.get("host", ""),
+        port=c.get("port"),
+        user=c.get("user", ""),
+        password=c.get("password", ""),
+        module=c.get("module"),
+        verified=bool(c.get("verified", True)),
+        note=c.get("note"),
     )
 
 

@@ -13,6 +13,9 @@ def test_scan_request_defaults():
     assert req.mode == ScanMode.overt
     assert req.do_dns_recon is True
     assert req.do_vuln_scan is True
+    # default-cred testing is OFF unless explicitly enabled (guardrail)
+    assert req.try_default_creds is False
+    assert req.open_sessions is False
 
 
 def test_scan_request_validates_mode():
@@ -56,5 +59,9 @@ def test_report_aggregates():
         vulns=[],
         recommendations=[],
         notes=[],
+        fingerprints=[],
+        credentials=[],
     )
     assert r.mode == ScanMode.overt
+    assert r.fingerprints == []
+    assert r.credentials == []

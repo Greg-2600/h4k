@@ -1,0 +1,246 @@
+{
+  "$schema": "h4k default-credential archive",
+  "description": "Default/known credentials by vendor fingerprint (make/model) plus a universal common list. Used opt-in against authorized lab targets for verifiable findings. SESSION_OPTIN may open a session only when the operator enables it.",
+  "version": "2026.1",
+  "universal": [
+    { "user": "admin",     "pass": "admin",     "services": ["http", "https", "ssh", "telnet", "smb", "rdp", "mysql", "mssql", "postgres", "ftp"] },
+    { "user": "admin",     "pass": "password",  "services": ["http", "https", "ssh", "smb", "rdp", "mysql", "postgres"] },
+    { "user": "admin",     "pass": "1234",      "services": ["http", "https", "telnet"] },
+    { "user": "root",      "pass": "root",      "services": ["ssh", "telnet", "mysql", "postgres", "smb"] },
+    { "user": "root",      "pass": "toor",      "services": ["ssh", "telnet"] },
+    { "user": "root",      "pass": "password",  "services": ["ssh", "telnet", "mysql", "postgres"] },
+    { "user": "root",      "pass": "123456",    "services": ["ssh", "telnet", "mysql"] },
+    { "user": "root",      "pass": "toor",      "services": ["ssh", "telnet"] },
+    { "user": "root",      "pass": "admin",     "services": ["ssh", "telnet", "smb"] },
+    { "user": "guest",     "pass": "guest",     "services": ["http", "https", "ftp", "smb", "telnet"] },
+    { "user": "user",      "pass": "user",      "services": ["ssh", "telnet", "http"] },
+    { "user": "test",      "pass": "test",      "services": ["ssh", "telnet", "http", "ftp"] },
+    { "user": "pi",        "pass": "raspberry", "services": ["ssh", "http"] },
+    { "user": "pi",        "pass": "raspberrypi", "services": ["ssh", "http"] },
+    { "user": "support",   "pass": "support",   "services": ["http", "https", "telnet", "ftp"] },
+    { "user": "cisco",     "pass": "cisco",     "services": ["telnet", "ssh", "http"] },
+    { "user": "cisco",     "pass": "ciscoisco", "services": ["telnet", "ssh"] },
+    { "user": "enable",    "pass": "admin",     "services": ["telnet", "ssh"] },
+    { "user": "ubnt",      "pass": "ubnt",      "services": ["http", "https", "ssh"] },
+    { "user": "ubnt",      "pass": "admin",     "services": ["http", "https"] },
+    { "user": "default",   "pass": "default",   "services": ["http", "https", "telnet"] },
+    { "user": "user",      "pass": "password",  "services": ["http", "https", "ssh", "telnet"] },
+    { "user": "tomcat",    "pass": "tomcat",    "services": ["http", "https"] },
+    { "user": "oracle",    "pass": "oracle",    "services": ["http", "https", "mysql"] },
+    { "user": "postgres",  "pass": "postgres",  "services": ["postgres"] },
+    { "user": "sa",        "pass": "sa",        "services": ["mssql", "smb"] },
+    { "user": "sa",        "pass": "password",  "services": ["mssql"] },
+    { "user": "administrator", "pass": "admin",   "services": ["smb", "rdp"] },
+    { "user": "administrator", "pass": "password", "services": ["smb", "rdp"] },
+    { "user": "kali",      "pass": "kali",      "services": ["ssh", "http"] },
+    { "user": "msfadmin",  "pass": "msfadmin",  "services": ["ssh", "smb", "mysql", "postgres", "http"] }
+  ],
+  "vendors": [
+    {
+      "vendor": "linksys",
+      "fingerprints": ["linksys", "cisco small business", "linksys wrt"],
+      "creds": [
+        { "model": "all", "user": "admin", "pass": "admin", "services": ["http", "https"], "desc": "Linksys router web admin default" },
+        { "model": "all", "user": "admin", "pass": "password", "services": ["http", "https"], "desc": "Linksys router web admin" },
+        { "model": "wrt54g", "user": "admin", "pass": "admin", "services": ["telnet", "ssh"], "desc": "WRT54G telnet/ssh default" },
+        { "model": "wrt310n", "user": "admin", "pass": "admin", "services": ["http"], "desc": "WRT310N admin" }
+      ]
+    },
+    {
+      "vendor": "netgear",
+      "fingerprints": ["netgear", "readyNAS", "netgear router"],
+      "creds": [
+        { "model": "legacy", "user": "admin", "pass": "password", "services": ["http", "https"], "desc": "Netgear router web admin" },
+        { "model": "legacy", "user": "admin", "pass": "1234", "services": ["http"], "desc": "Older Netgear default" },
+        { "model": "readyNAS", "user": "admin", "pass": "password", "services": ["http", "https", "ssh"], "desc": "ReadyNAS admin" }
+      ]
+    },
+    {
+      "vendor": "tp-link",
+      "fingerprints": ["tp-link", "tplink", "tenda"],
+      "creds": [
+        { "model": "most", "user": "admin", "pass": "admin", "services": ["http", "https"], "desc": "TP-Link router web admin" },
+        { "model": "some", "user": "admin", "pass": "password", "services": ["http", "https"], "desc": "TP-Link variant" },
+        { "model": "tenda", "user": "admin", "pass": "admin", "services": ["http"], "desc": "Tenda admin" }
+      ]
+    },
+    {
+      "vendor": "dlink",
+      "fingerprints": ["d-link", "dlink", "d-link systems"],
+      "creds": [
+        { "model": "most", "user": "admin", "pass": "admin", "services": ["http", "https"], "desc": "D-Link router web admin" },
+        { "model": "older", "user": "admin", "pass": "public", "services": ["http"], "desc": "Some D-Link cameras/routers" },
+        { "model": "router", "user": "admin", "pass": "1234", "services": ["http"], "desc": "D-Link 1234 variant" }
+      ]
+    },
+    {
+      "vendor": "belkin",
+      "fingerprints": ["belkin"],
+      "creds": [
+        { "model": "most", "user": "admin", "pass": "admin", "services": ["http"], "desc": "Belkin router web admin" },
+        { "model": "older", "user": "(blank)", "pass": "admin", "services": ["http"], "desc": "Belkin blank user" }
+      ]
+    },
+    {
+      "vendor": "draytek",
+      "fingerprints": ["draytek", "vigor"],
+      "creds": [
+        { "model": "vigor", "user": "admin", "pass": "admin", "services": ["http", "https", "ftp"], "desc": "DrayTek Vigor admin" }
+      ]
+    },
+    {
+      "vendor": "asus",
+      "fingerprints": ["asus", "asuswrt", "asus router"],
+      "creds": [
+        { "model": "router", "user": "admin", "pass": "admin", "services": ["http", "https", "ssh", "telnet"], "desc": "ASUS router web/ssh admin" }
+      ]
+    },
+    {
+      "vendor": "zyxel",
+      "fingerprints": ["zyxel", "zyxel zywall"],
+      "creds": [
+        { "model": "zywall", "user": "admin", "pass": "1234", "services": ["http", "https"], "desc": "ZyXEL ZyWALL default" },
+        { "model": "older", "user": "admin", "pass": "admin", "services": ["http"] }
+      ]
+    },
+    {
+      "vendor": "mikrotik",
+      "fingerprints": ["mikrotik", "routeros", "mikrotik router"],
+      "creds": [
+        { "model": "default", "user": "admin", "pass": "(blank)", "services": ["http", "https", "ssh", "telnet", "winbox"], "desc": "MikroTik default blank password admin" }
+      ]
+    },
+    {
+      "vendor": "ubiquiti",
+      "fingerprints": ["ubiquiti", "ubiquiti networks", "unifi", "airmax"],
+      "creds": [
+        { "model": "router", "user": "ubnt", "pass": "ubnt", "services": ["http", "https", "ssh"], "desc": "Ubiquiti EdgeRouter/AirOS default" },
+        { "model": "unifi", "user": "admin", "pass": "admin", "services": ["http", "https"], "desc": "UniFi console default" }
+      ]
+    },
+    {
+      "vendor": "motorola",
+      "fingerprints": ["motorola", "arris", "surfboard", "arris surfboard"],
+      "creds": [
+        { "model": "surfboard", "user": "admin", "pass": "motorola", "services": ["http", "https"], "desc": "Arris/Motorola Surfboard modem" },
+        { "model": "arris", "user": "admin", "pass": "password", "services": ["http", "https"] }
+      ]
+    },
+    {
+      "vendor": "apple-airport",
+      "fingerprints": ["airport", "apple air", "apple router", "airport extreme", "airport express"],
+      "creds": [
+        { "model": "airport", "user": "(blank)", "pass": "(blank)", "services": ["http", "https", "ssh"], "desc": "Apple AirPort utilities, no web auth by default" }
+      ]
+    },
+    {
+      "vendor": "synology",
+      "fingerprints": ["synology", "synology ds", "diskstation"],
+      "creds": [
+        { "model": "ds", "user": "admin", "pass": "(blank)", "services": ["http", "https", "ssh", "smb"], "desc": "Synology DSM initial admin/blank" }
+      ]
+    },
+    {
+      "vendor": "qnap",
+      "fingerprints": ["qnap", "qnap ts", "turbonas"],
+      "creds": [
+        { "model": "nas", "user": "admin", "pass": "admin", "services": ["http", "https"], "desc": "QNAP NAS web admin" }
+      ]
+    },
+    {
+      "vendor": "raspberry-pi",
+      "fingerprints": ["raspberry pi", "raspberrypi", "raspbian", "pi os"],
+      "creds": [
+        { "model": "default", "user": "pi", "pass": "raspberry", "services": ["ssh", "http", "vnc"], "desc": "Raspberry Pi OS default user/pass" },
+        { "model": "pi-imager", "user": "pi", "pass": "raspberrypi", "services": ["ssh"], "desc": "Pi variant" }
+      ]
+    },
+    {
+      "vendor": "microsoft-windows",
+      "fingerprints": ["windows", "microsoft windows", "windows 7", "windows 10", "windows server", "windows xp"],
+      "creds": [
+        { "model": "xp", "user": "Administrator", "pass": "(blank)", "services": ["smb", "rdp"], "desc": "WinXP empty admin (home)" },
+        { "model": "all", "user": "Administrator", "pass": "admin", "services": ["smb", "rdp"] },
+        { "model": "all", "user": "Administrator", "pass": "password", "services": ["smb", "rdp"] },
+        { "model": "server", "user": "Administrator", "pass": "P@ssw0rd", "services": ["smb", "rdp"] }
+      ]
+    },
+    {
+      "vendor": "apple-macos",
+      "fingerprints": ["mac os x", "mac os", "macos", "osx", "darwin apple"],
+      "creds": [
+        { "model": "all", "user": "admin", "pass": "admin", "services": ["ssh"] },
+        { "model": "all", "user": "root", "pass": "(locked)", "services": ["ssh"], "desc": "macOS root disabled by default" }
+      ]
+    },
+    {
+      "vendor": "raspberrypi-imager",
+      "fingerprints": ["linux rasppi", "raspberry"],
+      "creds": [
+        { "model": "default", "user": "pi", "pass": "raspberry", "services": ["ssh"] }
+      ]
+    },
+    {
+      "vendor": "ip-camera",
+      "fingerprints": ["hikvision", "dahua", "axis", "hik", "ipcam", "ip camera", "dvr"],
+      "creds": [
+        { "model": "hikvision", "user": "admin", "pass": "12345", "services": ["http", "https"], "desc": "HikVision admin/12345" },
+        { "model": "hikvision", "user": "admin", "pass": "admin", "services": ["http"] },
+        { "model": "dahua", "user": "admin", "pass": "admin", "services": ["http", "https"] },
+        { "model": "axis", "user": "root", "pass": "pass", "services": ["http", "https"], "desc": "Axis root/pass" }
+      ]
+    },
+    {
+      "vendor": "printer",
+      "fingerprints": ["brother", "hp laserjet", "hp officejet", "kyocera", "epson", "ricoh", "printer"],
+      "creds": [
+        { "model": "brother", "user": "admin", "pass": "access", "services": ["http", "https"], "desc": "Brother printer admin" },
+        { "model": "hp", "user": "admin", "pass": "admin", "services": ["http", "https"] },
+        { "model": "hp", "user": "admin", "pass": "12345", "services": ["http"] }
+      ]
+    },
+    {
+      "vendor": "mikrotik-alt",
+      "fingerprints": ["routeros"],
+      "creds": [
+        { "model": "v6", "user": "admin", "pass": "(blank)", "services": ["http", "ssh"] }
+      ]
+    },
+    {
+      "vendor": "moxa",
+      "fingerprints": ["moxa", "moxa iologik"],
+      "creds": [
+        { "model": "serial", "user": "admin", "pass": "moxa", "services": ["telnet", "http", "ssh"], "desc": "Moxa device servers" }
+      ]
+    },
+    {
+      "vendor": "varnish",
+      "fingerprints": ["vantec", "vantec nas"],
+      "creds": [
+        { "model": "nas", "user": "admin", "pass": "admin", "services": ["http", "https"] }
+      ]
+    },
+    {
+      "vendor": "openwrt",
+      "fingerprints": ["openwrt", "lede", "gargoyle router"],
+      "creds": [
+        { "model": "default", "user": "root", "pass": "(blank)", "services": ["ssh", "http", "https", "telnet"], "desc": "OpenWrt root/blank telnet fallback" },
+        { "model": "configured", "user": "root", "pass": "admin", "services": ["ssh", "http"] }
+      ]
+    },
+    {
+      "vendor": "pfsense",
+      "fingerprints": ["pfsense", "pf sense", "opnsense"],
+      "creds": [
+        { "model": "factory", "user": "admin", "pass": "pfsense", "services": ["http", "https", "ssh"], "desc": "pfSense factory default" }
+      ]
+    },
+    {
+      "vendor": "draytek-alt",
+      "fingerprints": ["vigor"],
+      "creds": [
+        { "model": "vigor2110", "user": "admin", "pass": "admin", "services": ["http", "http-alt"] }
+      ]
+    }
+  ]
+}

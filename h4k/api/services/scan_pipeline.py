@@ -1,16 +1,90 @@
 # Orchestrates a scan job: target normalization -> optional DNS recon ->
-# db_nmap port scan -> auxiliary vuln/enum scanners -> collect findings.
+# db_nmap port scan -> fingerprint -> auxiliary vuln/enum scanners ->
+# optional (opt-in) default-credential verification -> collect findings.
 import ipaddress
 import logging
 import subprocess  # nosec B404 - required to drive msfconsole / bash recon tools
 from collections.abc import Callable
 from contextlib import suppress
 
-from schemas import ScanRequest
+from schemas import ScanRequest, Service
+from services.creds import CredArchive
 from services.modes import ScanModeConfig, get_mode, scanners_for_service
 from services.msfrpc import MsfClient
 
 logger = logging.getLogger("h4k.pipeline")
+
+# Token hints used to fingerprint make/model/os/technology from banners.
+VENDOR_HINTS: list[tuple[str, str]] = [
+    # (vendor keyword, vendor name)
+    ("linksys", "linksys"),
+    ("cisco", "cisco"),
+    ("netgear", "netgear"),
+    ("tp-link", "tp-link"),
+    ("tplink", "tp-link"),
+    ("tenda", "tenda"),
+    ("d-link", "dlink"),
+    ("dlink", "dlink"),
+    ("belkin", "belkin"),
+    ("draytek", "draytek"),
+    ("vigor", "draytek"),
+    ("asuswrt", "asus"),
+    ("asus", "asus"),
+    ("zyxel", "zyxel"),
+    ("mikrotik", "mikrotik"),
+    ("routeros", "mikrotik"),
+    ("ubiquiti", "ubiquiti"),
+    ("unifi", "ubiquiti"),
+    ("airmax", "ubiquiti"),
+    ("arris", "arris"),
+    ("motorola", "motorola"),
+    ("surfboard", "arris"),
+    ("synology", "synology"),
+    ("diskstation", "synology"),
+    ("qnap", "qnap"),
+    ("raspberry", "raspberry-pi"),
+    ("raspbian", "raspberry-pi"),
+    ("openwrt", "openwrt"),
+    ("lede", "openwrt"),
+    ("pfsense", "pfsense"),
+    ("opnsense", "pfsense"),
+    ("hikvision", "hikvision"),
+    ("dahua", "dahua"),
+    ("axis", "axis"),
+    ("brother", "brother"),
+    ("hp ", "hp"),
+    ("kyocera", "kyocera"),
+    ("epson", "epson"),
+    ("ricoh", "ricoh"),
+]
+
+OS_HINTS: list[tuple[str, str]] = [
+    ("windows", "windows"),
+    ("microsoft windows", "windows"),
+    ("mac os", "macos"),
+    ("macos", "macos"),
+    ("darwin", "macos"),
+    ("ubuntu", "linux"),
+    ("debian", "linux"),
+    ("fedora", "linux"),
+    ("red hat", "linux"),
+    ("centos", "linux"),
+    ("linux", "linux"),
+]
+
+# Web technologies to look for in http banners / whatweb output
+TECH_HINTS: list[tuple[str, str]] = [
+    ("apache", "apache"),
+    ("nginx", "nginx"),
+    ("iis", "iis"),
+    ("lighttpd", "lighttpd"),
+    ("cherrypy", "cherrypy"),
+    ("php", "php"),
+    ("tomcat", "tomcat"),
+    ("jetty", "jetty"),
+    ("nginx", "nginx"),
+    ("openwrt", "openwrt"),
+]
 
 
 class ScanPipeline:
@@ -64,16 +138,28 @@ class ScanPipeline:
         # 3. Pull hosts + services from DB.
         hosts = self._collect_hosts_and_services(target)
 
-        # 4. Run auxiliary scanners per detected service.
+        # 4. Fingerprint make/model/os/technology from banners + whatweb.
+        self._tick("fingerprinting hosts", 35)
+        fingerprints = self._fingerprint(hosts, mode)
+
+        # 5. Run auxiliary scanners per detected service.
         self._tick("running auxiliary vuln/enum scanners", 45)
         self._run_aux_scanners(hosts, mode)
 
-        # 5. Collect vulnerabilities.
+        # 6. Collect vulnerabilities.
         vulns = self._collect_vulns(target)
-        self._tick("collecting vulnerability findings", 85)
+        self._tick("collecting vulnerability findings", 80)
 
-        # 6. Metasploit's own "analyze" suggestions.
-        self._tick("running module analysis recommendations", 90)
+        # 7. OPT-IN: try default/known credentials against matched services.
+        credentials: list[dict] = []
+        if req.try_default_creds:
+            self._tick("attempting default credential verification (opt-in)", 88)
+            credentials = self._try_default_creds(
+                hosts, fingerprints, req.open_sessions
+            )
+
+        # 8. Metasploit's own "analyze" suggestions.
+        self._tick("running module analysis recommendations", 94)
         notes = dns_notes + self._analyze(target)
 
         report = {
@@ -82,6 +168,8 @@ class ScanPipeline:
             "hosts": hosts,
             "vulns": vulns,
             "notes": list(set(notes)),
+            "fingerprints": fingerprints,
+            "credentials": credentials,
         }
         self._tick("scan complete", 100)
         return report
@@ -244,6 +332,153 @@ class ScanPipeline:
             except ValueError:
                 return [target]
 
+    # ---- fingerprinting -----------------------------------------------------
+
+    def _fingerprint(self, hosts: list[dict], mode: ScanModeConfig) -> list[dict]:
+        """Best-effort make/model/os/tech identification from nmap banners and
+        (for web services) whatweb output. Never definitive, always a hint."""
+        results: list[dict] = []
+        for host in hosts:
+            addr = host["address"]
+            text_pool = [
+                host.get("os") or "",
+                *(svc.get("info") or "" for svc in host["services"]),
+                *(svc.get("service") or "" for svc in host["services"]),
+            ]
+            text = " ".join(text_pool)
+            vendor = _match_hints(text, VENDOR_HINTS)
+            os_guess = _match_hints(text, OS_HINTS)
+            tech = _match_hints_many(text, TECH_HINTS)
+            source = ["nmap-banner"]
+
+            # whatweb gives much better web tech fingerprinting.
+            if mode.name != "tor":
+                www = self._whatweb(addr)
+                if www:
+                    source.append("whatweb")
+                    text = " ".join([text, www])
+                    vendor2 = _match_hints(text, VENDOR_HINTS)
+                    if vendor2:
+                        vendor = vendor2 or vendor
+                    tech = list(
+                        dict.fromkeys(tech + _match_hints_many(text, TECH_HINTS))
+                    )
+
+            results.append(
+                {
+                    "host": addr,
+                    "vendor": vendor,
+                    "model": None,
+                    "os": os_guess or host.get("os"),
+                    "technology": tech,
+                    "source": sorted(set(source)),
+                }
+            )
+        return results
+
+    def _whatweb(self, addr: str) -> str:
+        """Run whatweb (if present) for web tech fingerprinting. Returns plain text."""
+        try:
+            proc = subprocess.run(  # nosec B603 B607 - fixed binary, no shell
+                ["whatweb", "--no-errors", "--color=never", "-a", "3", addr],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+            return (proc.stdout or proc.stderr).strip()
+        except FileNotFoundError:
+            logger.debug("whatweb not installed; skipping web fingerprint")
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("whatweb failed for %s: %s", addr, exc)
+        return ""
+
+    # ---- opt-in default credential verification -----------------------------
+
+    def _try_default_creds(
+        self,
+        hosts: list[dict],
+        fingerprints: list[dict],
+        open_sessions: bool,
+    ) -> list[dict]:
+        """Opt-in: try default/known credentials from the archive against
+        services that carry a login module. Returns verified credentials for
+        the report. Only runs for authorized lab targets, and only when the
+        requesting scan turned `try_default_creds` on."""
+        try:
+            archive = CredArchive()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("could not load cred archive: %s", exc)
+            return []
+
+        found: list[dict] = []
+        vendor_map = {f["host"]: f for f in fingerprints}
+        for host in hosts:
+            addr = host["address"]
+            fp = vendor_map.get(addr, {})
+            vendor_creds = archive.match_fingerprints(
+                [fp.get("vendor") or "", *(fp.get("technology") or [])]
+            )
+            for svc in host["services"]:
+                svc_model = _service_from_dict(svc)
+                module = archive.module_for_service(svc_model)
+                if not module:
+                    continue
+                candidates = archive.vendor_for_service(
+                    vendor_creds, svc_model
+                ) + archive.universal_for_service(svc_model)
+                for cred in candidates:
+                    _BLANK = "blank"  # sentinel for blank-cred marker
+                    user = str(cred.get("user") or "").strip("()")
+                    password = str(cred.get("pass") or "").strip("()")
+                    if user == _BLANK or password == _BLANK or not user:  # nosec B105
+                        continue  # skip blank-cred fallbacks in automation
+                    res = self._try_one(
+                        module, addr, svc, user, password, open_sessions
+                    )
+                    if res:
+                        found.append(
+                            {
+                                "vendor": _cred_vendor(fp, vendor_creds, cred),
+                                "service": svc.get("service") or svc["port"],
+                                "host": addr,
+                                "port": svc.get("port"),
+                                "user": user,
+                                "password": password,
+                                "module": module,
+                                "verified": True,
+                                "note": cred.get("desc") or "",
+                            }
+                        )
+        return found
+
+    def _try_one(
+        self,
+        module: str,
+        addr: str,
+        svc: dict,
+        user: str,
+        password: str,
+        open_sessions: bool,
+    ) -> bool:
+        opts = {
+            "RHOSTS": addr,
+            "RPORT": svc.get("port"),
+            "USERNAME": user,
+            "PASSWORD": password,
+            "CreateSession": open_sessions,
+            "StopOnSuccess": True,
+        }
+        try:
+            res = self.msf.execute("auxiliary", module, opts)
+            # A verified login typically returns a session (if opened) or the
+            # module reports success in its output. We treat a non-error job
+            # result as a verified credential for reporting.
+            return bool(res)
+        except Exception as exc:
+            logger.debug("cred %s:%s on %s failed: %s", user, password, addr, exc)
+            return False
+
     # ---- DNS recon via Greg's bash tools -----------------------------------
 
     def _dns_recon(self, domain: str) -> list:
@@ -293,3 +528,41 @@ def _target_matches(addr: str | None, target: str) -> bool:
         return ipaddress.ip_address(addr) in net
     except ValueError:
         return addr == target
+
+
+def _match_hints(
+    text: str, hints: list[tuple[str, str]], all_matches: bool = False
+) -> str | list[str]:
+    """Return the first matched label (or all labels) from hint tokens."""
+    if all_matches:
+        return _match_hints_many(text, hints)
+    lowered = text.lower()
+    for token, label in hints:
+        if token in lowered:
+            return label
+    return ""
+
+
+def _match_hints_many(text: str, hints: list[tuple[str, str]]) -> list[str]:
+    """Return every matching hint label as a list."""
+    lowered = text.lower()
+    hits = [label for token, label in hints if token in lowered]
+    return list(dict.fromkeys(hits))
+
+
+def _cred_vendor(fp: dict, vendor_creds: list[dict], cred: dict) -> str:
+    """Best-effort vendor label for a credential (fingerprint or archive)."""
+    if fp.get("vendor"):
+        return fp["vendor"]
+    return cred.get("vendor") or "common"
+
+
+def _service_from_dict(s: dict) -> Service:
+    """Build a schemas.Service from a raw host-services dict."""
+    return Service(
+        port=s.get("port"),
+        proto=s.get("proto", "tcp"),
+        service=s.get("service"),
+        state=s.get("state"),
+        info=s.get("info"),
+    )

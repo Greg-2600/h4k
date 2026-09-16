@@ -55,6 +55,11 @@ body {
   background: var(--fg-faint); }
 .title-label { color: var(--fg-dim); letter-spacing: 0.4px; }
 .title-right { color: var(--fg-faint); font-size: 12px; }
+.title-link { color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--line-hi); }
+.title-link:hover { color: var(--cyan); }
+
+.field .danger, .danger { color: var(--danger); font-style: normal; font-size: 11px; }
+.ok { color: var(--green); }
 
 /* ---------- layout ---------- */
 main { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; }

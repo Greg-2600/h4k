@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tor proxychains4 \
     python3 python3-pip python3-venv python3-dev \
     dnsutils whois prips iputils-ping \
-    nmap \
+    nmap whatweb \
     && rm -rf /var/lib/apt/lists/*
 
 # Rapid7 official Metasploit apt repository
@@ -40,6 +40,7 @@ COPY api /opt/h4k/api
 COPY web /opt/h4k/web
 COPY scripts /opt/h4k/scripts
 COPY data /opt/h4k/data
+COPY README.md /opt/h4k/README.md
 
 # Proxychains config -> tor SOCKS (mirror of Greg-2600/proxy_scan)
 RUN printf 'strict_chain\nproxy_dns\ntcp_read_time_out 15000\ntcp_connect_time_out 8000\n[ProxyList]\nsocks5 127.0.0.1 9050\n' > /etc/proxychains.conf

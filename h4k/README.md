@@ -107,12 +107,32 @@ through Tor's SOCKS listener — no wrapper re-jiggering needed for the modules.
 ```
 target  ─► normalize (ip / cidr / hostname)
    │
-   ├─ [DNS recon]      dns_dumpster · sub_domain_lookup · reverse_dns  (optional)
+   ├─ [DNS recon]      dns_dumpster · sub_domain_lookup · reverse_dns   (optional)
    ├─ [port scan]      db_nmap  → hosts/services into the MSF database
-   ├─ [aux scanners]   scanner/<svc>_version · smb_enumshares · ...     (jobs awaited)
+   ├─ [fingerprint]    nmap banners + whatweb → make/model/os/technology
+   ├─ [aux scanners]  scanner/<svc>_version · smb_enumshares · ...      (jobs awaited)
    ├─ [collect]        services + vulns from the DB, scoped to target
+   ├─ [opt-in creds]   default/known creds vs matched services (verify/session)
    └─ [advise]         local CVE archive match  →  ranked recommendations
 ```
+
+### Fingerprinting & default credentials
+
+Two sources beyond the stock port scan:
+
+- **Fingerprint** — host make/model/OS/technology is derived from nmap service
+  banners and, for web services, `whatweb` output (added to the image).
+- **Default credentials (opt-in)** — a curated `data/creds.json` ships ~30
+  universal pairs (`admin/admin`, `root/toor`, `pi/raspberry`, ...) plus make/model
+  entries for home routers (Linksys, Netgear, TP-Link, D-Link, Belkin, ZyXEL,
+  ASUS, MikroTik, Ubiquiti, OpenWrt, pfSense, Arris/Surfboard, DrayTek),
+  Raspberry Pi OS, Apple macOS / Windows, IP cams/HVAC, and NAS boxes.
+
+Credential testing is **off by default**. It only runs when a scan explicitly
+sets `try_default_creds` (UI checkbox / API flag). When enabled, login modules
+run with `CreateSession` set per the operator's choice (verify-only by default,
+session-open if explicitly requested), so the tool still **advises** unless you
+tell it to open a session — on an authorized lab target only.
 
 Every finding is scoped back to the original target so you are never looking at
 a neighbor's machine by accident.
@@ -210,10 +230,11 @@ Current status: **all green.**
   (**CVE-2026-5463**, command injection). It is pinned in the lock/requirements
   and the RPC calls it exposes are only fed internally-constructed arguments.
 
-The tests live in `tests/` and cover the schemas, the OPSEC mode matrix, the
-CVE matcher (including the CherryPy not-included guard), recommendation
-scoring/ranking, the pipeline's pure helpers, and the HTTP API via a mocked
-Metasploit backend — no live daemon needed to run them.
+The tests live in `tests/` (64 passing) and cover the schemas, the OPSEC mode
+matrix, the CVE matcher (including the CherryPy not-included guard) and the
+default-credential archive, recommendation scoring/ranking, the pipeline's pure
+helpers, and the HTTP API via a mocked Metasploit backend — no live daemon
+needed to run them.
 
 ---
 
@@ -231,14 +252,16 @@ api/
   routers/scan.py   REST endpoints + job runner
   services/
     msfrpc.py       thin pymetasploit3 wrapper
-    scan_pipeline.py orchestrator: recon → scan → analyze
+    scan_pipeline.py orchestrator: recon → fingerprint → scan → creds → analyze
     modes.py        stealth / tor / overt config
     report.py       scoring + recommendations
     cve_lookup.py   offline archive + matching + refresh
+    creds.py        default-credential archive matching
 data/cves.json      curated CVE archive
-web/                term-style UI (html/css/js)
+data/creds.json     default-credential archive (opt-in use)
+web/                term-style UI (html/css/js) + phrack ezine README view
 scripts/            DNS recon bash tools (from the author's toolbox)
-tests/              47 unit + API tests
+tests/              64 unit + API tests
 ```
 
 ---

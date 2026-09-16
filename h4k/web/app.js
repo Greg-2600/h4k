@@ -41,6 +41,7 @@ form.addEventListener("submit", async (e) => {
   const target = $("target").value.trim();
   const mode = document.querySelector('input[name="mode"]:checked').value;
   const useCve = $("cve-toggle").checked;
+  const tryCreds = $("creds-toggle").checked;
   $("target").value = "";
   scanBtn.disabled = true;
   statusPane.hidden = false;
@@ -48,11 +49,13 @@ form.addEventListener("submit", async (e) => {
   prog.style.width = "0%"; pctEl.textContent = "0";
   $("status-msg").textContent = "queued…";
   $("status-tag").textContent = "queued";
-  log(`scan ${target} · mode=${mode}` + (useCve ? " · cve-db" : ""), "info");
+  log(`scan ${target} · mode=${mode}` + (useCve ? " · cve-db" : "")
+    + (tryCreds ? " · creds=ON" : ""), "info");
   try {
     const resp = await fetch("/api/scan", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target, mode, do_dns_recon: true, do_vuln_scan: true }),
+      body: JSON.stringify({ target, mode, do_dns_recon: true, do_vuln_scan: true,
+        try_default_creds: tryCreds, open_sessions: tryCreds }),
     });
     if (!resp.ok) throw new Error("http " + resp.status);
     const job = await resp.json();
@@ -105,7 +108,9 @@ function render(r) {
   $("report-meta").textContent =
     `${r.target} · ${r.mode} · ${(r.created_at || "").slice(11, 19)}`;
   renderHosts(r.hosts);
+  renderFingerprints(r.fingerprints);
   renderVulns(r.vulns, r.mode);
+  renderCreds(r.credentials);
   renderRecs(r.recommendations);
   renderNotes(r.notes);
 
@@ -117,6 +122,32 @@ function render(r) {
       $("tab-" + t.dataset.tab).classList.add("active");
     }));
   log(`report: ${r.hosts.length} host(s) · ${r.vulns.length} vuln(s) · ${r.recommendations.length} vector(s)`, "ok");
+}
+
+function renderFingerprints(fps) {
+  const el = $("tab-fp");
+  if (!fps || !fps.length) { el.innerHTML = "<p class='msg'>no fingerprint data</p>"; return; }
+  let h = "<table><tr><th>host</th><th>vendor</th><th>model</th><th>os</th><th>technology</th><th>source</th></tr>";
+  for (const f of fps) {
+    h += `<tr><td>${esc(f.host)}</td><td>${esc(f.vendor || "?")}</td>` +
+      `<td>${esc(f.model || "—")}</td><td>${esc(f.os || "—")}</td>` +
+      `<td>${esc((f.technology || []).join(", ") || "—")}</td>` +
+      `<td>${esc((f.source || []).join(", "))}</td></tr>`;
+  }
+  el.innerHTML = h + "</table>";
+}
+
+function renderCreds(creds) {
+  const el = $("tab-creds");
+  if (!creds || !creds.length) { el.innerHTML = "<p class='msg'>no credentials tested (opt-in default).</p>"; return; }
+  let h = "<table><tr><th>host</th><th>service</th><th>user</th><th>password</th><th>vendor</th><th>status</th></tr>";
+  for (const c of creds) {
+    h += `<tr><td>${esc(c.host)}</td><td>${esc(c.service)}:${esc(c.port ?? "?")}</td>` +
+      `<td>${esc(c.user)}</td><td>${esc(c.password)}</td>` +
+      `<td>${esc(c.vendor || "common")}</td>` +
+      `<td>${c.verified ? '<span class="ok">verified</span>' : '<span>tested</span>'}</td></tr>`;
+  }
+  el.innerHTML = h + "</table>";
 }
 
 function renderHosts(hosts) {

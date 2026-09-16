@@ -26,7 +26,7 @@
 
     <header class="titlebar">
       <div class="title-dots"><span></span><span></span><span></span></div>
-      <div class="title-label">h4k · zsh — recon</div>
+      <div class="title-label">h4k · zsh — recon <a class="title-link" href="/readme" target="_blank">[read the ezine]</a></div>
       <div class="title-right" id="sess">session: local</div>
     </header>
 
@@ -66,6 +66,11 @@
             <span>enrich from local cve db</span>
           </label>
 
+          <label class="field inline">
+            <input type="checkbox" id="creds-toggle" />
+            <span>try default credentials <em class="danger">(opt-in, authorized scope)</em></span>
+          </label>
+
           <button type="submit" id="scan-btn">run scan</button>
         </form>
       </section>
@@ -87,12 +92,16 @@
       </div>
       <nav class="tabs">
         <button class="tab active" data-tab="hosts">hosts</button>
+        <button class="tab" data-tab="fp">fingerprint</button>
         <button class="tab" data-tab="vulns">vulns</button>
+        <button class="tab" data-tab="creds">creds</button>
         <button class="tab" data-tab="recs">recommended attack</button>
         <button class="tab" data-tab="notes">raw notes</button>
       </nav>
       <div id="tab-hosts" class="tab-panel active"></div>
+      <div id="tab-fp" class="tab-panel"></div>
       <div id="tab-vulns" class="tab-panel"></div>
+      <div id="tab-creds" class="tab-panel"></div>
       <div id="tab-recs" class="tab-panel"></div>
       <div id="tab-notes" class="tab-panel"></div>
     </section>
