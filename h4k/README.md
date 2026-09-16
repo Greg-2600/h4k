@@ -46,6 +46,13 @@ authorized lab target:
   *What is broken?     (scan + local CVE cross-ref)
   *Where do I hit next?(prioritized recommendations)
 
+It also analyzes the **software you actually run**: upload/clone source and get
+SAST (Semgrep + heuristics), SBOM/SCA (supply-chain CVEs), crash triage, PoC
+skeletons, and AI-assisted root-cause & patching (local Ollama) — on top of a
+coverage-guided fuzzing lab.
+
+> Full inventory & design decisions: **`RELEASE_NOTES.md`· `ROADMAP.md`**.
+
 Every aggressive action — default-credential testing, Metasploit exploitation,
 and the deep toolkit (brute force, web vuln, SQLi) sweep — is **opt-in and off
 by default**. A plain scan only reconnoiters, fingerprints, and advises. You
