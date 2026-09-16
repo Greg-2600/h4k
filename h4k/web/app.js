@@ -472,6 +472,68 @@ function renderFuzz(cands) {
   el.innerHTML = h + "</table>";
 }
 
+/* ---------- source analysis (SAST) ---------- */
+$("source-run").addEventListener("click", async () => {
+  const file = $("source-file").files[0];
+  const gitUrl = $("source-url").value.trim();
+  if (!file && !gitUrl) { log("[!] provide a file or git URL to analyze", "err"); return; }
+  $("source-panel").hidden = false;
+  $("exploit-panel").hidden = true;
+  $("source-status").textContent = "running";
+  $("tab-source").innerHTML = "<p class='msg'>analyzing source…</p>";
+  try {
+    let resp;
+    if (file) {
+      const fd = new FormData();
+      fd.append("file", file);
+      resp = await fetch("/api/source/scan/upload", { method: "POST", body: fd });
+    } else {
+      resp = await fetch("/api/source/scan", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ git_url: gitUrl }),
+      });
+    }
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const result = await resp.json();
+    $("source-status").textContent = "done";
+    renderSource(result);
+  } catch (err) {
+    $("source-status").textContent = "error";
+    $("tab-source").innerHTML = "<p class='err'>" + esc(err.message) + "</p>";
+    log("source analysis error " + err.message, "err");
+  }
+});
+
+function renderSource(result) {
+  const el = $("tab-source");
+  let html = `<p class='msg'>source: ${esc(result.name)} · files scanned: ${esc(result.files_scanned)} · findings: ${esc(result.findings.length)}</p>`;
+  if (!result.findings.length) { html += "<p class='ok'>no risky patterns found</p>"; el.innerHTML = html; return; }
+  html += "<table><tr><th>sev</th><th>cwe</th><th>file</th><th>line</th><th>issue</th><th></th></tr>";
+  for (const f of result.findings) {
+    const sev = f.severity === "critical" || f.severity === "high" ? "err" : "";
+    html += `<tr><td class="${sev}">${esc(f.severity)}</td><td>${esc(f.cwe)}</td>` +
+      `<td>${esc(f.file)}:${esc(f.line)}</td><td>${esc(f.code || "—").slice(0, 40)}</td>` +
+      `<td>${esc(f.name)}</td>` +
+      `<td><button class="btn-sub" onclick="genExploit(${JSON.stringify(f)})">poc</button></td></tr>`;
+  }
+  el.innerHTML = html + "</table>";
+}
+
+async function genExploit(finding) {
+  $("exploit-panel").hidden = false;
+  $("tab-exploit").textContent = "generating disclosure PoC…";
+  try {
+    const resp = await fetch("/api/source/exploit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rule_id: finding.rule_id, finding }),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const poc = await resp.text();
+    $("tab-exploit").textContent = poc;
+    log("[+] PoC skeleton generated for " + finding.rule_id, "ok");
+  } catch (err) { $("tab-exploit").textContent = "error: " + err.message; }
+}
+
 /* ---------- session indicator toggling ---------- */
 (async () => {
   try {

@@ -18,6 +18,9 @@ extend-exclude = [".venv", "__pycache__"]
 select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RUF", "ASYNC"]
 ignore = ["RUF001", "RUF002", "RUF003", "E501"]
 
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
 [tool.pylint]
 master.py-version = "3.11"
 init-hook = "import os,sys; sys.path.insert(0, os.path.join(os.getcwd(), 'h4k', 'api'))"

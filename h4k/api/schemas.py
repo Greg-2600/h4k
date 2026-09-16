@@ -227,3 +227,36 @@ class ExportResult(BaseModel):
     job_id: str
     formats: list[str] = []
     filenames: dict[str, str] = {}
+
+
+class SourceScanRequest(BaseModel):
+    """Analyze a software project for vulnerabilities. One of:
+    `git_url` to clone, or an uploaded archive (multipart file)."""
+
+    git_url: str | None = None
+    name: str = "source"
+
+
+class SourceFinding(BaseModel):
+    rule_id: str
+    name: str
+    severity: str  # low | medium | high | critical
+    cwe: str
+    file: str
+    line: int
+    code: str = ""
+    description: str = ""
+
+
+class SourceScanResult(BaseModel):
+    name: str
+    root: str = ""
+    files_scanned: int = 0
+    findings: list[SourceFinding] = []
+
+
+class SourceExploitRequest(BaseModel):
+    """Generate a proof-of-concept skeleton for a finding (disclosure only)."""
+
+    rule_id: str
+    finding: SourceFinding | None = None

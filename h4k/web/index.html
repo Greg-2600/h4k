@@ -124,6 +124,15 @@
             <span class="field inline">target port</span>
             <input type="text" id="fuzz-port" class="tiny-input" placeholder="auto" />
           </div>
+
+          <div class="btn-row">
+            <button type="button" id="source-btn" class="btn-sub">SAST source analysis</button>
+          </div>
+          <div class="deep-row" id="source-controls">
+            <input type="file" id="source-file" accept=".zip,.tar,.tar.gz,.tgz" class="file-input" />
+            <input type="text" id="source-url" class="full-input" placeholder="or git URL (https://gitlab.com/org/repo.git)" />
+            <button type="button" id="source-run" class="btn-sub">analyze</button>
+          </div>
         </form>
       </section>
 
@@ -190,6 +199,19 @@
         <span class="pane-status" id="fuzz-status">idle</span>
       </div>
       <div id="tab-fuzz">mutate inputs toward a service YOU OWN and triage anomalies as potential bug candidates</div>
+    </section>
+
+    <!-- source SAST analysis -->
+    <section class="pane results" id="source-panel" hidden>
+      <div class="pane-head">
+        <span class="pane-title">/source analysis</span>
+        <span class="pane-status" id="source-status">idle</span>
+      </div>
+      <div id="tab-source">upload a zip/tar/tar.gz or clone a git URL, then scan the source for vulnerabilities</div>
+    </section>
+    <section class="pane results" id="exploit-panel" hidden>
+      <div class="pane-head"><span class="pane-title">/poc disclosure skeleton</span></div>
+      <pre class="notes" id="tab-exploit"></pre>
     </section>
 
   </div>

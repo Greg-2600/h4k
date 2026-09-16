@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from routers import scan as scan_router
+from routers import scan as scan_router, source as source_router
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="h4k", lifespan=lifespan)
 
 app.include_router(scan_router.router)
+app.include_router(source_router.router)
 
 # Serve the plain HTML/JS frontend.
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
