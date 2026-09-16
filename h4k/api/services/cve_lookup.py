@@ -5,7 +5,6 @@ import json
 import logging
 import urllib.request
 from pathlib import Path
-from typing import Any, List, Optional
 
 from schemas import Host, Service, Vuln
 
@@ -14,18 +13,16 @@ logger = logging.getLogger("h4k.cve")
 DATA_FILE = Path(__file__).resolve().parent.parent.parent / "data" / "cves.json"
 
 # Remote source for optional online refresh (fallback if unreachable -> offline).
-REFRESH_URL = (
-    "https://raw.githubusercontent.com/Greg-2600/h4k/main/data/cves.json"
-)
+REFRESH_URL = "https://raw.githubusercontent.com/Greg-2600/h4k/main/data/cves.json"
 
 
 class CveDb:
     def __init__(self, path: Path | str | None = None):
         self.path = Path(path or DATA_FILE)
-        self.cves: List[dict] = []
+        self.cves: list[dict] = []
         self.reload()
 
-    def reload(self):
+    def reload(self) -> None:
         if not self.path.exists():
             logger.warning("CVE data not found at %s", self.path)
             self.cves = []
@@ -41,7 +38,7 @@ class CveDb:
 
     # ---- matching ----------------------------------------------------------
 
-    def match_service(self, svc: Service) -> List[dict]:
+    def match_service(self, svc: Service) -> list[dict]:
         """Return CVEs relevant to a discovered service, sorted by CVSS desc."""
         if not self.cves:
             return []
@@ -61,7 +58,7 @@ class CveDb:
                 hits.append(cve)
         return sorted(hits, key=lambda c: -float(c.get("cvss", 0.0)))
 
-    def match_refs(self, refs: List[str]) -> List[dict]:
+    def match_refs(self, refs: list[str]) -> list[dict]:
         """Return CVEs whose ID/alias appears in the refs of a finding."""
         if not refs:
             return []
@@ -86,7 +83,8 @@ class CveDb:
         """
         url = url or REFRESH_URL
         try:
-            with urllib.request.urlopen(url, timeout=timeout) as resp:
+            # URL is a fixed https constant (no user input); allow only http(s).
+            with urllib.request.urlopen(url, timeout=timeout) as resp:  # nosec B310
                 payload = json.loads(resp.read().decode("utf-8"))
             if not isinstance(payload, dict) or "cves" not in payload:
                 logger.warning("remote CVE payload missing 'cves'; keeping local")
@@ -99,18 +97,16 @@ class CveDb:
             logger.info("CVE refresh offline or failed (%s); using bundled db", exc)
             return False
 
-    def enrich(self, hosts: List[Host], vulns: List[Vuln]) -> dict:
+    def enrich(self, hosts: list[Host], vulns: list[Vuln]) -> dict:
         """Map host/services and vulns -> matched CVEs.
 
         Returns {"services": {host_addr: {service_key: [cve,...]}},
                  "vulns":    {vuln_index: [cve,...]}}
         """
-        result = {
-            "services": {},
-            "vulns": {},
-        }
+        services: dict[str, dict[str, list[dict]]] = {}
+        vuln_map: dict[str, list[dict]] = {}
         if not self.cves:
-            return result
+            return {"services": services, "vulns": vuln_map}
 
         for host in hosts:
             for svc in host.services:
@@ -118,10 +114,10 @@ class CveDb:
                 if not matched:
                     continue
                 key = f"{host.address}:{svc.port}"
-                result["services"].setdefault(host.address, {})[key] = matched
+                services.setdefault(host.address, {})[key] = matched
 
         for idx, vuln in enumerate(vulns):
             matched = self.match_refs(vuln.refs)
             if matched:
-                result["vulns"][idx] = matched
-        return result
+                vuln_map[str(idx)] = matched
+        return {"services": services, "vulns": vuln_map}

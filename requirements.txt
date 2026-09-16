@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+pymetasploit3
+pydantic

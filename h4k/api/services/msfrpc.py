@@ -22,7 +22,8 @@ class MsfClient:
     def _connect(self) -> MsfRpcClient:
         if self._client is not None:
             try:
-                self._client.core.version
+                # touch the connection to check it is still alive
+                _ = self._client.core.version
                 return self._client
             except Exception:
                 self._client = None
@@ -42,7 +43,9 @@ class MsfClient:
             except Exception as exc:
                 logger.warning(
                     "msfrpcd connect attempt %s/%s failed: %s",
-                    attempt, RETRY_ATTEMPTS, exc,
+                    attempt,
+                    RETRY_ATTEMPTS,
+                    exc,
                 )
                 time.sleep(RETRY_SLEEP)
         raise ConnectionError("could not reach msfrpcd")
@@ -73,8 +76,8 @@ class MsfClient:
     # pymetasploit3's DbManager only exposes connect/driver/status/workspace,
     # so call the DB RPC methods directly with the workspace filter.
 
-    def _db_call(self, method: str, workspace: str = "default", **filt) -> list:
-        opts = dict(filt)
+    def _db_call(self, method: str, workspace: str = "default", **filt: object) -> list:
+        opts: dict[str, object] = dict(filt)
         opts["workspace"] = workspace
         res = self.client.call(method, [opts])
         if not isinstance(res, dict):
@@ -113,7 +116,7 @@ class MsfClient:
         return _to_dict(self.client.modules.results(uuid))
 
 
-def _to_dict(raw) -> dict:
+def _to_dict(raw: object) -> dict:
     if isinstance(raw, dict):
         return raw
-    return raw
+    return {}

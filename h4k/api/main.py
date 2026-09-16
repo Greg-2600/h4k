@@ -7,25 +7,28 @@ from pathlib import Path
 
 # Allow flat imports (from schemas import ...) since this file lives in api/.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from collections.abc import AsyncIterator
 
-import schemas
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from routers import scan as scan_router
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     host = os.environ.get("MSF_HOST", "127.0.0.1")
     port = int(os.environ.get("MSF_PORT", "55553"))
     password = os.environ.get("MSF_PASSWORD", "h4k_msf_rocks")
     # Write the shared client into app_state so routers can import it.
     import app_state
+    from services.cve_lookup import CveDb
     from services.msfrpc import MsfClient
+
     app_state.msf_client = MsfClient(host, port, password)
     # Load the local CVE database.
-    from services.cve_lookup import CveDb
     app_state.cve_db = CveDb()
     # Optional refresh if network is available (keeps bundled snapshot otherwise).
     if os.environ.get("H4K_REFRESH_CVE", "1") == "1":
@@ -35,7 +38,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="h4k", lifespan=lifespan)
 
-from routers import scan as scan_router
 app.include_router(scan_router.router)
 
 # Serve the plain HTML/JS frontend.
@@ -43,6 +45,5 @@ app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 
 
 @app.get("/", include_in_schema=False)
-async def index():
-    from fastapi.responses import FileResponse
+async def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")

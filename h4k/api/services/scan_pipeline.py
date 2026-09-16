@@ -2,12 +2,12 @@
 # db_nmap port scan -> auxiliary vuln/enum scanners -> collect findings.
 import ipaddress
 import logging
-import subprocess
-from typing import Callable, List, Optional
+import subprocess  # nosec B404 - required to drive msfconsole / bash recon tools
+from collections.abc import Callable
+from contextlib import suppress
 
-from schemas import ScanMode, ScanRequest
-
-from services.modes import get_mode, scanners_for_service
+from schemas import ScanRequest
+from services.modes import ScanModeConfig, get_mode, scanners_for_service
 from services.msfrpc import MsfClient
 
 logger = logging.getLogger("h4k.pipeline")
@@ -17,14 +17,14 @@ class ScanPipeline:
     def __init__(
         self,
         msf: MsfClient,
-        progress: Optional[Callable[[str, float], None]] = None,
+        progress: Callable[[str, float], None] | None = None,
     ):
         self.msf = msf
         self.progress = progress or (lambda msg, pct: None)
 
     # ---- helpers -----------------------------------------------------------
 
-    def _tick(self, message: str, pct: float):
+    def _tick(self, message: str, pct: float) -> None:
         logger.info("%s (%.0f%%)", message, pct)
         self.progress(message, pct)
 
@@ -46,13 +46,13 @@ class ScanPipeline:
 
     # ---- public API --------------------------------------------------------
 
-    def run(self, req: ScanRequest, job_id: str) -> dict:
+    def run(self, req: ScanRequest) -> dict:
         mode = get_mode(req.mode.value)
         target = self.normalize_target(req.target)
         self._tick(f"[{mode.name}] normalized target -> {target}", 5)
 
         # 1. Optional DNS recon enrichment (your GitHub bash tools).
-        dns_notes: List[str] = []
+        dns_notes: list[str] = []
         if req.do_dns_recon and _looks_like_domain(req.target):
             dns_notes = self._dns_recon(req.target)
             self._tick("DNS recon complete", 15)
@@ -88,23 +88,26 @@ class ScanPipeline:
 
     # ---- steps -------------------------------------------------------------
 
-    def _db_nmap(self, target: str, args: List[str]):
-        raw = target
-        try:
-            raw = str(ipaddress.ip_address(target))
-        except ValueError:
-            pass
+    def _db_nmap(self, target: str, args: list[str]) -> None:
+        with suppress(ValueError):
+            target = str(ipaddress.ip_address(target))
         # db_nmap writes host/service/vuln rows straight into the Metasploit DB
         # (reuses the framework's nmap + import path rather than reimplementing).
-        cmd = ["db_nmap"] + args + [raw]
+        cmd = ["db_nmap", *args, target]
         self._msfconsole_run(cmd)
 
-    def _msfconsole_run(self, argv: List[str]) -> str:
+    def _msfconsole_run(self, argv: list[str]) -> str:
         # The DB is already connected by msfrpcd, so just run db_nmap.
+        # argv is built internally from fixed module names (not user input).
         cmd_str = " ".join(argv)
         cli = f"msfconsole -q -x '{cmd_str};' </dev/null"
-        proc = subprocess.run(["bash", "-lc", cli], capture_output=True,
-                              text=True, timeout=3600)
+        proc = subprocess.run(  # nosec B603 B607 - internal argv, bash required
+            ["bash", "-lc", cli],
+            capture_output=True,
+            text=True,
+            timeout=3600,
+            check=False,
+        )
         return proc.stdout + proc.stderr
 
     def _collect_hosts_and_services(self, target: str) -> list:
@@ -117,13 +120,15 @@ class ScanPipeline:
                     continue
                 if not _target_matches(addr, target):
                     continue
-                hosts.append({
-                    "address": addr,
-                    "hostname": rec.get("name") or None,
-                    "os": rec.get("os_name") or rec.get("os_flavor") or None,
-                    "state": rec.get("state"),
-                    "services": [],
-                })
+                hosts.append(
+                    {
+                        "address": addr,
+                        "hostname": rec.get("name") or None,
+                        "os": rec.get("os_name") or rec.get("os_flavor") or None,
+                        "state": rec.get("state"),
+                        "services": [],
+                    }
+                )
         except Exception as exc:
             logger.warning("hosts() failed: %s", exc)
 
@@ -134,25 +139,30 @@ class ScanPipeline:
                     continue
                 for host in hosts:
                     if host["address"] == str(addr):
-                        host["services"].append({
-                            "port": rec.get("port"),
-                            "proto": rec.get("proto"),
-                            "service": rec.get("name"),
-                            "state": rec.get("state"),
-                            "info": rec.get("info"),
-                        })
+                        host["services"].append(
+                            {
+                                "port": rec.get("port"),
+                                "proto": rec.get("proto"),
+                                "service": rec.get("name"),
+                                "state": rec.get("state"),
+                                "info": rec.get("info"),
+                            }
+                        )
         except Exception as exc:
             logger.warning("services() failed: %s", exc)
         return hosts
 
-    def _run_aux_scanners(self, hosts: list, mode, timeout: float = 200.0):
+    def _run_aux_scanners(
+        self, hosts: list[dict], mode: ScanModeConfig, timeout: float = 200.0
+    ) -> None:
         import time
-        launched: list[tuple[int, str, int]] = []  # job_id, module, deadline
+
+        launched: list[tuple[object, str, str]] = []  # job_id, module, uuid
         for host in hosts:
             addr = host["address"]
             for svc in host["services"]:
                 for module in scanners_for_service(svc.get("service") or ""):
-                    opts = {"RHOSTS": addr}
+                    opts: dict[str, object] = {"RHOSTS": addr}
                     if svc.get("port"):
                         opts["RPORT"] = svc["port"]
                     if mode.proxies:
@@ -160,7 +170,9 @@ class ScanPipeline:
                     try:
                         res = self.msf.execute("auxiliary", module, opts)
                         if isinstance(res, dict) and res.get("job_id") is not None:
-                            launched.append((res["job_id"], module, res.get("uuid", "")))
+                            launched.append(
+                                (res["job_id"], module, str(res.get("uuid", "")))
+                            )
                         logger.info("launched %s (job %s)", module, res.get("job_id"))
                     except Exception as exc:
                         logger.warning("aux scanner %s failed: %s", module, exc)
@@ -192,12 +204,14 @@ class ScanPipeline:
                 addr = rec.get("host")
                 if not _target_matches(str(addr), target):
                     continue
-                vulns.append({
-                    "name": rec.get("name") or rec.get("info") or "unknown",
-                    "refs": rec.get("refs") or [],
-                    "port": rec.get("port"),
-                    "info": rec.get("info"),
-                })
+                vulns.append(
+                    {
+                        "name": rec.get("name") or rec.get("info") or "unknown",
+                        "refs": rec.get("refs") or [],
+                        "port": rec.get("port"),
+                        "info": rec.get("info"),
+                    }
+                )
         except Exception as exc:
             logger.warning("vulns() failed: %s", exc)
         return vulns
@@ -240,8 +254,16 @@ class ScanPipeline:
         }
         for name, argv in tool_map.items():
             try:
-                proc = subprocess.run(argv, capture_output=True, text=True,
-                                       timeout=300, cwd="/opt/h4k/scripts")
+                # argv[0] is a fixed script path; domain is passed as a bare
+                # argument (no shell interpolation), safe from injection.
+                proc = subprocess.run(  # nosec B603 - no shell, fixed script
+                    argv,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    cwd="/opt/h4k/scripts",
+                    check=False,
+                )
                 if proc.stdout.strip():
                     notes.append(f"[{name}] {proc.stdout.strip()[:300]}")
             except Exception as exc:

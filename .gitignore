@@ -8,3 +8,10 @@ docker.env
 # python
 __pycache__/
 *.py[co]
+.venv/
+.pytest_cache/
+htmlcov/
+.coverage
+.mypy_cache/
+.ruff_cache/
+.pylint.d/

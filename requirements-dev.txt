@@ -1,0 +1,20 @@
+# Runtime dependencies (also needed in the built container)
+fastapi
+uvicorn
+pymetasploit3
+pydantic
+
+# Testing
+pytest
+pytest-cov
+httpx
+
+# Linting & static analysis
+black
+ruff
+isort
+flake8
+pylint
+mypy
+bandit
+safety

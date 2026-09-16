@@ -75,9 +75,21 @@ MODES = {
         proxies=None,
         # Slow, non-invasive: low parallelism, top-100 ports, no OS detection,
         # high timing. Kept bounded so the scan completes within a sane window.
-        nmap_args=["-Pn", "-sT", "-T2", "--top-ports", "100",
-                   "--host-timeout", "240", "--max-retries", "1",
-                   "--randomize-hosts", "-sV", "--version-intensity", "0"],
+        nmap_args=[
+            "-Pn",
+            "-sT",
+            "-T2",
+            "--top-ports",
+            "100",
+            "--host-timeout",
+            "240",
+            "--max-retries",
+            "1",
+            "--randomize-hosts",
+            "-sV",
+            "--version-intensity",
+            "0",
+        ],
     ),
     "tor": ScanModeConfig(
         name="tor",
@@ -85,9 +97,20 @@ MODES = {
         proxies=TOR_SOCKS,
         # proxychains wraps the whole process; nmap flags similar to stealth to
         # be polite through a slow circuit.
-        nmap_args=["-Pn", "-sT", "-T2", "--top-ports", "100",
-                   "--host-timeout", "240", "--max-retries", "1",
-                   "-sV", "--version-intensity", "1"],
+        nmap_args=[
+            "-Pn",
+            "-sT",
+            "-T2",
+            "--top-ports",
+            "100",
+            "--host-timeout",
+            "240",
+            "--max-retries",
+            "1",
+            "-sV",
+            "--version-intensity",
+            "1",
+        ],
     ),
     "overt": ScanModeConfig(
         name="overt",

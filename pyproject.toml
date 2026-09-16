@@ -1,0 +1,66 @@
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+include = '\.pyi?$'
+extend-exclude = '__pycache__'
+
+[tool.isort]
+profile = "black"
+line_length = 88
+combine_as_imports = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = [".venv", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RUF", "ASYNC"]
+ignore = ["RUF001", "RUF002", "RUF003", "E501"]
+
+[tool.pylint]
+master.py-version = "3.11"
+init-hook = "import os,sys; sys.path.insert(0, os.path.join(os.getcwd(), 'h4k', 'api'))"
+disable = [
+  "C0114",
+  "C0115",
+  "C0116",
+  "C0103",
+  "R0903",
+  "R0913",
+  "W0718",
+  "W4701",
+  "C0415",
+  "R0911",   # too-many-return-statements
+  "R0912",   # too-many-branches
+  "R0914",   # too-many-locals
+  "R0917",   # too-many-positional-arguments
+  "C0206",   # consider-using-dict-items (nested lookups clearer here)
+  "W0613",   # unused-argument (framework callbacks)
+]
+fail-under = 7.0
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+allow_untyped_globals = false
+
+[tool.bandit]
+exclude_dirs = [".venv", "__pycache__"]
+skips = ["B101", "B110", "B324"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["h4k/api"]
+omit = ["h4k/api/services/msfrpc.py"]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true

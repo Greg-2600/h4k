@@ -1,11 +1,11 @@
 # h4k API schemas
-from enum import Enum
-from typing import Any, List, Optional, Dict
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel
 
 
-class ScanMode(str, Enum):
+class ScanMode(StrEnum):
     stealth = "stealth"
     tor = "tor"
     overt = "overt"
@@ -21,44 +21,44 @@ class ScanRequest(BaseModel):
 class Service(BaseModel):
     port: int
     proto: str = "tcp"
-    service: Optional[str] = None
-    state: Optional[str] = None
-    info: Optional[str] = None
+    service: str | None = None
+    state: str | None = None
+    info: str | None = None
 
 
 class Host(BaseModel):
     address: str
-    hostname: Optional[str] = None
-    os: Optional[str] = None
-    state: Optional[str] = None
-    services: List[Service] = []
+    hostname: str | None = None
+    os: str | None = None
+    state: str | None = None
+    services: list[Service] = []
 
 
 class Vuln(BaseModel):
     name: str
-    refs: List[str] = []
-    port: Optional[int] = None
-    info: Optional[str] = None
+    refs: list[str] = []
+    port: int | None = None
+    info: str | None = None
 
 
 class Recommendation(BaseModel):
     rank: int
     title: str
-    module: Optional[str] = None
+    module: str | None = None
     why: str
     difficulty: str
-    refs: List[str] = []
+    refs: list[str] = []
 
 
 class Report(BaseModel):
     target: str
     mode: ScanMode
     created_at: str
-    hosts: List[Host] = []
-    vulns: List[Vuln] = []
-    recommendations: List[Recommendation] = []
-    notes: List[str] = []
-    raw: Optional[Dict[str, Any]] = None
+    hosts: list[Host] = []
+    vulns: list[Vuln] = []
+    recommendations: list[Recommendation] = []
+    notes: list[str] = []
+    raw: dict[str, Any] | None = None
 
 
 class Job(BaseModel):
@@ -66,5 +66,5 @@ class Job(BaseModel):
     status: str  # queued | running | done | error
     progress: float = 0.0
     message: str = ""
-    report: Optional[Report] = None
-    error: Optional[str] = None
+    report: Report | None = None
+    error: str | None = None
