@@ -10,3 +10,12 @@ services:
       TOR_PORT: "9050"
       API_PORT: "3137"
     restart: unless-stopped
+
+  # lab-only intentionally-vulnerable fuzzing target (teaches 0-day discovery)
+  vulnlab:
+    build: ../vulnlab
+    image: vulnlab:latest
+    network_mode: host
+    environment:
+      VULNLAB_PORT: "8080"
+    restart: unless-stopped
