@@ -114,6 +114,7 @@ target  ─► normalize (ip / cidr / hostname)
    ├─ [traceroute]     path/authority mapping when present
    ├─ [aux scanners]  scanner/<svc>_version · smb_enumshares · ...       (jobs awaited)
    ├─ [collect]        services + vulns from the DB, scoped to target
+   ├─ [posture]        traceroute + exposure → security level/score/confidence
    ├─ [opt-in creds]   default/known creds vs matched services (verify/session)
    └─ [advise]         local CVE archive match  →  ranked recommendations
 ```
@@ -249,7 +250,7 @@ Current status: **all green.**
   (**CVE-2026-5463**, command injection). It is pinned in the lock/requirements
   and the RPC calls it exposes are only fed internally-constructed arguments.
 
-The tests live in `tests/` (73 passing) and cover the schemas, the OPSEC mode
+The tests live in `tests/` (78 passing) and cover the schemas, the OPSEC mode
 matrix, the CVE matcher (including the CherryPy not-included guard) and the
 default-credential archive, recommendation scoring/ranking, the pipeline's pure
 helpers, and the HTTP API via a mocked Metasploit backend — no live daemon
@@ -274,6 +275,7 @@ api/
     scan_pipeline.py orchestrator: recon → fingerprint → scan → creds → attack
     attack.py       opt-in exploit execution + module mapping
     discovery.py    ARP neighbor discovery (arp-scan / arp cache / msf)
+    security.py     traceroute + exposure → security posture heuristic
     modes.py        stealth / tor / overt config
     report.py       scoring + recommendations
     cve_lookup.py   offline archive + matching + refresh
@@ -282,7 +284,7 @@ data/cves.json      curated CVE archive
 data/creds.json     default-credential archive (opt-in use)
 web/                term-style UI (html/css/js) + phrack ezine README view
 scripts/            DNS recon bash tools (from the author's toolbox)
-tests/              73 unit + API tests
+tests/              78 unit + API tests
 ```
 
 ---

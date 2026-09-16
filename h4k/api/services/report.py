@@ -11,6 +11,7 @@ from schemas import (
     Host,
     Recommendation,
     Report,
+    SecurityAssessment,
     Service,
     Vuln,
 )
@@ -75,6 +76,7 @@ def build_report(
     fingerprints: list[dict] | None = None,
     credentials: list[dict] | None = None,
     attacks: list[dict] | None = None,
+    security: list[dict] | None = None,
     log: list[str] | None = None,
 ) -> Report:
     host_models = [_host_from_dict(h) for h in hosts]
@@ -88,6 +90,7 @@ def build_report(
     fp_models = [_fingerprint_from_dict(f or {}) for f in fingerprints or []]
     cred_models = [_credential_from_dict(c or {}) for c in credentials or []]
     attack_models = [_attack_from_dict(a or {}) for a in attacks or []]
+    security_models = [_security_from_dict(s or {}) for s in security or []]
 
     notes_out = notes + _cve_notes(enriched)
     if cred_models:
@@ -100,6 +103,12 @@ def build_report(
         notes_out.append(
             f"[attacks] {len(attack_models)} exploit attempt(s) run (opt-in)."
         )
+    if security_models:
+        for s in security_models:
+            notes_out.append(
+                f"[sec] {s.host}: {s.level.upper()} posture "
+                f"(score {s.score:.0f}, confidence {s.confidence})."
+            )
 
     return Report(
         target=target,
@@ -112,7 +121,19 @@ def build_report(
         fingerprints=fp_models,
         credentials=cred_models,
         attacks=attack_models,
+        security=security_models,
         log=log or [],
+    )
+
+
+def _security_from_dict(s: dict) -> SecurityAssessment:
+    return SecurityAssessment(
+        host=s.get("host", ""),
+        level=s.get("level", "unknown"),
+        score=float(s.get("score", 0.0)),
+        signals=list(s.get("signals") or []),
+        rationale=list(s.get("rationale") or []),
+        confidence=s.get("confidence", "low"),
     )
 
 

@@ -96,6 +96,7 @@ def _run_scan(job: dict[str, Any], req: ScanRequest) -> None:
             fingerprints=raw.get("fingerprints", []),
             credentials=raw.get("credentials", []),
             attacks=raw.get("attacks", []),
+            security=raw.get("security", []),
             log=job.get("log", []),
         )
         _scan_cache[_cache_key(req)] = {
@@ -317,6 +318,14 @@ def _report_markdown(report: Report) -> str:
     for c in report.credentials:
         port = c.port if c.port is not None else "?"
         lines.append(f"- `{c.host}:{port}` {c.user}:{c.password} ({c.vendor})")
+    lines += ["", "## Security posture (traceroute heuristic)", ""]
+    for s in report.security:
+        lines.append(
+            f"- `{s.host}` — **{s.level.upper()}** "
+            f"(score {s.score:.0f}/100, confidence {s.confidence})"
+        )
+        for r in s.rationale or []:
+            lines.append(f"    - {r}")
     lines += ["", "## Recommendations", ""]
     for r in report.recommendations:
         module = f" `{r.module}`" if r.module else ""

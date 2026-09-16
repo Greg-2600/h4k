@@ -98,6 +98,17 @@ class Attack(BaseModel):
     credential: str | None = None
 
 
+class SecurityAssessment(BaseModel):
+    """Educated, traceroute-derived guess at the security posture of a host."""
+
+    host: str
+    level: str  # high | medium | low | unknown
+    score: float  # 0-100 (higher = more exposed/better target)
+    signals: list[str] = []
+    rationale: list[str] = []
+    confidence: str = "low"  # low | medium | high
+
+
 class Report(BaseModel):
     target: str
     mode: ScanMode
@@ -110,6 +121,7 @@ class Report(BaseModel):
     fingerprints: list[Fingerprint] = []
     credentials: list[Credential] = []
     attacks: list[Attack] = []
+    security: list[SecurityAssessment] = []
     log: list[str] = []
 
 

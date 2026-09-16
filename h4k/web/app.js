@@ -176,6 +176,7 @@ function render(r) {
   renderVulns(r.vulns, r.mode);
   renderCreds(r.credentials);
   renderAttacks(r.attacks);
+  renderSecurity(r.security);
   renderRecs(r.recommendations);
   renderNotes(r.notes);
 
@@ -228,6 +229,23 @@ function renderCreds(creds) {
       `<td>${c.verified ? '<span class="ok">verified</span>' : '<span>tested</span>'}</td></tr>`;
   }
   el.innerHTML = h + "</table>";
+}
+
+function renderSecurity(sec) {
+  const el = $("tab-sec");
+  if (!sec || !sec.length) { el.innerHTML = "<p class='msg'>no security assessment (traceroute)</p>"; return; }
+  let h = "";
+  for (const s of sec) {
+    const cls = s.level === "low" ? "badge-critical" : (s.level === "medium" ? "badge-high" : "badge-sec");
+    h += '<div class="rec-card"><span class="rec-rank">◉</span>' +
+      '<span class="rec-title">' + esc(s.host) + '</span> ' +
+      '<span class="' + cls + '">' + esc(s.level.toUpperCase()) + ' posture</span>' +
+      ' <span class="rec-diff">score ' + esc(Math.round(s.score || 0)) + '/100 · confidence ' + esc(s.confidence || "low") + '</span><br/>' +
+      '<div class="rec-why">';
+    for (const r of (s.rationale || [])) h += '<div>· ' + esc(r) + '</div>';
+    h += "</div></div>";
+  }
+  el.innerHTML = h;
 }
 
 function renderHosts(hosts) {

@@ -185,6 +185,9 @@ tr:hover td { background: var(--bg-hi); }
 .badge.stealth { color: var(--cyan); background: color-mix(in srgb, var(--cyan) 12%, transparent); }
 .badge.tor { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .badge.overt { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, transparent); }
+.badge-sec { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
+.badge-critical { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.badge-high { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, transparent); }
 .dm .rec-card, .rec-card {
   border: 1px solid var(--line); border-radius: 8px;
   padding: 10px 12px; margin-bottom: 10px;

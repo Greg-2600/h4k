@@ -197,7 +197,11 @@ class ScanPipeline:
             self._tick("attempting active exploitation (opt-in)", 92)
             attacks = self._do_attacks(hosts, req.open_sessions)
 
-        # 9. Metasploit's own "analyze" suggestions.
+        # 9. Educated security-posture guess from traceroute + exposure signals.
+        self._tick("assessing security posture (traceroute)", 94)
+        security = self._assess_security(hosts, fingerprints)
+
+        # 10. Metasploit's own "analyze" suggestions.
         self._tick("running module analysis recommendations", 96)
         notes = dns_notes + self._analyze(target)
 
@@ -210,9 +214,32 @@ class ScanPipeline:
             "fingerprints": fingerprints,
             "credentials": credentials,
             "attacks": attacks,
+            "security": security,
         }
         self._tick("scan complete", 100)
         return report
+
+    def _assess_security(
+        self, hosts: list[dict], fingerprints: list[dict]
+    ) -> list[dict]:
+        """Traceroute + exposure based posture for each discovered host."""
+        from services.security import SecurityAssessmentService
+
+        svc = SecurityAssessmentService(progress=self._tick)
+        fp_map = {f["host"]: f for f in fingerprints}
+        out: list[dict] = []
+        for host in hosts:
+            addr = host["address"]
+            fp = fp_map.get(addr, {})
+            # merge fingerprint vendor/os/tech into the host dict for signals
+            host_with_fp = dict(host)
+            host_with_fp.setdefault("vendor", fp.get("vendor"))
+            host_with_fp.setdefault("os", fp.get("os") or host.get("os"))
+            host_with_fp.setdefault("technology", fp.get("technology"))
+            self._log(f"[sec] assessing posture of {addr} via traceroute")
+            a = svc.assess(addr, host_with_fp)
+            out.append(a)
+        return out
 
     def _raises_if_aborted(self) -> None:
         if self._should_stop():
