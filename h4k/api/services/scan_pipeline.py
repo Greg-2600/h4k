@@ -195,7 +195,9 @@ class ScanPipeline:
         attacks: list[dict] = []
         if req.do_attack:
             self._tick("attempting active exploitation (opt-in)", 92)
-            attacks = self._do_attacks(hosts, req.open_sessions)
+            attacks = self._do_attacks(
+                hosts, req.open_sessions, verified_creds=credentials
+            )
 
         # 9. Educated security-posture guess from traceroute + exposure signals.
         self._tick("assessing security posture (traceroute)", 94)
@@ -246,12 +248,25 @@ class ScanPipeline:
             self._log("abort requested — stopping scan")
             raise _ScanAbort()
 
-    def _do_attacks(self, hosts: list[dict], open_sessions: bool) -> list[dict]:
+    def _do_attacks(
+        self,
+        hosts: list[dict],
+        open_sessions: bool,
+        verified_creds: list[dict] | None = None,
+    ) -> list[dict]:
         """Opt-in exploitation: run exploit modules against discovered services."""
         from services.attack import AttackService
 
         svc = AttackService(self.msf, progress=self._tick)
-        # Build an AttackRequest-style list of services per host.
+        # index verified creds per host+service so exploits reuse them
+        cred_idx: dict[tuple[str, str], dict[str, str]] = {}
+        for c in verified_creds or []:
+            if not c.get("verified"):
+                continue
+            cred_idx[(c.get("host", ""), (c.get("service") or "").lower())] = {
+                "user": c.get("user", ""),
+                "password": c.get("password", ""),
+            }
         attacks: list[dict] = []
         for host in hosts:
             addr = host["address"]
@@ -260,8 +275,12 @@ class ScanPipeline:
                 module = AttackService._module_for_service(sname)
                 if not module:
                     continue
-                self._log(f"[attack] {addr} {sname} -> {module}")
-                res = svc._try_exploit(module, addr, sname, open_sessions)
+                cred = cred_idx.get((addr, sname.lower()))
+                self._log(
+                    f"[attack] {addr} {sname} -> {module}"
+                    + (" (with creds)" if cred else "")
+                )
+                res = svc._try_exploit(module, addr, sname, open_sessions, cred=cred)
                 attacks.append(
                     {
                         "host": addr,
@@ -271,6 +290,9 @@ class ScanPipeline:
                         "result": "success" if res["ok"] else "failed",
                         "detail": res["detail"],
                         "session_id": res.get("session_id"),
+                        "credential": (
+                            f"{cred['user']}:{cred['password']}" if cred else None
+                        ),
                     }
                 )
         return attacks

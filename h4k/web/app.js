@@ -322,6 +322,60 @@ cmd.addEventListener("keydown", async (e) => {
   }
 });
 
+/* ---------- deep toolkit attack ---------- */
+let deepTimer = null;
+$("deep-attack-btn").addEventListener("click", async () => {
+  const target = $("target").value.trim();
+  if (!target) { log("[!] enter a target first for deep attack", "err"); return; }
+  const services = [];
+  if ($("deep-ssh").checked) services.push("ssh");
+  if ($("deep-http").checked) services.push("http");
+  if ($("deep-smb").checked) services.push("smb");
+  if ($("deep-dns").checked) services.push("dns");
+  $("deep-panel").hidden = false;
+  $("deep-status").textContent = "queued";
+  $("tab-deep").innerHTML = "<p class='msg'>launching deep toolkit sweep…</p>";
+  log(`[!] deep toolkit attack on ${target} :: ${services.join(",")}`, "err");
+  try {
+    const resp = await fetch("/api/deepattack", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target, host: target, services }),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const job = await resp.json();
+    pollDeep(job.job_id);
+  } catch (err) { log("deep attack error " + err.message, "err"); }
+});
+
+function pollDeep(jobId) {
+  clearInterval(deepTimer);
+  deepTimer = setInterval(async () => {
+    try {
+      const resp = await fetch("/api/deepattack/" + jobId);
+      if (!resp.ok) { clearInterval(deepTimer); return; }
+      const job = await resp.json();
+      $("deep-status").textContent = job.status;
+      if (job.results && job.results.length) renderDeep(job.results);
+      if (job.status === "done" || job.status === "error") {
+        clearInterval(deepTimer);
+        log("[+] deep toolkit attack complete", "ok");
+      }
+    } catch (err) { clearInterval(deepTimer); }
+  }, 1500);
+}
+
+function renderDeep(results) {
+  const el = $("tab-deep");
+  let h = "<table><tr><th>tool</th><th>service</th><th>rc</th><th>output</th></tr>";
+  for (const r of results) {
+    const out = (r.stdout || "").trim();
+    const shown = out ? out.slice(0, 140) : (r.stderr || "").slice(0, 100) || "—";
+    h += `<tr><td>${esc(r.tool)}</td><td>${esc(r.service || "—")}</td>` +
+      `<td>${esc(r.rc)}</td><td>${esc(shown)}</td></tr>`;
+  }
+  el.innerHTML = h + "</table>";
+}
+
 /* ---------- session indicator toggling ---------- */
 (async () => {
   try {

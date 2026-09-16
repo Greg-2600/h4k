@@ -88,6 +88,27 @@
           <div class="btn-row">
             <button type="button" id="neighbors-btn" class="btn-sub">find neighbors (arp)</button>
           </div>
+          <div class="btn-row">
+            <button type="button" id="deep-attack-btn" class="btn-sub btn-danger">deep toolkit attack <em class="danger">(opt-in)</em></button>
+          </div>
+          <div class="deep-row">
+            <label class="field inline">
+              <input type="checkbox" id="deep-ssh" checked />
+              <span>ssh brute</span>
+            </label>
+            <label class="field inline">
+              <input type="checkbox" id="deep-http" checked />
+              <span>web vuln</span>
+            </label>
+            <label class="field inline">
+              <input type="checkbox" id="deep-smb" checked />
+              <span>smb enum</span>
+            </label>
+            <label class="field inline">
+              <input type="checkbox" id="deep-dns" checked />
+              <span>dns</span>
+            </label>
+          </div>
         </form>
       </section>
 
@@ -130,6 +151,15 @@
     <section class="pane results" id="neighbors-panel" hidden>
       <div class="pane-head"><span class="pane-title">/neighbors</span></div>
       <div id="tab-neighbors">click "find neighbors" to sweep the local net</div>
+    </section>
+
+    <!-- deep toolkit attack results -->
+    <section class="pane results" id="deep-panel" hidden>
+      <div class="pane-head">
+        <span class="pane-title">/deep toolkit attack</span>
+        <span class="pane-status" id="deep-status">idle</span>
+      </div>
+      <div id="tab-deep">launch a deep toolkit sweep (hydra/nikto/gobuster/sqlmap/...) on an authorized target</div>
     </section>
 
   </div>

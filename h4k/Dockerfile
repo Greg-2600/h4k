@@ -20,7 +20,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv python3-dev \
     dnsutils whois prips iputils-ping traceroute dnstracer \
     nmap whatweb arp-scan \
+    masscan tcpdump tshark netcat-openbsd socat iproute2 \
+    hydra ncrack john sqlmap \
+    dirb gobuster ffuf \
+    smbclient smbmap dnsenum dnsrecon \
+    git \
     && rm -rf /var/lib/apt/lists/*
+
+# nikto not packaged in Debian; install via git (widely used web vuln scanner)
+RUN git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto \
+    && ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto
 
 # Rapid7 official Metasploit apt repository
 RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \

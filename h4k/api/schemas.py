@@ -26,6 +26,25 @@ class ScanRequest(BaseModel):
     do_attack: bool = False
 
 
+class DeepAttackRequest(BaseModel):
+    """Deeper, separately-opted-in toolkit sweep (brute force, web vuln, smb,
+    dns) using classic non-Metasploit tools. Distinct from the scan flag."""
+
+    target: str
+    host: str | None = None  # specific host (defaults to target address)
+    services: list[str] = []  # ssh/http/smb/dns/...
+    mode: ScanMode = ScanMode.overt
+
+
+class ToolkitResult(BaseModel):
+    tool: str
+    host: str
+    service: str = ""
+    stdout: str = ""
+    stderr: str = ""
+    rc: int = 0
+
+
 class AttackRequest(BaseModel):
     target: str
     mode: ScanMode = ScanMode.overt

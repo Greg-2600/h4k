@@ -17,7 +17,22 @@ AUX_SCANNERS = {
     "smb": [
         "auxiliary/scanner/smb/smb_version",
         "auxiliary/scanner/smb/smb_enumshares",
+        "auxiliary/scanner/smb/smb_enumusers",
+        "auxiliary/scanner/smb/smb_login",
         "auxiliary/scanner/smb/ms17_010_eternalblue",
+    ],
+    "netbios": [
+        "auxiliary/scanner/netbios/nbname",
+        "auxiliary/scanner/netbios/nbdomain",
+    ],
+    "msrpc": [
+        "auxiliary/scanner/dcerpc/endpoint_mapper",
+        "auxiliary/scanner/dcerpc/hidden",
+        "auxiliary/scanner/dcerpc/management",
+    ],
+    "ldap": [
+        "auxiliary/scanner/ldap/ldap_search",
+        "auxiliary/scanner/ldap/ldap_hashdump",
     ],
     "ftp": [
         "auxiliary/scanner/ftp/ftp_version",
@@ -50,6 +65,9 @@ SERVICE_TO_SCANNERS = {
     "smb": AUX_SCANNERS["smb"],
     "netbios-ssn": AUX_SCANNERS["smb"],
     "microsoft-ds": AUX_SCANNERS["smb"],
+    "netbios-ns": AUX_SCANNERS["netbios"],
+    "msrpc": AUX_SCANNERS["msrpc"],
+    "ldap": AUX_SCANNERS["ldap"],
     "ftp": AUX_SCANNERS["ftp"],
     "ssh": AUX_SCANNERS["ssh"],
     "ms-wbt-server": AUX_SCANNERS["rdp"],

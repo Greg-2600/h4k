@@ -23,16 +23,42 @@ class _FakeMsf:
     def execute(self, mtype, mname, opts):
         return {"job_id": 5}
 
+    @property
+    def client(self):
+        class _Mod:
+            options = ("RHOSTS", "RPORT", "USERNAME", "PASSWORD", "LHOST", "LPORT")
 
-def test_try_exploit_success_returns_session():
+        class _Modules:
+            def use(self, mtype, mname):
+                return _Mod()
+
+        return type("C", (), {"modules": _Modules()})()
+
+
+def test_try_exploit_success_with_cred():
     svc = AttackService(_FakeMsf())
-    res = svc._try_exploit("exploit/multi/ssh/sshexec", "10.0.0.5", "ssh", True)
+    cred = {"user": "root", "password": "toor"}
+    res = svc._try_exploit(
+        "exploit/multi/ssh/sshexec", "10.0.0.5", "ssh", True, cred=cred
+    )
     assert res["ok"] is True
     assert res["session_id"] is not None
 
 
+def test_try_exploit_requires_cred():
+    # credential-driven module with no verified cred -> refused
+    svc = AttackService(_FakeMsf())
+    res = svc._try_exploit("exploit/multi/ssh/sshexec", "10.0.0.5", "ssh", False)
+    assert res["ok"] is False
+    assert "credential" in res["detail"].lower()
+
+
 class _FakeMsfFail:
     def execute(self, mtype, mname, opts):
+        raise RuntimeError("boom")
+
+    @property
+    def client(self):
         raise RuntimeError("boom")
 
 

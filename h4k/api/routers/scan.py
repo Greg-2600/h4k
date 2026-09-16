@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from schemas import AttackRequest, Job, Report, ScanRequest
+from schemas import AttackRequest, DeepAttackRequest, Job, Report, ScanRequest
 from services.cve_lookup import CveDb
 from services.discovery import NeighborFinder
 from services.msfrpc import MsfClient
@@ -44,7 +44,11 @@ def _get_cve_db() -> CveDb | None:
 
 
 def _cache_key(req: ScanRequest) -> str:
-    return f"{req.mode.value}::{req.target}"
+    return (
+        f"{req.mode.value}::{req.target}::"
+        f"creds={int(req.try_default_creds)}::"
+        f"attack={int(req.do_attack)}"
+    )
 
 
 def _pull_cached(req: ScanRequest) -> dict[str, Any] | None:
@@ -279,6 +283,61 @@ def attack_status(job_id: str) -> dict[str, Any]:
     return job
 
 
+_toolkit_jobs: dict[str, dict[str, Any]] = {}
+
+
+@router.post("/deepattack")
+def deep_attack(req: DeepAttackRequest, background: BackgroundTasks) -> dict[str, Any]:
+    """OPT-IN only: deeper non-Metasploit toolkit sweep (brute force, web vuln,
+    smb enum, sqlmap, dns) via a separate toggle. Authorized scope only."""
+    host = req.host or req.target
+    job_id = uuid.uuid4().hex[:12]
+    job = {
+        "id": job_id,
+        "target": req.target,
+        "host": host,
+        "services": req.services,
+        "status": "queued",
+        "results": [],
+        "created": datetime.now(UTC).isoformat(),
+    }
+    _toolkit_jobs[job_id] = job
+    background.add_task(_run_deep_attack, job, req, host)
+    return {"job_id": job_id, "status": "queued"}
+
+
+def _run_deep_attack(job: dict[str, Any], req: DeepAttackRequest, host: str) -> None:
+    from services.toolkit import ToolkitPlan, ToolkitRunner
+
+    runner = ToolkitRunner(progress=lambda m, p: job.update(message=m))
+    plan = ToolkitPlan.for_target(req)
+    results: list[dict] = []
+    for step in plan:
+        tool = step["tool"]
+        # tag each result with the service it targets
+        service = _service_for_tool(tool)
+        out = runner.run_tool(tool, step["argv"])
+        results.append(
+            {
+                **out,
+                "host": host,
+                "service": service,
+            }
+        )
+        job["results"] = results
+        job["status"] = "running"
+    job["status"] = "done"
+    job["results"] = results
+
+
+@router.get("/deepattack/{job_id}")
+def deep_attack_status(job_id: str) -> dict[str, Any]:
+    job = _toolkit_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="deep-attack job not found")
+    return job
+
+
 @router.get("/health")
 def health() -> dict[str, Any]:
     msf = _get_msf()
@@ -333,3 +392,19 @@ def _report_markdown(report: Report) -> str:
         lines.append(f"- **{r.rank}. {r.title}**{module} — {why}")
     lines += ["", "> authorized-scope only.", ""]
     return "\n".join(lines)
+
+
+def _service_for_tool(tool: str) -> str:
+    """Map a toolkit tool name to a coarse service label for the report."""
+    map_ = {
+        "hydra": "ssh",
+        "ncrack": "ssh",
+        "nikto": "http",
+        "gobuster": "http",
+        "ffuf": "http",
+        "sqlmap": "http",
+        "smbmap": "smb",
+        "smbclient": "smb",
+        "dnsrecon": "dns",
+    }
+    return map_.get(tool, "")
