@@ -36,6 +36,8 @@ const statusPane = $("status-pane"), results = $("results");
 const prog = $("prog"), pctEl = $("pct"), statusMsg = $("status-msg");
 let pollTimer = null;
 let currentJob = null;
+// last SAST scan result (findings); AI button refuses to run without real data
+let lastSast = null;
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -513,6 +515,7 @@ $("source-run").addEventListener("click", async () => {
 });
 
 function renderSource(result) {
+  lastSast = result; // keep for AI analysis
   const el = $("tab-source");
   let html = `<p class='msg'>source: ${esc(result.name)} · files scanned: ${esc(result.files_scanned)} · findings: ${esc(result.findings.length)}</p>`;
   if (!result.findings.length) { html += "<p class='ok'>no risky patterns found</p>"; el.innerHTML = html; return; }
@@ -628,11 +631,27 @@ async function refreshAiModels() {
 refreshAiModels();
 
 $("ai-btn").addEventListener("click", async () => {
-  const target = $("target").value.trim() || "the last SAST finding";
-  $("ai-panel").hidden = false;
+  const hasFindings = lastSast && lastSast.findings && lastSast.findings.length;
+  if (!hasFindings) {
+    $("ai-panel").hidden = false;
+    $("ai-prompt").textContent = "";
+    $("ai-model-used").textContent = "";
+    $("tab-ai").textContent =
+      "No SAST findings to analyze. Run a source scan first (upload a zip/tar or clone a git URL), then the AI can build a root-cause + patch from real findings.";
+    log("[!] AI skipped: no SAST findings", "err");
+    return;
+  }
+
   const model = ($("ai-model").value || "").trim() || null;
-  const text = "Analyze this authorized lab finding:\nTarget: " + target +
-    "\nPlease give ROOT_CAUSE, PATCH_CANDIDATE, CONFIRM_STEPS.";
+  // Summarize the actual findings we have, not a generic placeholder.
+  const findingsText = lastSast.findings.slice(0, 10).map(function (f) {
+    return (f.severity || "?") + " " + (f.cwe || "") + " " + (f.name || "") +
+      " @ " + (f.file || "?") + ":" + (f.line || "?");
+  }).join("\n");
+  const text = "Analyze these SAST findings in source code the user owns:\n" +
+    "Target: " + (lastSast.name || "project") + "\n" +
+    findingsText + "\n\n" +
+    "Please give ROOT_CAUSE, PATCH_CANDIDATE, CONFIRM_STEPS.";
   // show the exact prompt we're about to send
   $("ai-prompt").textContent = text;
   $("ai-model-used").textContent = model ? "model: " + model : "";
