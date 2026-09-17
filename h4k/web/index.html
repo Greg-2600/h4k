@@ -262,8 +262,15 @@
 
     <!-- AI root-cause / patch -->
     <section class="pane results" id="ai-panel" hidden>
-      <div class="pane-head"><span class="pane-title">/ai root-cause · patch</span></div>
-      <pre class="notes" id="tab-ai"></pre>
+      <div class="pane-head"><span class="pane-title">/ai root-cause · patch</span><span id="ai-model-used" class="pane-status"></span></div>
+      <div class="ai-block">
+        <div class="pane-head sub"><span class="pane-title">→ prompt sent</span></div>
+        <pre class="notes" id="ai-prompt"></pre>
+      </div>
+      <div class="ai-block">
+        <div class="pane-head sub"><span class="pane-title">← model response</span></div>
+        <pre class="notes" id="tab-ai"></pre>
+      </div>
     </section>
 
   </div>

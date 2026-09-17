@@ -213,6 +213,11 @@ pre.notes {
   max-height: 360px; overflow: auto; font-size: 12px;
 }
 
+/* AI request/response blocks */
+.ai-block { margin-bottom: 12px; }
+.pane-head.sub { border-bottom: none; margin-bottom: 6px; }
+.pane-head.sub .pane-title { font-size: 11px; color: var(--fg-faint); }
+
 .legal {
   margin-top: 18px; padding-top: 10px;
   font-size: 11.5px; color: var(--fg-faint);

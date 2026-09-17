@@ -630,10 +630,13 @@ refreshAiModels();
 $("ai-btn").addEventListener("click", async () => {
   const target = $("target").value.trim() || "the last SAST finding";
   $("ai-panel").hidden = false;
-  $("tab-ai").textContent = "asking model…";
   const model = ($("ai-model").value || "").trim() || null;
   const text = "Analyze this authorized lab finding:\nTarget: " + target +
     "\nPlease give ROOT_CAUSE, PATCH_CANDIDATE, CONFIRM_STEPS.";
+  // show the exact prompt we're about to send
+  $("ai-prompt").textContent = text;
+  $("ai-model-used").textContent = model ? "model: " + model : "";
+  $("tab-ai").textContent = "asking model…";
   try {
     const resp = await fetch("/api/source/ai", {
       method: "POST", headers: { "Content-Type": "application/json" },
