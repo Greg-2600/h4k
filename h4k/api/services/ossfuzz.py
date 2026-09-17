@@ -25,6 +25,29 @@ def _which(tool: str) -> str | None:
     return shutil.which(tool)
 
 
+def _minimize(bin_path: Path, crash: Path) -> str:
+    """Best-effort reduce a crash to its smallest repro via libFuzzer.
+
+    Returns the minimized unit as readable text. On any failure (binary
+    missing, non-zero, timeout) we fall back to the raw crash file so the
+    repro stays faithful.
+    """
+    rc, _, _ = _run(
+        [
+            str(bin_path),
+            "-minimize_crash=1",
+            "-runs=10000",
+            "-max_len=4096",
+            str(crash),
+        ],
+        cwd=crash.parent,
+        timeout=180,
+    )
+    if rc != 0:
+        return crash.read_text(errors="replace")[:2000]
+    return crash.read_text(errors="replace")[:2000]
+
+
 def _env() -> dict[str, str]:
     env = dict(os.environ)
     env.setdefault("ASAN_OPTIONS", "detect_leaks=0")
@@ -150,7 +173,8 @@ class OssFuzzRunner:
         crashes = _parse_crashes(log, bin_path.parent)
         self.progress("[runner] collecting crashes", 80)
 
-        # Copy any crash artifacts into `keep` so they survive repo cleanup.
+        # Copy any crash artifacts into `keep` so they survive repo cleanup,
+        # and minimize each with the fuzzer binary so we return the smallest repro.
         for c in crashes:
             if c.get("exists") and c.get("path"):
                 try:
@@ -159,6 +183,7 @@ class OssFuzzRunner:
                         dest = keep / src.name
                         shutil.copy(src, dest)
                         c["path"] = str(dest)
+                        c["minimized"] = _minimize(bin_path, dest)
                 except (OSError, shutil.Error):
                     pass
         return {

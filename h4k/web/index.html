@@ -139,10 +139,14 @@
           </div>
           <div class="btn-row">
             <button type="button" id="ai-btn" class="btn-sub">AI root-cause + patch</button>
+            <button type="button" id="ai-loop-btn" class="btn-sub">AI full-loop (fix + verify)</button>
             <span id="ai-reach" class="field inline msg">ai: —</span>
           </div>
           <div class="deep-row" id="ai-controls" hidden>
             <select id="ai-model" class="full-input"></select>
+          </div>
+          <div class="btn-row">
+            <button type="button" id="ossfuzz-btn" class="btn-sub btn-danger">OSS-Fuzz auto-run (ASan) <em class="danger">(own repo)</em></button>
           </div>
 
           <div class="btn-row">
@@ -296,6 +300,19 @@
     <section class="pane results" id="net-panel" hidden>
       <div class="pane-head"><span class="pane-title">/network layer</span><span id="net-status" class="pane-status">idle</span></div>
       <pre class="notes" id="tab-net"></pre>
+    </section>
+
+    <!-- OSS-Fuzz auto-runner + crash minimization -->
+    <section class="pane results" id="ossfuzz-panel" hidden>
+      <div class="pane-head"><span class="pane-title">/oss-fuzz auto-run</span><span id="ossfuzz-status" class="pane-status">idle</span></div>
+      <div class="deep-row">
+        <input type="text" id="ossfuzz-url" class="full-input" placeholder="git URL of a fuzz-harness repo you own (e.g. vulnlab)" />
+        <div class="btn-row">
+          <button type="button" id="ossfuzz-run" class="btn-sub btn-danger">build + fuzz (ASan)</button>
+          <button type="button" id="minimize-btn" class="btn-sub">minimize crash(s)</button>
+        </div>
+      </div>
+      <pre class="notes" id="tab-ossfuzz">clone a repo with an LLVMFuzzer-style harness (or a Makefile that builds one), build with AddressSanitizer, and auto-fuzz for a short window.</pre>
     </section>
 
   </div>

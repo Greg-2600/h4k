@@ -38,6 +38,10 @@ let pollTimer = null;
 let currentJob = null;
 // last SAST scan result (findings); AI button refuses to run without real data
 let lastSast = null;
+// last OSS-Fuzz minimized crash so the AI loop can reason about a real trigger
+let lastMinimized = null;
+// last OSS-Fuzz auto-run result (crashes carry server-side minimized inputs)
+let lastOssFuzz = null;
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -637,41 +641,151 @@ async function refreshAiModels() {
 }
 refreshAiModels();
 
-$("ai-btn").addEventListener("click", async () => {
-  const hasFindings = lastSast && lastSast.findings && lastSast.findings.length;
-  if (!hasFindings) {
+function buildAiInput(fromFindings) {
+  // For the one-click full-loop demo, prefer a real minimized crash trigger
+  // (that's the actual "crash -> patch -> verify" story).
+  if (!fromFindings && lastMinimized) {
+    return {
+      source: "minimized crash (" + (lastMinimized.source || "OSS-Fuzz") + ")",
+      text: "Analyze this minimized crash repro from a fuzzer the user owns:\n" +
+        "file: " + (lastMinimized.file || "—") + "\ninput:\n" +
+        (lastMinimized.input || "—") +
+        "\n\nPlease give ROOT_CAUSE, PATCH_CANDIDATE, VERIFY.",
+    };
+  }
+  // Prefer real SAST findings; else fall back to the last minimized crash.
+  if (fromFindings && lastSast && lastSast.findings && lastSast.findings.length) {
+    const f = lastSast.findings.slice(0, 10).map((x) =>
+      (x.severity || "?") + " " + (x.cwe || "") + " " + (x.name || "") +
+      " @ " + (x.file || "?") + ":" + (x.line || "?"));
+    return {
+      source: "SAST findings",
+      text: "Analyze these SAST findings in source code the user owns:\n" +
+        "Target: " + (lastSast.name || "project") + "\n" + f.join("\n") +
+        "\n\nPlease give ROOT_CAUSE, PATCH_CANDIDATE, VERIFY.",
+    };
+  }
+  return null;
+}
+
+async function runAi(endpoint, label, useFindings) {
+  const prompt = buildAiInput(useFindings) || buildAiInput(!useFindings);
+  if (!prompt) {
     $("ai-panel").hidden = false;
     $("ai-prompt").textContent = "";
     $("ai-model-used").textContent = "";
     $("tab-ai").textContent =
-      "No SAST findings to analyze. Run a source scan first (upload a zip/tar or clone a git URL), then the AI can build a root-cause + patch from real findings.";
-    log("[!] AI skipped: no SAST findings", "err");
+      "No source analysis yet. Run a SAST scan (upload zip/tar or clone a git URL) or an OSS-Fuzz run + minimize so the AI has a real finding/minimized crash to reason about.";
+    log("[!] AI skipped: nothing to analyze", "err");
     return;
   }
-
   const model = ($("ai-model").value || "").trim() || null;
-  // Summarize the actual findings we have, not a generic placeholder.
-  const findingsText = lastSast.findings.slice(0, 10).map(function (f) {
-    return (f.severity || "?") + " " + (f.cwe || "") + " " + (f.name || "") +
-      " @ " + (f.file || "?") + ":" + (f.line || "?");
-  }).join("\n");
-  const text = "Analyze these SAST findings in source code the user owns:\n" +
-    "Target: " + (lastSast.name || "project") + "\n" +
-    findingsText + "\n\n" +
-    "Please give ROOT_CAUSE, PATCH_CANDIDATE, CONFIRM_STEPS.";
-  // show the exact prompt we're about to send
-  $("ai-prompt").textContent = text;
-  $("ai-model-used").textContent = model ? "model: " + model : "";
+  const payload = prompt.text + "\n(analyzed from: " + prompt.source + ")";
+  $("ai-panel").hidden = false;
+  $("ai-prompt").textContent = payload;
+  $("ai-model-used").textContent = model ? "model: " + model + " · " + prompt.source : "source: " + prompt.source;
   $("tab-ai").textContent = "asking model…";
   try {
-    const resp = await fetch("/api/source/ai", {
+    const resp = await fetch(endpoint, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, model }),
+      body: JSON.stringify({ text: payload, model }),
     });
     const d = await resp.json();
-    if (d.ok) { $("tab-ai").textContent = d.raw; log("[+] AI analysis returned", "ok"); }
-    else { $("tab-ai").textContent = "AI unavailable: " + (d.error || "no provider").replace(/^"|"$/g, ""); log("[!] AI: " + d.error, "err"); }
+    if (d.ok) {
+      $("tab-ai").textContent = (d.parsed && (d.parsed.patch_candidate || d.parsed.verify || d.parsed.root_cause))
+        ? renderAiParsed(d.parsed, d.raw)
+        : d.raw;
+      log("[+] AI " + label + " returned", "ok");
+    } else {
+      $("tab-ai").textContent = "AI unavailable: " + (d.error || "no provider").replace(/^"|"$/g, "");
+      log("[!] AI: " + d.error, "err");
+    }
   } catch (err) { $("tab-ai").textContent = "error: " + err.message; }
+}
+
+function renderAiParsed(parsed, raw) {
+  let h = "";
+  if (parsed.root_cause) h += "ROOT_CAUSE:\n" + parsed.root_cause + "\n\n";
+  if (parsed.patch_candidate) h += "PATCH_CANDIDATE:\n" + parsed.patch_candidate + "\n\n";
+  if (parsed.verify) h += "VERIFY:\n" + parsed.verify + "\n\n";
+  return (h || raw || "").trim();
+}
+
+$("ai-btn").addEventListener("click", () => runAi("/api/source/ai", "analysis", true));
+$("ai-loop-btn").addEventListener("click", () => runAi("/api/source/ai/loop", "full-loop", false));
+
+/* ---------- OSS-Fuzz auto-run + crash minimization ---------- */
+$("ossfuzz-btn").addEventListener("click", () => {
+  $("ossfuzz-panel").hidden = false;
+  $("ossfuzz-status").textContent = "ready";
+  $("ossfuzz-url").focus();
+  log("[*] open OSS-Fuzz auto-runner — paste a git URL to a fuzz harness you own", "info");
+});
+
+$("ossfuzz-run").addEventListener("click", async () => {
+  const url = $("ossfuzz-url").value.trim();
+  if (!url) { log("[!] enter a git URL to the fuzz-harness repo you own", "err"); return; }
+  if (!window.confirm(
+    "OSS-FUZZ AUTO-RUN on " + url + "\n\n" +
+    "Clones the repo, builds with AddressSanitizer/UBSan, and runs libFuzzer for a short window. " +
+    "This compiles and executes code and may crash — only on a repo YOU OWN. Proceed?"
+  )) { log("OSS-Fuzz cancelled", "err"); return; }
+  $("ossfuzz-status").textContent = "running";
+  $("tab-ossfuzz").innerHTML = "<p class='msg'>building with ASan + fuzzing…</p>";
+  log("[!] OSS-Fuzz auto-run on " + url, "err");
+  try {
+    const resp = await fetch("/api/source/ossfuzz", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ git_url: url, seconds: 10 }),
+    });
+    if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || "http " + resp.status); }
+    const d = await resp.json();
+    renderOssFuzz(d);
+  } catch (err) {
+    $("ossfuzz-status").textContent = "error";
+    $("tab-ossfuzz").innerHTML = "<p class='err'>" + esc(err.message) + "</p>";
+    log("OSS-Fuzz error: " + err.message, "err");
+  }
+});
+
+function renderOssFuzz(d) {
+  const el = $("tab-ossfuzz");
+  lastOssFuzz = d;
+  $("ossfuzz-status").textContent = d.ok ? "done" : "error";
+  if (!d.ok) { el.innerHTML = "<p class='err'>" + esc(d.error || "run failed") + "</p>"; return; }
+  const crashes = (d.crashes || []).filter((c) => c.exists || c.summary);
+  let h = `<p class='msg'>built: ${esc(d.built)} · fuzz bin: ${esc(d.fuzz_bin)} · fuzzed ${esc(d.seconds)}s · crashes: ${crashes.length}</p>`;
+  if (!crashes.length) {
+    h += "<p class='ok'>no crashes in this window — try more seconds or richer seed data.</p>";
+  } else {
+    h += "<table><tr><th>crash/artifact</th><th>path</th><th>summary</th><th>minimized input</th></tr>";
+    for (const c of crashes) {
+      h += `<tr><td>${esc(c.name)}</td><td>${esc(c.path || "—")}</td><td>${esc((c.summary || "").slice(0, 80))}</td>` +
+        `<td>${esc((c.minimized || "—").slice(0, 80))}</td></tr>`;
+    }
+    h += "</table>";
+    h += "<p class='msg'>hint: use “minimize crash(s)” to reduce to the smallest repro, then “AI full-loop” for root-cause → patch → verify.</p>";
+  }
+  if (d.steps && d.steps.length) h += "<p class='notes'>" + esc(d.steps.join(" · ")) + "</p>";
+  if (d.log_tail) h += "<pre class='notes'>" + esc(d.log_tail.slice(-600)) + "</pre>";
+  el.innerHTML = h;
+  log("[+] OSS-Fuzz run complete — " + crashes.length + " crash lead(s)", crashes.length ? "err" : "ok");
+}
+
+$("minimize-btn").addEventListener("click", () => {
+  const minimized = (lastOssFuzz || {}).crashes || [];
+  const have = minimized.filter((c) => c.minimized && c.minimized.length);
+  if (!have.length) {
+    $("ossfuzz-status").textContent = "no-op";
+    $("tab-ossfuzz").innerHTML = "<p class='msg'>No minimized crash artifacts from the last OSS-Fuzz run. Run a build+fuzz first on a harness that trips a crash, and minimization will be reported per-crash above.</p>";
+    log("[!] minimize: no crash artifacts to reduce", "err");
+    return;
+  }
+  if (have[0]) lastMinimized = { source: "OSS-Fuzz", input: have[0].minimized, file: have[0].name };
+  $("ossfuzz-status").textContent = "done";
+  $("tab-ossfuzz").innerHTML +=
+    "<p class='ok'>Minimization done for " + have.length + " crash(s). First reduced repro stored for AI full-loop (root-cause → patch → verify).</p>";
+  log("[+] minimize: reduced repro ready for AI full-loop", "ok");
 });
 
 /* ---------- supply-chain map ---------- */
