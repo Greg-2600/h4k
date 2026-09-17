@@ -1,0 +1,33 @@
+flowchart TB
+    subgraph browser["Browser (terminal UI)"]
+        UI["web/ · index.html + app.js + style.css<br/>zsh-style console + report tabs"]
+    end
+
+    subgraph api["FastAPI (api/)"]
+        R["routers/ scan.py · source.py · update.py"]
+        S["services ~24 modules<br/>(scan_pipeline, sast, sca, fuzzer, triage, ai, ...)"]
+    end
+
+    subgraph msf["Metasploit"]
+        RPC["msfrpcd · MessagePack-RPC :55553"]
+        DB["PostgreSQL (hosts/services/vulns)"]
+    end
+
+    subgraph tools["Offensive / analysis tools"]
+        TOOLS["nmap · whatweb · hydra · nikto · sqlmap<br/>semgrep · trivy · osv-scanner · gobuster<br/>libFuzzer/AFL++ · masscan"]
+    end
+
+    subgraph llm["Local LLM (optional)"]
+        OLLAMA["Ollama · qwen2.5 :11434/<sidecar>"]
+    end
+
+    subgraph lab["Fuzzing target (separate)"]
+        VULN["vulnlab · intentionally-vulnerable<br/>HTTP server + coverage-guided harness"]
+    end
+
+    UI -->|HTTP/JSON :3137| R
+    R -->|RPC calls| RPC
+    RPC --> DB
+    R -->|subprocess| TOOLS
+    R -->|local model| OLLAMA
+    R --> VULN

@@ -112,6 +112,52 @@ the project.
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph browser["Browser (terminal UI)"]
+        UI["web/ · index.html + app.js + style.css<br/>zsh-style console + report tabs"]
+    end
+
+    subgraph api["FastAPI (api/)"]
+        R["routers/ scan.py · source.py · update.py"]
+        S["services · ~24 modules<br/>(scan_pipeline, sast, sca, fuzzer, triage, ai…)"]
+    end
+
+    subgraph msf["Metasploit"]
+        RPC["msfrpcd · MessagePack-RPC :55553"]
+        DB["PostgreSQL (hosts/services/vulns)"]
+    end
+
+    subgraph tools["Offensive & analysis tools"]
+        TOOLS["nmap · hydra · nikto · sqlmap · semgrep<br/>trivy · osv-scanner · gobuster · masscan"]
+    end
+
+    subgraph llm["Local LLM (optional)"]
+        OLLAMA["Ollama · qwen2.5"]
+    end
+
+    subgraph lab["Fuzzing target (separate)"]
+        VULN["vulnlab · vulnerable HTTP server<br/>+ coverage-guided harness"]
+    end
+
+    UI -->|HTTP/JSON :3137| R
+    R -->|RPC| RPC
+    RPC --> DB
+    R -->|subprocess| TOOLS
+    R -->|local model| OLLAMA
+    R --> VULN
+```
+
+![architecture](docs/img/architecture.png)
+
+### It animates, too
+
+Watch a live scan run end-to-end:
+
+![h4k demo](docs/img/demo.gif)
+
 ## Documentation
 
 - **[README (this file)](README.md)** — you are here.
