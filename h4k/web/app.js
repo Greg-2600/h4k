@@ -187,20 +187,14 @@ function render(r) {
   renderSecurity(r.security);
   renderRecs(r.recommendations);
   renderNotes(r.notes);
-
-  document.querySelectorAll(".tab").forEach((t) =>
-    t.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach((x) => x.classList.remove("active"));
-      t.classList.add("active");
-      $("tab-" + t.dataset.tab).classList.add("active");
-    }));
   log(`report: ${r.hosts.length} host(s) · ${r.vulns.length} vuln(s) · ${r.recommendations.length} vector(s)`, "ok");
 }
 
 function renderFingerprints(fps) {
   const el = $("tab-fp");
-  if (!fps || !fps.length) { el.innerHTML = "<p class='msg'>no fingerprint data</p>"; return; }
+  const has = fps && fps.length;
+  $("box-fp").hidden = !has;
+  if (!has) { el.innerHTML = "<p class='msg'>no fingerprint data</p>"; return; }
   let h = "<table><tr><th>host</th><th>vendor</th><th>model</th><th>os</th><th>technology</th><th>source</th></tr>";
   for (const f of fps) {
     h += `<tr><td>${esc(f.host)}</td><td>${esc(f.vendor || "?")}</td>` +
@@ -213,7 +207,9 @@ function renderFingerprints(fps) {
 
 function renderAttacks(attacks) {
   const el = $("tab-attacks");
-  if (!attacks || !attacks.length) { el.innerHTML = "<p class='msg'>no attack attempts (opt-in exploit).</p>"; return; }
+  const has = attacks && attacks.length;
+  $("box-attacks").hidden = !has;
+  if (!has) { el.innerHTML = "<p class='msg'>no attack attempts (opt-in exploit).</p>"; return; }
   let h = "<table><tr><th>host</th><th>service</th><th>module</th><th>result</th><th>session</th><th>detail</th></tr>";
   for (const a of attacks) {
     const ok = a.result === "success";
@@ -228,7 +224,9 @@ function renderAttacks(attacks) {
 
 function renderCreds(creds) {
   const el = $("tab-creds");
-  if (!creds || !creds.length) { el.innerHTML = "<p class='msg'>no credentials tested (opt-in default).</p>"; return; }
+  const has = creds && creds.length;
+  $("box-creds").hidden = !has;
+  if (!has) { el.innerHTML = "<p class='msg'>no credentials tested (opt-in default).</p>"; return; }
   let h = "<table><tr><th>host</th><th>service</th><th>user</th><th>password</th><th>vendor</th><th>status</th></tr>";
   for (const c of creds) {
     h += `<tr><td>${esc(c.host)}</td><td>${esc(c.service)}:${esc(c.port ?? "?")}</td>` +
@@ -241,7 +239,9 @@ function renderCreds(creds) {
 
 function renderSecurity(sec) {
   const el = $("tab-sec");
-  if (!sec || !sec.length) { el.innerHTML = "<p class='msg'>no security assessment (traceroute)</p>"; return; }
+  const has = sec && sec.length;
+  $("box-sec").hidden = !has;
+  if (!has) { el.innerHTML = "<p class='msg'>no security assessment (traceroute)</p>"; return; }
   let h = "";
   for (const s of sec) {
     const cls = s.level === "low" ? "badge-critical" : (s.level === "medium" ? "badge-high" : "badge-sec");
@@ -258,7 +258,9 @@ function renderSecurity(sec) {
 
 function renderHosts(hosts) {
   const el = $("tab-hosts");
-  if (!hosts || !hosts.length) { el.innerHTML = "<p class='msg'>no hosts responding</p>"; return; }
+  const has = hosts && hosts.length;
+  $("box-hosts").hidden = !has;
+  if (!has) { el.innerHTML = "<p class='msg'>no hosts responding</p>"; return; }
   let h = "<table><tr><th>host</th><th>os</th><th>state</th><th>services</th></tr>";
   for (const hd of hosts) {
     const sv = (hd.services || []).map((s) => s.port + "/" + (s.service || "?")).join(", ") || "—";
@@ -270,7 +272,9 @@ function renderHosts(hosts) {
 
 function renderVulns(vulns, mode) {
   const el = $("tab-vulns");
-  if (!vulns || !vulns.length) { el.innerHTML = "<p class='msg'>no logged findings</p>"; return; }
+  const has = vulns && vulns.length;
+  $("box-vulns").hidden = !has;
+  if (!has) { el.innerHTML = "<p class='msg'>no logged findings</p>"; return; }
   let h = "<table><tr><th>finding</th><th>port</th><th>refs</th></tr>";
   for (const v of vulns) {
     const refs = (v.refs || []).map(esc).join(" · ") || "—";
@@ -281,7 +285,9 @@ function renderVulns(vulns, mode) {
 
 function renderRecs(recs) {
   const el = $("tab-recs");
-  if (!recs || !recs.length) { el.innerHTML = "<p class='msg'>no vectors prioritized</p>"; return; }
+  const has = recs && recs.length;
+  $("box-recs").hidden = !has;
+  if (!has) { el.innerHTML = "<p class='msg'>no vectors prioritized</p>"; return; }
   el.innerHTML = recs.map((r) => {
     const cve = (r.refs || []).find((x) => /CVE-\d/.test(x)) || "";
     return `<div class="rec-card">
@@ -297,7 +303,9 @@ function renderRecs(recs) {
 
 function renderNotes(notes) {
   const el = $("tab-notes");
-  if (!notes || !notes.length) { el.innerHTML = "<p class='msg'>no notes</p>"; return; }
+  const has = notes && notes.length;
+  $("box-notes").hidden = !has;
+  if (!has) { el.innerHTML = "<p class='msg'>no notes</p>"; return; }
   el.innerHTML = "<pre class='notes'>" + esc(notes.join("\n\n")) + "</pre>";
 }
 
