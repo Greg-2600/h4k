@@ -121,11 +121,57 @@ class ToolkitPlan:
                 }
             )
 
-        # SMB enumeration + share listing
+        # SMB enumeration + share listing + RPC null-session info
         if _has("smb", req.services) or _has("microsoft-ds", req.services):
             runs.append({"tool": "smbmap", "argv": ["smbmap", "-H", host, "-g"]})
             runs.append(
                 {"tool": "smbclient", "argv": ["smbclient", "-L", "//" + host, "-N"]}
+            )
+            runs.append(
+                {
+                    "tool": "rpcclient",
+                    "argv": ["rpcclient", "-U", "%", "-c", "srvinfo", host],
+                }
+            )
+            # impacket secretsdump (anonymous / guest) — high-value for Windows labs
+            runs.append(
+                {
+                    "tool": "secretsdump",
+                    "argv": ["secretsdump.py", "-just-dc", f"anonymous:@{host}"],
+                }
+            )
+
+        # LDAP enumeration when 389/636 is exposed
+        if _has("ldap", req.services):
+            runs.append(
+                {
+                    "tool": "ldapsearch",
+                    "argv": [
+                        "ldapsearch",
+                        "-x",
+                        "-H",
+                        f"ldap://{host}",
+                        "-b",
+                        "",
+                        "s",
+                        "",
+                    ],
+                }
+            )
+
+        # WordPress scan (fast on non-WP too; harmless)
+        if _has("http", req.services):
+            runs.append(
+                {
+                    "tool": "wpscan",
+                    "argv": [
+                        "wpscan",
+                        "--url",
+                        f"http://{host}/",
+                        "--no-banner",
+                        "--disable-tls-checks",
+                    ],
+                }
             )
 
         # web app SQL injection check (sqlmap, no banner grab)

@@ -520,8 +520,12 @@ def _service_for_tool(tool: str) -> str:
         "gobuster": "http",
         "ffuf": "http",
         "sqlmap": "http",
+        "wpscan": "http",
         "smbmap": "smb",
         "smbclient": "smb",
+        "rpcclient": "smb",
+        "secretsdump": "smb",
+        "ldapsearch": "ldap",
         "dnsrecon": "dns",
     }
     return map_.get(tool, "")

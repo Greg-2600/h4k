@@ -29,8 +29,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     hydra ncrack john sqlmap \
     dirb gobuster ffuf \
     smbclient smbmap dnsenum dnsrecon \
+    ldap-utils samba-common-bin \
     git \
     && rm -rf /var/lib/apt/lists/*
+
+# impacket (secretsdump, wmiexec, GetNPUsers...) — powershell/AD RPC suite
+RUN python3 -m pip install --break-system-packages --no-cache-dir impacket \
+  && for s in secretdump secretsdump wmiexec smbexec GetNPUsers getTGT GetADUsers \
+             mssqlclient smbclient; do \
+       if [ -f "/usr/lib/python3/dist-packages/impacket/examples/${s}.py" ]; then \
+         ln -sf "/usr/lib/python3/dist-packages/impacket/examples/${s}.py" "/usr/local/bin/${s}.py"; \
+       fi; \
+     done
 
 # nikto not packaged in Debian; install via git (widely used web vuln scanner)
 RUN git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto \
