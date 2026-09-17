@@ -596,22 +596,92 @@ function renderSca(d) {
 }
 
 /* ---------- AI root-cause + patch ---------- */
+/* ---------- AI model picker + reachability ---------- */
+async function refreshAiModels() {
+  try {
+    const resp = await fetch("/api/source/ai/models");
+    const d = await resp.json();
+    const reach = $("ai-reach");
+    if (d.ollama_reachable) {
+      reach.textContent = "ai: online (" + (d.model || "?") + ")";
+      reach.classList.add("ok");
+    } else {
+      reach.textContent = "ai: offline — no local ollama";
+      reach.classList.remove("ok");
+    }
+    const sel = $("ai-model");
+    sel.innerHTML = "";
+    for (const m of (d.models || [])) {
+      const opt = document.createElement("option");
+      opt.value = m; opt.textContent = m;
+      sel.appendChild(opt);
+    }
+    // pre-select configured model if present
+    if (d.model && (d.models || []).includes(d.model)) sel.value = d.model;
+    $("ai-controls").hidden = !(d.models || []).length;
+  } catch (e) {
+    $("ai-reach").textContent = "ai: unreachable";
+    $("ai-controls").hidden = true;
+    log("AI health check failed: " + e.message, "err");
+  }
+}
+refreshAiModels();
+
 $("ai-btn").addEventListener("click", async () => {
   const target = $("target").value.trim() || "the last SAST finding";
   $("ai-panel").hidden = false;
   $("tab-ai").textContent = "asking model…";
+  const model = ($("ai-model").value || "").trim() || null;
   const text = "Analyze this authorized lab finding:\nTarget: " + target +
     "\nPlease give ROOT_CAUSE, PATCH_CANDIDATE, CONFIRM_STEPS.";
   try {
     const resp = await fetch("/api/source/ai", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, model }),
     });
     const d = await resp.json();
     if (d.ok) { $("tab-ai").textContent = d.raw; log("[+] AI analysis returned", "ok"); }
     else { $("tab-ai").textContent = "AI unavailable: " + (d.error || "no provider").replace(/^"|"$/g, ""); log("[!] AI: " + d.error, "err"); }
   } catch (err) { $("tab-ai").textContent = "error: " + err.message; }
 });
+
+/* ---------- supply-chain map ---------- */
+$("sca-map-btn").addEventListener("click", async () => {
+  const url = $("source-url").value.trim();
+  if (!url) { log("[!] enter a git URL for the supply-chain map", "err"); return; }
+  $("sca-panel").hidden = false;
+  $("tab-sca").innerHTML = "<p class='msg'>building dependency graph + reachability…</p>";
+  log("[*] supply-chain map on " + url, "info");
+  try {
+    const resp = await fetch("/api/source/sca/map?git_url=" + encodeURIComponent(url));
+    if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.detail || "http " + resp.status); }
+    const d = await resp.json();
+    if (d.error) throw new Error(d.error);
+    renderSupplyChainMap(d);
+  } catch (err) { $("tab-sca").innerHTML = "<p class='err'>" + esc(err.message) + "</p>"; log("map error " + err.message, "err"); }
+});
+
+function renderSupplyChainMap(d) {
+  const el = $("tab-sca");
+  const gr = d.graph || {};
+  const nodes = gr.nodes || [];
+  const edits = gr.edges || [];
+  const cveMap = {};
+  for (const n of nodes) if (n.cves && n.cves.length) cveMap[n.label] = n.cves;
+  let h = `<p class='msg'>components: ${(d.summary||{}).components||0} · edges: ${edits.length} · known CVEs: ${(d.summary||{}).cves||0}</p>`;
+  h += "<h3>Dependency graph (nodes → edges)</h3><table><tr><th>node</th><th>type</th><th>dependencies</th><th>known CVEs</th></tr>";
+  const childByParent = {};
+  for (const e of edits) (childByParent[e.from] = childByParent[e.from]||[]).push(e.to);
+  for (const n of nodes) {
+    const kids = (childByParent[n.id]||[]).map(x=>esc(x)).join(", ")||"—";
+    const cves = (n.cves||[]).map(esc).join(", ")||"—";
+    h += `<tr><td>${esc(n.label)}</td><td>${esc(n.type||"—")}</td><td>${kids}</td><td>${cves}</td></tr>`;
+  }
+  h += "</table>";
+  h += "<p class='msg'>reachability: any node with a listed CVE is a reachable-vulnerable component.</p>";
+  el.innerHTML = h;
+  log("[+] supply-chain map built (" + nodes.length + " nodes, " + (d.summary||{}).cves + " CVEs)", "ok");
+}
 
 /* ---------- custom rule test ---------- */
 $("rule-test").addEventListener("click", async () => {

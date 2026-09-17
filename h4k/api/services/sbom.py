@@ -6,15 +6,12 @@
 # the cutting-edge supply-chain picture on top of SCA.
 import json
 import logging
-from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("h4k.sbom")
 
-REACHABLE_REL_BOM = (
-    "https://cyclonedx.org/schema/bom-1.4.schema.json"
-)
+REACHABLE_REL_BOM = "https://cyclonedx.org/schema/bom-1.4.schema.json"
 
 
 def parse_sbom(sbom_path_or_data: str | Path) -> list[dict[str, Any]]:
@@ -35,18 +32,21 @@ def parse_sbom(sbom_path_or_data: str | Path) -> list[dict[str, Any]]:
     comps: list[dict[str, Any]] = []
     for c in (data or {}).get("components", []) or []:
         licenses = []
-        for l in c.get("licenses", []) or []:
-            name = (l.get("license", {}) or {}).get("name") or l.get("license", {}).get("id")
+        for lic in c.get("licenses", []) or []:
+            lic_obj = lic.get("license", {}) or {}
+            name = lic_obj.get("name") or lic_obj.get("id")
             if name:
                 licenses.append(name)
-        comps.append({
-            "bom_ref": c.get("bom-ref") or str(c.get("name", "")),
-            "type": c.get("type", ""),
-            "name": c.get("name", ""),
-            "version": c.get("version", ""),
-            "purl": c.get("purl", ""),
-            "licenses": licenses,
-        })
+        comps.append(
+            {
+                "bom_ref": c.get("bom-ref") or str(c.get("name", "")),
+                "type": c.get("type", ""),
+                "name": c.get("name", ""),
+                "version": c.get("version", ""),
+                "purl": c.get("purl", ""),
+                "licenses": licenses,
+            }
+        )
     return comps
 
 
@@ -55,15 +55,24 @@ def build_graph(sbom_path_or_data: str | Path) -> dict[str, Any]:
     if isinstance(sbom_path_or_data, (str, Path)) and Path(sbom_path_or_data).exists():
         data = json.loads(Path(sbom_path_or_data).read_text(encoding="utf-8"))
     else:
-        data = (json.loads(sbom_path_or_data) if isinstance(sbom_path_or_data, str)
-                else sbom_path_or_data)
+        data = (
+            json.loads(sbom_path_or_data)
+            if isinstance(sbom_path_or_data, str)
+            else sbom_path_or_data
+        )
 
-    # Components indexed by bom-ref.
+    # Components indexed by bom-ref (kept in case callers want a lookup).
     comps = parse_sbom(data)
-    by_ref: dict[str, dict[str, Any]] = {c["bom_ref"]: c for c in comps}
 
-    nodes = [{"id": c["bom_ref"], "label": f"{c['name']}@{c['version']}",
-              "type": c["type"], "purl": c["purl"]} for c in comps]
+    nodes = [
+        {
+            "id": c["bom_ref"],
+            "label": f"{c['name']}@{c['version']}",
+            "type": c["type"],
+            "purl": c["purl"],
+        }
+        for c in comps
+    ]
 
     edges: list[dict[str, str]] = []
     seen: set[str] = set()
@@ -79,7 +88,9 @@ def build_graph(sbom_path_or_data: str | Path) -> dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
-def annotate_cves(graph: dict[str, Any], cve_map: dict[str, list[str]]) -> dict[str, Any]:
+def annotate_cves(
+    graph: dict[str, Any], cve_map: dict[str, list[str]]
+) -> dict[str, Any]:
     """Attach known CVEs to graph nodes by package name (case/fuzzy match).
 
     cve_map: {package_name: [cve...]} from osv-scanner.
@@ -96,7 +107,9 @@ def annotate_cves(graph: dict[str, Any], cve_map: dict[str, list[str]]) -> dict[
     return graph
 
 
-def build_supply_chain_map(sbom_path: str | Path, cve_map: dict[str, list[str]]) -> dict[str, Any]:
+def build_supply_chain_map(
+    sbom_path: str | Path, cve_map: dict[str, list[str]]
+) -> dict[str, Any]:
     """Build the full {graph, component CVE list, summary} map."""
     comps = parse_sbom(sbom_path)
     graph = build_graph(sbom_path)

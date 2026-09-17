@@ -1,0 +1,35 @@
+rules:
+  - id: h4k.python.sql-injection
+    languages: [python]
+    message: "Possible SQL injection: SQL built via string concatenation."
+    severity: ERROR
+    pattern-either:
+      - pattern: "execute('SELECT ... ' + $X)"
+      - pattern: "execute(\"SELECT ... \" + $X)"
+  - id: h4k.python.eval
+    languages: [python]
+    message: "Use of eval() with potentially untrusted input."
+    severity: ERROR
+    pattern: "eval($X)"
+  - id: h4k.c.buffer
+    languages: [c]
+    message: "Unbounded buffer copy (strcpy) — overflow risk."
+    severity: ERROR
+    pattern: "strcpy($D, $S);"
+  - id: h4k.c.format
+    languages: [c]
+    message: "Non-literal format string passed to printf."
+    severity: ERROR
+    pattern: "printf($F);"
+  - id: h4k.javascript.eval
+    languages: [javascript]
+    message: "Use of eval() with potentially untrusted input."
+    severity: ERROR
+    pattern: "eval($X)"
+  - id: h4k.generic.command-shell
+    languages: [python, javascript, shell]
+    message: "Possible shell command injection (shell=True / command built from input)."
+    severity: ERROR
+    pattern-either:
+      - pattern: "subprocess.run($C, shell=True)"
+      - pattern: "execa($C, { shell: true })"

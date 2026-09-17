@@ -41,6 +41,7 @@ class ScaResult:
     osv_vulns: list[dict] = field(default_factory=list)
     cve_ids: list[str] = field(default_factory=list)
     packages: list[str] = field(default_factory=list)
+    pkg_cves: dict[str, list[str]] = field(default_factory=dict)
     sbom_available: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -49,6 +50,7 @@ class ScaResult:
             "osv_vulns": self.osv_vulns,
             "cve_ids": self.cve_ids,
             "packages": self.packages,
+            "pkg_cves": self.pkg_cves,
             "sbom_available": self.sbom_available,
         }
 
@@ -136,10 +138,19 @@ def scan_osv(root: Path) -> ScaResult:
     vulns: list[dict] = []
     cves: list[str] = []
     pkgs: list[str] = []
+    pkg_cves: dict[str, list[str]] = {}  # package name -> [cve...]
 
     # osv-scanner output: {"results": [{"source": {...}, "packages": [...]
     #   , "vulnerabilities": [{"id": "GHSA/PYSEC/OSV", "aliases":["CVE-..."], ...}]}]}
     for grp in data.get("results", []):
+        # packages in this group (name@version or name)
+        group_pkgs: list[str] = []
+        for pkg in grp.get("packages", []):
+            name = pkg.get("package", {}).get("name", "")
+            if name:
+                group_pkgs.append(name)
+                if name not in pkgs:
+                    pkgs.append(name)
         for vuln in grp.get("vulnerabilities", []):
             vid = vuln.get("id", "")
             aliases = vuln.get("aliases", []) or []
@@ -148,14 +159,16 @@ def scan_osv(root: Path) -> ScaResult:
             vulns.append({"id": vid, "cve": cve, "summary": intro})
             if cve and cve not in cves:
                 cves.append(cve)
-        for pkg in grp.get("packages", []):
-            name = pkg.get("package", {}).get("name", "")
-            if name and name not in pkgs:
-                pkgs.append(name)
+            # attribute the CVE to any package in this group
+            for name in group_pkgs:
+                pkg_cves.setdefault(name, [])
+                if cve not in pkg_cves[name]:
+                    pkg_cves[name].append(cve)
 
     res.osv_vulns = vulns
     res.cve_ids = cves
     res.packages = pkgs
+    res.pkg_cves = pkg_cves
     return res
 
 
@@ -169,6 +182,7 @@ def sca_scan(root: Path, with_sbom: bool = True) -> dict[str, Any]:
         "cves": osv.cve_ids,
         "vulnerabilities": osv.osv_vulns,
         "packages": osv.packages,
+        "pkg_cves": osv.pkg_cves,
         "sbom_available": sbom is not None,
         "sbom_path": str(sbom) if sbom else None,
         "sbom_dir": str(out_dir),

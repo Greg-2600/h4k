@@ -290,6 +290,7 @@ class AiRequest(BaseModel):
     """Ask the configured LLM for root-cause + patch-candidate on this input."""
 
     text: str
+    model: str | None = None  # optional Ollama model override
 
 
 class AiResult(BaseModel):

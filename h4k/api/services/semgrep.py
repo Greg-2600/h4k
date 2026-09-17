@@ -14,6 +14,16 @@ from typing import Any
 
 logger = logging.getLogger("h4k.semgrep")
 
+# Directory of bundled Semgrep rule sets for fully-offline scanning.
+# Populated at image build time (see Dockerfile). If present, we prefer these
+# so SAST works with no network.
+OFFLINE_RULES = Path("/opt/h4k/data/semgrep-rules")
+
+
+def _is_offline() -> bool:
+    """True if we should run semgrep against the bundled (offline) registry."""
+    return OFFLINE_RULES.exists() and any(OFFLINE_RULES.iterdir())
+
 
 @dataclass
 class SemgrepFinding:
@@ -50,7 +60,11 @@ def _semgrep_bin() -> str:
 
 
 def scan_semgrep(root: Path) -> list[SemgrepFinding]:
-    """Run `semgrep scan --json` over root/. Returns [] on any failure."""
+    """Run `semgrep scan --json` over root/. Returns [] on any failure.
+
+    If a bundled offline rules dir exists we use it (with --offline) so SAST
+    works fully without network; otherwise rely on semgrep's default registry.
+    """
     binary = _semgrep_bin()
     env = dict(os.environ)
     venv_bin = str(Path(sys.prefix) / "bin")
@@ -60,18 +74,15 @@ def scan_semgrep(root: Path) -> list[SemgrepFinding]:
     fd, tmpname = tempfile.mkstemp(suffix=".json")
     os.close(fd)
     out_file = Path(tmpname)
+    argv = [binary, "scan", "--json", "--quiet", "--no-rewrite-rule-ids"]
+    # Offline mode: --config points at the bundled rules dir and --offline tells
+    # semgrep not to fetch anything.
+    if _is_offline():
+        argv += ["--config", str(OFFLINE_RULES), "--offline"]
+    argv += ["-o", str(out_file), str(root)]
     try:
         subprocess.run(  # nosec B603 B607 - fixed argv, no shell
-            [
-                binary,
-                "scan",
-                "--json",
-                "--quiet",
-                "--no-rewrite-rule-ids",
-                "-o",
-                str(out_file),
-                str(root),
-            ],
+            argv,
             capture_output=True,
             text=True,
             timeout=180,

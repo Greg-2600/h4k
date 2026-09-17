@@ -135,7 +135,14 @@
           </div>
           <div class="btn-row">
             <button type="button" id="sca-btn" class="btn-sub">SBOM / SCA (dependencies→CVEs)</button>
+            <button type="button" id="sca-map-btn" class="btn-sub">supply-chain map</button>
+          </div>
+          <div class="btn-row">
             <button type="button" id="ai-btn" class="btn-sub">AI root-cause + patch</button>
+            <span id="ai-reach" class="field inline msg">ai: —</span>
+          </div>
+          <div class="deep-row" id="ai-controls" hidden>
+            <select id="ai-model" class="full-input"></select>
           </div>
           <div class="deep-row" id="custom-rule">
             <input type="text" id="rule-pattern" class="full-input" placeholder="custom semgrep pattern, e.g. exec(request.GET[&quot;cmd&quot;])" />

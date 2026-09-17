@@ -143,18 +143,43 @@ def sca_sbom_download(git_url: str) -> Any:
     except ingest.IngestError as exc:
         shutil.rmtree(work, ignore_errors=True)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        if not sbom or not sbom.exists():
+            raise HTTPException(status_code=400, detail="could not generate SBOM")
+        content = sbom.read_text(encoding="utf-8")
     finally:
-        pass  # keep temp dir until we read the file
-    if not sbom or not sbom.exists():
         shutil.rmtree(work, ignore_errors=True)
-        raise HTTPException(status_code=400, detail="could not generate SBOM")
-    content = sbom.read_text(encoding="utf-8")
-    shutil.rmtree(work, ignore_errors=True)
     return PlainTextResponse(
         content=content,
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="sbom.cdx.json"'},
     )
+
+
+@router.get("/sca/map")
+def sca_supply_chain_map(git_url: str) -> dict[str, Any]:
+    """Supply-chain map: dependency graph + per-package CVE reachability.
+
+    Returns {components, graph{nodes,edges}, summary{n,cves}} from the SBOM,
+    annotated with known CVEs per package from osv-scanner.
+    """
+    work = ingest.make_workdir()
+    try:
+        ingest.clone_git(git_url, work)
+        root = ingest.find_source_root(work)
+    except ingest.IngestError as exc:
+        shutil.rmtree(work, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        res = sca_service.sca_scan(root, with_sbom=True)
+        sbom_path = res.get("sbom_path")
+        if not sbom_path or not Path(sbom_path).exists():
+            return {"error": "no SBOM generated (no manifest/lockfile present)"}
+        from services.sbom import build_supply_chain_map
+
+        return build_supply_chain_map(Path(sbom_path), res.get("pkg_cves", {}))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 @router.post("/triage", response_model=TriageResult)
@@ -172,7 +197,7 @@ def analyze_crash(req: TriageRequest) -> TriageResult:
 @router.post("/ai", response_model=AiResult)
 def ai_analysis(req: AiRequest) -> AiResult:
     """Ask the configured LLM for a root-cause + patch candidate."""
-    result = ai_service.ai_analyze(req.text)
+    result = ai_service.ai_analyze(req.text, model_override=req.model)
     return AiResult(**result)
 
 
@@ -181,7 +206,7 @@ def ai_full_loop(req: AiRequest) -> AiLoopResult:
     """AI full-loop: root cause + patch candidate + verify/re-fuzz steps."""
     from services.ai_loop import ai_full_loop
 
-    result = ai_full_loop(req.text)
+    result = ai_full_loop(req.text, model_override=req.model)
     return AiLoopResult(
         ok=result["ok"],
         provider=result.get("provider", ""),

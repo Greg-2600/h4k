@@ -107,10 +107,14 @@ def _ensure_ollama_model(model: str) -> bool:
         return False
 
 
-def ai_analyze(input_text: str) -> dict[str, Any]:
-    """Call the configured LLM; return {ok, raw, provider, error}."""
+def ai_analyze(input_text: str, model_override: str | None = None) -> dict[str, Any]:
+    """Call the configured LLM; return {ok, raw, provider, error}.
+
+    `model_override` (if provided) overrides the configured model for this call
+    (used by the UI model picker); must be a model name Ollama can serve.
+    """
     provider = _provider()
-    model = _model()
+    model = model_override or _model()
 
     if provider == "openai" or provider == "openai_compatible":
         if not os.environ.get("H4K_AI_KEY"):

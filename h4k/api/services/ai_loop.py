@@ -25,12 +25,14 @@ FULL_LOOP_PROMPT = (
 )
 
 
-def ai_full_loop(input_text: str) -> dict[str, Any]:
+def ai_full_loop(input_text: str, model_override: str | None = None) -> dict[str, Any]:
     """Run a single finding/crash through the full AI loop.
 
     Returns {ok, provider, raw, error, parsed:{root_cause, patch, verify}}.
     """
-    analysis = ai_analyze(FULL_LOOP_PROMPT.format(input=input_text))
+    analysis = ai_analyze(
+        FULL_LOOP_PROMPT.format(input=input_text), model_override=model_override
+    )
     if not analysis.get("ok"):
         return {
             "ok": False,
