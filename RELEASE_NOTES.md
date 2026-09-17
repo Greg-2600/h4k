@@ -114,9 +114,10 @@ Two runnable images:
 
 ### 2.6 Platform / UX
 
-- **Terminal-style UI** (zsh/opencode aesthetic): status bar, live console,
-  operation pane, tabbed report (hosts / fingerprint / vulns / creds / attacks /
-  security / recs / notes).
+- **Terminal-style pipeline UI** (zsh/opencode aesthetic): status bar, live
+  console, sticky target banner, and a three-stage workflow — **Recon →
+  Source & Supply → Fix** — with a primary CTA per stage, collapsible
+  secondary/lab tools, and a consolidated results region.
 - **Report export** to `.json` / `.md`.
 - **Phrack-ezine README view** at `/readme`.
 - **Scan cache** (5 min per target+mode) to avoid re-probing.

@@ -10,14 +10,16 @@ item is a self-contained, live-demonstrable increment on the current release.
 - [ ] **Sanitizer-first everywhere** — surface ASan/UBSan flags in *every*
       finding (fuzz + SAST), not just line numbers, so each one shows a clean
       crash/error trace.
-- [ ] **True crash minimization** — wrap libFuzzer `-minimize_crash=1` /
+- [x] **True crash minimization** — wrap libFuzzer `-minimize_crash=1` /
       `afl-tmin` behind `/api/fuzz` so a crash auto-reduces to the smallest
       repro, then feed it straight into triage. ("Here's the exact 12-byte
       trigger.")
+  (done: OSS-Fuzz runner minimizes crash artifacts server-side)
 - [ ] **One-click report from all sources** — merge SAST + SCA + fuzz + scan
       findings into a single exportable `.md`/`.json` (already partly wired).
-- [ ] **AI hookup toggle in the UI** — surface Ollama reachability + model picker
+- [x] **AI hookup toggle in the UI** — surface Ollama reachability + model picker
       + a "verify" button so the AI section is obviously live vs. fallback.
+  (done: model picker + AI full-loop + reachability badge in the Fix stage)
 
 ## Tier 2 — bring real tools in (what pros use)
 
@@ -34,12 +36,14 @@ item is a self-contained, live-demonstrable increment on the current release.
 
 ## Tier 3 — the actual frontier (big wow, more work)
 
-- [ ] **AI full-loop** — fuzzer crash → AI root-cause → AI patch → re-fuzz to
+- [x] **AI full-loop** — fuzzer crash → AI root-cause → AI patch → re-fuzz to
       verify the fix removed it. One button.
+  (done: `POST /api/source/ai/loop` + Fix-stage "AI full-loop" button)
 - [ ] **Local TLS interception lab** — mkcert + local CA so the fuzzer/SAST can
       target HTTPS web apps you own.
-- [ ] **OSS-Fuzz-style auto-runner** — pull repo → build w/ sanitizers → fuzz N
+- [x] **OSS-Fuzz-style auto-runner** — pull repo → build w/ sanitizers → fuzz N
       minutes → triaged report + patch diff (mirrors Google's public bug-hunting).
+  (done: `POST /api/source/ossfuzz` + Fix-stage "OSS-Fuzz auto-run")
 - [ ] **SBOM → supply-chain map** — render dependency graph + reachability (which
       vulnerable call paths are actually hit).
 

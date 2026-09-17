@@ -54,6 +54,11 @@ and layers modern analysis on top:
 **Every aggressive action is off by default and opt-in.** This is a lab tool for
 systems you own or have written permission to test.
 
+The web UI is organized as a three-stage pipeline — **Recon → Source & Supply →
+Fix** — with a sticky target banner and a primary CTA per stage; secondary / lab
+tools are tucked under collapsible "more tools" disclosures. The Fix stage hosts
+the OSS-Fuzz auto-run → crash minimize → AI full-loop demo flow.
+
 ---
 
 ## 3 · Bring it up / run

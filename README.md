@@ -117,7 +117,7 @@ the project.
 ```mermaid
 flowchart TB
     subgraph browser["Browser (terminal UI)"]
-        UI["web/ · index.html + app.js + style.css<br/>zsh-style console + report tabs"]
+        UI["web/ · index.html + app.js + style.css<br/>zsh-style console · 3-stage pipeline (recon → source/supply → fix)"]
     end
 
     subgraph api["FastAPI (api/)"]

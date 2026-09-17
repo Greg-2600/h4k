@@ -30,10 +30,31 @@
       <div class="title-right" id="sess">session: local</div>
     </header>
 
+    <!-- persistent target-under-assessment banner, pinned on scroll -->
+    <div class="target-banner" id="target-banner" hidden>
+      <span class="tb-label">target</span>
+      <span class="tb-value" id="tb-value">—</span>
+      <span class="tb-mode" id="tb-mode"></span>
+      <button type="button" class="tb-clear" id="tb-clear" title="clear target">clear</button>
+    </div>
+
+    <!-- stage navigation -->
+    <nav class="stage-nav" id="stage-nav" aria-label="workflow stage">
+      <button type="button" class="stage-btn active" data-stage="recon" id="st-recon">
+        <span class="st-num">1</span><span class="st-name">recon</span>
+      </button>
+      <button type="button" class="stage-btn" data-stage="source" id="st-source">
+        <span class="st-num">2</span><span class="st-name">source · supply</span>
+      </button>
+      <button type="button" class="stage-btn" data-stage="fix" id="st-fix">
+        <span class="st-num">3</span><span class="st-name">fix</span>
+      </button>
+    </nav>
+
     <main>
-      <!-- console / main pane -->
+      <!-- console / activity feed (left) -->
       <section class="pane">
-        <div class="pane-head"><span class="pane-title">console</span><span class="pane-caret">●</span></div>
+        <div class="pane-head"><span class="pane-title">activity</span><span class="pane-caret">●</span></div>
         <div class="console" id="console"></div>
         <div class="prompt-row">
           <span class="prompt-user">h4k</span>
@@ -43,140 +64,147 @@
         </div>
       </section>
 
-      <!-- operation form -->
-      <section class="pane">
-        <div class="pane-head"><span class="pane-title">/operation</span></div>
-        <form id="scan-form">
-          <label class="field">
-            <span class="field-lbl">target</span>
-            <input id="target" name="target" placeholder="ip · host · cidr" required />
-          </label>
+      <!-- stage panes (right; only the active stage is shown) -->
+      <div class="stages">
 
-          <div class="field">
-            <span class="field-lbl">mode</span>
-            <div class="segmented" id="mode-select">
-              <label class="opt"><input type="radio" name="mode" value="stealth" /><span>stealth</span></label>
-              <label class="opt"><input type="radio" name="mode" value="tor" /><span>tor</span></label>
-              <label class="opt"><input type="radio" name="mode" value="overt" checked /><span>overt</span></label>
+        <!-- ============ STAGE 1 · RECON ============ -->
+        <section class="pane stage" data-stage="recon" id="stage-recon">
+          <div class="pane-head"><span class="pane-title">1 · recon</span></div>
+          <p class="stage-desc">Enumerate a host or network: ports, services, versions, posture, and neighbors.</p>
+
+          <form id="scan-form">
+            <label class="field">
+              <span class="field-lbl">target</span>
+              <input id="target" name="target" placeholder="ip · host · cidr" required />
+            </label>
+
+            <div class="field">
+              <span class="field-lbl">mode</span>
+              <div class="segmented" id="mode-select">
+                <label class="opt"><input type="radio" name="mode" value="stealth" /><span>stealth</span></label>
+                <label class="opt"><input type="radio" name="mode" value="tor" /><span>tor</span></label>
+                <label class="opt"><input type="radio" name="mode" value="overt" checked /><span>overt</span></label>
+              </div>
             </div>
-          </div>
 
-          <label class="field inline">
-            <input type="checkbox" id="cve-toggle" checked />
-            <span>enrich from local cve db</span>
-          </label>
+            <div class="toggles">
+              <label class="field inline"><input type="checkbox" id="cve-toggle" checked /><span>enrich from local cve db</span></label>
+              <label class="field inline"><input type="checkbox" id="creds-toggle" /><span>try default credentials <em class="danger">(opt-in)</em></span></label>
+              <label class="field inline"><input type="checkbox" id="attack-toggle" /><span>active exploit attempts <em class="danger">(opt-in)</em></span></label>
+            </div>
 
-          <label class="field inline">
-            <input type="checkbox" id="creds-toggle" />
-            <span>try default credentials <em class="danger">(opt-in)</em></span>
-          </label>
+            <div class="btn-row">
+              <button type="submit" id="scan-btn">run scan</button>
+              <button type="button" id="stop-btn" class="btn-stop" disabled>stop</button>
+            </div>
+            <div class="btn-row">
+              <button type="button" id="export-json" class="btn-sub">export .json</button>
+              <button type="button" id="export-md" class="btn-sub">export .md</button>
+            </div>
+          </form>
 
-          <label class="field inline">
-            <input type="checkbox" id="attack-toggle" />
-            <span>active exploit attempts <em class="danger">(opt-in)</em></span>
-          </label>
+          <!-- secondary / lab tools -->
+          <details class="more-tools" id="recon-more">
+            <summary>more tools<span class="mt-hint">arp · version leads · deep attack · lab fuzz</span></summary>
+            <div class="mt-body">
+              <div class="btn-row">
+                <button type="button" id="neighbors-btn" class="btn-sub">find neighbors (arp)</button>
+                <button type="button" id="vulnleads-btn" class="btn-sub">version leads (EOL/beta)</button>
+              </div>
+              <div class="btn-row">
+                <button type="button" id="deep-attack-btn" class="btn-sub btn-danger">deep toolkit attack <em class="danger">(opt-in)</em></button>
+              </div>
+              <div class="deep-row">
+                <label class="field inline"><input type="checkbox" id="deep-ssh" checked /><span>ssh brute</span></label>
+                <label class="field inline"><input type="checkbox" id="deep-http" checked /><span>web vuln</span></label>
+                <label class="field inline"><input type="checkbox" id="deep-smb" checked /><span>smb enum</span></label>
+                <label class="field inline"><input type="checkbox" id="deep-dns" checked /><span>dns</span></label>
+              </div>
+              <div class="btn-row">
+                <button type="button" id="fuzz-btn" class="btn-sub btn-danger">lab fuzz <em class="danger">(own target)</em></button>
+              </div>
+              <div class="deep-row">
+                <label class="field inline"><input type="checkbox" id="fuzz-http" checked /><span>http</span></label>
+                <span class="field inline">target port</span>
+                <input type="text" id="fuzz-port" class="tiny-input" placeholder="auto" />
+              </div>
+              <div class="mnet">
+                <div class="btn-row">
+                  <button type="button" id="iface-btn" class="btn-sub">list interfaces</button>
+                </div>
+                <input type="text" id="net-iface" class="full-input" placeholder="network interface (e.g. eth0 / wlan0mon)" />
+                <div class="btn-row">
+                  <button type="button" id="sniff-btn" class="btn-sub">sniff (tcpdump)</button>
+                  <button type="button" id="arp-btn" class="btn-sub">arp / arp-scan</button>
+                </div>
+                <div class="btn-row">
+                  <button type="button" id="mitm-btn" class="btn-sub btn-danger">ARP-spoof <em class="danger">(lab only)</em></button>
+                  <button type="button" id="wifi-scan-btn" class="btn-sub">wifi: scan APs</button>
+                  <button type="button" id="wifi-cap-btn" class="btn-sub">wifi: capture</button>
+                </div>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <!-- ============ STAGE 2 · SOURCE & SUPPLY ============ -->
+        <section class="pane stage" data-stage="source" id="stage-source" hidden>
+          <div class="pane-head"><span class="pane-title">2 · source &amp; supply</span></div>
+          <p class="stage-desc">Analyze a project's source (SAST) and dependency supply chain (SCA/SBOM) for vulnerabilities.</p>
 
           <div class="btn-row">
-            <button type="submit" id="scan-btn">run scan</button>
-            <button type="button" id="stop-btn" class="btn-stop" disabled>stop</button>
-          </div>
-          <div class="btn-row">
-            <button type="button" id="export-json" class="btn-sub">export .json</button>
-            <button type="button" id="export-md" class="btn-sub">export .md</button>
-          </div>
-
-          <div class="btn-row">
-            <button type="button" id="neighbors-btn" class="btn-sub">find neighbors (arp)</button>
-          </div>
-          <div class="btn-row">
-            <button type="button" id="deep-attack-btn" class="btn-sub btn-danger">deep toolkit attack <em class="danger">(opt-in)</em></button>
-          </div>
-          <div class="deep-row">
-            <label class="field inline">
-              <input type="checkbox" id="deep-ssh" checked />
-              <span>ssh brute</span>
-            </label>
-            <label class="field inline">
-              <input type="checkbox" id="deep-http" checked />
-              <span>web vuln</span>
-            </label>
-            <label class="field inline">
-              <input type="checkbox" id="deep-smb" checked />
-              <span>smb enum</span>
-            </label>
-            <label class="field inline">
-              <input type="checkbox" id="deep-dns" checked />
-              <span>dns</span>
-            </label>
-          </div>
-
-          <div class="btn-row">
-            <button type="button" id="vulnleads-btn" class="btn-sub">scan version leads (EOL/beta)</button>
-          </div>
-          <div class="btn-row">
-            <button type="button" id="fuzz-btn" class="btn-sub btn-danger">lab fuzz <em class="danger">(own target)</em></button>
-          </div>
-          <div class="deep-row">
-            <label class="field inline">
-              <input type="checkbox" id="fuzz-http" checked />
-              <span>http</span>
-            </label>
-            <span class="field inline">target port</span>
-            <input type="text" id="fuzz-port" class="tiny-input" placeholder="auto" />
-          </div>
-
-          <div class="btn-row">
-            <button type="button" id="source-btn" class="btn-sub">SAST source analysis</button>
+            <button type="button" id="source-btn" class="btn-primary">SAST source analysis</button>
           </div>
           <div class="deep-row" id="source-controls">
             <input type="file" id="source-file" accept=".zip,.tar,.tar.gz,.tgz" class="file-input" />
             <input type="text" id="source-url" class="full-input" placeholder="or git URL (https://gitlab.com/org/repo.git)" />
             <button type="button" id="source-run" class="btn-sub">analyze</button>
           </div>
+
           <div class="btn-row">
             <button type="button" id="sca-btn" class="btn-sub">SBOM / SCA (dependencies→CVEs)</button>
             <button type="button" id="sca-map-btn" class="btn-sub">supply-chain map</button>
           </div>
+
+          <details class="more-tools" id="source-more">
+            <summary>more<span class="mt-hint">custom semgrep rules</span></summary>
+            <div class="mt-body" id="custom-rule">
+              <input type="text" id="rule-pattern" class="full-input" placeholder="custom semgrep pattern, e.g. exec(request.GET[&quot;cmd&quot;])" />
+              <div class="btn-row">
+                <button type="button" id="rule-test" class="btn-sub">test custom rule</button>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <!-- ============ STAGE 3 · FIX ============ -->
+        <section class="pane stage" data-stage="fix" id="stage-fix" hidden>
+          <div class="pane-head"><span class="pane-title">3 · fix</span></div>
+          <p class="stage-desc">Fuzz a crash, minimize it, and get an AI root-cause → patch → verify plan for code you own.</p>
+
+          <div class="ai-reach"><span id="ai-reach" class="msg">ai: —</span>
+            <select id="ai-model" hidden></select>
+          </div>
+
           <div class="btn-row">
+            <button type="button" id="ai-loop-btn" class="btn-primary">AI full-loop <span class="btn-sub-txt">fix + verify</span></button>
             <button type="button" id="ai-btn" class="btn-sub">AI root-cause + patch</button>
-            <button type="button" id="ai-loop-btn" class="btn-sub">AI full-loop (fix + verify)</button>
-            <span id="ai-reach" class="field inline msg">ai: —</span>
-          </div>
-          <div class="deep-row" id="ai-controls" hidden>
-            <select id="ai-model" class="full-input"></select>
-          </div>
-          <div class="btn-row">
-            <button type="button" id="ossfuzz-btn" class="btn-sub btn-danger">OSS-Fuzz auto-run (ASan) <em class="danger">(own repo)</em></button>
           </div>
 
           <div class="btn-row">
-            <button type="button" id="iface-btn" class="btn-sub">list interfaces</button>
+            <button type="button" id="ossfuzz-btn" class="btn-sub btn-danger">OSS-Fuzz auto-run <em class="danger">(own repo)</em></button>
           </div>
-          <div class="deep-row" id="net-controls">
-            <input type="text" id="net-iface" class="full-input" placeholder="network interface (e.g. eth0 / wlan0mon)" />
+          <div class="deep-row" id="ossfuzz-controls">
+            <input type="text" id="ossfuzz-url" class="full-input" placeholder="git URL of a fuzz-harness repo you own (e.g. vulnlab)" />
             <div class="btn-row">
-              <button type="button" id="sniff-btn" class="btn-sub">sniff (tcpdump)</button>
-              <button type="button" id="arp-btn" class="btn-sub">arp / arp-scan</button>
-            </div>
-            <div class="btn-row">
-              <button type="button" id="mitm-btn" class="btn-sub btn-danger">bettercap ARP-spoof <em class="danger">(lab only)</em></button>
-            </div>
-            <div class="btn-row">
-              <button type="button" id="wifi-scan-btn" class="btn-sub">wifi: scan APs</button>
-              <button type="button" id="wifi-cap-btn" class="btn-sub">wifi: capture frames</button>
+              <button type="button" id="ossfuzz-run" class="btn-sub btn-danger">build + fuzz (ASan)</button>
+              <button type="button" id="minimize-btn" class="btn-sub">minimize crash(s)</button>
             </div>
           </div>
+        </section>
+      </div>
 
-          <div class="deep-row" id="custom-rule">
-            <input type="text" id="rule-pattern" class="full-input" placeholder="custom semgrep pattern, e.g. exec(request.GET[&quot;cmd&quot;])" />
-            <div class="btn-row">
-              <button type="button" id="rule-test" class="btn-sub">test custom rule</button>
-            </div>
-          </div>
-        </form>
-      </section>
-
-      <!-- progress -->
+      <!-- progress (scan/attack jobs) -->
       <section class="pane" id="status-pane" hidden>
         <div class="pane-head"><span class="pane-title">/job</span><span class="pane-status" id="status-tag">queued</span></div>
         <div class="pct" id="pct">0</div>
@@ -185,135 +213,34 @@
       </section>
     </main>
 
-    <!-- report header -->
-    <section class="pane results" id="results" hidden>
+    <!-- ================= results (consolidated below the stages) ================= -->
+    <section class="results-head" id="results" hidden>
       <div class="pane-head">
         <span class="pane-title">/report</span>
         <span class="pane-meta" id="report-meta"></span>
       </div>
     </section>
 
-    <!-- report sections: each its own box -->
-    <section class="pane results report-box" id="box-hosts" hidden>
-      <div class="pane-head"><span class="pane-title">/hosts</span></div>
-      <div id="tab-hosts"></div>
-    </section>
+    <section class="pane results report-box" id="box-hosts" hidden><div class="pane-head"><span class="pane-title">/hosts</span></div><div id="tab-hosts"></div></section>
+    <section class="pane results report-box" id="box-fp" hidden><div class="pane-head"><span class="pane-title">/fingerprint</span></div><div id="tab-fp"></div></section>
+    <section class="pane results report-box" id="box-vulns" hidden><div class="pane-head"><span class="pane-title">/vulns</span></div><div id="tab-vulns"></div></section>
+    <section class="pane results report-box" id="box-creds" hidden><div class="pane-head"><span class="pane-title">/credentials</span></div><div id="tab-creds"></div></section>
+    <section class="pane results report-box" id="box-attacks" hidden><div class="pane-head"><span class="pane-title">/attacks</span></div><div id="tab-attacks"></div></section>
+    <section class="pane results report-box" id="box-sec" hidden><div class="pane-head"><span class="pane-title">/security posture</span></div><div id="tab-sec"></div></section>
+    <section class="pane results report-box" id="box-recs" hidden><div class="pane-head"><span class="pane-title">/recommended attack</span></div><div id="tab-recs"></div></section>
+    <section class="pane results report-box" id="box-notes" hidden><div class="pane-head"><span class="pane-title">/raw notes</span></div><div id="tab-notes"></div></section>
 
-    <section class="pane results report-box" id="box-fp" hidden>
-      <div class="pane-head"><span class="pane-title">/fingerprint</span></div>
-      <div id="tab-fp"></div>
-    </section>
-
-    <section class="pane results report-box" id="box-vulns" hidden>
-      <div class="pane-head"><span class="pane-title">/vulns</span></div>
-      <div id="tab-vulns"></div>
-    </section>
-
-    <section class="pane results report-box" id="box-creds" hidden>
-      <div class="pane-head"><span class="pane-title">/credentials</span></div>
-      <div id="tab-creds"></div>
-    </section>
-
-    <section class="pane results report-box" id="box-attacks" hidden>
-      <div class="pane-head"><span class="pane-title">/attacks</span></div>
-      <div id="tab-attacks"></div>
-    </section>
-
-    <section class="pane results report-box" id="box-sec" hidden>
-      <div class="pane-head"><span class="pane-title">/security posture</span></div>
-      <div id="tab-sec"></div>
-    </section>
-
-    <section class="pane results report-box" id="box-recs" hidden>
-      <div class="pane-head"><span class="pane-title">/recommended attack</span></div>
-      <div id="tab-recs"></div>
-    </section>
-
-    <section class="pane results report-box" id="box-notes" hidden>
-      <div class="pane-head"><span class="pane-title">/raw notes</span></div>
-      <div id="tab-notes"></div>
-    </section>
-
-    <!-- neighbor discovery results -->
-    <section class="pane results" id="neighbors-panel" hidden>
-      <div class="pane-head"><span class="pane-title">/neighbors</span></div>
-      <div id="tab-neighbors">click "find neighbors" to sweep the local net</div>
-    </section>
-
-    <!-- deep toolkit attack results -->
-    <section class="pane results" id="deep-panel" hidden>
-      <div class="pane-head">
-        <span class="pane-title">/deep toolkit attack</span>
-        <span class="pane-status" id="deep-status">idle</span>
-      </div>
-      <div id="tab-deep">launch a deep toolkit sweep (hydra/nikto/gobuster/sqlmap/...) on an authorized target</div>
-    </section>
-
-    <!-- version leads -->
-    <section class="pane results" id="vulnleads-panel" hidden>
-      <div class="pane-head"><span class="pane-title">/version leads</span></div>
-      <div id="tab-vulnleads">scan a target to surface EOL / beta / unusual service versions to research</div>
-    </section>
-
-    <!-- lab fuzz -->
-    <section class="pane results" id="fuzz-panel" hidden>
-      <div class="pane-head">
-        <span class="pane-title">/lab fuzz</span>
-        <span class="pane-status" id="fuzz-status">idle</span>
-      </div>
-      <div id="tab-fuzz">mutate inputs toward a service YOU OWN and triage anomalies as potential bug candidates</div>
-    </section>
-
-    <!-- source SAST analysis -->
-    <section class="pane results" id="source-panel" hidden>
-      <div class="pane-head">
-        <span class="pane-title">/source analysis</span>
-        <span class="pane-status" id="source-status">idle</span>
-      </div>
-      <div id="tab-source">upload a zip/tar/tar.gz or clone a git URL, then scan the source for vulnerabilities</div>
-    </section>
-    <section class="pane results" id="exploit-panel" hidden>
-      <div class="pane-head"><span class="pane-title">/poc disclosure skeleton</span></div>
-      <pre class="notes" id="tab-exploit"></pre>
-    </section>
-
-    <!-- SCA / SBOM -->
-    <section class="pane results" id="sca-panel" hidden>
-      <div class="pane-head"><span class="pane-title">/sbom · supply-chain</span></div>
-      <div id="tab-sca">analyze a project's dependencies for known CVEs</div>
-    </section>
-
-    <!-- AI root-cause / patch -->
-    <section class="pane results" id="ai-panel" hidden>
-      <div class="pane-head"><span class="pane-title">/ai root-cause · patch</span><span id="ai-model-used" class="pane-status"></span></div>
-      <div class="ai-block">
-        <div class="pane-head sub"><span class="pane-title">→ prompt sent</span></div>
-        <pre class="notes" id="ai-prompt"></pre>
-      </div>
-      <div class="ai-block">
-        <div class="pane-head sub"><span class="pane-title">← model response</span></div>
-        <pre class="notes" id="tab-ai"></pre>
-      </div>
-    </section>
-
-    <!-- network layer (sniff / arp / mitm / wifi) -->
-    <section class="pane results" id="net-panel" hidden>
-      <div class="pane-head"><span class="pane-title">/network layer</span><span id="net-status" class="pane-status">idle</span></div>
-      <pre class="notes" id="tab-net"></pre>
-    </section>
-
-    <!-- OSS-Fuzz auto-runner + crash minimization -->
-    <section class="pane results" id="ossfuzz-panel" hidden>
-      <div class="pane-head"><span class="pane-title">/oss-fuzz auto-run</span><span id="ossfuzz-status" class="pane-status">idle</span></div>
-      <div class="deep-row">
-        <input type="text" id="ossfuzz-url" class="full-input" placeholder="git URL of a fuzz-harness repo you own (e.g. vulnlab)" />
-        <div class="btn-row">
-          <button type="button" id="ossfuzz-run" class="btn-sub btn-danger">build + fuzz (ASan)</button>
-          <button type="button" id="minimize-btn" class="btn-sub">minimize crash(s)</button>
-        </div>
-      </div>
-      <pre class="notes" id="tab-ossfuzz">clone a repo with an LLVMFuzzer-style harness (or a Makefile that builds one), build with AddressSanitizer, and auto-fuzz for a short window.</pre>
-    </section>
+    <!-- action result panels (each action shows its output here) -->
+    <section class="pane results" id="neighbors-panel" hidden><div class="pane-head"><span class="pane-title">/neighbors</span></div><div id="tab-neighbors"></div></section>
+    <section class="pane results" id="deep-panel" hidden><div class="pane-head"><span class="pane-title">/deep toolkit</span><span class="pane-status" id="deep-status">idle</span></div><div id="tab-deep"></div></section>
+    <section class="pane results" id="vulnleads-panel" hidden><div class="pane-head"><span class="pane-title">/version leads</span></div><div id="tab-vulnleads"></div></section>
+    <section class="pane results" id="fuzz-panel" hidden><div class="pane-head"><span class="pane-title">/lab fuzz</span><span class="pane-status" id="fuzz-status">idle</span></div><div id="tab-fuzz"></div></section>
+    <section class="pane results" id="source-panel" hidden><div class="pane-head"><span class="pane-title">/source analysis</span><span class="pane-status" id="source-status">idle</span></div><div id="tab-source"></div></section>
+    <section class="pane results" id="exploit-panel" hidden><div class="pane-head"><span class="pane-title">/poc disclosure skeleton</span></div><pre class="notes" id="tab-exploit"></pre></section>
+    <section class="pane results" id="sca-panel" hidden><div class="pane-head"><span class="pane-title">/sbom · supply-chain</span></div><div id="tab-sca"></div></section>
+    <section class="pane results" id="ai-panel" hidden><div class="pane-head"><span class="pane-title">/ai</span><span id="ai-model-used" class="pane-status"></span></div><div class="ai-block"><div class="pane-head sub"><span class="pane-title">→ prompt</span></div><pre class="notes" id="ai-prompt"></pre></div><div class="ai-block"><div class="pane-head sub"><span class="pane-title">← response</span></div><pre class="notes" id="tab-ai"></pre></div></section>
+    <section class="pane results" id="net-panel" hidden><div class="pane-head"><span class="pane-title">/network layer</span><span id="net-status" class="pane-status">idle</span></div><pre class="notes" id="tab-net"></pre></section>
+    <section class="pane results" id="ossfuzz-panel" hidden><div class="pane-head"><span class="pane-title">/oss-fuzz auto-run</span><span id="ossfuzz-status" class="pane-status">idle</span></div><pre class="notes" id="tab-ossfuzz"></pre></section>
 
   </div>
   <div class="legal">

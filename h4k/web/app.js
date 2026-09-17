@@ -26,9 +26,39 @@ function log(msg, cls = "") {
 }
 function boot() {
   log("h4k terminal · metasploit recon suite", "sys");
-  log("type 'help' for commands · authorized scope only", "sys");
+  log("choose a stage · authorized scope only", "sys");
 }
 boot();
+
+/* ---------- pipeline stage routing ---------- */
+function setStage(name) {
+  document.querySelectorAll(".stage-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.stage === name);
+  });
+  document.querySelectorAll(".stage").forEach((p) => {
+    p.hidden = p.dataset.stage !== name;
+  });
+}
+document.querySelectorAll(".stage-btn").forEach((b) => {
+  b.addEventListener("click", () => setStage(b.dataset.stage));
+});
+
+/* ---------- target banner ---------- */
+const targetBanner = $("target-banner");
+function setTargetBanner(target, mode) {
+  if (!target) { targetBanner.hidden = true; return; }
+  $("tb-value").textContent = target;
+  $("tb-mode").textContent = mode || "";
+  targetBanner.hidden = false;
+}
+$("tb-clear").addEventListener("click", () => setTargetBanner("", ""));
+
+/* ---------- action button busy state ---------- */
+function busy(btn, on) {
+  if (!btn) return;
+  btn.classList.toggle("busy", !!on);
+  btn.disabled = !!on;
+}
 
 /* ---------- scan form ---------- */
 const form = $("scan-form"), scanBtn = $("scan-btn");
@@ -58,8 +88,9 @@ form.addEventListener("submit", async (e) => {
     log("scan cancelled — active action not confirmed", "err");
     return;
   }
+  setTargetBanner(target, "mode:" + mode);
   $("target").value = "";
-  scanBtn.disabled = true;
+  busy(scanBtn, true);
   $("stop-btn").disabled = false;
   $("neighbors-panel").hidden = true;
   statusPane.hidden = false;
@@ -67,9 +98,10 @@ form.addEventListener("submit", async (e) => {
   prog.style.width = "0%"; pctEl.textContent = "0";
   $("status-msg").textContent = "queued…";
   $("status-tag").textContent = "queued";
-  log(`scan ${target} · mode=${mode}` + (useCve ? " · cve-db" : "")
-    + (tryCreds ? " · creds" : "") + (doAttack ? " · attack" : ""), "info");
-  try {
+    log(`scan ${target} · mode=${mode}` + (useCve ? " · cve-db" : "")
+      + (tryCreds ? " · creds" : "") + (doAttack ? " · attack" : ""), "info");
+    setStage("recon");
+    try {
     const resp = await fetch("/api/scan", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ target, mode, do_dns_recon: true, do_vuln_scan: true,
@@ -83,7 +115,7 @@ form.addEventListener("submit", async (e) => {
     poll(job.id);
   } catch (err) {
     log("error " + err.message, "err");
-    scanBtn.disabled = false;
+    busy(scanBtn, false);
   }
 });
 
@@ -157,25 +189,25 @@ function poll(id) {
         $("job-ind").textContent = "idle";
         $("stop-btn").disabled = true;
         render(j.report);
-        scanBtn.disabled = false;
+        busy(scanBtn, false);
       } else if (j.status === "aborted") {
         clearInterval(pollTimer);
         log("scan aborted by operator", "err");
         $("job-ind").textContent = "idle";
         $("stop-btn").disabled = true;
-        scanBtn.disabled = false;
+        busy(scanBtn, false);
       } else if (j.status === "error") {
         clearInterval(pollTimer);
         log("error: " + (j.error || "unknown"), "err");
         $("job-ind").textContent = "idle";
         $("stop-btn").disabled = true;
-        scanBtn.disabled = false;
+        busy(scanBtn, false);
       }
     } catch (err) {
       clearInterval(pollTimer);
       $("job-ind").textContent = "idle";
       $("stop-btn").disabled = true;
-      scanBtn.disabled = false;
+      busy(scanBtn, false);
     }
   }, 1000);
 }
@@ -355,8 +387,7 @@ cmd.addEventListener("keydown", async (e) => {
 let deepTimer = null;
 $("deep-attack-btn").addEventListener("click", async () => {
   const target = $("target").value.trim();
-  if (!target) { log("[!] enter a target first for deep attack", "err"); return; }
-  if (!window.confirm(
+  if (!target) { log("[!] enter a target first for deep attack", "err"); return; }  if (!window.confirm(
     "DEEP TOOLKIT attack on " + target + "\n" +
     "Runs brute-force (hydra), web vuln (nikto/sqlmap), smb & dns tools.\n\n" +
     "Only proceed if you own this system or have WRITTEN permission to test it.\n\nProceed?"
@@ -370,6 +401,7 @@ $("deep-attack-btn").addEventListener("click", async () => {
   $("deep-status").textContent = "queued";
   $("tab-deep").innerHTML = "<p class='msg'>launching deep toolkit sweep…</p>";
   log(`[!] deep toolkit attack on ${target} :: ${services.join(",")}`, "err");
+  busy($("deep-attack-btn"), true);
   try {
     const resp = await fetch("/api/deepattack", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -392,6 +424,7 @@ function pollDeep(jobId) {
       if (job.results && job.results.length) renderDeep(job.results);
       if (job.status === "done" || job.status === "error") {
         clearInterval(deepTimer);
+        busy($("deep-attack-btn"), false);
         log("[+] deep toolkit attack complete", "ok");
       }
     } catch (err) { clearInterval(deepTimer); }
@@ -454,6 +487,7 @@ $("fuzz-btn").addEventListener("click", async () => {
   $("fuzz-status").textContent = "running";
   $("tab-fuzz").innerHTML = "<p class='msg'>fuzzing…</p>";
   log(`[!] lab fuzz on ${target}` + (port ? ":" + port : ""), "err");
+  busy($("fuzz-btn"), true);
   try {
     const resp = await fetch("/api/fuzz", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -476,6 +510,7 @@ function pollFuzz(jobId) {
       if (job.candidates && job.candidates.length) renderFuzz(job.candidates);
       if (job.status === "done" || job.status === "error") {
         clearInterval(fuzzTimer);
+        busy($("fuzz-btn"), false);
         log("[+] fuzz complete — " + (job.count || 0) + " candidate(s)", "ok");
       }
     } catch (err) { clearInterval(fuzzTimer); }
@@ -632,10 +667,10 @@ async function refreshAiModels() {
     }
     // pre-select configured model if present
     if (d.model && (d.models || []).includes(d.model)) sel.value = d.model;
-    $("ai-controls").hidden = !(d.models || []).length;
+    sel.hidden = !(d.models || []).length;
   } catch (e) {
     $("ai-reach").textContent = "ai: unreachable";
-    $("ai-controls").hidden = true;
+    $("ai-model").hidden = true;
     log("AI health check failed: " + e.message, "err");
   }
 }
@@ -711,11 +746,12 @@ function renderAiParsed(parsed, raw) {
   return (h || raw || "").trim();
 }
 
-$("ai-btn").addEventListener("click", () => runAi("/api/source/ai", "analysis", true));
-$("ai-loop-btn").addEventListener("click", () => runAi("/api/source/ai/loop", "full-loop", false));
+$("ai-btn").addEventListener("click", () => { setStage("fix"); runAi("/api/source/ai", "analysis", true); });
+$("ai-loop-btn").addEventListener("click", () => { setStage("fix"); runAi("/api/source/ai/loop", "full-loop", false); });
 
 /* ---------- OSS-Fuzz auto-run + crash minimization ---------- */
 $("ossfuzz-btn").addEventListener("click", () => {
+  setStage("fix");
   $("ossfuzz-panel").hidden = false;
   $("ossfuzz-status").textContent = "ready";
   $("ossfuzz-url").focus();
@@ -733,6 +769,7 @@ $("ossfuzz-run").addEventListener("click", async () => {
   $("ossfuzz-status").textContent = "running";
   $("tab-ossfuzz").innerHTML = "<p class='msg'>building with ASan + fuzzing…</p>";
   log("[!] OSS-Fuzz auto-run on " + url, "err");
+  busy($("ossfuzz-run"), true);
   try {
     const resp = await fetch("/api/source/ossfuzz", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -740,8 +777,10 @@ $("ossfuzz-run").addEventListener("click", async () => {
     });
     if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || "http " + resp.status); }
     const d = await resp.json();
+    busy($("ossfuzz-run"), false);
     renderOssFuzz(d);
   } catch (err) {
+    busy($("ossfuzz-run"), false);
     $("ossfuzz-status").textContent = "error";
     $("tab-ossfuzz").innerHTML = "<p class='err'>" + esc(err.message) + "</p>";
     log("OSS-Fuzz error: " + err.message, "err");
@@ -783,9 +822,10 @@ $("minimize-btn").addEventListener("click", () => {
   }
   if (have[0]) lastMinimized = { source: "OSS-Fuzz", input: have[0].minimized, file: have[0].name };
   $("ossfuzz-status").textContent = "done";
-  $("tab-ossfuzz").innerHTML +=
-    "<p class='ok'>Minimization done for " + have.length + " crash(s). First reduced repro stored for AI full-loop (root-cause → patch → verify).</p>";
+  $("tab-ossfuzz").innerHTML =
+    "<p class='ok'>Minimization done for " + have.length + " crash(s). Reduced repro ready — run “AI full-loop” in the Fix stage for root-cause → patch → verify.</p>";
   log("[+] minimize: reduced repro ready for AI full-loop", "ok");
+  setStage("fix");
 });
 
 /* ---------- supply-chain map ---------- */

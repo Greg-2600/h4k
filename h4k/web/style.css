@@ -65,6 +65,89 @@ body {
 main { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; }
 @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
 
+/* ---------- target banner (pinned) ---------- */
+.target-banner {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-raise);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+.target-banner .tb-label { color: var(--fg-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.target-banner .tb-value { color: var(--accent); font-weight: 600; }
+.target-banner .tb-mode { color: var(--cyan); font-size: 12px; margin-left: auto; }
+.target-banner .tb-clear {
+  width: auto; flex: 0 0 auto; padding: 4px 10px; font-size: 11px;
+  border-color: var(--line-hi); color: var(--fg-dim);
+  background: color-mix(in srgb, var(--line-hi) 15%, transparent);
+}
+
+/* ---------- stage navigation ---------- */
+.stage-nav {
+  display: flex; gap: 8px; margin-bottom: 14px;
+}
+.stage-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-hi);
+  border-radius: 8px;
+  background: var(--bg-raise);
+  color: var(--fg-dim);
+  font-family: var(--mono); font-size: 13px; cursor: pointer;
+  transition: all 0.12s;
+}
+.stage-btn:hover { border-color: var(--accent); color: var(--fg); }
+.stage-btn.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.stage-btn .st-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid currentColor; font-size: 12px;
+}
+.stage-btn.active .st-num { background: var(--accent); color: var(--bg); }
+.stage-btn .st-name { font-weight: 500; }
+
+/* ---------- stages ---------- */
+.stages { min-width: 0; }
+.stage-desc { color: var(--fg-dim); font-size: 12px; margin: 0 0 12px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 6px; }
+
+/* ---------- more tools (collapsible) ---------- */
+.more-tools { margin-top: 14px; }
+.more-tools summary {
+  cursor: pointer; user-select: none;
+  color: var(--fg-dim); font-size: 12px;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  padding: 10px 0 2px;
+}
+.more-tools summary::-webkit-details-marker { display: none; }
+.more-tools summary::before { content: "▸ "; color: var(--accent); }
+.more-tools[open] summary::before { content: "▾ "; }
+.more-tools .mt-hint { color: var(--fg-faint); font-size: 11px; margin-left: 8px; }
+.mt-body { padding-top: 10px; }
+.mnet { border-top: 1px dashed var(--line); margin-top: 14px; padding-top: 12px; }
+
+/* ---------- primary CTA + loading state ---------- */
+.btn-primary {
+  border-color: var(--accent); color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  font-weight: 600;
+}
+.btn-sub-txt { color: var(--fg-faint); font-size: 11px; font-weight: 400; margin-left: 6px; }
+button.busy {
+  color: var(--amber) !important;
+  border-color: var(--amber) !important;
+  pointer-events: none;
+  position: relative;
+}
+button.busy::after {
+  content: "…"; display: inline-block; margin-left: 6px; color: var(--amber);
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0.25; } }
+
 .pane {
   background: var(--bg-raise);
   border: 1px solid var(--line);
