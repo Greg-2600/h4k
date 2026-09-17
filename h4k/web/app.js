@@ -263,11 +263,18 @@ function renderHosts(hosts) {
   const has = hosts && hosts.length;
   $("box-hosts").hidden = !has;
   if (!has) { el.innerHTML = "<p class='msg'>no hosts responding</p>"; return; }
-  let h = "<table><tr><th>host</th><th>os</th><th>state</th><th>services</th></tr>";
+  let h = "<table><tr><th>host</th><th>os</th><th>state</th></tr>";
   for (const hd of hosts) {
-    const sv = (hd.services || []).map((s) => s.port + "/" + (s.service || "?")).join(", ") || "—";
     h += `<tr><td>${esc(hd.address)}</td><td>${esc(hd.os || "—")}</td>` +
-         `<td>${esc(hd.state || "—")}</td><td>${esc(sv)}</td></tr>`;
+         `<td>${esc(hd.state || "—")}</td></tr>`;
+    // per-service detail rows: port/proto, service, version banner (info), state
+    for (const s of (hd.services || [])) {
+      h += `<tr class="svc-row"><td> </td>` +
+        `<td colspan="2"><span class="svc-port">${esc(s.port)}/${esc(s.proto||"tcp")}</span> ` +
+        `<span class="svc-name">${esc(s.service || "?")}</span>` +
+        (s.info ? ` <span class="svc-info">${esc(s.info)}</span>` : "") +
+        ` <span class="svc-state">${esc(s.state || "")}</span></td></tr>`;
+    }
   }
   el.innerHTML = h + "</table>";
 }

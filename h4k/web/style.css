@@ -223,3 +223,10 @@ pre.notes {
   font-size: 11.5px; color: var(--fg-faint);
   border-top: 1px solid var(--line);
 }
+
+/* per-service detail rows in the hosts table */
+.svc-row td { padding-top: 2px; padding-bottom: 2px; color: var(--fg-dim); }
+.svc-port { color: var(--accent); font-family: var(--mono); margin-right: 6px; }
+.svc-name { color: var(--fg); }
+.svc-info { color: var(--muted); font-size: 11px; margin-left: 8px; }
+.svc-state { color: var(--fg-faint); font-size: 11px; }

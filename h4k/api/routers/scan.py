@@ -464,13 +464,28 @@ def _report_markdown(report: Report) -> str:
         f"- **mode**: {report.mode.value}",
         f"- **generated**: {report.created_at}",
         "",
-        "## Hosts",
+        "## Hosts & open services",
         "",
+        "| Host | Port | Service | Version / banner | State |",
+        "|---|---|---|---|---|",
     ]
     for h in report.hosts:
-        svcs = ", ".join(f"{s.port}/{s.service or '?'}" for s in h.services) or "-"
-        lines.append(f"- `{h.address}` OS={h.os or '-'} services: {svcs}")
-    lines += ["", "## Vulnerabilities", ""]
+        if not h.services:
+            lines.append(
+                f"| `{h.address}` | — | — | OS={h.os or '-'} | {h.state or '-'} |"
+            )
+        for s in h.services:
+            banner = (s.info or "").replace("\n", " ").replace("|", "\\|")
+            lines.append(
+                f"| `{h.address}` | {s.port}/{s.proto} | {s.service or '?'} "
+                f"| {banner[:120] or '-'} | {s.state or '-'} |"
+            )
+    lines += [
+        "",
+        "> OS / banner info from nmap -sV -O (service & version detection).",
+        "",
+    ]
+    lines += ["## Vulnerabilities", ""]
     for v in report.vulns:
         port = v.port if v.port is not None else "-"
         refs = ", ".join(v.refs) or "-"
