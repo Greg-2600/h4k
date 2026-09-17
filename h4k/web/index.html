@@ -144,6 +144,25 @@
           <div class="deep-row" id="ai-controls" hidden>
             <select id="ai-model" class="full-input"></select>
           </div>
+
+          <div class="btn-row">
+            <button type="button" id="iface-btn" class="btn-sub">list interfaces</button>
+          </div>
+          <div class="deep-row" id="net-controls">
+            <input type="text" id="net-iface" class="full-input" placeholder="network interface (e.g. eth0 / wlan0mon)" />
+            <div class="btn-row">
+              <button type="button" id="sniff-btn" class="btn-sub">sniff (tcpdump)</button>
+              <button type="button" id="arp-btn" class="btn-sub">arp / arp-scan</button>
+            </div>
+            <div class="btn-row">
+              <button type="button" id="mitm-btn" class="btn-sub btn-danger">bettercap ARP-spoof <em class="danger">(lab only)</em></button>
+            </div>
+            <div class="btn-row">
+              <button type="button" id="wifi-scan-btn" class="btn-sub">wifi: scan APs</button>
+              <button type="button" id="wifi-cap-btn" class="btn-sub">wifi: capture frames</button>
+            </div>
+          </div>
+
           <div class="deep-row" id="custom-rule">
             <input type="text" id="rule-pattern" class="full-input" placeholder="custom semgrep pattern, e.g. exec(request.GET[&quot;cmd&quot;])" />
             <div class="btn-row">
@@ -271,6 +290,12 @@
         <div class="pane-head sub"><span class="pane-title">← model response</span></div>
         <pre class="notes" id="tab-ai"></pre>
       </div>
+    </section>
+
+    <!-- network layer (sniff / arp / mitm / wifi) -->
+    <section class="pane results" id="net-panel" hidden>
+      <div class="pane-head"><span class="pane-title">/network layer</span><span id="net-status" class="pane-status">idle</span></div>
+      <pre class="notes" id="tab-net"></pre>
     </section>
 
   </div>

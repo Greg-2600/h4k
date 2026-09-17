@@ -712,6 +712,53 @@ function renderSupplyChainMap(d) {
   log("[+] supply-chain map built (" + nodes.length + " nodes, " + (d.summary||{}).cves + " CVEs)", "ok");
 }
 
+/* ---------- network layer (sniff / arp / mitm / wifi) ---------- */
+const netIf = () => ($("net-iface").value.trim() || "eth0");
+const netOut = (d) => {
+  $("net-status").textContent = "done";
+  $("tab-net").textContent = (d.stdout || d.error || d.stderr || JSON.stringify(d, null, 2)).slice(0, 3000);
+};
+
+$("iface-btn").addEventListener("click", async () => {
+  try { const d = await (await fetch("/api/net/interfaces")).json();
+    $("net-panel").hidden = false; $("tab-net").textContent = JSON.stringify(d.interfaces, null, 2);
+    log("[+] interfaces listed", "ok"); } catch (e) { log("interfaces error " + e.message, "err"); }
+});
+
+$("sniff-btn").addEventListener("click", async () => {
+  $("net-panel").hidden = false; $("net-status").textContent = "running"; $("tab-net").textContent = "sniffing…";
+  try { const r = await (await fetch("/api/net/sniff", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf()})})).json(); netOut(r); log("[+] sniff done", "ok"); }
+  catch (e) { $("tab-net").textContent = "error: " + e.message; }
+});
+
+$("arp-btn").addEventListener("click", async () => {
+  $("net-panel").hidden = false; $("net-status").textContent = "running";
+  try { const r = await (await fetch("/api/net/arp", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf()})})).json(); netOut(r); log("[+] arp done", "ok"); }
+  catch (e) { $("tab-net").textContent = "error: " + e.message; }
+});
+
+$("mitm-btn").addEventListener("click", async () => {
+  if (!window.confirm("bettercap ARP-spoof MITM on " + netIf() + " — only on a lab interface/net you control. Continue?")) { log("mitm cancelled", "err"); return; }
+  $("net-panel").hidden = false; $("net-status").textContent = "running";
+  // target the gateway? We let the user pass any single host; default to the local subnet broadcast-ish target note.
+  const target = window.prompt("ARP-spoof target IP (lab only):", "") || "";
+  if (!target) { log("mitm cancelled — no target", "err"); return; }
+  try { const r = await (await fetch("/api/net/mitm", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf(), target})})).json(); netOut(r); log("[+] mitm done", "ok"); }
+  catch (e) { $("tab-net").textContent = "error: " + e.message; }
+});
+
+$("wifi-scan-btn").addEventListener("click", async () => {
+  $("net-panel").hidden = false; $("net-status").textContent = "running"; $("tab-net").textContent = "scanning (need monitor interface)…";
+  try { const r = await (await fetch("/api/net/wifi/scan", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf()})})).json(); netOut(r); log("[+] wifi scan done", "ok"); }
+  catch (e) { $("tab-net").textContent = "error: " + e.message; }
+});
+
+$("wifi-cap-btn").addEventListener("click", async () => {
+  $("net-panel").hidden = false; $("net-status").textContent = "running"; $("tab-net").textContent = "capturing frames (offline crack later)…";
+  try { const r = await (await fetch("/api/net/wifi/capture", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf()})})).json(); netOut(r); log("[+] wifi capture done — feed .cap to aircrack-ng", "ok"); }
+  catch (e) { $("tab-net").textContent = "error: " + e.message; }
+});
+
 /* ---------- custom rule test ---------- */
 $("rule-test").addEventListener("click", async () => {
   const pattern = $("rule-pattern").value.trim();

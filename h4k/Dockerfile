@@ -30,8 +30,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dirb gobuster ffuf \
     smbclient smbmap dnsenum dnsrecon \
     ldap-utils samba-common-bin \
+    bettercap aircrack-ng sshuttle \
     git \
     && rm -rf /var/lib/apt/lists/*
+
+# chisel (TCP pivoting) — not in Debian apt; grab the release binary
+RUN CHISEL_VER=$(\
+      curl -s https://api.github.com/repos/jpillora/chisel/releases/latest \
+      | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
+    && curl -sSfL "https://github.com/jpillora/chisel/releases/download/${CHISEL_VER}/chisel_${CHISEL_VER#v}_linux_amd64.gz" \
+       -o /tmp/chisel.gz \
+    && gunzip -f /tmp/chisel.gz && mv /tmp/chisel /usr/local/bin/chisel \
+    && chmod +x /usr/local/bin/chisel
 
 # impacket (secretsdump, wmiexec, GetNPUsers...) — powershell/AD RPC suite
 RUN python3 -m pip install --break-system-packages --no-cache-dir impacket \
