@@ -66,8 +66,13 @@ const statusPane = $("status-pane"), results = $("results");
 const prog = $("prog"), pctEl = $("pct"), statusMsg = $("status-msg");
 let pollTimer = null;
 let currentJob = null;
+// capture each source's results so the consolidated report can merge them all
+let lastScanReport = null;   // host scan render() payload
+let lastSast = null;         // SAST findings
+let lastSca = null;          // SCA result
+let lastFuzz = null;         // lab-fuzz candidates
+let lastMergedReport = null; // last consolidated report (JSON)
 // last SAST scan result (findings); AI button refuses to run without real data
-let lastSast = null;
 // last OSS-Fuzz minimized crash so the AI loop can reason about a real trigger
 let lastMinimized = null;
 // last OSS-Fuzz auto-run result (crashes carry server-side minimized inputs)
@@ -215,6 +220,7 @@ function poll(id) {
 /* ---------- rendering ---------- */
 function render(r) {
   results.hidden = false;
+  lastScanReport = r;
   $("report-meta").textContent =
     `${r.target} · ${r.mode} · ${(r.created_at || "").slice(11, 19)}`;
   renderHosts(r.hosts);
@@ -507,9 +513,10 @@ function pollFuzz(jobId) {
       if (!resp.ok) { clearInterval(fuzzTimer); return; }
       const job = await resp.json();
       $("fuzz-status").textContent = job.status;
-      if (job.candidates && job.candidates.length) renderFuzz(job.candidates);
+      if (job.candidates && job.candidates.length) { renderFuzz(job.candidates); lastFuzz = job.candidates; }
       if (job.status === "done" || job.status === "error") {
         clearInterval(fuzzTimer);
+        if (job.candidates && job.candidates.length) lastFuzz = job.candidates;
         busy($("fuzz-btn"), false);
         log("[+] fuzz complete — " + (job.count || 0) + " candidate(s)", "ok");
       }
@@ -628,6 +635,7 @@ $("sca-btn").addEventListener("click", async () => {
 
 function renderSca(d) {
   const el = $("tab-sca");
+  lastSca = d;
   const cves = d.cves || [];
   const pkgs = d.packages || [];
   let h = `<p class='msg'>SBOM available: ${esc(d.sbom_available ? "yes" : "no")} · packages: ${esc(pkgs.length)} · known CVEs: ${esc(cves.length)}</p>`;
@@ -827,6 +835,106 @@ $("minimize-btn").addEventListener("click", () => {
   log("[+] minimize: reduced repro ready for AI full-loop", "ok");
   setStage("fix");
 });
+
+/* ---------- consolidated one-click report ---------- */
+function mergePayload() {
+  // scan: map hosts/services into the merged_report schema
+  const scanHosts = (lastScanReport && lastScanReport.hosts) || [];
+  const scan = scanHosts.map((hd) => ({
+    address: hd.address, os: hd.os, state: hd.state,
+    services: (hd.services || []).map((s) => ({
+      port: s.port, service: s.service, proto: s.proto, info: s.info, state: s.state,
+    })),
+  }));
+  // sast: keep the fields the renderer/markdown need
+  const sast = (lastSast && lastSast.findings) || [];
+  return {
+    scan,
+    sast,
+    sca: lastSca || {},
+    fuzz: lastFuzz || [],
+    triage: [],
+  };
+}
+
+function mergedCounts() {
+  const p = mergePayload();
+  const hosts = p.scan.length;
+  const sast = p.sast.length;
+  const cves = ((p.sca && p.sca.cves) || []).length;
+  const fuzz = p.fuzz.length;
+  return { hosts, sast, cves, fuzz };
+}
+
+function refreshMergedSummary() {
+  const c = mergedCounts();
+  $("merged-meta").textContent =
+    `hosts ${c.hosts} · SAST ${c.sast} · SCA CVEs ${c.cves} · fuzz ${c.fuzz}`;
+  $("merged-summary").innerHTML =
+    `<p class="msg">Collects everything from this session: ` +
+    `<b>${c.hosts}</b> host(s), <b>${c.sast}</b> SAST finding(s), ` +
+    `<b>${c.cves}</b> known dependency CVE(s), <b>${c.fuzz}</b> fuzz candidate(s). ` +
+    `Run an analysis first so the report is populated.</p>`;
+}
+
+$("merged-run").addEventListener("click", async () => {
+  busy($("merged-run"), true);
+  try {
+    const resp = await fetch("/api/source/report/merge", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(mergePayload()),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const rep = await resp.json();
+    lastMergedReport = rep;
+    const s = rep.summary || {};
+    $("merged-meta").textContent =
+      `generated ${(rep.generated || "").slice(0, 19).replace("T", " ")} · ` +
+      `hosts ${s.hosts_scanned} · SAST ${s.sast_findings} · SCA ${s.sca_cves} · fuzz ${s.fuzz_candidates}`;
+    $("merged-summary").innerHTML =
+      `<p class='ok'>Report built. Download as .md or .json.</p>`;
+    log("[+] consolidated report built", "ok");
+  } catch (err) {
+    $("merged-summary").innerHTML = "<p class='err'>" + esc(err.message) + "</p>";
+    log("merged report error " + err.message, "err");
+  } finally {
+    busy($("merged-run"), false);
+  }
+});
+
+async function mergedDownload(btn, endpoint, filename) {
+  busy(btn, true);
+  try {
+    const resp = await fetch(endpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(mergePayload()),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const text = await resp.text();
+    const isJson = endpoint.endsWith("merge");
+    // /report/merge returns JSON; /report/md returns a JSON-encoded string of markdown.
+    let finalText = text;
+    if (isJson) {
+      finalText = JSON.stringify(JSON.parse(text), null, 2);
+    } else {
+      try { finalText = JSON.parse(text); } catch (_) { /* already plain */ }
+    }
+    const finalBlob = new Blob([finalText], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(finalBlob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    log("[+] report downloaded: " + filename, "ok");
+  } catch (err) {
+    log("report download error " + err.message, "err");
+  } finally {
+    busy(btn, false);
+  }
+}
+$("merged-md").addEventListener("click", () => mergedDownload($("merged-md"), "/api/source/report/md", "h4k-assessment.md"));
+$("merged-json").addEventListener("click", () => mergedDownload($("merged-json"), "/api/source/report/merge", "h4k-assessment.json"));
+refreshMergedSummary();
 
 /* ---------- supply-chain map ---------- */
 $("sca-map-btn").addEventListener("click", async () => {

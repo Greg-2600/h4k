@@ -57,7 +57,9 @@ systems you own or have written permission to test.
 The web UI is organized as a three-stage pipeline — **Recon → Source & Supply →
 Fix** — with a sticky target banner and a primary CTA per stage; secondary / lab
 tools are tucked under collapsible "more tools" disclosures. The Fix stage hosts
-the OSS-Fuzz auto-run → crash minimize → AI full-loop demo flow.
+the OSS-Fuzz auto-run → crash minimize → AI full-loop demo flow. A bottom
+**consolidated report** panel merges the session's scan/SAST/SCA/fuzz results and
+downloads a single `.md`/`.json` assessment.
 
 ---
 

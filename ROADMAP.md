@@ -15,8 +15,10 @@ item is a self-contained, live-demonstrable increment on the current release.
       repro, then feed it straight into triage. ("Here's the exact 12-byte
       trigger.")
   (done: OSS-Fuzz runner minimizes crash artifacts server-side)
-- [ ] **One-click report from all sources** — merge SAST + SCA + fuzz + scan
+- [x] **One-click report from all sources** — merge SAST + SCA + fuzz + scan
       findings into a single exportable `.md`/`.json` (already partly wired).
+  (done: "consolidated report" panel builds + downloads .md/.json from the
+  session's captured scan/SAST/SCA/fuzz results)
 - [x] **AI hookup toggle in the UI** — surface Ollama reachability + model picker
       + a "verify" button so the AI section is obviously live vs. fallback.
   (done: model picker + AI full-loop + reachability badge in the Fix stage)

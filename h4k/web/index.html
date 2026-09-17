@@ -242,6 +242,20 @@
     <section class="pane results" id="net-panel" hidden><div class="pane-head"><span class="pane-title">/network layer</span><span id="net-status" class="pane-status">idle</span></div><pre class="notes" id="tab-net"></pre></section>
     <section class="pane results" id="ossfuzz-panel" hidden><div class="pane-head"><span class="pane-title">/oss-fuzz auto-run</span><span id="ossfuzz-status" class="pane-status">idle</span></div><pre class="notes" id="tab-ossfuzz"></pre></section>
 
+    <!-- consolidated one-click assessment report -->
+    <section class="pane results" id="merged-panel">
+      <div class="pane-head">
+        <span class="pane-title">/consolidated report</span>
+        <span class="pane-meta" id="merged-meta"></span>
+      </div>
+      <div class="merged-summary" id="merged-summary"></div>
+      <div class="btn-row">
+        <button type="button" id="merged-run" class="btn-primary">build report</button>
+        <button type="button" id="merged-md" class="btn-sub">download .md</button>
+        <button type="button" id="merged-json" class="btn-sub">download .json</button>
+      </div>
+    </section>
+
   </div>
   <div class="legal">
     authorized-scope only · targets you own or have written permission to test (school lab / own VMs).
