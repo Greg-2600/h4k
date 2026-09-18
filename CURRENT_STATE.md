@@ -42,8 +42,8 @@ and layers modern analysis on top:
   (libFuzzer / AFL++ / ASan) in the separate `vulnlab` container.
 - **Triage & PoC** — crash → bug-class/CWE → minimized repro → patch direction →
   PoC/disclosure skeleton (downloadable).
-- **AI assist** — local **Ollama** root-cause + patch; full-loop
-  (crash→root-cause→patch→verify); model picker in UI.
+- **AI assist** — local **Ollama** root-cause + patch; exploit-first full-loop
+  (crash→minimal trigger confirming the vuln→patch→verify); model picker in UI.
 - **Active toolkit (opt-in)** — Metasploit exploits, hydra/ncrack/john,
   sqlmap/nikto/gobuster/ffuf/wpscan, smbmap/smbclient, impacket
   (secretsdump/GetNPUsers/kerberoast), ldapsearch/rpcclient, chisel/sshuttle pivot.
@@ -57,7 +57,8 @@ systems you own or have written permission to test.
 The web UI is organized as a three-stage pipeline — **Recon → Source & Supply →
 Fix** — with a sticky target banner and a primary CTA per stage; secondary / lab
 tools are tucked under collapsible "more tools" disclosures. The Fix stage hosts
-the OSS-Fuzz auto-run → crash minimize → AI full-loop demo flow. A bottom
+the OSS-Fuzz auto-run → crash minimize → AI exploit + fix (trigger → patch →
+verify) demo flow. A bottom
 **consolidated report** panel merges the session's scan/SAST/SCA/fuzz results and
 downloads a single `.md`/`.json` assessment.
 

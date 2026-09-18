@@ -139,7 +139,7 @@ Health/diagnostic:
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets | 
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |
 | `ai.py` | LLM provider (default local Ollama qwen2.5; OpenAI-compatible opt-in) |
-| `ai_loop.py` | AI full-loop: root-cause + patch + verify |
+| `ai_loop.py` | AI exploit-first loop: root-cause + minimal trigger (confirm) + patch + verify |
 | `rules.py` | persistent custom-rule library |
 | `merged_report.py` | one-click consolidate scan+SAST+SCA+fuzz+triage |
 | `ossfuzz.py` | OSS-Fuzz-style build+asan+fuzz auto-runner |

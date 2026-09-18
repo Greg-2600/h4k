@@ -686,14 +686,14 @@ refreshAiModels();
 
 function buildAiInput(fromFindings) {
   // For the one-click full-loop demo, prefer a real minimized crash trigger
-  // (that's the actual "crash -> patch -> verify" story).
+  // (that's the actual "exploit -> fix -> verify" story).
   if (!fromFindings && lastMinimized) {
     return {
       source: "minimized crash (" + (lastMinimized.source || "OSS-Fuzz") + ")",
       text: "Analyze this minimized crash repro from a fuzzer the user owns:\n" +
         "file: " + (lastMinimized.file || "—") + "\ninput:\n" +
         (lastMinimized.input || "—") +
-        "\n\nPlease give ROOT_CAUSE, PATCH_CANDIDATE, VERIFY.",
+        "\n\nPlease give ROOT_CAUSE, TRIGGER (minimal PoC confirming the vuln on this owned system), PATCH_CANDIDATE, VERIFY.",
     };
   }
   // Prefer real SAST findings; else fall back to the last minimized crash.
@@ -705,7 +705,7 @@ function buildAiInput(fromFindings) {
       source: "SAST findings",
       text: "Analyze these SAST findings in source code the user owns:\n" +
         "Target: " + (lastSast.name || "project") + "\n" + f.join("\n") +
-        "\n\nPlease give ROOT_CAUSE, PATCH_CANDIDATE, VERIFY.",
+        "\n\nPlease give ROOT_CAUSE, TRIGGER (minimal PoC confirming the vuln on this owned system), PATCH_CANDIDATE, VERIFY.",
     };
   }
   return null;
@@ -748,6 +748,7 @@ async function runAi(endpoint, label, useFindings) {
 
 function renderAiParsed(parsed, raw) {
   let h = "";
+  if (parsed.trigger) h += "TRIGGER (confirms the vuln):\n" + parsed.trigger + "\n\n";
   if (parsed.root_cause) h += "ROOT_CAUSE:\n" + parsed.root_cause + "\n\n";
   if (parsed.patch_candidate) h += "PATCH_CANDIDATE:\n" + parsed.patch_candidate + "\n\n";
   if (parsed.verify) h += "VERIFY:\n" + parsed.verify + "\n\n";
@@ -811,7 +812,7 @@ function renderOssFuzz(d) {
         `<td>${esc((c.minimized || "—").slice(0, 80))}</td></tr>`;
     }
     h += "</table>";
-    h += "<p class='msg'>hint: use “minimize crash(s)” to reduce to the smallest repro, then “AI full-loop” for root-cause → patch → verify.</p>";
+    h += "<p class='msg'>hint: use “minimize crash(s)” to reduce to the smallest repro, then “AI exploit + fix” for minimal trigger → patch → verify.</p>";
   }
   if (d.steps && d.steps.length) h += "<p class='notes'>" + esc(d.steps.join(" · ")) + "</p>";
   if (d.log_tail) h += "<pre class='notes'>" + esc(d.log_tail.slice(-600)) + "</pre>";
@@ -831,8 +832,8 @@ $("minimize-btn").addEventListener("click", () => {
   if (have[0]) lastMinimized = { source: "OSS-Fuzz", input: have[0].minimized, file: have[0].name };
   $("ossfuzz-status").textContent = "done";
   $("tab-ossfuzz").innerHTML =
-    "<p class='ok'>Minimization done for " + have.length + " crash(s). Reduced repro ready — run “AI full-loop” in the Fix stage for root-cause → patch → verify.</p>";
-  log("[+] minimize: reduced repro ready for AI full-loop", "ok");
+    "<p class='ok'>Minimization done for " + have.length + " crash(s). Reduced repro ready — run “AI exploit + fix” in the Fix stage for minimal trigger → patch → verify.</p>";
+  log("[+] minimize: reduced repro ready for AI exploit + fix", "ok");
   setStage("fix");
 });
 

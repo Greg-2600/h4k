@@ -180,14 +180,14 @@
         <!-- ============ STAGE 3 · FIX ============ -->
         <section class="pane stage" data-stage="fix" id="stage-fix" hidden>
           <div class="pane-head"><span class="pane-title">3 · fix</span></div>
-          <p class="stage-desc">Fuzz a crash, minimize it, and get an AI root-cause → patch → verify plan for code you own.</p>
+          <p class="stage-desc">Fuzz a crash, minimize it, and get an AI exploit (minimal trigger confirming the vuln) → patch → verify plan for code you own.</p>
 
           <div class="ai-reach"><span id="ai-reach" class="msg">ai: —</span>
             <select id="ai-model" hidden></select>
           </div>
 
           <div class="btn-row">
-            <button type="button" id="ai-loop-btn" class="btn-primary">AI full-loop <span class="btn-sub-txt">fix + verify</span></button>
+            <button type="button" id="ai-loop-btn" class="btn-primary">AI exploit + fix <span class="btn-sub-txt">confirm → patch → verify</span></button>
             <button type="button" id="ai-btn" class="btn-sub">AI root-cause + patch</button>
           </div>
 

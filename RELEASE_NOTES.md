@@ -101,8 +101,12 @@ Two runnable images:
   language-aware, clearly-labeled proof-of-concept for responsible disclosure,
   downloadable as a file.
 - **AI root-cause + patch** (`/api/source/ai`) — defaults to **local Ollama**
-  (qwen2.5) producing `ROOT_CAUSE` / `PATCH_CANDIDATE` / `CONFIRM_STEPS`;
+  (qwen2.5) producing `ROOT_CAUSE` / `PATCH_CANDIDATE` / `VERIFY`;
   OpenAI-compatible endpoints supported; degrades gracefully when unreachable.
+- **AI exploit-first loop** (`/api/source/ai/loop`) — from a crash/SAST finding
+  produces `ROOT_CAUSE` → a minimal **`TRIGGER`** (a PoC that *confirms* the
+  vuln on code you own) → **`PATCH_CANDIDATE`** → **`VERIFY`**. Exploit to
+  confirm, then fix — still clearly scoped to authorized systems, non-weaponized.
 
 ### 2.5 Fuzzing lab (separate `vulnlab` container)
 

@@ -57,6 +57,17 @@ item is a self-contained, live-demonstrable increment on the current release.
       gate for the class).
 - [ ] **Release packaging** — tagged image + one-line `docker run` for classmates.
 
+## Evaluated & rejected
+
+- **ExploitGym** (`sunblaze-ucb/exploitgym`) — not adopted. It's a CyberGym-style
+  Docker-in-Docker eval rig whose only agent backends (Codex / Claude Code /
+  Gemini CLI) all require a cloud LLM API key; there is no local/no-key path,
+  and it needs Python 3.12+ and per-task target images + a squid firewall +
+  controller. It also clashes with the project's local-first, no-weaponization
+  stance. The exploit-first AI loop (minimal trigger → patch → verify) already
+  demonstrates the same "AI turns a finding into a confirmed attack" idea
+  locally via Ollama.
+
 ---
 
 ## Suggested order for a 10-minute class demo
