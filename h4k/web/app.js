@@ -638,9 +638,12 @@ function renderSca(d) {
   lastSca = d;
   const cves = d.cves || [];
   const pkgs = d.packages || [];
-  let h = `<p class='msg'>SBOM available: ${esc(d.sbom_available ? "yes" : "no")} · packages: ${esc(pkgs.length)} · known CVEs: ${esc(cves.length)}</p>`;
+  const secrets = d.secrets || [];
+  const licenses = d.licenses || [];
+  $("sca-actions").hidden = !d.sbom_available;
+  let h = `<p class='msg'>SBOM available: ${esc(d.sbom_available ? "yes" : "no")} · packages: ${esc(pkgs.length)} · known CVEs: ${esc(cves.length)} · secrets: ${esc(secrets.length)} · licenses: ${esc(licenses.length)}</p>`;
   if (cves.length) {
-    h += "<table><tr><th>CVE</th></tr>";
+    h += "<h3>Known CVEs</h3><table><tr><th>CVE</th></tr>";
     for (const c of cves) h += `<tr><td>${esc(c)}</td></tr>`;
     h += "</table>";
   } else if (pkgs.length) {
@@ -648,9 +651,47 @@ function renderSca(d) {
   } else {
     h += "<p class='msg'>no lockfiles/manifests found to scan</p>";
   }
+  if (licenses.length) {
+    h += "<h3>Licenses (trivy)</h3><table><tr><th>package</th><th>version</th><th>licenses</th><th>target</th></tr>";
+    for (const l of licenses) {
+      h += `<tr><td>${esc(l.package)}</td><td>${esc(l.version || "—")}</td>` +
+        `<td>${esc((l.licenses || []).join(", ") || "—")}</td><td>${esc(l.target)}</td></tr>`;
+    }
+    h += "</table>";
+  }
+  if (secrets.length) {
+    h += "<h3>Hardcoded-secret candidates (heuristic)</h3><table><tr><th>kind</th><th>file</th><th>line</th><th>match</th></tr>";
+    for (const s of secrets) {
+      h += `<tr><td>${esc(s.kind)}</td><td>${esc(s.file)}:${esc(s.line)}</td>` +
+        `<td>${esc((s.code || "").slice(0, 40))}</td></tr>`;
+    }
+    h += "</table><p class='msg'>secret hits are candidates — confirm before acting.</p>";
+  }
   el.innerHTML = h;
   log("[+] SCA done", "ok");
 }
+
+/* ---------- SBOM download ---------- */
+$("sbom-download").addEventListener("click", async () => {
+  const url = $("source-url").value.trim();
+  if (!url) { log("[!] enter a git URL to download its SBOM", "err"); return; }
+  busy($("sbom-download"), true);
+  try {
+    const resp = await fetch("/api/source/sca/sbom?git_url=" + encodeURIComponent(url));
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const text = await resp.text();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    a.download = "sbom.cdx.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    log("[+] SBOM downloaded: sbom.cdx.json", "ok");
+  } catch (err) {
+    log("SBOM download error " + err.message, "err");
+  } finally {
+    busy($("sbom-download"), false);
+  }
+});
 
 /* ---------- AI root-cause + patch ---------- */
 /* ---------- AI model picker + reachability ---------- */
@@ -1022,6 +1063,36 @@ $("wifi-cap-btn").addEventListener("click", async () => {
   catch (e) { $("tab-net").textContent = "error: " + e.message; }
 });
 
+/* ---------- local TLS interception lab ---------- */
+const tlsPost = async (path, body) => await (await fetch("/api/net/tls/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })).json();
+
+$("tls-status-btn").addEventListener("click", async () => {
+  $("net-panel").hidden = false; $("net-status").textContent = "loading"; $("tab-net").textContent = "checking TLS lab…";
+  try { const r = await (await fetch("/api/net/tls/status")).json(); netOut(r); log("[+] TLS lab status: " + (r.ready ? "ready" : r.error || "pending"), r.ready ? "ok" : "err"); }
+  catch (e) { $("tab-net").textContent = "error: " + e.message; }
+});
+
+$("tls-setup-btn").addEventListener("click", async () => {
+  $("net-panel").hidden = false; $("net-status").textContent = "running"; $("tab-net").textContent = "building lab CA + localhost cert…";
+  try { const r = await tlsPost("setup"); netOut(r); log("[+] TLS CA + cert built" + (r.ready ? " (ready)" : ""), r.ready ? "ok" : "err"); }
+  catch (e) { $("tab-net").textContent = "error: " + e.message; }
+});
+
+$("tls-trust-btn").addEventListener("click", async () => {
+  $("net-panel").hidden = false; $("net-status").textContent = "running";
+  if (!window.confirm("Install the lab CA into the container's system trust store? Loopback-only lab cert, authorized work.")) { log("CA install cancelled", "err"); return; }
+  $("tab-net").textContent = "installing lab CA…";
+  try { const r = await tlsPost("trust"); netOut(r); log("[+] CA install: " + (r.ok ? "ok" : "failed"), r.ok ? "ok" : "err"); }
+  catch (e) { $("tab-net").textContent = "error: " + e.message; }
+});
+
+$("tls-proxy-btn").addEventListener("click", async () => {
+  $("net-panel").hidden = false; $("net-status").textContent = "starting";
+  $("tab-net").textContent = "starting loopback HTTPS proxy (127.0.0.1:8443 -> 127.0.0.1:8080)…";
+  try { const r = await tlsPost("proxy", { backend_host: "127.0.0.1", backend_port: 8080, listen_port: 8443 }); netOut(r); log("[+] TLS proxy: " + (r.ok ? r.listening : "failed"), r.ok ? "ok" : "err"); }
+  catch (e) { $("tab-net").textContent = "error: " + e.message; }
+});
+
 /* ---------- custom rule test ---------- */
 $("rule-test").addEventListener("click", async () => {
   const pattern = $("rule-pattern").value.trim();
@@ -1040,6 +1111,62 @@ $("rule-test").addEventListener("click", async () => {
     if (d.ok) log("[+] custom rule " + (d.matched ? "matched (vuln found)" : "did not match") + " sample code", d.matched ? "err" : "ok");
     else log("[!] rule test error: " + (d.error || "").slice(0, 120), "err");
   } catch (err) { log("rule test error " + err.message, "err"); }
+});
+
+function currentRule() {
+  const pattern = $("rule-pattern").value.trim();
+  const name = $("rule-name").value.trim() || "custom-rule-" + Math.random().toString(36).slice(2, 6);
+  const severity = $("rule-severity").value || "medium";
+  return { rule_id: name.replace(/\s+/g, "-").toLowerCase(), name, severity, languages: ["python"], pattern, message: "custom rule hit", test_code: "exec('id')" };
+}
+
+$("rule-save").addEventListener("click", async () => {
+  const rule = currentRule();
+  if (!rule.pattern) { log("[!] enter a pattern to save", "err"); return; }
+  try {
+    const resp = await fetch("/api/source/rules/save", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rule),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const d = await resp.json();
+    log("[+] rule saved: " + (d.rule && d.rule.name) + " (" + d.rule.rule_id + ")", "ok");
+    $("rules-out").innerHTML = "<p class='ok'>saved: " + esc(d.rule.rule_id) + "</p>";
+  } catch (err) { log("rule save error " + err.message, "err"); }
+});
+
+$("rule-list").addEventListener("click", async () => {
+  try {
+    const resp = await fetch("/api/source/rules");
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const d = await resp.json();
+    const rules = d.rules || [];
+    if (!rules.length) { $("rules-out").innerHTML = "<p class='msg'>no saved rules</p>"; return; }
+    $("rules-out").innerHTML = rules.map((r) =>
+      `<span class='msg'>${esc(r.rule_id)} · ${esc(r.severity)} · ${esc((r.pattern || "").slice(0, 40))}</span><br/>`
+    ).join("");
+    log("[+] " + rules.length + " saved rule(s)", "ok");
+  } catch (err) { log("rule list error " + err.message, "err"); }
+});
+
+$("rule-run-tree").addEventListener("click", async () => {
+  const url = $("rule-tree").value.trim();
+  if (!url) { log("[!] enter a git URL to run saved rules over", "err"); return; }
+  busy($("rule-run-tree"), true);
+  try {
+    const resp = await fetch("/api/source/rules/run", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ git_url: url }),
+    });
+    if (!resp.ok) throw new Error("http " + resp.status);
+    const d = await resp.json();
+    const hits = d.findings || [];
+    $("rules-out").innerHTML = hits.length
+      ? hits.map((f) => `<span class='err'>${esc(f.severity)} ${esc(f.name)} @ ${esc(f.file)}:${esc(f.line)}</span><br/>`).join("")
+      : "<p class='ok'>no saved-rule hits across the repo</p>";
+    log("[+] saved-rule sweep: " + hits.length + " hit(s) over " + url, hits.length ? "err" : "ok");
+  } catch (err) { log("rule run error " + err.message, "err"); }
+  finally { busy($("rule-run-tree"), false); }
 });
 
 /* ---------- session indicator toggling ---------- */

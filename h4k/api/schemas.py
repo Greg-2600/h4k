@@ -268,6 +268,7 @@ class ScaResult(BaseModel):
     packages: list[str] = []
     sbom_available: bool = False
     secrets: list[dict] = []
+    licenses: list[dict] = []
 
 
 class TriageRequest(BaseModel):

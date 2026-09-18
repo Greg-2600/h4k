@@ -25,16 +25,21 @@ item is a self-contained, live-demonstrable increment on the current release.
 
 ## Tier 2 — bring real tools in (what pros use)
 
-- [ ] **SCA demo fixture** — ship a small repo *with a committed lockfile* that
+- [x] **SCA demo fixture** — ship a small repo *with a committed lockfile* that
       reliably trips osv-scanner (e.g. pins an old log4j / requests) so the
       "dependencies are broken" demo never depends on network luck.
-- [ ] **SBOM export** — expose the generated CycloneDX SBOM for download.
-- [ ] **Custom SAST rules library** — let the user save their Semgrep rule and
+  (done: `demos/sca-demo/` pins lodash 4.17.20 → trips osv-scanner + trivy license)
+- [x] **SBOM export** — expose the generated CycloneDX SBOM for download.
+  (done: `GET /api/source/sca/sbom` + UI "download SBOM (.cdx.json)")
+- [x] **Custom SAST rules library** — let the user save their Semgrep rule and
       re-run it over a whole tree (already validated per-file).
-- [ ] **License/secret scanning step** — trivy license + secret findings surfaced
+  (done: UI save/list/run-over-repo via `/rules/save` · `/rules/list` · `/rules/run`)
+- [x] **License/secret scanning step** — trivy license + secret findings surfaced
       alongside CVEs (tool already installed).
-- [ ] **Semgrep offline registry** — pre-bundle the rules so SAST works fully
+  (done: `scan_licenses` + secrets surfaced in the SCA panel)
+- [x] **Semgrep offline registry** — pre-bundle the rules so SAST works fully
       offline (avoids a network fetch on first scan).
+  (done: 21 bundled rules; fixed `--offline` flag that made offline SAST return nothing)
 
 ## Tier 3 — the actual frontier (big wow, more work)
 
@@ -43,6 +48,7 @@ item is a self-contained, live-demonstrable increment on the current release.
   (done: `POST /api/source/ai/loop` + Fix-stage "AI full-loop" button)
 - [ ] **Local TLS interception lab** — mkcert + local CA so the fuzzer/SAST can
       target HTTPS web apps you own.
+  (done: `tls_lab.py` — private CA + localhost cert + trust install + loopback HTTPS proxy via openssl/socat; endpoints under `/api/net/tls/*`)
 - [x] **OSS-Fuzz-style auto-runner** — pull repo → build w/ sanitizers → fuzz N
       minutes → triaged report + patch diff (mirrors Google's public bug-hunting).
   (done: `POST /api/source/ossfuzz` + Fix-stage "OSS-Fuzz auto-run")

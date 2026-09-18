@@ -91,10 +91,21 @@ Two runnable images:
   2. **regex heuristics** (SQLi, command injection, path traversal, eval,
      deserialization, C buffer/format-string, hardcoded secrets, insecure HTTP,
      debug leaks).
-- **Custom Semgrep rules** — author + validate a pattern against sample code
-  in the UI.
+- **Local TLS interception lab** (`/api/net/tls/*`) — build a private CA, sign
+  a localhost cert, install the CA into the container's trust store, and expose
+  an owned plain-HTTP lab target over HTTPS on loopback so fuzzer/SAST can
+  target an `https://` web app you own with a cert clients trust. All loopback,
+  opt-in.
+- **Custom SAST rule library** — author, **save**, list, and re-run rules over a
+  whole git tree (`/rules/save` · `/rules/list` · `/rules/run`).
+- **Semgrep offline registry** — a bundled rule pack (21 rules across Python,
+  JS/TS, Java, C/C++, bash) so SAST runs fully offline; fixed the `--offline`
+  flag on newer semgrep that was silently returning no findings.
 - **SCA / SBOM** (`/api/source/sca`) — build a CycloneDX SBOM (trivy) and
   cross-check dependencies against the **OSV DB** (osv-scanner) → known CVEs.
+  Surfaces **license** findings (trivy `--scanners license`) and hardcoded
+  **secret** candidates (regex heuristic) alongside the CVEs; the SBOM is
+  downloadable (.cdx.json).
 - **Triage** (`/api/source/triage`) — crash candidate → bug-class + CWE +
   minimized trigger + concrete patch direction + confirm steps.
 - **PoC / disclosure skeleton** (`/api/source/exploit` · `.../download`) —

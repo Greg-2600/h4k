@@ -1,4 +1,5 @@
 rules:
+  # ---- python ----
   - id: h4k.python.sql-injection
     languages: [python]
     message: "Possible SQL injection: SQL built via string concatenation."
@@ -6,30 +7,132 @@ rules:
     pattern-either:
       - pattern: "execute('SELECT ... ' + $X)"
       - pattern: "execute(\"SELECT ... \" + $X)"
+      - pattern: "cursor.execute(f\"SELECT ... {$X}\")"
+      - pattern: "cursor.execute(f'SELECT ... {$X}')"
   - id: h4k.python.eval
     languages: [python]
     message: "Use of eval() with potentially untrusted input."
     severity: ERROR
     pattern: "eval($X)"
-  - id: h4k.c.buffer
-    languages: [c]
-    message: "Unbounded buffer copy (strcpy) — overflow risk."
+  - id: h4k.python.subprocess-shell
+    languages: [python]
+    message: "Shell=True with possibly attacker-controlled command."
     severity: ERROR
-    pattern: "strcpy($D, $S);"
-  - id: h4k.c.format
-    languages: [c]
-    message: "Non-literal format string passed to printf."
+    pattern-either:
+      - pattern: "subprocess.run($C, shell=True)"
+      - pattern: "subprocess.call($C, shell=True)"
+      - pattern: "os.system($X)"
+      - pattern: "os.popen($X)"
+  - id: h4k.python.yaml-load
+    languages: [python]
+    message: "yaml.load without Loader can execute arbitrary code (CWE-502)."
     severity: ERROR
-    pattern: "printf($F);"
+    pattern-either:
+      - pattern: "yaml.load($X)"
+      - pattern: "yaml.unsafe_load($X)"
+  - id: h4k.python.pickle-load
+    languages: [python]
+    message: "pickle.load of untrusted input executes arbitrary code (CWE-502)."
+    severity: ERROR
+    pattern: "pickle.load($X)"
+  - id: h4k.python.regex-dos
+    languages: [python]
+    message: "User input compiled to a regex can cause ReDoS."
+    severity: WARNING
+    pattern: "re.compile($X)"
+  - id: h4k.python.path-traversal
+    languages: [python]
+    message: "Open with raw user input — path traversal (CWE-22)."
+    severity: WARNING
+    pattern-either:
+      - pattern: "open($X)"
+      - pattern: "Path($X).read_text()"
+  - id: h4k.python.assert-usage
+    languages: [python]
+    message: "assert used for security checks — stripped under -O (CWE-703)."
+    severity: WARNING
+    pattern: "assert $A"
+
+  # ---- javascript / typescript ----
   - id: h4k.javascript.eval
-    languages: [javascript]
+    languages: [javascript, typescript]
     message: "Use of eval() with potentially untrusted input."
     severity: ERROR
     pattern: "eval($X)"
+  - id: h4k.javascript.innerHTML
+    languages: [javascript, typescript]
+    message: "innerHTML assignment can introduce XSS (CWE-79)."
+    severity: ERROR
+    pattern-either:
+      - pattern: "$EL.innerHTML = $X"
+      - pattern: "$EL.outerHTML = $X"
+  - id: h4k.javascript.child-process
+    languages: [javascript, typescript]
+    message: "exec/spawn of possibly attacker-controlled command."
+    severity: ERROR
+    pattern-either:
+      - pattern: "child_process.exec($X)"
+      - pattern: "child_process.execSync($X)"
+      - pattern: "exec($X)"
+  - id: h4k.javascript.no-sql-injection
+    languages: [javascript, typescript]
+    message: "Mongo-style query built from interpolation — NoSQL injection."
+    severity: ERROR
+    pattern: "({ $where: $X })"
+
+  # ---- java ----
+  - id: h4k.java.sql-injection
+    languages: [java]
+    message: "SQL via string concatenation — injection (CWE-89)."
+    severity: ERROR
+    pattern-either:
+      - pattern: "stmt.executeQuery(\"SELECT ... \" + $X)"
+      - pattern: "stmt.execute(\"SELECT ... \" + $X)"
+  - id: h4k.java.deserialization
+    languages: [java]
+    message: "Untrusted deserialization via readObject (CWE-502)."
+    severity: ERROR
+    pattern: "$O.readObject()"
+  - id: h4k.java.readline-concat
+    languages: [java]
+    message: "File read from raw input — path traversal (CWE-22)."
+    severity: WARNING
+    pattern: "new File($X)"
+
+  # ---- C / C++ ----
+  - id: h4k.c.buffer
+    languages: [c]
+    message: "Unbounded buffer copy (strcpy) — overflow risk (CWE-120)."
+    severity: ERROR
+    pattern-either:
+      - pattern: "strcpy($D, $S);"
+      - pattern: "sprintf($D, $S);"
+  - id: h4k.c.format
+    languages: [c]
+    message: "Non-literal format string passed to printf (CWE-134)."
+    severity: ERROR
+    pattern: "printf($F);"
+  - id: h4k.c.system
+    languages: [c]
+    message: "system() with a non-literal command — arbitrary execution."
+    severity: ERROR
+    pattern: "system($X);"
+  - id: h4k.c.gets
+    languages: [c]
+    message: "gets() is unbounded — stack overflow (CWE-120)."
+    severity: ERROR
+    pattern: "gets($B);"
+
+  # ---- shell ----
   - id: h4k.generic.command-shell
-    languages: [python, javascript, shell]
+    languages: [python, javascript, bash]
     message: "Possible shell command injection (shell=True / command built from input)."
     severity: ERROR
     pattern-either:
       - pattern: "subprocess.run($C, shell=True)"
       - pattern: "execa($C, { shell: true })"
+  - id: h4k.shell.curl-pipe
+    languages: [bash]
+    message: "curl | sh executes remote code — supply-chain risk."
+    severity: WARNING
+    pattern: "curl $X | sh"

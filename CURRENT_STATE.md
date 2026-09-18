@@ -177,6 +177,7 @@ live daemon needed. Tests that reach the network are monkeypatched (e.g.
 | `ingest.py` | source ingest (zip/tar/git), zip-slip-safe |
 | `updater.py` | periodic tool/data refresh |
 | `sniffer.py` | tcpdump/arp/bettercap/aircrack opt-in lab tooling |
+| `tls_lab.py` | local TLS interception lab: private CA + localhost cert + loopback HTTPS proxy (openssl/trust-store) |
 
 ---
 

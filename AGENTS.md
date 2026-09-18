@@ -136,7 +136,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
-| `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets | 
+| `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses | 
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |
 | `ai.py` | LLM provider (default local Ollama qwen2.5; OpenAI-compatible opt-in) |
 | `ai_loop.py` | AI exploit-first loop: root-cause + minimal trigger (confirm) + patch + verify |

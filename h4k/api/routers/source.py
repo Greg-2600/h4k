@@ -122,6 +122,7 @@ def software_composition(req: SourceScanRequest) -> ScaResult:
         packages=res.get("packages", []),
         sbom_available=bool(res.get("sbom_available")),
         secrets=res.get("secrets", []),
+        licenses=res.get("licenses", []),
     )
 
 

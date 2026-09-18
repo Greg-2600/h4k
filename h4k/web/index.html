@@ -131,6 +131,7 @@
               <div class="mnet">
                 <div class="btn-row">
                   <button type="button" id="iface-btn" class="btn-sub">list interfaces</button>
+                  <button type="button" id="tls-status-btn" class="btn-sub">TLS lab: status</button>
                 </div>
                 <input type="text" id="net-iface" class="full-input" placeholder="network interface (e.g. eth0 / wlan0mon)" />
                 <div class="btn-row">
@@ -141,6 +142,11 @@
                   <button type="button" id="mitm-btn" class="btn-sub btn-danger">ARP-spoof <em class="danger">(lab only)</em></button>
                   <button type="button" id="wifi-scan-btn" class="btn-sub">wifi: scan APs</button>
                   <button type="button" id="wifi-cap-btn" class="btn-sub">wifi: capture</button>
+                </div>
+                <div class="btn-row">
+                  <button type="button" id="tls-setup-btn" class="btn-sub btn-danger">TLS: build CA + cert</button>
+                  <button type="button" id="tls-trust-btn" class="btn-sub btn-danger">TLS: install CA</button>
+                  <button type="button" id="tls-proxy-btn" class="btn-sub btn-danger">TLS: https proxy</button>
                 </div>
               </div>
             </div>
@@ -167,12 +173,28 @@
           </div>
 
           <details class="more-tools" id="source-more">
-            <summary>more<span class="mt-hint">custom semgrep rules</span></summary>
+            <summary>more<span class="mt-hint">custom semgrep rules · save + rerun over a tree</span></summary>
             <div class="mt-body" id="custom-rule">
               <input type="text" id="rule-pattern" class="full-input" placeholder="custom semgrep pattern, e.g. exec(request.GET[&quot;cmd&quot;])" />
+              <input type="text" id="rule-name" class="full-input" placeholder="rule name (e.g. exec-cmd-injection)" />
+              <select id="rule-severity" class="full-input">
+                <option value="medium">severity: medium</option>
+                <option value="high">severity: high</option>
+                <option value="critical">severity: critical</option>
+                <option value="low">severity: low</option>
+              </select>
               <div class="btn-row">
                 <button type="button" id="rule-test" class="btn-sub">test custom rule</button>
+                <button type="button" id="rule-save" class="btn-sub">save rule</button>
               </div>
+              <div class="btn-row">
+                <input type="text" id="rule-tree" class="full-input" placeholder="git URL to re-run saved rules over" />
+                <button type="button" id="rule-run-tree" class="btn-sub">run saved rules on repo</button>
+              </div>
+              <div class="btn-row">
+                <button type="button" id="rule-list" class="btn-sub">list saved rules</button>
+              </div>
+              <div id="rules-out" class="notes"></div>
             </div>
           </details>
         </section>
@@ -237,7 +259,7 @@
     <section class="pane results" id="fuzz-panel" hidden><div class="pane-head"><span class="pane-title">/lab fuzz</span><span class="pane-status" id="fuzz-status">idle</span></div><div id="tab-fuzz"></div></section>
     <section class="pane results" id="source-panel" hidden><div class="pane-head"><span class="pane-title">/source analysis</span><span class="pane-status" id="source-status">idle</span></div><div id="tab-source"></div></section>
     <section class="pane results" id="exploit-panel" hidden><div class="pane-head"><span class="pane-title">/poc disclosure skeleton</span></div><pre class="notes" id="tab-exploit"></pre></section>
-    <section class="pane results" id="sca-panel" hidden><div class="pane-head"><span class="pane-title">/sbom · supply-chain</span></div><div id="tab-sca"></div></section>
+    <section class="pane results" id="sca-panel" hidden><div class="pane-head"><span class="pane-title">/sbom · supply-chain</span></div><div id="tab-sca"></div><div class="btn-row" id="sca-actions" hidden><button type="button" id="sbom-download" class="btn-sub">download SBOM (.cdx.json)</button></div></section>
     <section class="pane results" id="ai-panel" hidden><div class="pane-head"><span class="pane-title">/ai</span><span id="ai-model-used" class="pane-status"></span></div><div class="ai-block"><div class="pane-head sub"><span class="pane-title">→ prompt</span></div><pre class="notes" id="ai-prompt"></pre></div><div class="ai-block"><div class="pane-head sub"><span class="pane-title">← response</span></div><pre class="notes" id="tab-ai"></pre></div></section>
     <section class="pane results" id="net-panel" hidden><div class="pane-head"><span class="pane-title">/network layer</span><span id="net-status" class="pane-status">idle</span></div><pre class="notes" id="tab-net"></pre></section>
     <section class="pane results" id="ossfuzz-panel" hidden><div class="pane-head"><span class="pane-title">/oss-fuzz auto-run</span><span id="ossfuzz-status" class="pane-status">idle</span></div><pre class="notes" id="tab-ossfuzz"></pre></section>

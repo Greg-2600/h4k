@@ -75,10 +75,12 @@ def scan_semgrep(root: Path) -> list[SemgrepFinding]:
     os.close(fd)
     out_file = Path(tmpname)
     argv = [binary, "scan", "--json", "--quiet", "--no-rewrite-rule-ids"]
-    # Offline mode: --config points at the bundled rules dir and --offline tells
-    # semgrep not to fetch anything.
+    # Offline mode: --config points at the bundled rules dir. A local config
+    # dir never touches the registry, so no extra flag is needed (and newer
+    # semgrep versions reject a non-existent `--offline` flag, which would make
+    # offline SAST silently return no findings).
     if _is_offline():
-        argv += ["--config", str(OFFLINE_RULES), "--offline"]
+        argv += ["--config", str(OFFLINE_RULES)]
     argv += ["-o", str(out_file), str(root)]
     try:
         subprocess.run(  # nosec B603 B607 - fixed argv, no shell

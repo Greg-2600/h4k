@@ -106,6 +106,51 @@ def generate_sbom(root: Path) -> Path | None:
     return None
 
 
+def scan_licenses(root: Path) -> list[dict]:
+    """Surface license + secret-type findings via trivy (best-effort).
+
+    Returns a flat list of {package, version, licenses, classification,
+    target, file, line} for each scanned component. Uses `trivy fs
+    --scanners license`. Non-fatal: returns [] if trivy is missing/fails.
+    """
+    trivy = _tool_cmd("trivy")
+    if not trivy:
+        return []
+    rc, so, _se = _run(
+        [
+            trivy,
+            "fs",
+            "--scanners",
+            "license",
+            "--license-full",
+            "--format",
+            "json",
+            str(root),
+        ],
+        timeout=240,
+    )
+    if rc != 0 or not so.strip():
+        return []
+    try:
+        data = json.loads(so)
+    except json.JSONDecodeError:
+        return []
+    out: list[dict] = []
+    for res in data.get("Results", []):
+        tgt = res.get("Target", "")
+        for pkg in res.get("Packages", []):
+            out.append(
+                {
+                    "package": pkg.get("Name", "?"),
+                    "version": pkg.get("Version", ""),
+                    "licenses": pkg.get("Licenses", []) or [],
+                    "target": tgt,
+                    "file": (pkg.get("Locations") or [{}])[0].get("StartLine", 0),
+                }
+            )
+    return out
+
+
 def scan_osv(root: Path) -> ScaResult:
     """Run osv-scanner over the source tree for known-vuln dependencies."""
     res = ScaResult(tool="osv-scanner")
@@ -178,6 +223,7 @@ def sca_scan(root: Path, with_sbom: bool = True) -> dict[str, Any]:
     sbom = generate_sbom(root) if with_sbom else None
     osv = scan_osv(root)
     leaks = scan_secrets(root)
+    lic = scan_licenses(root)
     return {
         "cves": osv.cve_ids,
         "vulnerabilities": osv.osv_vulns,
@@ -187,6 +233,7 @@ def sca_scan(root: Path, with_sbom: bool = True) -> dict[str, Any]:
         "sbom_path": str(sbom) if sbom else None,
         "sbom_dir": str(out_dir),
         "secrets": leaks,
+        "licenses": lic,
     }
 
 
