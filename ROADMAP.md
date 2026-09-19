@@ -52,8 +52,12 @@ item is a self-contained, live-demonstrable increment on the current release.
 - [x] **OSS-Fuzz-style auto-runner** — pull repo → build w/ sanitizers → fuzz N
       minutes → triaged report + patch diff (mirrors Google's public bug-hunting).
   (done: `POST /api/source/ossfuzz` + Fix-stage "OSS-Fuzz auto-run")
-- [ ] **SBOM → supply-chain map** — render dependency graph + reachability (which
+- [x] **SBOM → supply-chain map** — render dependency graph + reachability (which
       vulnerable call paths are actually hit).
+  (done: `build_supply_chain_map` returns per-node `reachable` + `reachable_cves`;
+  summary `reachable_nodes` + `vulnerable_reachable`; UI shows a reachable column.
+  Reachability is dependency-graph (on an active path from the app root), labeled
+  honestly as not a code-level call-graph claim.)
 
 ## Infra / shipping
 

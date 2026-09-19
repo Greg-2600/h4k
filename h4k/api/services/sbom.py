@@ -107,13 +107,81 @@ def annotate_cves(
     return graph
 
 
+def _dep_edges(edges: list[dict[str, str]]) -> list[tuple[str, str]]:
+    """Normalise edges to a stable (from, to) list for traversal."""
+    return [(e.get("from", ""), e.get("to", "")) for e in edges]
+
+
+def reachability_from_roots(graph: dict[str, Any]) -> list[str]:
+    """Return the set of node ids reachable from any root node.
+
+    A "root" is a node that nothing depends on (nothing points to it) — normally
+    the application/top-level package. Reachable = on an active dependency path
+    from a root (directly or transitively). This is genuine graph reachability,
+    not a claim about code-level call paths (which needs per-language call-graph
+    analysis we don't fabricate).
+    """
+    nodes = graph.get("nodes", [])
+    edges = _dep_edges(graph.get("edges", []))
+
+    # Build parent->children adjacency and a reverse index (who points at me).
+    children: dict[str, list[str]] = {}
+    parents: dict[str, list[str]] = {}
+    for frm, to in edges:
+        children.setdefault(frm, []).append(to)
+        parents.setdefault(to, []).append(frm)
+
+    node_ids = {n.get("id", "") for n in nodes}
+    # Roots = top of a dependency tree: nothing points to them AND they pull
+    # something in (have children). Leaf orphans (no parent, no child) are not
+    # part of any path and are correctly left unreachable.
+    has_parent = set(parents.keys())
+    top_level = node_ids - has_parent
+    roots = {nid for nid in top_level if children.get(nid)}
+    if not roots:
+        # Flat/cyclic graph: fall back to everything with no parent.
+        roots = top_level or node_ids
+
+    if not roots:
+        # Degenerate: every node is a child (cyclic or flat) — fall back to all.
+        return sorted(node_ids)
+
+    reachable: set[str] = set()
+    stack = list(roots)
+    while stack:
+        cur = stack.pop()
+        if cur in reachable:
+            continue
+        reachable.add(cur)
+        for ch in children.get(cur, []):
+            if ch in node_ids and ch not in reachable:
+                stack.append(ch)
+    return sorted(reachable)
+
+
 def build_supply_chain_map(
     sbom_path: str | Path, cve_map: dict[str, list[str]]
 ) -> dict[str, Any]:
-    """Build the full {graph, component CVE list, summary} map."""
+    """Build the full {graph, component CVE list, summary, reachability} map."""
     comps = parse_sbom(sbom_path)
     graph = build_graph(sbom_path)
     graph = annotate_cves(graph, cve_map)
+
+    reachable = reachability_from_roots(graph)
+    reachable_set = set(reachable)
+
+    # Annotate each node with reachability + flag vulnerable-and-reachable
+    # (the real "this CVEs is on an active dependency path" signal).
+    for node in graph.get("nodes", []):
+        node["reachable"] = node.get("id", "") in reachable_set
+        node["reachable_cves"] = node["cves"] if node["reachable"] else []
+
+    vuln_reachable = [
+        n.get("label", "")
+        for n in graph.get("nodes", [])
+        if n.get("reachable") and n.get("cves")
+    ]
+
     return {
         "components": comps,
         "graph": graph,
@@ -121,5 +189,9 @@ def build_supply_chain_map(
             "components": len(comps),
             "edges": len(graph.get("edges", [])),
             "cves": graph.get("cve_total", 0),
+            "reachable_nodes": len(reachable),
+            "vulnerable_reachable": len(vuln_reachable),
         },
+        "reachable": reachable,
+        "vulnerable_reachable": vuln_reachable,
     }

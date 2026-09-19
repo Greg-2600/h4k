@@ -999,21 +999,24 @@ function renderSupplyChainMap(d) {
   const gr = d.graph || {};
   const nodes = gr.nodes || [];
   const edits = gr.edges || [];
-  const cveMap = {};
-  for (const n of nodes) if (n.cves && n.cves.length) cveMap[n.label] = n.cves;
-  let h = `<p class='msg'>components: ${(d.summary||{}).components||0} · edges: ${edits.length} · known CVEs: ${(d.summary||{}).cves||0}</p>`;
-  h += "<h3>Dependency graph (nodes → edges)</h3><table><tr><th>node</th><th>type</th><th>dependencies</th><th>known CVEs</th></tr>";
+  const s = d.summary || {};
+  let h = `<p class='msg'>components: ${s.components||0} · edges: ${edits.length} · known CVEs: ${s.cves||0} · reachable: ${s.reachable_nodes||0} · <span class="${s.vulnerable_reachable ? "err" : "ok"}">vulnerable + reachable: ${s.vulnerable_reachable||0}</span></p>`;
+  h += "<h3>Dependency graph + reachability</h3>";
+  h += "<p class='stage-desc'>Reachability = on an active dependency path from the app/root. A package that is <b>not</b> reachable is dead weight — its CVEs still matter less than reachable ones.</p>";
+  h += "<table><tr><th>node</th><th>type</th><th>dependencies</th><th>known CVEs</th><th>reachable</th></tr>";
   const childByParent = {};
   for (const e of edits) (childByParent[e.from] = childByParent[e.from]||[]).push(e.to);
   for (const n of nodes) {
     const kids = (childByParent[n.id]||[]).map(x=>esc(x)).join(", ")||"—";
     const cves = (n.cves||[]).map(esc).join(", ")||"—";
-    h += `<tr><td>${esc(n.label)}</td><td>${esc(n.type||"—")}</td><td>${kids}</td><td>${cves}</td></tr>`;
+    const reach = n.reachable ? "<span class='ok'>yes</span>" : "<span class='err'>no</span>";
+    const cls = (n.reachable && n.cves && n.cves.length) ? "err" : "";
+    h += `<tr class="${cls}"><td>${esc(n.label)}</td><td>${esc(n.type||"—")}</td><td>${kids}</td><td>${cves}</td><td>${reach}</td></tr>`;
   }
   h += "</table>";
-  h += "<p class='msg'>reachability: any node with a listed CVE is a reachable-vulnerable component.</p>";
+  h += "<p class='msg'>honest note: reachability here is dependency-graph reachability (is the package on an active path), not a code-level call-graph claim — we don't fabricate call paths.</p>";
   el.innerHTML = h;
-  log("[+] supply-chain map built (" + nodes.length + " nodes, " + (d.summary||{}).cves + " CVEs)", "ok");
+  log("[+] supply-chain map built (" + nodes.length + " nodes, " + s.cves + " CVEs, " + (s.vulnerable_reachable||0) + " reachable)", "ok");
 }
 
 /* ---------- network layer (sniff / arp / mitm / wifi) ---------- */
