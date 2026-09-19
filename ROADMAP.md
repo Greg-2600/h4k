@@ -61,11 +61,14 @@ item is a self-contained, live-demonstrable increment on the current release.
 
 ## Infra / shipping
 
-- [ ] **Ollama sidecar in compose** — run Ollama in its own container on a
+- [x] **Ollama sidecar in compose** — run Ollama in its own container on a
       non-standard port; `OLLAMA_BASE_URL` already makes this a config change.
-- [ ] **CI**: GitHub Actions running lint + tests on push (reproducible quality
+  (done: compose `ollama-sidecar` service on `127.0.0.1:11435`, `--profile llm`)
+- [x] **CI**: GitHub Actions running lint + tests on push (reproducible quality
       gate for the class).
-- [ ] **Release packaging** — tagged image + one-line `docker run` for classmates.
+  (done: `.github/workflows/ci.yml` runs `make lint` + `make coverage` on push/PR)
+- [x] **Release packaging** — tagged image + one-line `docker run` for classmates.
+  (done: `scripts/release.sh <ver>` builds/tags/pushes and prints the one-liner)
 
 ## Evaluated & rejected
 

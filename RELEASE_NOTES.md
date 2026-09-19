@@ -136,6 +136,8 @@ Two runnable images:
 - **Report export** to `.json` / `.md`.
 - **Phrack-ezine README view** at `/readme`.
 - **Scan cache** (5 min per target+mode) to avoid re-probing.
+- **Release packaging** — `scripts/release.sh <ver>` builds/tags the image and
+  prints the one-line `docker run`.
 - **REST surface** (see §5).
 
 ---
