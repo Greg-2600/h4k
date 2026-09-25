@@ -309,6 +309,8 @@ def _to_result(name: str, work: Path, findings: list[sast.Finding]) -> SourceSca
 
 
 def _to_finding(f: sast.Finding) -> SourceFinding:
+    from services import sanitizer
+
     return SourceFinding(
         rule_id=f.rule_id,
         name=f.name,
@@ -318,6 +320,7 @@ def _to_finding(f: sast.Finding) -> SourceFinding:
         line=f.line,
         code=f.code,
         description=f.description,
+        sanitizer=sanitizer.verify_plan(f.cwe, rule_id=f.rule_id, file=f.file),
     )
 
 

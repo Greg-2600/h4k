@@ -4,6 +4,7 @@
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess  # nosec B404 - runs semgrep for static analysis
 import sys
@@ -41,10 +42,76 @@ class SemgrepFinding:
 _SEV = {"ERROR": "high", "WARNING": "medium", "INFO": "low"}
 
 
-def _cwe_from(tags: list[str]) -> str:
-    for t in tags or []:
-        if t.upper().startswith("CWE-"):
-            return t.upper()
+# Last-resort CWE inference for rules that carry no CWE metadata (e.g. some
+# upstream registry rules). Keyword -> CWE, matched against the rule id. This is
+# a heuristic and only runs when the rule told us nothing itself.
+_RULE_CWE_HINTS: list[tuple[str, str]] = [
+    ("use-after-free", "CWE-416"),
+    ("use-after-scope", "CWE-416"),
+    ("double-free", "CWE-415"),
+    ("uaf", "CWE-416"),
+    ("buffer-overflow", "CWE-122"),
+    ("buffer", "CWE-120"),
+    ("strcpy", "CWE-120"),
+    ("gets", "CWE-120"),
+    ("sprintf", "CWE-120"),
+    ("overflow", "CWE-190"),
+    ("format-string", "CWE-134"),
+    ("format", "CWE-134"),
+    ("printf", "CWE-134"),
+    ("free", "CWE-415"),
+    ("alloc", "CWE-401"),
+    ("sql", "CWE-89"),
+    ("nosql", "CWE-943"),
+    ("command", "CWE-78"),
+    ("shell", "CWE-78"),
+    ("exec", "CWE-78"),
+    ("system", "CWE-78"),
+    ("eval", "CWE-95"),
+    ("deserial", "CWE-502"),
+    ("pickle", "CWE-502"),
+    ("yaml", "CWE-502"),
+    ("path", "CWE-22"),
+    ("traversal", "CWE-22"),
+    ("xss", "CWE-79"),
+    ("innerhtml", "CWE-79"),
+    ("crypto", "CWE-327"),
+    ("tls", "CWE-319"),
+    ("insecure", "CWE-319"),
+    ("regex", "CWE-1333"),
+    ("redos", "CWE-1333"),
+    ("assert", "CWE-703"),
+    ("random", "CWE-330"),
+    ("secret", "CWE-798"),
+]
+
+_CWE_IN_TEXT = re.compile(r"CWE-\d+", re.IGNORECASE)
+
+
+def _cwe_from(meta: dict, rule_id: str = "") -> str:
+    """Extract a CWE from a semgrep rule's `extra.metadata`.
+
+    Order of preference: an explicit `tags` entry, a `cwe` key (Semgrep's own
+    convention, e.g. "CWE-89: SQL Injection"), a CWE mentioned in the message
+    text, then a keyword heuristic on the rule id.
+    """
+    if not isinstance(meta, dict):
+        meta = {}
+    for t in meta.get("tags", []) or []:
+        if str(t).upper().startswith("CWE-"):
+            return str(t).upper().split(":")[0].strip()
+    cwe = meta.get("cwe") or meta.get("CWE")
+    if cwe:
+        m = _CWE_IN_TEXT.search(str(cwe))
+        if m:
+            return m.group(0).upper()
+    m = _CWE_IN_TEXT.search(str(meta.get("message", "")))
+    if m:
+        return m.group(0).upper()
+    rid = (rule_id or "").lower()
+    for keyword, cwe_id in _RULE_CWE_HINTS:
+        if keyword in rid:
+            return cwe_id
     return "CWE-710"
 
 
@@ -117,7 +184,7 @@ def scan_semgrep(root: Path) -> list[SemgrepFinding]:
         sev = extra.get("severity", "INFO")
         msg = (extra.get("message") or "").strip()[:200]
         meta = extra.get("metadata", {}) or {}
-        tags = meta.get("tags", []) if isinstance(meta, dict) else []
+        rid = _rule_id(cid, msg)
         findings.append(
             SemgrepFinding(
                 check_id=cid,
@@ -126,16 +193,14 @@ def scan_semgrep(root: Path) -> list[SemgrepFinding]:
                 line=start.get("line", 0),
                 end_line=end.get("line", start.get("line", 0)),
                 message=msg,
-                rule_id=_rule_id(cid, msg),
-                cwe=_cwe_from(tags),
+                rule_id=rid,
+                cwe=_cwe_from(meta, rid),
             )
         )
     return findings
 
 
 def _rule_id(cid: str, message: str) -> str:
-    import re
-
     base = cid.split(".")[-1].lower() or ""
     if not base:
         m = re.search(r"([A-Za-z_\-]+)", message or "")

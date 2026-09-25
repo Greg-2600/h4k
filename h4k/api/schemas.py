@@ -180,6 +180,7 @@ class FuzzResult(BaseModel):
     repro: str
     evidence: str = ""
     payload_mutated: bool = True
+    sanitizer: dict[str, Any] = {}  # replay recipe + plausible bug classes
 
 
 class Report(BaseModel):
@@ -246,6 +247,7 @@ class SourceFinding(BaseModel):
     line: int
     code: str = ""
     description: str = ""
+    sanitizer: dict[str, Any] = {}  # flags + expected trace to confirm/refute
 
 
 class SourceScanResult(BaseModel):

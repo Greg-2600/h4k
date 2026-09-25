@@ -101,9 +101,26 @@ def build_triage(candidate: str, finding: Any = None) -> TriageReport:
     # is via libFuzzer -minimize_crash / afl-tmin, which we flag as a next step).
     minimized = _attempt_minimize(candidate, bug_class)
 
+    # Sanitizer-first: name the exact flags + expected trace for this CWE so the
+    # "confirm it's really a <class>" step is concrete, not hand-wavy.
+    from services import sanitizer
+
+    plan = sanitizer.verify_plan(cwe)
+    if plan["relevant"]:
+        confirm = (
+            f"Confirm it's a {bug_class} ({cwe}): rebuild with "
+            f"`{plan['build_flags']}` and replay — expect "
+            f"'{plan['expect']}'."
+        )
+    else:
+        confirm = (
+            f"Confirm it's a {bug_class} ({cwe}). A sanitizer cannot adjudicate "
+            f"this class — use the tainted-input repro instead."
+        )
+
     steps = [
         "Reproduce the crash on a system you own (fuzz target / asan build).",
-        f"Confirm it's a {bug_class} ({cwe}) — check the ASan/backtrace line.",
+        confirm,
         "Minimize the repro further (libFuzzer -minimize_crash=1 or afl-tmin).",
         "Apply the patch direction, then re-fuzz to verify it's gone.",
         "Disclose responsibly: report to the vendor before publishing.",

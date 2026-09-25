@@ -59,6 +59,8 @@ class LabFuzzer:
             evid, rc, elapsed = self._send_http(host, port, vector)
             signal = self._classify(rc, elapsed, evid, baseline_ok)
             if signal:
+                from services import sanitizer
+
                 candidates.append(
                     {
                         "host": host,
@@ -69,6 +71,13 @@ class LabFuzzer:
                         "repro": vector.decode("latin1"),
                         "evidence": evid,
                         "payload_mutated": True,
+                        # Sanitizer-first: a black-box signal is not a verdict,
+                        # so we attach the rebuild+replay recipe and the bug
+                        # classes a sanitizer would name if it is memory
+                        # corruption after all.
+                        "sanitizer": sanitizer.confirm_plan(
+                            signal, host=host, port=port, vector=label
+                        ),
                     }
                 )
             self.progress(f"[fuzz] {label} -> {signal or 'ok'}", 10)
@@ -157,38 +166,17 @@ class LabFuzzer:
 
         Returns {summary, kind, cwe} best-effort. `kind` is a coarse bug class
         (e.g. stack-buffer-overflow, format string, leak); `cwe` a best guess.
+        Classification is delegated to services.sanitizer so fuzz, SAST and
+        triage all agree on what a given trace means.
         """
-        text = stderr or ""
-        summary = ""
-        kind = "unknown"
-        cwe = "CWE-710"
-        for line in text.splitlines():
-            low = line.lower()
-            if "addresssanitizer:" in low and "error:" in low:
-                # e.g. ==1==ERROR: AddressSanitizer: stack-buffer-overflow on address...
-                summary = line.split("ERROR:", 1)[-1].strip()
-                break
-        if not summary:
-            for line in text.splitlines():
-                if "ERROR:" in line and (
-                    "sanitizer" in line.lower() or "ubsan" in line.lower()
-                ):
-                    summary = line.split("ERROR:", 1)[-1].strip()
-                    break
-        s = summary.lower()
-        if "stack-buffer-overflow" in s:
-            kind, cwe = "stack-buffer-overflow", "CWE-120"
-        elif "heap-buffer-overflow" in s:
-            kind, cwe = "heap-buffer-overflow", "CWE-122"
-        elif "format" in s or "%n" in s:
-            kind, cwe = "format-string", "CWE-134"
-        elif "use-after-free" in s:
-            kind, cwe = "use-after-free", "CWE-416"
-        elif "buffer-overflow" in s or "overflow" in s:
-            kind, cwe = "buffer-overflow", "CWE-120"
-        elif "out-of-bounds" in s or "oob" in s:
-            kind, cwe = "out-of-bounds", "CWE-787"
-        return {"summary": summary, "kind": kind, "cwe": cwe}
+        from services import sanitizer
+
+        info = sanitizer.classify_trace(stderr)
+        return {
+            "summary": info["summary"],
+            "kind": info["class"],
+            "cwe": info["cwe"],
+        }
 
     def minimize_crash(self, cmd: list[str], crashes: list[str]) -> list[dict]:
         """Run a crash-minimizer (libFuzzer -minimize_crash=1) over crash files.
@@ -203,7 +191,9 @@ class LabFuzzer:
         if not binary or not Path(binary).exists():
             return out
         env = dict(__import__("os").environ)
-        env["ASAN_OPTIONS"] = env.get("ASAN_OPTIONS", "detect_leaks=0")
+        from services import sanitizer
+
+        env.update(sanitizer.trace_env())
         for crash in crashes:
             try:
                 proc = subprocess.run(  # nosec B603 B607 - fixed argv from caller

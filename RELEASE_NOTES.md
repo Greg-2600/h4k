@@ -161,6 +161,7 @@ Two runnable images:
 | D13 | **In-memory job stores + 5-min cache** | Single-lab deployment; avoids re-scanning the same box, keeps state simple. |
 | D14 | **Fingerprinting via banners + whatweb, posture via traceroute** | Cheap, no extra auth; posture is a labeled heuristic (high = more exposed), not a claim. |
 | D15 | **Strict static-analysis hygiene** | black/ruff/isort/flake8/mypy/pylint/bandit all green; bandit-nosec annotations carry rationale. |
+| D16 | **Sanitizer-first, and honest about its limits** | Every SAST finding and fuzz candidate carries the exact ASan/UBSan flags, runtime env, and the trace line a sanitizer would print. We only claim what a sanitizer can adjudicate: for injection/traversal/secret classes it says "a sanitizer can't confirm this", and a black-box signal gets a *replay recipe + candidate classes*, never a verdict. A static hit is a hypothesis until you run it. |
 
 ---
 

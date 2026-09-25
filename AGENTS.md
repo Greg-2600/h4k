@@ -49,7 +49,7 @@ HACKING/                 git root
     fuzz/parse_fuzzer.c  libFuzzer harness; fuzz/parse_afl.c AFL harness
     README.md
   demos/sca-demo/        SCA fixture: committed package-lock pinning lodash 4.17.20
-  tests/                 pytest suites (147 tests)
+  tests/                 pytest suites (186 tests)
 ```
 
 ## How to run everything
@@ -138,6 +138,7 @@ Health/diagnostic:
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses | 
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |
+| `sanitizer.py` | sanitizer-first: ASan/UBSan flags, trace env, bug-class table, per-finding verify/confirm plans |
 | `ai.py` | LLM provider (default local Ollama qwen2.5; OpenAI-compatible opt-in) |
 | `ai_loop.py` | AI exploit-first loop: root-cause + minimal trigger (confirm) + patch + verify |
 | `rules.py` | persistent custom-rule library |

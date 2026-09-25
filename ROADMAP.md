@@ -7,9 +7,17 @@ item is a self-contained, live-demonstrable increment on the current release.
 
 ## Tier 1 — polish & airtightness (small effort, big payoff)
 
-- [ ] **Sanitizer-first everywhere** — surface ASan/UBSan flags in *every*
+- [x] **Sanitizer-first everywhere** — surface ASan/UBSan flags in *every*
       finding (fuzz + SAST), not just line numbers, so each one shows a clean
       crash/error trace.
+  (done: `services/sanitizer.py` is the single source of truth — build flags,
+  `ASAN_OPTIONS`/`UBSAN_OPTIONS` for abort-on-first-error traces, a 17-class
+  bug table, and per-finding `verify_plan` / `confirm_plan` blocks. SAST hits and
+  fuzz candidates both carry it; `parse_sanitizer_trace` now classifies via the
+  same table. Honest about limits: non-memory-safety classes say a sanitizer
+  can't adjudicate them, and a black-box fuzz signal gets a replay recipe with
+  candidate bug classes rather than a verdict. Bundled Semgrep rules gained
+  `metadata.cwe` so their findings resolve a real CWE → real plan.)
 - [x] **True crash minimization** — wrap libFuzzer `-minimize_crash=1` /
       `afl-tmin` behind `/api/fuzz` so a crash auto-reduces to the smallest
       repro, then feed it straight into triage. ("Here's the exact 12-byte
@@ -46,7 +54,7 @@ item is a self-contained, live-demonstrable increment on the current release.
 - [x] **AI full-loop** — fuzzer crash → AI root-cause → AI patch → re-fuzz to
       verify the fix removed it. One button.
   (done: `POST /api/source/ai/loop` + Fix-stage "AI full-loop" button)
-- [ ] **Local TLS interception lab** — mkcert + local CA so the fuzzer/SAST can
+- [x] **Local TLS interception lab** — mkcert + local CA so the fuzzer/SAST can
       target HTTPS web apps you own.
   (done: `tls_lab.py` — private CA + localhost cert + trust install + loopback HTTPS proxy via openssl/socat; endpoints under `/api/net/tls/*`)
 - [x] **OSS-Fuzz-style auto-runner** — pull repo → build w/ sanitizers → fuzz N

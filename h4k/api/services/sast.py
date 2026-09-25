@@ -125,6 +125,8 @@ class Finding:
     description: str
 
     def to_dict(self) -> dict[str, Any]:
+        from services import sanitizer
+
         return {
             "rule_id": self.rule_id,
             "name": self.name,
@@ -134,6 +136,11 @@ class Finding:
             "line": self.line,
             "code": self.code,
             "description": self.description,
+            # Sanitizer-first: how would ASan/UBSan confirm (or refuse to
+            # confirm) this? relevant=False for non-memory-safety classes.
+            "sanitizer": sanitizer.verify_plan(
+                self.cwe, rule_id=self.rule_id, file=self.file
+            ),
         }
 
 

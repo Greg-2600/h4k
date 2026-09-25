@@ -49,8 +49,10 @@ def _minimize(bin_path: Path, crash: Path) -> str:
 
 
 def _env() -> dict[str, str]:
+    from services import sanitizer
+
     env = dict(os.environ)
-    env.setdefault("ASAN_OPTIONS", "detect_leaks=0")
+    env.update(sanitizer.trace_env())
     return env
 
 

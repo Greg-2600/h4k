@@ -13,7 +13,7 @@ the immediate horizon.
 | Item | Status |
 |---|---|
 | Git branch | `main` |
-| Tests | **155 passing** (offline, mocked Metasploit) |
+| Tests | **186 passing** (offline, mocked Metasploit) |
 | Linters | black · ruff · isort · flake8 · mypy · bandit all green · pylint ~9.88 |
 | Container | **`h4k`** running, host-networking, UI on `http://127.0.0.1:3137` |
 | Local LLM | Ollama reachable at `127.0.0.1:11434` (30 models); default `qwen2.5:latest` |
@@ -170,6 +170,7 @@ live daemon needed. Tests that reach the network are monkeypatched (e.g.
 | `sast.py`, `semgrep.py` | regex (+ offline Semgrep) SAST + custom rules |
 | `sca.py`, `sbom.py` | supply-chain CVEs + dependency-graph map |
 | `triage.py` | crash→bug-class/CWE/patch/minimize |
+| `sanitizer.py` | sanitizer-first: ASan/UBSan flags, trace env, bug-class table, per-finding plans |
 | `ai.py`, `ai_loop.py` | Ollama root-cause + patch + full-loop |
 | `rules.py` | custom-rule library |
 | `merged_report.py` | one-click consolidate export |

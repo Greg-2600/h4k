@@ -1,6 +1,8 @@
 rules:
   # ---- python ----
   - id: h4k.python.sql-injection
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
     languages: [python]
     message: "Possible SQL injection: SQL built via string concatenation."
     severity: ERROR
@@ -10,11 +12,15 @@ rules:
       - pattern: "cursor.execute(f\"SELECT ... {$X}\")"
       - pattern: "cursor.execute(f'SELECT ... {$X}')"
   - id: h4k.python.eval
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
     languages: [python]
     message: "Use of eval() with potentially untrusted input."
     severity: ERROR
     pattern: "eval($X)"
   - id: h4k.python.subprocess-shell
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
     languages: [python]
     message: "Shell=True with possibly attacker-controlled command."
     severity: ERROR
@@ -24,6 +30,8 @@ rules:
       - pattern: "os.system($X)"
       - pattern: "os.popen($X)"
   - id: h4k.python.yaml-load
+    metadata:
+      cwe: "CWE-502: Deserialization of Untrusted Data"
     languages: [python]
     message: "yaml.load without Loader can execute arbitrary code (CWE-502)."
     severity: ERROR
@@ -31,16 +39,22 @@ rules:
       - pattern: "yaml.load($X)"
       - pattern: "yaml.unsafe_load($X)"
   - id: h4k.python.pickle-load
+    metadata:
+      cwe: "CWE-502: Deserialization of Untrusted Data"
     languages: [python]
     message: "pickle.load of untrusted input executes arbitrary code (CWE-502)."
     severity: ERROR
     pattern: "pickle.load($X)"
   - id: h4k.python.regex-dos
+    metadata:
+      cwe: "CWE-1333: Inefficient Regular Expression Complexity"
     languages: [python]
     message: "User input compiled to a regex can cause ReDoS."
     severity: WARNING
     pattern: "re.compile($X)"
   - id: h4k.python.path-traversal
+    metadata:
+      cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
     languages: [python]
     message: "Open with raw user input — path traversal (CWE-22)."
     severity: WARNING
@@ -48,6 +62,8 @@ rules:
       - pattern: "open($X)"
       - pattern: "Path($X).read_text()"
   - id: h4k.python.assert-usage
+    metadata:
+      cwe: "CWE-703: Improper Check or Handling of Exceptional Conditions"
     languages: [python]
     message: "assert used for security checks — stripped under -O (CWE-703)."
     severity: WARNING
@@ -55,11 +71,15 @@ rules:
 
   # ---- javascript / typescript ----
   - id: h4k.javascript.eval
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
     languages: [javascript, typescript]
     message: "Use of eval() with potentially untrusted input."
     severity: ERROR
     pattern: "eval($X)"
   - id: h4k.javascript.innerHTML
+    metadata:
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation"
     languages: [javascript, typescript]
     message: "innerHTML assignment can introduce XSS (CWE-79)."
     severity: ERROR
@@ -67,6 +87,8 @@ rules:
       - pattern: "$EL.innerHTML = $X"
       - pattern: "$EL.outerHTML = $X"
   - id: h4k.javascript.child-process
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
     languages: [javascript, typescript]
     message: "exec/spawn of possibly attacker-controlled command."
     severity: ERROR
@@ -75,6 +97,8 @@ rules:
       - pattern: "child_process.execSync($X)"
       - pattern: "exec($X)"
   - id: h4k.javascript.no-sql-injection
+    metadata:
+      cwe: "CWE-943: Improper Neutralization of Special Elements in Data Query Logic"
     languages: [javascript, typescript]
     message: "Mongo-style query built from interpolation — NoSQL injection."
     severity: ERROR
@@ -82,6 +106,8 @@ rules:
 
   # ---- java ----
   - id: h4k.java.sql-injection
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
     languages: [java]
     message: "SQL via string concatenation — injection (CWE-89)."
     severity: ERROR
@@ -89,11 +115,15 @@ rules:
       - pattern: "stmt.executeQuery(\"SELECT ... \" + $X)"
       - pattern: "stmt.execute(\"SELECT ... \" + $X)"
   - id: h4k.java.deserialization
+    metadata:
+      cwe: "CWE-502: Deserialization of Untrusted Data"
     languages: [java]
     message: "Untrusted deserialization via readObject (CWE-502)."
     severity: ERROR
     pattern: "$O.readObject()"
   - id: h4k.java.readline-concat
+    metadata:
+      cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
     languages: [java]
     message: "File read from raw input — path traversal (CWE-22)."
     severity: WARNING
@@ -101,6 +131,8 @@ rules:
 
   # ---- C / C++ ----
   - id: h4k.c.buffer
+    metadata:
+      cwe: "CWE-120: Copy of Buffer without Checking Size of Input"
     languages: [c]
     message: "Unbounded buffer copy (strcpy) — overflow risk (CWE-120)."
     severity: ERROR
@@ -108,16 +140,22 @@ rules:
       - pattern: "strcpy($D, $S);"
       - pattern: "sprintf($D, $S);"
   - id: h4k.c.format
+    metadata:
+      cwe: "CWE-134: Use of Externally-Controlled Format String"
     languages: [c]
     message: "Non-literal format string passed to printf (CWE-134)."
     severity: ERROR
     pattern: "printf($F);"
   - id: h4k.c.system
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
     languages: [c]
     message: "system() with a non-literal command — arbitrary execution."
     severity: ERROR
     pattern: "system($X);"
   - id: h4k.c.gets
+    metadata:
+      cwe: "CWE-120: Copy of Buffer without Checking Size of Input"
     languages: [c]
     message: "gets() is unbounded — stack overflow (CWE-120)."
     severity: ERROR
@@ -125,6 +163,8 @@ rules:
 
   # ---- shell ----
   - id: h4k.generic.command-shell
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
     languages: [python, javascript, bash]
     message: "Possible shell command injection (shell=True / command built from input)."
     severity: ERROR
@@ -132,6 +172,8 @@ rules:
       - pattern: "subprocess.run($C, shell=True)"
       - pattern: "execa($C, { shell: true })"
   - id: h4k.shell.curl-pipe
+    metadata:
+      cwe: "CWE-494: Download of Code Without Integrity Check"
     languages: [bash]
     message: "curl | sh executes remote code — supply-chain risk."
     severity: WARNING

@@ -527,10 +527,20 @@ function pollFuzz(jobId) {
 function renderFuzz(cands) {
   const el = $("tab-fuzz");
   if (!cands.length) { el.innerHTML = "<p class='msg'>no anomalies detected (clean)</p>"; return; }
-  let h = "<p class='msg'>Potential bug candidates — reproduce on a lab box, then disclose responsibly.</p><table><tr><th>vector</th><th>signal</th><th>evidence</th></tr>";
+  let h = "<p class='msg'>Potential bug candidates — reproduce on a lab box, then disclose responsibly.</p>";
+  h += "<p class='stage-desc'>Sanitizer-first: each signal carries the exact rebuild+replay recipe. A black-box signal is <b>not</b> a verdict — rebuild the service under ASan/UBSan and replay to get a clean trace that names the bug class.</p>";
+  h += "<table><tr><th>vector</th><th>signal</th><th>evidence</th><th>confirm under sanitizer</th></tr>";
   for (const c of cands) {
+    const s = c.sanitizer || {};
+    let cell = "<span class='err'>no plan</span>";
+    if (s.relevant) {
+      cell = `<span class="ok">${esc(s.build_flags)}</span>` +
+        `<div class='msg'>then replay this vector; expect one of: ${esc((s.class_candidates || []).join(" | "))}</div>`;
+    } else {
+      cell = `<span class='msg'>${esc(s.note || "not sanitizer-adjudicable")}</span>`;
+    }
     h += `<tr><td>${esc(c.vector)}</td><td><span class="${c.signal === "teardown" || c.signal === "resource" ? "err" : ""}">${esc(c.signal)}</span></td>` +
-      `<td>${esc((c.evidence || "").slice(0, 80))}</td></tr>`;
+      `<td>${esc((c.evidence || "").slice(0, 80))}</td><td>${cell}</td></tr>`;
   }
   el.innerHTML = h + "</table>";
 }
@@ -572,12 +582,23 @@ function renderSource(result) {
   const el = $("tab-source");
   let html = `<p class='msg'>source: ${esc(result.name)} · files scanned: ${esc(result.files_scanned)} · findings: ${esc(result.findings.length)}</p>`;
   if (!result.findings.length) { html += "<p class='ok'>no risky patterns found</p>"; el.innerHTML = html; return; }
-  html += "<table><tr><th>sev</th><th>cwe</th><th>file</th><th>line</th><th>issue</th><th></th></tr>";
+  html += "<p class='stage-desc'>Sanitizer-first: each finding shows the flags + expected trace that would <b>confirm or refute</b> it. A static hit is a hypothesis, not a verdict.</p>";
+  html += "<table><tr><th>sev</th><th>cwe</th><th>file</th><th>line</th><th>issue</th><th>confirm under sanitizer</th><th></th></tr>";
   for (const f of result.findings) {
     const sev = f.severity === "critical" || f.severity === "high" ? "err" : "";
+    const s = f.sanitizer || {};
+    let san = "<span class='msg'>—</span>";
+    if (s.relevant) {
+      san = `<span class="ok">${esc(s.sanitizer)}</span>` +
+        `<div class='msg'>build: ${esc(s.build_flags)}</div>` +
+        `<div class='msg'>expect: ${esc(s.expect)}</div>`;
+    } else {
+      san = `<span class='msg'>${esc((s.note || "not sanitizer-adjudicable").slice(0, 150))}</span>`;
+    }
     html += `<tr><td class="${sev}">${esc(f.severity)}</td><td>${esc(f.cwe)}</td>` +
       `<td>${esc(f.file)}:${esc(f.line)}</td><td>${esc(f.code || "—").slice(0, 40)}</td>` +
       `<td>${esc(f.name)}</td>` +
+      `<td>${san}</td>` +
       `<td>` +
       `<button class="btn-sub" onclick="genExploit(${JSON.stringify(f)})">poc</button> ` +
       `<button class="btn-sub" onclick="downloadExploit(${JSON.stringify(f)})">dl</button>` +
