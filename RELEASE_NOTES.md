@@ -82,6 +82,30 @@ Two runnable images:
   netcat/socat — gated behind its own opt-in button.
 - **Scan abort** — `/api/scan/{id}/abort` with graceful stop between stages.
 
+### 2.3b Engagements & credential propagation
+
+A per-target scan is stateless and dies with the process. An engagement is not.
+
+- **Persistent engagement store** (`/api/engagement`, SQLite) — hosts, services,
+  credentials, vulns and an attempt ledger accumulate across scans and restarts,
+  so the operator keeps one growing picture instead of re-scanning and forgetting.
+  The DB is `0600`: it holds verified credentials in the clear.
+- **Scope is the boundary, enforced server-side.** An engagement declares its
+  authorized CIDRs. Every write re-checks them, so a mistyped target in the UI
+  cannot silently widen the engagement. Out-of-scope hosts from a wide scan are
+  skipped and *reported back* (`skipped_out_of_scope`), never recorded.
+- **Credential propagation** (`/api/engagement/{id}/propagate`, opt-in) — replays
+  credentials *already verified in the engagement* against every other in-scope
+  service that has a login module. Humans reuse passwords; this finds where.
+  A dry-run `…/propagate/plan` shows the blast radius before anything is sent.
+- **Provenance, not inference.** One credential found on three hosts is one
+  credential and three `cred_access` rows, and the asset graph emits a `pivot`
+  edge listing exactly the hosts where a login *actually succeeded*. Nothing is
+  inferred from "these hosts both run ssh" — consistent with D16.
+- **Attempt ledger** — a failed replay is recorded too, so re-running is cheap
+  and the attempt count stays a real cost bound (`MAX_ATTEMPTS = 500`).
+
+
 ### 2.4 Software analysis on source you provide
 
 - **Ingest** — upload `.zip`/`.tar`/`.tar.gz` **or** clone a git/GitLab URL,
@@ -163,6 +187,8 @@ Two runnable images:
 | D15 | **Strict static-analysis hygiene** | black/ruff/isort/flake8/mypy/pylint/bandit all green; bandit-nosec annotations carry rationale. |
 | D16 | **Sanitizer-first, and honest about its limits** | Every SAST finding and fuzz candidate carries the exact ASan/UBSan flags, runtime env, and the trace line a sanitizer would print. We only claim what a sanitizer can adjudicate: for injection/traversal/secret classes it says "a sanitizer can't confirm this", and a black-box signal gets a *replay recipe + candidate classes*, never a verdict. A static hit is a hypothesis until you run it. |
 | D17 | **Tools report failure instead of pretending** | Every openssl/socat/tool step's return code is checked and the failing step is named, so a broken lab says *why*. States that are legitimately incomplete (certs built but CA not yet trusted) return an explicit `next` action rather than a bare `false`. Same principle as D16 applied to the tool layer. |
+| D18 | **Scope is enforced in the store, not the UI** | An engagement declares its authorized CIDRs and every write and every replayed login re-checks them. A wrong target typed into the UI cannot widen the engagement, and out-of-scope hosts are skipped and reported rather than quietly recorded. Authorization is a property of the data model, not of a form. |
+| D19 | **Propagation replays proven credentials, never invents them** | It reuses only credentials already verified against an in-scope host. It cannot spray new candidates, and a miss is ledgered so it is never retried. A pivot edge is drawn only where a login genuinely succeeded — reachability is measured, never assumed from "these hosts run the same service". |
 
 ---
 

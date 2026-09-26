@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from routers import (
+    engagement as engagement_router,
     net as net_router,
     scan as scan_router,
     source as source_router,
@@ -71,6 +72,7 @@ app.include_router(scan_router.router)
 app.include_router(source_router.router)
 app.include_router(update_router.router)
 app.include_router(net_router.router)
+app.include_router(engagement_router.router)
 
 # Serve the plain HTML/JS frontend.
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")

@@ -151,6 +151,30 @@
               </div>
             </div>
           </details>
+
+          <details class="mt-block">
+            <summary>engagement<span class="mt-hint">persistent scope · asset graph · cred propagation</span></summary>
+            <div class="mt-body">
+              <p class="stage-desc">Accumulate every host, service and credential across a whole engagement, then replay verified credentials against the rest of the in-scope estate. Scope is enforced server-side on every write and every login attempt.</p>
+              <div class="btn-row">
+                <button type="button" id="eng-new-btn" class="btn-sub">new engagement</button>
+                <button type="button" id="eng-list-btn" class="btn-sub">list</button>
+                <select id="eng-select" class="tiny-input"></select>
+              </div>
+              <div class="deep-row">
+                <input type="text" id="eng-scope" class="full-input" placeholder="authorized scope, e.g. 10.0.0.0/24, 10.1.1.5" />
+              </div>
+              <div class="btn-row">
+                <button type="button" id="eng-ingest-btn" class="btn-sub">ingest last scan</button>
+                <button type="button" id="eng-graph-btn" class="btn-sub">asset graph</button>
+                <button type="button" id="eng-creds-btn" class="btn-sub">credentials</button>
+              </div>
+              <div class="btn-row">
+                <button type="button" id="eng-plan-btn" class="btn-sub">propagation plan <em>(dry run)</em></button>
+                <button type="button" id="eng-propagate-btn" class="btn-sub btn-danger">propagate creds <em class="danger">(opt-in)</em></button>
+              </div>
+            </div>
+          </details>
         </section>
 
         <!-- ============ STAGE 2 · SOURCE & SUPPLY ============ -->

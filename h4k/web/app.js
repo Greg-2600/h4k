@@ -1207,3 +1207,100 @@ $("rule-run-tree").addEventListener("click", async () => {
     }
   } catch (_) {}
 })();
+
+/* ---------- engagement (persistent scope · asset graph · cred propagation) ---------- */
+const engId = () => $("eng-select").value || "";
+const engOut = (d) => { $("tab-net").textContent = JSON.stringify(d, null, 2).slice(0, 4000); };
+
+const engRefreshList = async () => {
+  const r = await (await fetch("/api/engagement")).json();
+  const sel = $("eng-select");
+  const keep = sel.value;
+  sel.innerHTML = "";
+  for (const e of r.engagements || []) {
+    const o = document.createElement("option");
+    o.value = e.id;
+    o.textContent = `${e.name} (${e.id}) — ${e.summary.assets} hosts / ${e.summary.verified_credentials} creds`;
+    sel.appendChild(o);
+  }
+  if (keep) sel.value = keep;
+};
+
+$("eng-list-btn").addEventListener("click", async () => {
+  try { await engRefreshList(); log("[+] engagements listed", "ok"); }
+  catch (e) { log("[-] engagement list failed: " + e.message, "err"); }
+});
+
+$("eng-new-btn").addEventListener("click", async () => {
+  const name = prompt("Engagement name?");
+  if (!name) return;
+  const scope = ($("eng-scope").value || "").trim();
+  try {
+    const r = await (await fetch("/api/engagement", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, scope: scope.split(/[,\s]+/).filter(Boolean) }),
+    })).json();
+    if (r.detail) { log("[-] " + r.detail, "err"); return; }
+    await engRefreshList();
+    $("eng-select").value = r.id;
+    log(`[+] engagement ${r.id} created · scope ${(r.scope || []).join(", ")}`, "ok");
+  } catch (e) { log("[-] engagement create failed: " + e.message, "err"); }
+});
+
+$("eng-ingest-btn").addEventListener("click", async () => {
+  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
+  if (!currentJob) { log("[!] no scan job to ingest — run a scan first", "err"); return; }
+  try {
+    const r = await (await fetch(`/api/engagement/${engId()}/ingest`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_id: currentJob }),
+    })).json();
+    if (r.detail) { log("[-] " + r.detail, "err"); return; }
+    const a = r.added;
+    log(`[+] ingested: +${a.assets} hosts, +${a.services} services, +${a.credentials} creds, +${a.vulns} vulns`, "ok");
+    if ((r.skipped_out_of_scope || []).length)
+      log(`[!] ${r.skipped_out_of_scope.length} host(s) skipped as out of scope: ${r.skipped_out_of_scope.join(", ")}`, "err");
+    engOut(r);
+    await engRefreshList();
+  } catch (e) { log("[-] ingest failed: " + e.message, "err"); }
+});
+
+$("eng-graph-btn").addEventListener("click", async () => {
+  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
+  const g = await (await fetch(`/api/engagement/${engId()}/graph`)).json();
+  const pivots = (g.edges || []).filter((e) => e.type === "pivot");
+  log(`[+] graph: ${(g.nodes || []).length} hosts, ${(g.edges || []).length} edges, ${pivots.length} pivotable credential(s)`, "ok");
+  for (const p of pivots) log(`    ${p.user}@${p.service || "any"} from ${p.source} reaches ${p.reaches.join(", ")}`, "ok");
+  engOut(g);
+});
+
+$("eng-creds-btn").addEventListener("click", async () => {
+  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
+  const d = await (await fetch(`/api/engagement/${engId()}/credentials`)).json();
+  for (const c of d.credentials || [])
+    log(`    ${c.user}@${c.service || "any"} ${c.verified ? "verified" : "unverified"} on ${(c.hosts || []).map((h) => h.host).join(", ") || "-"}`, c.verified ? "ok" : "err");
+  engOut(d);
+});
+
+$("eng-plan-btn").addEventListener("click", async () => {
+  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
+  const d = await (await fetch(`/api/engagement/${engId()}/propagate/plan`)).json();
+  if (d.detail) { log("[-] " + d.detail, "err"); return; }
+  log(`[+] dry run: ${d.credentials} verified cred(s) x ${d.targets} in-scope service(s) = ${d.attempts} login attempt(s)${d.capped ? " (capped)" : ""} — nothing sent yet`, "ok");
+  engOut(d);
+});
+
+$("eng-propagate-btn").addEventListener("click", async () => {
+  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
+  if (!confirm("Replay every credential already verified in this engagement against the other in-scope services? Authorized scope only.")) { log("propagation cancelled", "err"); return; }
+  $("tab-net").textContent = "replaying verified credentials across in-scope services…";
+  try {
+    const d = await (await fetch(`/api/engagement/${engId()}/propagate`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}),
+    })).json();
+    if (d.detail) { log("[-] " + d.detail, "err"); return; }
+    log(`[+] propagation: ${d.attempted} attempted, ${d.verified} verified, ${d.failed} failed, ${d.lateral_moves} lateral move(s)`, d.verified ? "ok" : "err");
+    for (const r of d.reached || []) log(`    ${r.user}:*** reached ${r.new_host}:${r.port} (${r.service})${r.lateral ? " — lateral" : ""}`, "ok");
+    engOut(d);
+  } catch (e) { log("[-] propagation failed: " + e.message, "err"); }
+});

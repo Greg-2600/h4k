@@ -31,6 +31,7 @@ Metasploitable box. Every aggressive action is **off by default and opt-in**.
 |------|--------------|
 | **Host recon & scan** | 3 OPSEC modes (stealth / Tor / overt), fingerprinting, PTR, DNS, ARP neighbors, posture heuristic |
 | **Vuln analysis** | curated CVE archive, EOL/version leads, default-cred archive, ranked recommendations |
+| **Engagements** | persistent scope-enforced asset graph; replays *verified* credentials across the in-scope estate to find where they also work (lateral movement), with a dry-run plan first |
 | **Source analysis (SAST)** | upload `.zip/.tar/.tar.gz` or clone a git URL → Semgrep + heuristics |
 | **Supply-chain (SCA)** | SBOM (CycloneDX) + osv-scanner → known CVEs + secrets/license scan |
 | **Fuzzing** | black-box HTTP fuzz *and* a bundled coverage-guided lab (libFuzzer/AFL++ + ASan) |
@@ -186,7 +187,7 @@ HACKING/                git root
     Dockerfile · docker-compose.yml · entrypoint.sh
   vulnlab/              intentionally-vulnerable fuzzing target + harnesses
   demos/sca-demo/       SCA fixture (pins vulnerable lodash)
-  tests/                pytest suites (315 tests)
+  tests/                pytest suites (374 tests)
 ```
 
 ## Development
@@ -199,8 +200,8 @@ pip install -r requirements-dev.txt
 
 make fmt     # black + isort
 make lint    # black ruff isort flake8 mypy pylint bandit
-make test    # pytest (315 tests)
-make coverage # pytest --cov (70% gate, currently 74.6%)
+make test    # pytest (374 tests)
+make coverage # pytest --cov (70% gate, currently 77.1%)
 ```
 
 All linters pass and the suite is green. Tests run offline (a mocked Metasploit

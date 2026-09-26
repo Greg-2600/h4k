@@ -49,7 +49,7 @@ HACKING/                 git root
     fuzz/parse_fuzzer.c  libFuzzer harness; fuzz/parse_afl.c AFL harness
     README.md
   demos/sca-demo/        SCA fixture: committed package-lock pinning lodash 4.17.20
-  tests/                 pytest suites (315 tests)
+  tests/                 pytest suites (374 tests)
 ```
 
 ## How to run everything
@@ -88,7 +88,7 @@ make test                        # pytest
 make coverage                    # pytest --cov (70% gate)
 ```
 
-All linters must pass before commit. Tests currently **315 passing** at **74.6%**
+All linters must pass before commit. Tests currently **374 passing** at **77.1%**
 coverage (CI gate 70%), pylint ~9.88.
 
 ## The API surface (FastAPI, all under /api)
@@ -102,6 +102,13 @@ Host recon/scan:
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
 - `POST /vulnleads`
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
+
+Engagement (persistent memory + cred propagation, engagement router):
+- `POST /api/engagement` (declare authorized scope), `GET /api/engagement`, `GET|DELETE /api/engagement/{id}`
+- `POST /api/engagement/parse-scope`
+- `POST /api/engagement/{id}/ingest` (raw report or `{job_id}`) → asset graph
+- `GET /api/engagement/{id}/assets|credentials|graph`
+- `GET /api/engagement/{id}/propagate/plan` (dry run), `POST /api/engagement/{id}/propagate` (opt-in)
 
 Source analysis (source router):
 - `POST /source/scan` (git URL SAST), `POST /source/scan/upload` (zip/tar/tgz)
@@ -147,6 +154,8 @@ Health/diagnostic:
 | `ossfuzz.py` | OSS-Fuzz-style build+asan+fuzz auto-runner |
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
+| `engagement.py` | persistent engagement store (scope-enforced asset graph: hosts/services/creds/vulns/attempts) |
+| `propagate.py` | credential propagation: replay verified creds across in-scope services |
 
 ## Design decisions (the important ones)
 
@@ -171,8 +180,14 @@ Health/diagnostic:
     supervisord.
 12. **Auto-update periodic task** refreshes semgrep/osv-scanner/trivy + CVE/creds
     (H4K_AUTO_UPDATE=1, interval env).
+13. **Engagement scope is enforced in the store, not the UI** — every write and
+    every replayed login re-checks the CIDR list. Out-of-scope hosts from a wide
+    scan are skipped and reported, never recorded.
+14. **Propagation only replays already-verified credentials** — it never invents
+    or sprays new candidates, and a ledger means a miss is never re-attempted.
+    A pivot edge appears only where a login actually succeeded.
 
-Fuller prose in `RELEASE_NOTES.md` (features + D1–D15) and `ROADMAP.md`.
+Fuller prose in `RELEASE_NOTES.md` (features + D1–D19) and `ROADMAP.md`.
 
 ## Common pitfalls / gotchas
 

@@ -67,6 +67,31 @@ item is a self-contained, live-demonstrable increment on the current release.
   Reachability is dependency-graph (on an active path from the app root), labeled
   honestly as not a code-level call-graph claim.)
 
+## Tier 4 — operator: engagements & lateral movement
+
+- [x] **Persistent engagement store** — hosts/services/creds/vulns/attempts
+      accumulate in SQLite across scans and restarts, instead of dying with the
+      process like `JOBS`.
+  (done: `engagement.py` + `/api/engagement/*`; scope CIDRs are enforced on
+  every write, out-of-scope hosts are skipped *and reported*, DB is `0600`.)
+- [x] **Credential propagation** — replay credentials already verified in the
+      engagement against the rest of the in-scope estate, with a dry-run plan.
+  (done: `propagate.py`; `…/propagate/plan` shows blast radius first.
+  `cred_access` records where each cred works, so the graph emits a `pivot`
+  edge only where a login actually succeeded. Attempt ledger means misses are
+  never retried; `MAX_ATTEMPTS=500`.)
+
+## Next up — the actual red-team gaps
+
+- [ ] **Attack paths to objectives** — let the operator declare crown jewels
+      (a DC, a file server, `db-prod-01`) and compute *paths* to them, so a
+      2.0 info-leak that pivots to the DC outranks a 9.8 on an isolated box.
+      Needs the engagement graph above; this is the missing deliverable.
+- [ ] **ATT&CK technique IDs** — map every action/finding to a technique so the
+      output speaks the defender's language. Cheap once paths exist.
+- [ ] **Detection guidance** — per technique, what telemetry a defender would
+      have seen (log source, event ID). Worth more to a client than the vuln list.
+
 ## Infra / shipping
 
 - [x] **Ollama sidecar in compose** — run Ollama in its own container on a

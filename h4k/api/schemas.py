@@ -322,3 +322,21 @@ class CustomRuleRequest(BaseModel):
     message: str = ""
     cwe: str = "CWE-710"
     test_code: str = ""  # sample code to validate the rule against
+
+
+class EngagementRequest(BaseModel):
+    """Create an engagement. `scope` is the authorized IP/CIDR list and is
+    enforced on every write and every replayed login attempt — it is the
+    boundary, not a label."""
+
+    name: str
+    scope: list[str]
+    notes: str = ""
+
+
+class PropagateRequest(BaseModel):
+    """OPT-IN: replay credentials already verified in this engagement against
+    other in-scope services. Off by default; never invents new candidates."""
+
+    open_sessions: bool = False
+    max_attempts: int = 500
