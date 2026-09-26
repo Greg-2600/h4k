@@ -1092,13 +1092,16 @@ const tlsPost = async (path, body) => await (await fetch("/api/net/tls/" + path,
 
 $("tls-status-btn").addEventListener("click", async () => {
   $("net-panel").hidden = false; $("net-status").textContent = "loading"; $("tab-net").textContent = "checking TLS lab…";
-  try { const r = await (await fetch("/api/net/tls/status")).json(); netOut(r); log("[+] TLS lab status: " + (r.ready ? "ready" : r.error || "pending"), r.ready ? "ok" : "err"); }
+  try { const r = await (await fetch("/api/net/tls/status")).json(); netOut(r); log("[+] TLS lab status: " + (r.ready ? "ready" : r.error || r.next || "pending"), r.ready ? "ok" : "err"); }
   catch (e) { $("tab-net").textContent = "error: " + e.message; }
 });
 
 $("tls-setup-btn").addEventListener("click", async () => {
   $("net-panel").hidden = false; $("net-status").textContent = "running"; $("tab-net").textContent = "building lab CA + localhost cert…";
-  try { const r = await tlsPost("setup"); netOut(r); log("[+] TLS CA + cert built" + (r.ready ? " (ready)" : ""), r.ready ? "ok" : "err"); }
+  try { const r = await tlsPost("setup"); netOut(r);
+    if (r.error) log("[-] TLS setup failed: " + r.error, "err");
+    else if (r.ready) log("[+] TLS CA + cert built (ready)", "ok");
+    else log("[+] TLS CA + cert built — " + (r.next || "not ready yet"), "err"); }
   catch (e) { $("tab-net").textContent = "error: " + e.message; }
 });
 

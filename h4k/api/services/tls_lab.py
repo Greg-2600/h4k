@@ -28,7 +28,12 @@ SERV_CNF = LAB_DIR / "server.ext"
 CERT_BUNDLE = LAB_DIR / "server.pem"  # key + crt for socat openssl s_server
 
 CA_DN = "/CN=h4k Lab CA"
-SERV_ALTNAMES = "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1"
+# `x509 -extensions subjectAltName` reads an INI-style extfile, so the section
+# header is mandatory -- a bare `subjectAltName=...` line fails with
+# "Error checking extension section subjectAltName" on OpenSSL 3.x.
+SERV_EXT_SECTION = "subjectAltName"
+SERV_ALTNAMES = "DNS:localhost,IP:127.0.0.1,IP:::1"
+SERV_CNF_TEXT = f"[{SERV_EXT_SECTION}]\nsubjectAltName={SERV_ALTNAMES}\n"
 
 
 def _which(t: str) -> str | None:
@@ -51,15 +56,38 @@ def _run(cmd: list[str], timeout: int = 60) -> int:
         return -1
 
 
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+
+
+def _has_ext_section(path: Path) -> bool:
+    """True only if the extfile carries the `[<section>]` INI header openssl
+    needs. A missing/legacy file is rewritten so setup is self-healing."""
+    for line in _read_text(path).splitlines():
+        if line.strip().lower() == f"[{SERV_EXT_SECTION.lower()}]":
+            return True
+    return False
+
+
 def status() -> dict[str, Any]:
-    return {
+    trusted = _ca_trusted()
+    built = CA_CRT.exists() and SERV_CRT.exists()
+    out = {
         "available": _which("openssl") is not None,
-        "ca_installed": _ca_trusted(),
+        "ca_installed": trusted,
         "ca_key": str(CA_KEY),
         "ca_crt": str(CA_CRT),
         "server_cert": str(SERV_CRT),
-        "ready": CA_CRT.exists() and SERV_CRT.exists() and _ca_trusted(),
+        "ready": built and trusted,
     }
+    if built and not trusted:
+        out["next"] = "run POST /api/net/tls/trust to trust the lab CA"
+    elif not built:
+        out["next"] = "run POST /api/net/tls/setup to build the lab CA + cert"
+    return out
 
 
 def _ca_trusted() -> bool:
@@ -78,16 +106,29 @@ def _open_ssl() -> str:
 
 
 def setup_ca() -> dict[str, Any]:
-    """Create the lab CA + a localhost server cert (idempotent)."""
+    """Create the lab CA + a localhost server cert (idempotent).
+
+    Every openssl step's return code is checked, so a genuine failure names the
+    step that broke instead of returning a bare `ready: false`.
+    """
     if not _which("openssl"):
         return {"ok": False, "error": "openssl not installed"}
     LAB_DIR.mkdir(parents=True, exist_ok=True)
 
+    def step(label: str, cmd: list[str]) -> str | None:
+        rc = _run(cmd)
+        return None if rc == 0 else label
+
     # 1) CA key + cert
     if not CA_KEY.exists():
-        _run([_open_ssl(), "genrsa", "-out", str(CA_KEY), "2048"])
+        err = step(
+            "genrsa (CA key)", [_open_ssl(), "genrsa", "-out", str(CA_KEY), "2048"]
+        )
+        if err:
+            return {"ok": False, "error": f"openssl failed: {err}"}
     if not CA_CRT.exists():
-        _run(
+        err = step(
+            "req -x509 (self-signed CA cert)",
             [
                 _open_ssl(),
                 "req",
@@ -103,14 +144,22 @@ def setup_ca() -> dict[str, Any]:
                 str(CA_CRT),
                 "-subj",
                 CA_DN,
-            ]
+            ],
         )
+        if err:
+            return {"ok": False, "error": f"openssl failed: {err}"}
 
     # 2) server key signed by the CA for localhost/127.0.0.1
     if not SERV_KEY.exists():
-        _run([_open_ssl(), "genrsa", "-out", str(SERV_KEY), "2048"])
+        err = step(
+            "genrsa (server key)",
+            [_open_ssl(), "genrsa", "-out", str(SERV_KEY), "2048"],
+        )
+        if err:
+            return {"ok": False, "error": f"openssl failed: {err}"}
     if not SERV_CSR.exists():
-        _run(
+        err = step(
+            "req -new (server CSR)",
             [
                 _open_ssl(),
                 "req",
@@ -121,13 +170,16 @@ def setup_ca() -> dict[str, Any]:
                 str(SERV_CSR),
                 "-subj",
                 "/CN=localhost",
-            ]
+            ],
         )
+        if err:
+            return {"ok": False, "error": f"openssl failed: {err}"}
     # openssl 3.x needs -copy_extensions on x509 for subjectAltName from CSR
-    if not SERV_CNF.exists():
-        SERV_CNF.write_text(SERV_ALTNAMES + "\n", encoding="utf-8")
+    if not _has_ext_section(SERV_CNF):
+        SERV_CNF.write_text(SERV_CNF_TEXT, encoding="utf-8")
     if not SERV_CRT.exists():
-        _run(
+        err = step(
+            "x509 -req (sign server cert)",
             [
                 _open_ssl(),
                 "x509",
@@ -145,18 +197,25 @@ def setup_ca() -> dict[str, Any]:
                 "-extfile",
                 str(SERV_CNF),
                 "-extensions",
-                "subjectAltName",
+                SERV_EXT_SECTION,
                 "-copy_extensions",
                 "copy",
                 "-out",
                 str(SERV_CRT),
-            ]
+            ],
         )
+        if err:
+            return {"ok": False, "error": f"openssl failed: {err}"}
 
     # 3) bundle key+crt for socat's openssl s_server -cert
     if SERV_CRT.exists() and SERV_KEY.exists():
         CERT_BUNDLE.write_bytes(SERV_KEY.read_bytes() + SERV_CRT.read_bytes())
+    else:  # pragma: no cover - defensive; steps above would have returned
+        return {"ok": False, "error": "server key/cert missing after signing"}
 
+    # `ready` also requires the CA to be trusted, a separate opt-in step;
+    # status() attaches the `next` action for that so a `ready: false` here is
+    # never mistaken for a setup failure.
     return status()
 
 

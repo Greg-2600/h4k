@@ -13,7 +13,8 @@ the immediate horizon.
 | Item | Status |
 |---|---|
 | Git branch | `main` |
-| Tests | **186 passing** (offline, mocked Metasploit) |
+| Tests | **315 passing** (offline, mocked Metasploit) |
+| Coverage | **74.6%** (CI gate 70%) |
 | Linters | black · ruff · isort · flake8 · mypy · bandit all green · pylint ~9.88 |
 | Container | **`h4k`** running, host-networking, UI on `http://127.0.0.1:3137` |
 | Local LLM | Ollama reachable at `127.0.0.1:11434` (30 models); default `qwen2.5:latest` |

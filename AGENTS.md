@@ -49,7 +49,7 @@ HACKING/                 git root
     fuzz/parse_fuzzer.c  libFuzzer harness; fuzz/parse_afl.c AFL harness
     README.md
   demos/sca-demo/        SCA fixture: committed package-lock pinning lodash 4.17.20
-  tests/                 pytest suites (186 tests)
+  tests/                 pytest suites (315 tests)
 ```
 
 ## How to run everything
@@ -88,7 +88,8 @@ make test                        # pytest
 make coverage                    # pytest --cov (70% gate)
 ```
 
-All linters must pass before commit. Tests currently **147 passing**, pylint ~9.88.
+All linters must pass before commit. Tests currently **315 passing** at **74.6%**
+coverage (CI gate 70%), pylint ~9.88.
 
 ## The API surface (FastAPI, all under /api)
 
