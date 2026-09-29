@@ -108,3 +108,54 @@ def test_readme_renders(client):
     r = client.get("/readme")
     assert r.status_code == 200
     assert "PHrack" in r.text or "PHRACK" in r.text or "h4k" in r.text.lower()
+
+
+# --- fuzz: iterations is wired end to end ------------------------------------
+
+
+def test_fuzz_accepts_and_records_iterations(client):
+    r = client.post("/api/fuzz", json={"target": "127.0.0.1", "iterations": 77})
+    assert r.status_code == 200
+    job = client.get(f"/api/fuzz/{r.json()['job_id']}").json()
+    assert job["iterations"] == 77
+
+
+def test_fuzz_defaults_iterations(client):
+    r = client.post("/api/fuzz", json={"target": "127.0.0.1"})
+    assert r.status_code == 200
+    job = client.get(f"/api/fuzz/{r.json()['job_id']}").json()
+    assert job["iterations"] == 1
+
+
+def test_fuzz_job_reports_dedup_counts_not_raw_crash_count(client, monkeypatch):
+    from services.fuzzer import LabFuzzer
+
+    trace = (
+        "==1==ERROR: AddressSanitizer: stack-buffer-overflow\n"
+        "    #0 0x7f1 in parse_header /src/v.c:47:10"
+    )
+    calls = {"n": 0}
+
+    def fake_send(self, host, port, vector):
+        calls["n"] += 1
+        return (trace, 0, 0.001) if calls["n"] > 1 else ("HTTP/1.1 200 OK", 0, 0.001)
+
+    monkeypatch.setattr(LabFuzzer, "_probe_http", lambda self, url: True)
+    monkeypatch.setattr(LabFuzzer, "_send_http", fake_send)
+
+    job_id = client.post(
+        "/api/fuzz", json={"target": "127.0.0.1", "iterations": 12}
+    ).json()["job_id"]
+
+    for _ in range(60):
+        job = client.get(f"/api/fuzz/{job_id}").json()
+        if job["status"] in ("done", "error"):
+            break
+    assert job["status"] == "done"
+    # 11 crashing inputs, all the same bug -> one candidate row.
+    assert job["count"] == 1
+    assert job["stats"]["crashes"]["unique_crashes"] == 1
+    assert job["stats"]["crashes"]["total_occurrences"] >= 10
+    assert job["stats"]["coverage_guided"] is False
+    assert job["candidates"][0]["confirmed"] is True
+    assert job["candidates"][0]["occurrences"] >= 10

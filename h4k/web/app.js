@@ -487,7 +487,9 @@ $("fuzz-btn").addEventListener("click", async () => {
   )) { log("fuzz cancelled — not confirmed", "err"); return; }
   const portText = $("fuzz-port").value.trim();
   const port = portText ? parseInt(portText, 10) : null;
-  const body = { target, host: target, service: "http" };
+  const itersText = $("fuzz-iters").value.trim();
+  const iterations = itersText ? parseInt(itersText, 10) : 500;
+  const body = { target, host: target, service: "http", iterations };
   if (port) body.port = port;
   $("fuzz-panel").hidden = false;
   $("fuzz-status").textContent = "running";
@@ -518,7 +520,20 @@ function pollFuzz(jobId) {
         clearInterval(fuzzTimer);
         if (job.candidates && job.candidates.length) lastFuzz = job.candidates;
         busy($("fuzz-btn"), false);
-        log("[+] fuzz complete — " + (job.count || 0) + " candidate(s)", "ok");
+        const s = job.stats && job.stats.crashes;
+        // Report distinct bugs and raw crashes as two separate numbers. A
+        // fuzzer that hits one bug 69 times has found ONE bug, and showing
+        // only the raw count is the classic way to oversell a fuzz run.
+        if (s) {
+          log(
+            "[+] fuzz complete — " + (job.count || 0) + " distinct bug(s) from " +
+            (s.total_occurrences || 0) + " crash(es) in " +
+            ((job.stats && job.stats.executed) || 0) + " execs " +
+            "(" + (s.confirmed_bugs || 0) + " confirmed, " +
+            (s.unconfirmed_leads || 0) + " unconfirmed lead(s))", "ok");
+        } else {
+          log("[+] fuzz complete — " + (job.count || 0) + " candidate(s)", "ok");
+        }
       }
     } catch (err) { clearInterval(fuzzTimer); }
   }, 1600);
@@ -527,9 +542,14 @@ function pollFuzz(jobId) {
 function renderFuzz(cands) {
   const el = $("tab-fuzz");
   if (!cands.length) { el.innerHTML = "<p class='msg'>no anomalies detected (clean)</p>"; return; }
-  let h = "<p class='msg'>Potential bug candidates — reproduce on a lab box, then disclose responsibly.</p>";
+  const total = cands.reduce((n, c) => n + (c.occurrences || 1), 0);
+  const confirmed = cands.filter((c) => c.confirmed).length;
+  let h = `<p class='msg'><b>${cands.length} distinct bug(s)</b> from ${total} crash(es). ` +
+    `Same bug reached by many inputs is counted once, not once per input. ` +
+    `Reproduce on a lab box, then disclose responsibly.</p>`;
+  h += `<p class='stage-desc'>Signal-guided black-box fuzzing, not coverage-guided: there is no instrumentation, so this cannot tell "reached new code" from "looks new". ${confirmed} of ${cands.length} carry a real sanitizer trace and are <b>confirmed</b>; the rest are unconfirmed leads. For coverage-guided fuzzing of an instrumented binary use the OSS-Fuzz auto-runner.</p>`;
   h += "<p class='stage-desc'>Sanitizer-first: each signal carries the exact rebuild+replay recipe. A black-box signal is <b>not</b> a verdict — rebuild the service under ASan/UBSan and replay to get a clean trace that names the bug class.</p>";
-  h += "<table><tr><th>vector</th><th>signal</th><th>evidence</th><th>confirm under sanitizer</th></tr>";
+  h += "<table><tr><th>bug</th><th>class</th><th>vector</th><th>crashes</th><th>evidence</th><th>confirm under sanitizer</th></tr>";
   for (const c of cands) {
     const s = c.sanitizer || {};
     let cell = "<span class='err'>no plan</span>";
@@ -539,7 +559,12 @@ function renderFuzz(cands) {
     } else {
       cell = `<span class='msg'>${esc(s.note || "not sanitizer-adjudicable")}</span>`;
     }
-    h += `<tr><td>${esc(c.vector)}</td><td><span class="${c.signal === "teardown" || c.signal === "resource" ? "err" : ""}">${esc(c.signal)}</span></td>` +
+    const conf = c.confirmed
+      ? `<span class="ok">confirmed</span> <span class='msg'>${esc(c.crash_id || "")}</span>`
+      : `<span class='msg'>unconfirmed lead</span>`;
+    h += `<tr><td>${conf}</td><td>${esc(c.bug_class || c.signal)}</td>` +
+      `<td>${esc(c.vector)}</td>` +
+      `<td>${c.occurrences || 1}</td>` +
       `<td>${esc((c.evidence || "").slice(0, 80))}</td><td>${cell}</td></tr>`;
   }
   el.innerHTML = h + "</table>";

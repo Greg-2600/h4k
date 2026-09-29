@@ -214,6 +214,10 @@ SIGNAL_CANDIDATES: dict[str, list[str]] = {
     "hang": ["heap-buffer-overflow", "leak"],
     "anomaly": ["heap-buffer-overflow", "stack-buffer-overflow"],
     "server_error": [],
+    # The target echoed a real sanitizer report. We already have the verdict's
+    # text, so there is nothing left to guess at -- the trace is classified
+    # directly and this candidate set stays empty on purpose.
+    "sanitizer": [],
 }
 
 

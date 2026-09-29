@@ -22,7 +22,27 @@ item is a self-contained, live-demonstrable increment on the current release.
       `afl-tmin` behind `/api/fuzz` so a crash auto-reduces to the smallest
       repro, then feed it straight into triage. ("Here's the exact 12-byte
       trigger.")
-  (done: OSS-Fuzz runner minimizes crash artifacts server-side)
+  (real now: `libfuzzer_minimize` runs `-minimize_crash=1` in a clean temp cwd,
+  reads back the smallest non-empty `minimized-from-<sha1>` artifact, ignores
+  libFuzzer's non-zero exit (77 = crash reproduced, artifacts already written),
+  and only claims a reduction when the result is genuinely smaller.
+  Verified live against real libFuzzer: 4027 → 256 bytes (93.6%) on vulnlab B1,
+  landing exactly on `BUF_SIZE`. The previous implementation returned the
+  unmodified crash file on both its success and failure branch — it never
+  reduced anything while reporting that it had.)
+- [x] **Crash dedup — count bugs, not crashes** — fingerprint each crash by the
+      sanitizer's error class + normalized top frames (ASLR addresses, line
+      numbers, module offsets stripped), so thousands of crashing inputs
+  collapse to the distinct bugs they actually are.
+  (done: `services/crashes.py` + `CrashRegistry`. Live: 300 execs → 116 crashes
+  → **2 distinct bugs**, exactly vulnlab's documented B1 stack-buffer-overflow
+  and B2 format-param. Black-box signals stay unconfirmed leads. See D20.)
+- [x] **Real mutation engine** — replace the fixed 13-payload probe list with a
+      seeded, reproducible operator set (bitflip, byte-set, arith, boundary,
+  dictionary, block delete/repeat, splice, havoc) and honour the `iterations`
+  field, which was declared and never read.
+  (done: `MutationEngine`. Same seed → identical crash fingerprints, so a
+  finding is replayable.)
 - [x] **One-click report from all sources** — merge SAST + SCA + fuzz + scan
       findings into a single exportable `.md`/`.json` (already partly wired).
   (done: "consolidated report" panel builds + downloads .md/.json from the

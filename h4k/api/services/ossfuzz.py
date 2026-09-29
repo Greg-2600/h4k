@@ -28,23 +28,18 @@ def _which(tool: str) -> str | None:
 def _minimize(bin_path: Path, crash: Path) -> str:
     """Best-effort reduce a crash to its smallest repro via libFuzzer.
 
-    Returns the minimized unit as readable text. On any failure (binary
-    missing, non-zero, timeout) we fall back to the raw crash file so the
-    repro stays faithful.
+    Delegates to services.fuzzer.libfuzzer_minimize, which runs
+    libFuzzer's `-merge=1` and reads back the file it actually wrote. This
+    function used to return the raw crash text on both the success and the
+    failure branch -- two identical branches, which is the signature of a
+    reducer that never reduced anything -- so a report could claim a
+    minimized repro that was byte-for-byte the original crash.
     """
-    rc, _, _ = _run(
-        [
-            str(bin_path),
-            "-minimize_crash=1",
-            "-runs=10000",
-            "-max_len=4096",
-            str(crash),
-        ],
-        cwd=crash.parent,
-        timeout=180,
-    )
-    if rc != 0:
-        return crash.read_text(errors="replace")[:2000]
+    from services.fuzzer import libfuzzer_minimize
+
+    minimized, reduced = libfuzzer_minimize(str(bin_path), crash)
+    if reduced:
+        return minimized
     return crash.read_text(errors="replace")[:2000]
 
 

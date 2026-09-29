@@ -216,8 +216,13 @@ def test_minimize_crash_swallows_failures(tmp_path, monkeypatch):
         raise subprocess.TimeoutExpired(cmd="fz", timeout=1)
 
     monkeypatch.setattr(subprocess, "run", boom)
-    # must not raise; the crash is simply skipped
-    assert LabFuzzer().minimize_crash([str(binp)], [str(crash)]) == []
+    # must not raise. The crash is still reported, but with reduced=False:
+    # we no longer silently return the un-reduced crash under the "minimized"
+    # key, which is what the old identical-branches implementation did.
+    out = LabFuzzer().minimize_crash([str(binp)], [str(crash)])
+    assert len(out) == 1
+    assert out[0]["reduced"] is False
+    assert out[0]["minimized"] == "Z"
 
 
 def test_extract_minimized_falls_back_to_crash_file(tmp_path):

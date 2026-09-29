@@ -151,6 +151,30 @@ A per-target scan is stateless and dies with the process. An engagement is not.
   and AFL++ harnesses — the modern way vs. blind mutation.
 - The h4k black-box fuzzer demonstrates the crash→restart→retrieve loop.
 
+### 2.5b Crash dedup & real minimization (zero-day hunting)
+
+- **A fuzzer reports events, not bugs.** One stack overflow in a length field
+  produces thousands of distinct crashing inputs and exactly one bug. The
+  registry fingerprints each crash by the sanitizer's own error class plus
+  normalized top frames, so `N crashes → M distinct bugs` is a real number.
+  Fingerprints survive ASLR (load addresses stripped), source line drift,
+  and truncated stacks — the volatile parts are removed before hashing, the
+  faulting function and module are what is kept.
+- **Black-box signals are never counted as confirmed bugs.** A connection
+  reset names no code path, so it is fingerprinted on signal + target and
+  labelled an unconfirmed lead. Only sanitizer-backed fingerprints count as
+  bugs. The run reports `confirmed_bugs` and `unconfirmed_leads` separately
+  from `total_occurrences` so the two can never be confused.
+- **A real mutation engine**, seeded and reproducible: bitflip, byte-set,
+  arithmetic, boundary-value, dictionary, block delete/repeat, splice, and
+  stacked havoc. The corpus grows when an input finds a fingerprint the run
+  has not seen. Same seed → same mutation sequence, so a crash replays.
+- **Minimization that minimizes.** libFuzzer `-minimize_crash=1` runs in a
+  clean temp cwd and the smallest `minimized-from-<sha1>` artifact is read
+  back; empty artifacts are skipped and the result is only reported when it
+  is genuinely smaller. Measured: 4027 → 256 bytes (93.6%) on vulnlab B1,
+  landing exactly on `BUF_SIZE` — the true overflow point.
+
 ### 2.6 Platform / UX
 
 - **Terminal-style pipeline UI** (zsh/opencode aesthetic): status bar, live
@@ -189,6 +213,9 @@ A per-target scan is stateless and dies with the process. An engagement is not.
 | D17 | **Tools report failure instead of pretending** | Every openssl/socat/tool step's return code is checked and the failing step is named, so a broken lab says *why*. States that are legitimately incomplete (certs built but CA not yet trusted) return an explicit `next` action rather than a bare `false`. Same principle as D16 applied to the tool layer. |
 | D18 | **Scope is enforced in the store, not the UI** | An engagement declares its authorized CIDRs and every write and every replayed login re-checks them. A wrong target typed into the UI cannot widen the engagement, and out-of-scope hosts are skipped and reported rather than quietly recorded. Authorization is a property of the data model, not of a form. |
 | D19 | **Propagation replays proven credentials, never invents them** | It reuses only credentials already verified against an in-scope host. It cannot spray new candidates, and a miss is ledgered so it is never retried. A pivot edge is drawn only where a login genuinely succeeded — reachability is measured, never assumed from "these hosts run the same service". |
+| D20 | **A fuzzer counts bugs, not crashes** | Raw crash counts are the classic way to oversell a fuzz run: 40000 crashes can be 3 bugs. Crashes are fingerprinted by faulting code path (ASLR and line numbers stripped) and deduped, and the report always shows distinct bugs *alongside* total crashes. Black-box signals that name no code path are counted as unconfirmed leads, never as bugs. |
+| D21 | **A reducer that reports no reduction is worse than none** | The old minimizer returned the unmodified crash file on both its success and failure branch — two identical branches, the signature of a reducer that never reduced. It now reads back the artifact libFuzzer actually wrote and only claims a reduction when the result is genuinely smaller, so "minimized" always means minimized. |
+| D22 | **Signal-guided is not coverage-guided, and the tool says so** | The HTTP fuzzer has no instrumentation and therefore no edge feedback, so it cannot distinguish "reached new code" from "looks new". `stats.coverage_guided` is `false` in the output and the UI says so, pointing at the libFuzzer path for real coverage guidance. Marketing blind mutation as coverage guidance would be the same lie in a different coat. |
 
 ---
 
@@ -225,7 +252,7 @@ GET   /api/neighbors                   ARP sweep
 POST  /api/attack                      opt-in Metasploit exploit
 POST  /api/deepattack                  opt-in toolkit sweep (hydra/nikto/...)
 POST  /api/vulnleads                   EOL/beta/old version leads
-POST  /api/fuzz + /api/fuzz/{id}        lab fuzzer (own target)
+POST  /api/fuzz + /api/fuzz/{id}        lab fuzzer, dedup'd by bug fingerprint
 POST  /api/source/scan                 clone+SAST (git URL)
 POST  /api/source/scan/upload          upload+SAST (zip/tar/tgz)
 POST  /api/source/exploit              PoC skeleton
@@ -241,7 +268,7 @@ GET   /api/health
 
 ## 6 · Quality
 
-- **127 unit/API tests**, no live daemon required (mocked MSF backend).
+- **442 unit/API tests**, no live daemon required (mocked MSF backend).
 - Linters: **black, ruff, isort, flake8, mypy, bandit — all clean**; **pylint 9.90/10**.
 - Container builds clean; AI + SCA + SAST verified live in the running container.
 
@@ -255,6 +282,20 @@ GET   /api/health
 - **Security posture** is a heuristic triage gauge, not an authoritative assessment.
 - **AI output is unvalidated** — treat as a diagnostic *assist*; verify on systems
   you own. Requires Ollama (or an OpenAI key) to be live; degrades otherwise.
+- **The HTTP fuzzer is signal-guided, not coverage-guided.** No instrumentation
+  means no edge feedback, so its corpus grows on *finding something new*, not on
+  *reaching new code* — a strictly weaker notion of interestingness. Use the
+  libFuzzer/AFL path for real coverage guidance.
+- **A black-box crash can only be *confirmed* if the target leaks its trace.**
+  A service that dies quietly gives you a connection reset, which names no code
+  path and therefore stays an unconfirmed lead. To confirm, rebuild the target
+  under ASan/UBSan and replay — that is what the per-candidate recipe is for.
+- **The OSS-Fuzz runner does not generate harnesses.** It clones, runs your
+  `build_cmd`, and fuzzes `fuzz_bin`; writing `LLVMFuzzerTestOneInput` and
+  wiring sanitizers into the build is still the operator's job.
+- **No binary analysis, reversing, or CTF-category tooling.** No Ghidra/radare2/
+  angr/pwntools integration and no pwn/crypto/stego/forensics/web-CTF helpers.
+  These are real gaps, not hidden features.
 
 ---
 
@@ -266,7 +307,7 @@ api/
   main.py · schemas.py · app_state.py
   routers/  scan.py · source.py
   services/ msfrpc, scan_pipeline, modes, report, cve_lookup, creds,
-            attack, toolkit, discovery, security, fuzzer, vulnleads,
+            attack, toolkit, discovery, security, fuzzer, crashes, vulnleads,
             sast, semgrep, sca, triage, ai, ingest
 data/       cves.json · creds.json · users/passwords/web-words lists
 web/        terminal UI (html/css/js)

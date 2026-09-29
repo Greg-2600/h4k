@@ -368,6 +368,7 @@ def run_fuzz(req: FuzzRequest, background: BackgroundTasks) -> dict[str, Any]:
         "host": host,
         "service": req.service,
         "port": port,
+        "iterations": req.iterations,
         "status": "running",
         "candidates": [],
         "created": datetime.now(UTC).isoformat(),
@@ -383,11 +384,16 @@ def _run_fuzz(job: dict[str, Any], req: FuzzRequest, host: str, port: int) -> No
     fuzzer = LabFuzzer(
         progress=lambda msg, pct: job.update(message=msg),
         timeout=req.timeout,
+        iterations=req.iterations,
     )
     try:
         candidates = fuzzer._fuzz_http(host, port, req.scheme)
         job["candidates"] = candidates
+        # `count` is the number of DISTINCT crashes, not inputs executed.
+        # Dedup happens in CrashRegistry; counting raw execs here is what
+        # makes a fuzzer look like it found 40000 bugs when it found 1.
         job["count"] = len(candidates)
+        job["stats"] = fuzzer.stats
         job["status"] = "done"
     except Exception as exc:  # pragma: no cover - defensive
         job["status"] = "error"

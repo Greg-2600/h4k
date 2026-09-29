@@ -49,7 +49,7 @@ HACKING/                 git root
     fuzz/parse_fuzzer.c  libFuzzer harness; fuzz/parse_afl.c AFL harness
     README.md
   demos/sca-demo/        SCA fixture: committed package-lock pinning lodash 4.17.20
-  tests/                 pytest suites (374 tests)
+  tests/                 pytest suites (442 tests)
 ```
 
 ## How to run everything
@@ -88,7 +88,7 @@ make test                        # pytest
 make coverage                    # pytest --cov (70% gate)
 ```
 
-All linters must pass before commit. Tests currently **374 passing** at **77.1%**
+All linters must pass before commit. Tests currently **442 passing** at **79.1%**
 coverage (CI gate 70%), pylint ~9.88.
 
 ## The API surface (FastAPI, all under /api)
@@ -140,7 +140,8 @@ Health/diagnostic:
 | `toolkit.py` | opt-in non-Metasploit toolkit (hydra/nikto/sqlmap/...) |
 | `discovery.py` | ARP neighbor discovery (arp-scan / cache / msf) |
 | `security.py` | traceroute + exposure -> posture heuristic |
-| `fuzzer.py` | black-box HTTP fuzzer + sanitizer-trace parse + minimize_crash |
+| `fuzzer.py` | signal-guided HTTP mutation engine + real libFuzzer crash minimizer |
+| `crashes.py` | crash fingerprinting + dedup (N crashes -> M distinct bugs) |
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
