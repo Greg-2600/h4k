@@ -482,3 +482,60 @@ class LateralRequest(BaseModel):
 
 class DBInterrogateRequest(BaseModel):
     target: str = "127.0.0.1"
+
+
+# ---- Nuclei ----
+class NucleiRequest(BaseModel):
+    """Nuclei template-based vulnerability scan request."""
+
+    target: str
+    templates: list[str] | None = None
+    severity: str | None = None
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class NucleiResult(BaseModel):
+    target: str = ""
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    stdout: str = ""
+    stderr: str = ""
+    rc: int | None = None
+    success: bool = False
+    timed_out: bool = False
+
+
+# ---- SQLMap ----
+class SqlmapRequest(BaseModel):
+    """SQLMap automated SQL injection scan request."""
+
+    url: str
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class SqlmapResult(BaseModel):
+    url: str = ""
+    findings: list[dict[str, Any]] = []
+    stdout: str = ""
+    stderr: str = ""
+    rc: int | None = None
+    success: bool = False
+    timed_out: bool = False
+
+
+# ---- AD Tools ----
+class ADBloodhoundRequest(BaseModel):
+    domain: str
+    username: str
+    password: str
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class ADMitm6Request(BaseModel):
+    interface: str
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class ADResponderRequest(BaseModel):
+    interface: str
+    options: dict[str, Any] = Field(default_factory=dict)

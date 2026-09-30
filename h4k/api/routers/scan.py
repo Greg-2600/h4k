@@ -9,6 +9,9 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from schemas import (
+    ADBloodhoundRequest,
+    ADMitm6Request,
+    ADResponderRequest,
     AircrackRequest,
     AircrackResult,
     AttackRequest,
@@ -22,8 +25,12 @@ from schemas import (
     LateralRequest,
     NmapNSERequest,
     NmapNSEResult,
+    NucleiRequest,
+    NucleiResult,
     Report,
     ScanRequest,
+    SqlmapRequest,
+    SqlmapResult,
     TsharkRequest,
     TsharkResult,
     VulnLeadsRequest,
@@ -549,6 +556,50 @@ def container_escape_check() -> ContainerEscapeResult:
     from services.container_escape import ContainerEscape
 
     return ContainerEscapeResult(**ContainerEscape().detect())
+
+
+@router.post("/nuclei", response_model=NucleiResult)
+def nuclei_scan_api(req: NucleiRequest) -> NucleiResult:
+    """Fast template-based vulnerability scan with nuclei."""
+    from services.nuclei import nuclei_scan
+
+    return NucleiResult(
+        **nuclei_scan(
+            req.target, templates=req.templates, severity=req.severity, **req.options
+        )
+    )
+
+
+@router.post("/sqlmap", response_model=SqlmapResult)
+def sqlmap_scan_api(req: SqlmapRequest) -> SqlmapResult:
+    """Automated SQL injection detection and exploitation."""
+    from services.sqlmap import sqlmap_scan
+
+    return SqlmapResult(**sqlmap_scan(req.url, **req.options))
+
+
+@router.post("/ad/bloodhound")
+def ad_bloodhound_collect(req: ADBloodhoundRequest) -> dict[str, Any]:
+    """Collect AD data with BloodHound.py."""
+    from services.ad_tools import bloodhound_collect
+
+    return bloodhound_collect(req.domain, req.username, req.password, **req.options)
+
+
+@router.post("/ad/mitm6")
+def ad_mitm6_attack(req: ADMitm6Request) -> dict[str, Any]:
+    """IPv6 MITM attack with mitm6."""
+    from services.ad_tools import mitm6_attack
+
+    return mitm6_attack(req.interface, **req.options)
+
+
+@router.post("/ad/responder")
+def ad_responder_attack(req: ADResponderRequest) -> dict[str, Any]:
+    """NTLM/LLMNR/NBNS poisoning with Responder."""
+    from services.ad_tools import responder_attack
+
+    return responder_attack(req.interface, **req.options)
 
 
 @router.post("/lateral")

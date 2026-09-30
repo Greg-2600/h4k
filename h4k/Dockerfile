@@ -26,13 +26,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dnsutils whois prips iputils-ping traceroute dnstracer \
     nmap whatweb arp-scan \
     masscan tcpdump tshark netcat-openbsd socat iproute2 \
-    hydra ncrack john sqlmap \
+hydra ncrack john sqlmap \
     dirb gobuster ffuf \
     smbclient smbmap dnsenum dnsrecon \
     ldap-utils samba-common-bin \
     bettercap aircrack-ng sshuttle \
     git \
     openjdk-17-jre-headless \
+    golang-go \
     && rm -rf /var/lib/apt/lists/*
 
 # chisel (TCP pivoting) — not in Debian apt; grab the release binary
@@ -57,6 +58,16 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir impacket \
 RUN git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto \
     && ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto
 
+# Nuclei — fast template-based vulnerability scanner
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/* \
+    && NUCLEI_VER=$(\
+      curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
+      | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
+    && curl -sSfL "https://github.com/projectdiscovery/nuclei/releases/download/${NUCLEI_VER}/nuclei_${NUCLEI_VER#v}_linux_amd64.zip" \
+       -o /tmp/nuclei.zip \
+    && unzip -o /tmp/nuclei.zip -d /usr/local/bin/ \
+    && rm /tmp/nuclei.zip
+
 # OWASP ZAP (Zed Attack Proxy) — web app scanner with active/passive scan,
 # spider, AJAX spider, fuzzer, API. Headless mode for automation.
 RUN ZAP_VER="2.17.0" \
@@ -77,9 +88,13 @@ RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \
     && rm -rf /var/lib/apt/lists/*
 
 # Python automation stack (container images: break-system-packages is fine)
-RUN python3 -m pip install --break-system-packages --no-cache-dir \
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --break-system-packages --no-cache-dir \
     pymetasploit3 fastapi uvicorn python-multipart semgrep \
-    python-owasp-zap-v2.4
+    python-owasp-zap-v2.4 \
+    mitm6 \
+    responder3 \
+    bloodhound
 
 # SCA / supply-chain tools: osv-scanner (Google) validates a repo/SBOM against
 # the OSV vulnerability DB; trivy (Aqua) can emit a CycloneDX SBOM.

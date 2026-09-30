@@ -1,4 +1,5 @@
 # h4k services package
+from .ad_tools import ADToolsService, bloodhound_collect, mitm6_attack, responder_attack
 from .ai import (
     _chat_endpoint,
     _model,
@@ -33,6 +34,7 @@ from .lateral import LateralMovement
 from .merged_report import build_merged_report
 from .modes import MODES, TOR_SOCKS, ScanModeConfig, get_mode, scanners_for_service
 from .msfrpc import MsfClient
+from .nuclei import NucleiRunner, NucleiService, nuclei_scan
 from .ossfuzz import OssFuzzRunner
 from .propagate import PropagationService as CredentialPropagator
 from .report import build_report
@@ -59,6 +61,7 @@ from .sniffer import (
     wifi_capture,
     wifi_scan,
 )
+from .sqlmap import SQLMapRunner, SQLMapService, sqlmap_scan
 from .tls_lab import install_ca_to_trust, setup_ca, start_https_proxy, status
 from .toolkit import ToolkitPlan, ToolkitRunner
 from .triage import TriageReport as TriageEngine
@@ -70,6 +73,7 @@ from .zap import ZAPRunner, ZAPService, zap_scan
 __all__ = [
     "MODES",
     "TOR_SOCKS",
+    "ADToolsService",
     "AircrackRunner",
     "AircrackService",
     "AttackService",
@@ -87,7 +91,11 @@ __all__ = [
     "LateralMovement",
     "MsfClient",
     "NeighborFinder",
+    "NucleiRunner",
+    "NucleiService",
     "OssFuzzRunner",
+    "SQLMapRunner",
+    "SQLMapService",
     "ScanModeConfig",
     "ScanPipeline",
     "SecurityAssessmentService",
@@ -107,6 +115,7 @@ __all__ = [
     "ai_full_loop",
     "analyze_service",
     "arp_who",
+    "bloodhound_collect",
     "build_merged_report",
     "build_report",
     "build_sbom",
@@ -124,12 +133,15 @@ __all__ = [
     "is_archive",
     "list_rules",
     "make_workdir",
+    "mitm6_attack",
     "mitm_arp_poison",
     "normalize_source_name",
+    "nuclei_scan",
     "ollama_models",
     "refresh_cve_data",
     "refresh_tools",
     "replay_command",
+    "responder_attack",
     "run_rule_via_regex",
     "run_update",
     "sast_scan",
@@ -142,6 +154,7 @@ __all__ = [
     "setup_ca",
     "should_run",
     "sniff_packets",
+    "sqlmap_scan",
     "start_https_proxy",
     "status",
     "test_rule",
