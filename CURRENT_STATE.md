@@ -13,8 +13,8 @@ the immediate horizon.
 | Item | Status |
 |---|---|
 | Git branch | `main` |
-| Tests | **442 passing** (offline, mocked Metasploit) |
-| Coverage | **79.1%** (CI gate 70%) |
+| Tests | **531 passing** (offline, mocked Metasploit) |
+| Coverage | **~79%** (CI gate 70%) |
 | Linters | black · ruff · isort · flake8 · mypy · bandit all green · pylint ~9.88 |
 | Container | **`h4k`** running, host-networking, UI on `http://127.0.0.1:3137` |
 | Local LLM | Ollama reachable at `127.0.0.1:11434` (30 models); default `qwen2.5:latest` |
@@ -135,6 +135,10 @@ live daemon needed. Tests that reach the network are monkeypatched (e.g.
 `POST /attack`, `GET /attack/{job_id}`, `POST /deepattack`, `GET /vulnleads`,
 `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`.
 
+**CTF / lab toolkit (opt-in)** — `POST /zap`, `POST /john`, `POST /aircrack`,
+`POST /tshark/pcap`, `POST /tshark/live`, `POST /nmap/nse`,
+`POST /container_escape`, `POST /lateral`, `POST /db_interrogate`.
+
 **Source (SAST/SCA/AI/triage)** — `POST /source/scan`,
 `POST /source/scan/upload`, `POST /source/exploit`,
 `POST /source/exploit/download`, `POST /source/sca`,
@@ -180,6 +184,13 @@ live daemon needed. Tests that reach the network are monkeypatched (e.g.
 | `updater.py` | periodic tool/data refresh |
 | `sniffer.py` | tcpdump/arp/bettercap/aircrack opt-in lab tooling |
 | `tls_lab.py` | local TLS interception lab: private CA + localhost cert + loopback HTTPS proxy (openssl/trust-store) |
+| `zap.py` | OWASP ZAP headless web-app scanner via REST |
+| `john.py` | John the Ripper hash cracking (multi-format CTF) |
+| `aircrack.py` | aircrack-ng wireless assessment |
+| `tshark.py` | tshark pcap/live capture + flow/cred/asset extraction |
+| `container_escape.py` | container escape detection (read-only) + explicit helpers |
+| `lateral.py` | route/interface map, SSH/chisel tunnels, SMB session |
+| `db_interrogate.py` | local API/DB/config flag interrogation |
 
 ---
 
@@ -193,6 +204,13 @@ live daemon needed. Tests that reach the network are monkeypatched (e.g.
 - **network-layer / WiFi** need monitor-mode NIC, root, or NET_ADMIN/NET_RAW in
   the container; the code degrades gracefully if not available.
 - **netexec/crackmapexec** was **not** added — no installable PyPI/apt package.
+- **Port coverage**: `depth=quick|standard|full` is independent of the OPSEC
+  `mode`. Anything but `full` is a partial sweep and the report emits a
+  `[coverage] PARTIAL SCAN` note; absence of a finding is not absence of a
+  service.
+- **CTF tools are opt-in endpoints**: ZAP/John/aircrack/tshark/NSE/container-
+  escape/lateral/DB-interrogation never fire from a scan. WiFi/live-capture need
+  monitor mode / NET_ADMIN.
 
 ---
 

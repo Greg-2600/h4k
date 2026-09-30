@@ -380,21 +380,24 @@ class PropagateRequest(BaseModel):
     max_attempts: int = 500
 
 
+# ---- CTF / lab toolkit schemas -------------------------------------------
+# These wrap the opt-in tools (ZAP, John, aircrack, tshark, NSE, container
+# escape, lateral, DB interrogation). They run only when explicitly called.
+
+
 class ZapRequest(BaseModel):
     """OWASP ZAP web application scan request."""
 
     target: str  # URL to scan
     mode: str = "full"  # full | spider | active
-    authenticated: bool = False
-    credentials: dict | None = None  # {username, password, login_url, ...}
 
 
 class ZapResult(BaseModel):
-    target: str
-    alerts: list[dict] = []
+    target: str = ""
+    alerts: list[dict[str, Any]] = []
     alert_count: int = 0
-    high_risk: list[dict] = []
-    medium_risk: list[dict] = []
+    high_risk: list[dict[str, Any]] = []
+    medium_risk: list[dict[str, Any]] = []
     report_html: str = ""
 
 
@@ -402,39 +405,37 @@ class JohnRequest(BaseModel):
     """John the Ripper hash cracking request."""
 
     hashes: list[str] | str  # hash or list of hashes
-    format: str | None = None  # hash format (md5, sha256, nt, etc.)
+    formats: list[str] | None = None  # auto-detect if None
     wordlist: str | None = None
-    rules: str = "single"  # single | wordlist | Jumbo | NTLM
-    session: str | None = None
-    max_time: int = 3600
+    max_time_per_format: int = Field(default=60, ge=1, le=36_000)
 
 
 class JohnResult(BaseModel):
-    cracked: list[dict] = []
     total: int = 0
-    by_format: dict = {}
-    status: dict = {}
+    cracked: list[dict[str, Any]] = []
+    by_format: dict[str, list[dict[str, Any]]] = {}
+    formats_tried: list[str] = []
+    remaining: list[str] = []
 
 
 class AircrackRequest(BaseModel):
     """Aircrack-ng wireless assessment request."""
 
-    interface: str  # wireless interface (will be put in monitor mode)
+    interface: str  # wireless interface (put into monitor mode)
     target_essid: str | None = None  # specific ESSID to target
     wordlist: str | None = None
-    duration: int = 30  # scan duration
     capture_duration: int = 60  # handshake capture duration
 
 
 class AircrackResult(BaseModel):
-    interface: str
-    networks: list[dict] = []
-    handshakes: list[dict] = []
-    cracked: list[dict] = []
+    interface: str = ""
+    networks: list[dict[str, Any]] = []
+    handshakes: list[dict[str, Any]] = []
+    error: str | None = None
 
 
 class TsharkRequest(BaseModel):
-    """Tshark packet capture/analysis request."""
+    """Tshark packet capture/analysis request (one of pcap_file/interface)."""
 
     pcap_file: str | None = None  # existing pcap to analyze
     interface: str | None = None  # live capture interface
@@ -443,11 +444,12 @@ class TsharkRequest(BaseModel):
 
 
 class TsharkResult(BaseModel):
+    file: str = ""
     stats: str = ""
-    flows: dict = {}
-    credentials: dict = {}
-    anomalies: dict = {}
-    extracted_files: dict = {}
+    flows: dict[str, Any] = {}
+    credentials: dict[str, Any] = {}
+    anomalies: dict[str, Any] = {}
+    extracted_files: dict[str, Any] = {}
 
 
 class NmapNSERequest(BaseModel):
@@ -461,8 +463,7 @@ class NmapNSERequest(BaseModel):
 
 class NmapNSEResult(BaseModel):
     target: str
-    open_ports: list[dict] = []
-    scripts_output: list[dict] = []
+    tool: dict[str, Any] = {}
 
 
 class ContainerEscapeResult(BaseModel):
@@ -470,41 +471,14 @@ class ContainerEscapeResult(BaseModel):
     dangerous_caps: list[str] = []
     mounts: list[str] = []
     dangerous_mounts: list[str] = []
-    vectors: list[dict] = []
+    cgroup_path: str = ""
     is_privileged: bool = False
+    vectors: list[dict[str, Any]] = []
 
 
-class LateralResult(BaseModel):
-    cidr: str
-    hosts: list[dict] = []
-    routes: list[dict] = []
-    services: dict = {}
-    local_ips: list[str] = []
+class LateralRequest(BaseModel):
+    cidr: str = "192.168.1.0/24"
 
 
-class DBInterrogateResult(BaseModel):
-    target: str
-    apis: dict = {}
-    databases: dict = {}
-    env_vars: dict = {}
-    config_files: dict = {}
-    flags: list[str] = []
-
-
-class JohnHashes(BaseModel):
-    """CTF hash cracking with multiple formats."""
-
-    hashes: list[str] | str
-    formats: list[str] | None = None  # auto-detect if None
-    wordlist: str | None = None
-    max_time_per_format: int = 300
-
-
-class AircrackAssessment(BaseModel):
-    interface: str
-    target_essid: str | None = None
-    wordlist: str | None = None
-
-
-class TsharkPcapAnalysis(BaseModel):
-    pcap_file: str
+class DBInterrogateRequest(BaseModel):
+    target: str = "127.0.0.1"

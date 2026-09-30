@@ -103,6 +103,10 @@ Host recon/scan:
 - `POST /vulnleads`
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
 
+CTF / lab toolkit (opt-in, each explicit):
+- `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
+- `POST /nmap/nse`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+
 Engagement (persistent memory + cred propagation, engagement router):
 - `POST /api/engagement` (declare authorized scope), `GET /api/engagement`, `GET|DELETE /api/engagement/{id}`
 - `POST /api/engagement/parse-scope`
@@ -157,6 +161,13 @@ Health/diagnostic:
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph: hosts/services/creds/vulns/attempts) |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |
+| `zap.py` | OWASP ZAP headless web-app scanner (spider/active) via REST |
+| `john.py` | John the Ripper hash cracking (multi-format CTF flow) |
+| `aircrack.py` | aircrack-ng wireless assessment (monitor/capture/crack) |
+| `tshark.py` | tshark pcap/live capture, flow/credential/anomaly extraction |
+| `container_escape.py` | detect container escape vectors (read-only); explicit exploit helpers |
+| `lateral.py` | route/interface map + SSH/chisel tunnel + SMB session helpers |
+| `db_interrogate.py` | enumerate local APIs/DBs/configs for flag-shaped secrets |
 
 ## Design decisions (the important ones)
 
@@ -187,8 +198,15 @@ Health/diagnostic:
 14. **Propagation only replays already-verified credentials** — it never invents
     or sprays new candidates, and a ledger means a miss is never re-attempted.
     A pivot edge appears only where a login actually succeeded.
+15. **Port breadth is a separate axis from OPSEC mode** — `ScanRequest.depth`
+    (`quick`/`standard`/`full`) decides how many ports; every report carries a
+    `Coverage` and a partial sweep emits a `[coverage] PARTIAL SCAN` note.
+16. **CTF tools are separate opt-in endpoints** — ZAP/John/aircrack/tshark/NSE/
+    container-escape/lateral/DB-interrogation each have their own button and
+    endpoint; a scan never triggers one. Detection is read-only; exploit helpers
+    are only ever called explicitly.
 
-Fuller prose in `RELEASE_NOTES.md` (features + D1–D19) and `ROADMAP.md`.
+Fuller prose in `RELEASE_NOTES.md` (features + D1–D24) and `ROADMAP.md`.
 
 ## Common pitfalls / gotchas
 

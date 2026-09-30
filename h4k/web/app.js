@@ -1329,3 +1329,74 @@ $("eng-propagate-btn").addEventListener("click", async () => {
     engOut(d);
   } catch (e) { log("[-] propagation failed: " + e.message, "err"); }
 });
+
+/* ---------- ctf / lab toolkit (opt-in) ---------- */
+/* Each button POSTs to a dedicated endpoint and renders the raw JSON into the
+   /ctf toolkit panel. Nothing here runs on its own. */
+function ctfOut(d, note) {
+  $("ctf-panel").hidden = false;
+  $("ctf-status").textContent = "done";
+  $("tab-ctf").textContent = (note ? note + "\n\n" : "") + JSON.stringify(d, null, 2).slice(0, 12000);
+}
+
+async function ctfPost(path, body, okNote) {
+  $("ctf-panel").hidden = false;
+  $("ctf-status").textContent = "running";
+  $("tab-ctf").textContent = "working…";
+  try {
+    const resp = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.detail || "http " + resp.status);
+    ctfOut(d, okNote);
+    log("[+] " + okNote, "ok");
+    return d;
+  } catch (e) {
+    $("ctf-status").textContent = "error";
+    $("tab-ctf").textContent = "error: " + e.message;
+    log("[-] " + okNote + " failed: " + e.message, "err");
+    return null;
+  }
+}
+
+$("ctf-escape-btn").addEventListener("click", async () => {
+  const d = await ctfPost("/api/container_escape", {}, "container escape check");
+  if (d) log(`    ${(d.dangerous_caps || []).length} dangerous cap(s), ${(d.dangerous_mounts || []).length} risky mount(s)${d.is_privileged ? " — PRIVILEGED" : ""}`, (d.dangerous_caps || []).length || d.is_privileged ? "err" : "ok");
+});
+
+$("ctf-lateral-btn").addEventListener("click", () => {
+  ctfPost("/api/lateral", { cidr: ($("ctf-cidr").value || "192.168.1.0/24").trim() }, "lateral route map");
+});
+
+$("ctf-db-btn").addEventListener("click", () => {
+  if (!confirm("Interrogate local APIs/DBs/configs on the container/host? Authorized scope only.")) { log("db interrogation cancelled", "err"); return; }
+  ctfPost("/api/db_interrogate", { target: "127.0.0.1" }, "db/API interrogation");
+});
+
+$("ctf-nse-btn").addEventListener("click", () => {
+  const target = $("target").value.trim();
+  if (!target) { log("[!] enter a target in the recon stage first", "err"); return; }
+  ctfPost("/api/nmap/nse", { target }, "nmap vuln NSE scan of " + target);
+});
+
+$("ctf-zap-btn").addEventListener("click", () => {
+  const url = $("ctf-web-url").value.trim();
+  if (!url) { log("[!] enter a web app URL", "err"); return; }
+  if (!confirm("Run an ACTIVE ZAP scan against " + url + "? Authorized web apps only.")) { log("zap cancelled", "err"); return; }
+  ctfPost("/api/zap", { target: url, mode: "full" }, "ZAP scan of " + url);
+});
+
+$("ctf-john-btn").addEventListener("click", () => {
+  const hashes = $("ctf-hashes").value.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+  if (!hashes.length) { log("[!] paste at least one hash", "err"); return; }
+  ctfPost("/api/john", { hashes }, `john against ${hashes.length} hash(es)`);
+});
+
+$("ctf-tshark-btn").addEventListener("click", () => {
+  const pcap = $("ctf-pcap").value.trim();
+  if (!pcap) { log("[!] enter a pcap path", "err"); return; }
+  ctfPost("/api/tshark/pcap", { pcap_file: pcap }, "pcap analysis of " + pcap);
+});

@@ -216,6 +216,8 @@ A per-target scan is stateless and dies with the process. An engagement is not.
 | D20 | **A fuzzer counts bugs, not crashes** | Raw crash counts are the classic way to oversell a fuzz run: 40000 crashes can be 3 bugs. Crashes are fingerprinted by faulting code path (ASLR and line numbers stripped) and deduped, and the report always shows distinct bugs *alongside* total crashes. Black-box signals that name no code path are counted as unconfirmed leads, never as bugs. |
 | D21 | **A reducer that reports no reduction is worse than none** | The old minimizer returned the unmodified crash file on both its success and failure branch — two identical branches, the signature of a reducer that never reduced. It now reads back the artifact libFuzzer actually wrote and only claims a reduction when the result is genuinely smaller, so "minimized" always means minimized. |
 | D22 | **Signal-guided is not coverage-guided, and the tool says so** | The HTTP fuzzer has no instrumentation and therefore no edge feedback, so it cannot distinguish "reached new code" from "looks new". `stats.coverage_guided` is `false` in the output and the UI says so, pointing at the libFuzzer path for real coverage guidance. Marketing blind mutation as coverage guidance would be the same lie in a different coat. |
+| D23 | **Port breadth is its own axis, and a partial sweep says so** | Stealth/tor/overt decides *how* we probe; a separate `depth` (quick/standard/full) decides *how much*. Previously every mode shipped `--top-ports`, so an "overt" scan silently checked a few hundred ports and could report nothing open on 11434/18799. Every report now carries `coverage` (`ports_spec`, `max_ports`, `complete`) and a partial sweep emits a `[coverage] PARTIAL SCAN` note: absence of a finding is not absence of a service. |
+| D24 | **CTF tools run only when asked, and each names its target** | ZAP, John, aircrack, tshark, NSE, container-escape, lateral and DB-interrogation are separate opt-in endpoints with their own UI buttons — a scan never triggers a web scan, hash crack or wireless capture. Read-only detectors (container escape, route map) stay read-only; exploit helpers (ptrace/cgroup/docker-socket, tunnels) are never called by detection. This keeps the "aggressive actions are explicit" rule (D5) true of the new surface as well. |
 
 ---
 
@@ -261,6 +263,14 @@ POST  /api/source/sca · GET /sca/git   SBOM + SCA/CVEs
 POST  /api/source/triage · .../minimize
 POST  /api/source/ai                   AI root-cause + patch (Ollama/OpenAI)
 POST  /api/source/rules/test           custom Semgrep rule validation
+POST  /api/zap                          opt-in OWASP ZAP web-app scan
+POST  /api/john                         opt-in John hash cracking (CTF)
+POST  /api/aircrack                     opt-in wireless assessment
+POST  /api/tshark/pcap · /tshark/live   pcap / live capture analysis
+POST  /api/nmap/nse                     nmap vuln NSE scripts
+POST  /api/container_escape             container escape vector check (read-only)
+POST  /api/lateral                      route/interface map (read-only)
+POST  /api/db_interrogate               local API/DB/flag interrogation
 GET   /api/health
 ```
 

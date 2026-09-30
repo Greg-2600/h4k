@@ -114,15 +114,23 @@ item is a self-contained, live-demonstrable increment on the current release.
 
 ## CTF / Live-target enhancements (added during 192.168.1.13 engagement)
 
-- [ ] **Container escape module** — exploit CAP_SYS_PTRACE / CAP_DAC_OVERRIDE /
-      host mounts for breakout (ptrace sandbox escape, cgroup release_agent,
-      mount namespace traversal). Integrate with deepattack as "privesc" step.
-- [ ] **Lateral movement / network pivot** — ARP + route discovery + SSH/SMB
-      relay + proxy chains through compromised hosts. Auto-build chisel/sshuttle
-      tunnels through verified creds.
-- [ ] **Database interrogation** — enumerate internal APIs (zhc3, Ollama, CAD
-      worker) via REST/GraphQL; extract flags from DBs, env vars, config files.
-      Treat every open HTTP API as a potential data source.
+- [x] **Container escape module** — detect dangerous caps/mounts and expose
+      explicit escape helpers (ptrace attach, docker/containerd socket, cgroup
+      release_agent). Detection is read-only; helpers are only called on demand.
+      (done: `container_escape.py` + `POST /api/container_escape`)
+- [x] **Lateral movement / network pivot** — route + interface mapping, SSH
+      SOCKS and chisel tunnels, authenticated SMB session helper, and a
+      SOCKS-aware TCP scan.
+      (done: `lateral.py` + `POST /api/lateral`; tunnels/SMB are explicit calls)
+- [x] **Database interrogation** — enumerate local APIs (ollama/zhc3/CAD worker)
+      and extract flag-shaped secrets from SQLite/JSON/env/config files.
+      (done: `db_interrogate.py` + `POST /api/db_interrogate`; bounded search
+      roots instead of a blind `/` walk)
+- [x] **CTF tool wrappers** — ZAP web scan, John hash cracking, aircrack-ng
+      wireless, tshark pcap/live analysis, nmap NSE, each an explicit endpoint
+      with a UI button.
+      (done: `zap.py` `john.py` `aircrack.py` `tshark.py` + `/api/zap|john|aircrack|
+      tshark/*|nmap/nse`)
 - [ ] **Advanced fuzzing for container surfaces** — fuzz Docker API, containerd
       gRPC, kubelet, CAD worker endpoints for RCE/DoS.
 - [ ] **Attack path graph to flag** — compute minimal path from foothold to flag

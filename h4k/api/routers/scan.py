@@ -9,19 +9,21 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from schemas import (
-    AircrackAssessment,
+    AircrackRequest,
     AircrackResult,
     AttackRequest,
+    ContainerEscapeResult,
+    DBInterrogateRequest,
     DeepAttackRequest,
     FuzzRequest,
     Job,
-    JohnHashes,
+    JohnRequest,
     JohnResult,
+    LateralRequest,
     NmapNSERequest,
     NmapNSEResult,
     Report,
     ScanRequest,
-    TsharkPcapAnalysis,
     TsharkRequest,
     TsharkResult,
     VulnLeadsRequest,
@@ -462,100 +464,107 @@ def _target_matches_svc(rec: dict[str, Any], target: str) -> bool:
         )
 
 
+# ---- CTF / lab toolkit (opt-in) ------------------------------------------
+# Read-only detectors (container escape, lateral map, DB interrogation) and
+# explicitly-invoked scanners. Kept separate from the scan pipeline so a plain
+# scan never triggers a web scan, hash crack or wireless capture.
+
+
 @router.post("/zap", response_model=ZapResult)
 def zap_scan_api(req: ZapRequest) -> ZapResult:
-    """OWASP ZAP web application scan."""
+    """OWASP ZAP web-application scan (spider + active). Authorized web apps."""
     from services.zap import zap_scan
 
-    result = zap_scan(req.target, mode=req.mode)
-    return ZapResult(**result)
+    return ZapResult(**zap_scan(req.target, mode=req.mode))
 
 
 @router.post("/john", response_model=JohnResult)
-def john_crack(req: JohnHashes) -> JohnResult:
-    """John the Ripper hash cracking for CTF."""
+def john_crack(req: JohnRequest) -> JohnResult:
+    """Crack hashes with John the Ripper over a bounded set of formats."""
     from services.john import JohnRunner
 
-    runner = JohnRunner()
-    result = runner.crack_ctf_hashes(req.hashes, req.formats)
+    result = JohnRunner().crack_ctf_hashes(
+        req.hashes,
+        formats=req.formats,
+        wordlist=req.wordlist,
+        max_time_per_format=req.max_time_per_format,
+    )
     return JohnResult(**result)
 
 
 @router.post("/aircrack", response_model=AircrackResult)
-def aircrack_assessment(req: AircrackAssessment) -> AircrackResult:
-    """Aircrack-ng wireless assessment."""
+def aircrack_assessment(req: AircrackRequest) -> AircrackResult:
+    """Aircrack-ng wireless assessment: scan, capture, (optionally) crack."""
     from services.aircrack import AircrackRunner
 
-    runner = AircrackRunner()
-    result = runner.full_wpa_assessment(req.interface, req.target_essid, req.wordlist)
+    result = AircrackRunner().full_wpa_assessment(
+        req.interface,
+        req.target_essid,
+        req.wordlist,
+        capture_duration=req.capture_duration,
+    )
+    result.setdefault("interface", req.interface)
     return AircrackResult(**result)
 
 
 @router.post("/tshark/pcap", response_model=TsharkResult)
-def tshark_pcap_analysis(req: TsharkPcapAnalysis) -> TsharkResult:
-    """Tshark full pcap analysis."""
+def tshark_pcap_analysis(req: TsharkRequest) -> TsharkResult:
+    """Full pcap analysis: flows, credentials, anomalies, extracted files."""
     from services.tshark import TsharkRunner
 
-    runner = TsharkRunner()
-    result = runner.full_pcap_analysis(req.pcap_file)
-    return TsharkResult(**result)
+    if not req.pcap_file:
+        raise HTTPException(status_code=400, detail="pcap_file required")
+    return TsharkResult(**TsharkRunner().full_pcap_analysis(req.pcap_file))
 
 
 @router.post("/tshark/live", response_model=TsharkResult)
 def tshark_live_capture(req: TsharkRequest) -> TsharkResult:
-    """Tshark live capture and analysis."""
+    """Capture live traffic on an interface, then analyze it."""
     from services.tshark import TsharkRunner
 
-    runner = TsharkRunner()
     if not req.interface:
         raise HTTPException(status_code=400, detail="interface required")
-    result = runner.live_capture_analysis(req.interface, req.duration, req.filter)
+    result = TsharkRunner().live_capture_analysis(
+        req.interface, req.duration, req.filter
+    )
     return TsharkResult(**result)
 
 
 @router.post("/nmap/nse", response_model=NmapNSEResult)
 def nmap_nse_scan(req: NmapNSERequest) -> NmapNSEResult:
-    """Enhanced Nmap with NSE vulnerability scripts."""
+    """Nmap with NSE vulnerability scripts (vuln/auth/default by default)."""
     from services.toolkit import ToolkitRunner
 
-    runner = ToolkitRunner()
     argv = ["nmap", "-sV", "-sC", "--script", req.scripts, f"-{req.timing}"]
     if req.ports:
         argv += ["-p", req.ports]
-    argv += [req.target]
-    out = runner.run_tool("nmap_nse", argv, timeout=600)
-    return NmapNSEResult(
-        target=req.target,
-        open_ports=[],
-        scripts_output=[{"tool": "nmap", **out}],
-    )
+    argv.append(req.target)
+    out = ToolkitRunner().run_tool("nmap_nse", argv, timeout=600)
+    return NmapNSEResult(target=req.target, tool=out)
 
 
-@router.post("/container_escape")
-def container_escape_check() -> dict:
-    """Check container escape vectors."""
+@router.post("/container_escape", response_model=ContainerEscapeResult)
+def container_escape_check() -> ContainerEscapeResult:
+    """Detect container escape vectors (read-only; never auto-executes)."""
     from services.container_escape import ContainerEscape
 
-    ce = ContainerEscape()
-    return ce.detect()
+    return ContainerEscapeResult(**ContainerEscape().detect())
 
 
 @router.post("/lateral")
-def lateral_movement(cidr: str = "192.168.1.0/24") -> dict:
-    """Network discovery and lateral movement planning."""
+def lateral_movement(req: LateralRequest) -> dict[str, Any]:
+    """Map local interfaces and routes for pivot planning (read-only)."""
     from services.lateral import LateralMovement
 
-    lm = LateralMovement()
-    return lm.discover_network(cidr)
+    return LateralMovement().discover_network(req.cidr)
 
 
 @router.post("/db_interrogate")
-def db_interrogate(target: str = "127.0.0.1") -> dict:
-    """Interrogate internal APIs and databases."""
+def db_interrogate(req: DBInterrogateRequest) -> dict[str, Any]:
+    """Enumerate local APIs and flag-shaped strings from DBs/configs."""
     from services.db_interrogate import DBInterrogate
 
-    di = DBInterrogate()
-    return di.interrogate_all(target)
+    return DBInterrogate().interrogate_all(req.target)
 
 
 @router.get("/health")

@@ -150,6 +150,113 @@ def test_fuzz_request_bounds_at_the_schema_level():
             FuzzRequest(target="h", timeout=bad_timeout)
 
 
+# --- CTF/lab toolkit endpoints ----------------------------------------------
+
+
+def test_container_escape_endpoint(client):
+    r = client.post("/api/container_escape")
+    assert r.status_code == 200
+    d = r.json()
+    assert "vectors" in d and "dangerous_caps" in d
+
+
+def test_lateral_endpoint(client):
+    r = client.post("/api/lateral", json={"cidr": "10.0.0.0/24"})
+    assert r.status_code == 200
+    assert r.json()["cidr"] == "10.0.0.0/24"
+
+
+def test_db_interrogate_endpoint(client, monkeypatch):
+    import services.db_interrogate as dbi
+
+    monkeypatch.setattr(
+        dbi.DBInterrogate,
+        "interrogate_all",
+        lambda self, target="127.0.0.1": {"target": target},
+    )
+    r = client.post("/api/db_interrogate", json={"target": "127.0.0.1"})
+    assert r.status_code == 200
+    assert r.json()["target"] == "127.0.0.1"
+
+
+def test_john_endpoint(client, monkeypatch):
+    import services.john as john
+
+    monkeypatch.setattr(
+        john.JohnRunner,
+        "crack_ctf_hashes",
+        lambda self, hashes, **k: {
+            "total": 1,
+            "cracked": [{"hash": "h", "password": "pw"}],
+        },
+    )
+    r = client.post("/api/john", json={"hashes": ["h"]})
+    assert r.status_code == 200
+    assert r.json()["cracked"][0]["password"] == "pw"
+
+
+def test_tshark_pcap_requires_file(client):
+    r = client.post("/api/tshark/pcap", json={})
+    assert r.status_code == 400
+
+
+def test_tshark_live_requires_interface(client):
+    r = client.post("/api/tshark/live", json={"duration": 1})
+    assert r.status_code == 400
+
+
+def test_tshark_pcap_endpoint(client, monkeypatch):
+    import services.tshark as tshark
+
+    monkeypatch.setattr(
+        tshark.TsharkRunner,
+        "full_pcap_analysis",
+        lambda self, pcap: {"file": pcap, "stats": "S"},
+    )
+    r = client.post("/api/tshark/pcap", json={"pcap_file": "x.pcap"})
+    assert r.status_code == 200
+    assert r.json()["stats"] == "S"
+
+
+def test_nmap_nse_endpoint(client, monkeypatch):
+    import services.toolkit as toolkit
+
+    monkeypatch.setattr(
+        toolkit.ToolkitRunner,
+        "run_tool",
+        lambda self, tool, argv, timeout=300: {"tool": tool, "stdout": "22/tcp open"},
+    )
+    r = client.post("/api/nmap/nse", json={"target": "192.168.1.13"})
+    assert r.status_code == 200
+    assert r.json()["tool"]["stdout"].startswith("22")
+
+
+def test_zap_endpoint(client, monkeypatch):
+    import services.zap as zap
+
+    monkeypatch.setattr(
+        zap,
+        "zap_scan",
+        lambda target, mode="full", **k: {"target": target, "alert_count": 0},
+    )
+    r = client.post("/api/zap", json={"target": "http://127.0.0.1:8080"})
+    assert r.status_code == 200
+    assert r.json()["target"].endswith("8080")
+
+
+def test_aircrack_endpoint(client, monkeypatch):
+    import services.aircrack as aircrack
+
+    monkeypatch.setattr(
+        aircrack.AircrackRunner,
+        "full_wpa_assessment",
+        lambda self, interface, *a, **k: {"interface": interface, "networks": []},
+    )
+    r = client.post("/api/aircrack", json={"interface": "wlan0"})
+    assert r.status_code == 200
+    assert r.json()["interface"] == "wlan0"
+
+
 def test_fuzz_job_reports_dedup_counts_not_raw_crash_count(client, monkeypatch):
     from services.fuzzer import LabFuzzer
 

@@ -177,6 +177,39 @@
               </div>
             </div>
           </details>
+
+          <details class="mt-block" id="ctf-more">
+            <summary>ctf toolkit<span class="mt-hint">web scan · nse · john · pcap · container · db</span></summary>
+            <div class="mt-body">
+              <p class="stage-desc">CTF/lab tools that run only when you press a button. Each prints its result to the <code>/ctf toolkit</code> panel below. Authorized scope only.</p>
+
+              <input type="text" id="ctf-web-url" class="full-input" placeholder="web app URL for ZAP (http://target:8080)" />
+              <div class="btn-row">
+                <button type="button" id="ctf-zap-btn" class="btn-sub btn-danger">ZAP web scan <em class="danger">(active)</em></button>
+                <button type="button" id="ctf-nse-btn" class="btn-sub">nmap vuln NSE</button>
+              </div>
+
+              <textarea id="ctf-hashes" class="full-input" rows="2" placeholder="hashes to crack (one per line, or pasted john/htpasswd format)"></textarea>
+              <div class="btn-row">
+                <button type="button" id="ctf-john-btn" class="btn-sub btn-danger">crack hashes (john)</button>
+              </div>
+
+              <div class="deep-row">
+                <input type="text" id="ctf-pcap" class="full-input" placeholder="pcap path to analyze (e.g. /opt/h4k/data/cap.pcap)" />
+                <button type="button" id="ctf-tshark-btn" class="btn-sub">analyze pcap</button>
+              </div>
+
+              <div class="deep-row">
+                <input type="text" id="ctf-cidr" class="full-input" placeholder="lateral map CIDR (e.g. 192.168.1.0/24)" />
+                <button type="button" id="ctf-lateral-btn" class="btn-sub">map routes</button>
+              </div>
+
+              <div class="btn-row">
+                <button type="button" id="ctf-escape-btn" class="btn-sub">container escape check</button>
+                <button type="button" id="ctf-db-btn" class="btn-sub btn-danger">interrogate DB / APIs</button>
+              </div>
+            </div>
+          </details>
         </section>
 
         <!-- ============ STAGE 2 · SOURCE & SUPPLY ============ -->
@@ -289,6 +322,7 @@
     <section class="pane results" id="ai-panel" hidden><div class="pane-head"><span class="pane-title">/ai</span><span id="ai-model-used" class="pane-status"></span></div><div class="ai-block"><div class="pane-head sub"><span class="pane-title">→ prompt</span></div><pre class="notes" id="ai-prompt"></pre></div><div class="ai-block"><div class="pane-head sub"><span class="pane-title">← response</span></div><pre class="notes" id="tab-ai"></pre></div></section>
     <section class="pane results" id="net-panel" hidden><div class="pane-head"><span class="pane-title">/network layer</span><span id="net-status" class="pane-status">idle</span></div><pre class="notes" id="tab-net"></pre></section>
     <section class="pane results" id="ossfuzz-panel" hidden><div class="pane-head"><span class="pane-title">/oss-fuzz auto-run</span><span id="ossfuzz-status" class="pane-status">idle</span></div><pre class="notes" id="tab-ossfuzz"></pre></section>
+    <section class="pane results" id="ctf-panel" hidden><div class="pane-head"><span class="pane-title">/ctf toolkit</span><span id="ctf-status" class="pane-status">idle</span></div><pre class="notes" id="tab-ctf"></pre></section>
 
     <!-- consolidated one-click assessment report -->
     <section class="pane results" id="merged-panel">
