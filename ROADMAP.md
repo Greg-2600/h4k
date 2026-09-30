@@ -112,6 +112,23 @@ item is a self-contained, live-demonstrable increment on the current release.
 - [ ] **Detection guidance** — per technique, what telemetry a defender would
       have seen (log source, event ID). Worth more to a client than the vuln list.
 
+## CTF / Live-target enhancements (added during 192.168.1.13 engagement)
+
+- [ ] **Container escape module** — exploit CAP_SYS_PTRACE / CAP_DAC_OVERRIDE /
+      host mounts for breakout (ptrace sandbox escape, cgroup release_agent,
+      mount namespace traversal). Integrate with deepattack as "privesc" step.
+- [ ] **Lateral movement / network pivot** — ARP + route discovery + SSH/SMB
+      relay + proxy chains through compromised hosts. Auto-build chisel/sshuttle
+      tunnels through verified creds.
+- [ ] **Database interrogation** — enumerate internal APIs (zhc3, Ollama, CAD
+      worker) via REST/GraphQL; extract flags from DBs, env vars, config files.
+      Treat every open HTTP API as a potential data source.
+- [ ] **Advanced fuzzing for container surfaces** — fuzz Docker API, containerd
+      gRPC, kubelet, CAD worker endpoints for RCE/DoS.
+- [ ] **Attack path graph to flag** — compute minimal path from foothold to flag
+      (container escape → host → other containers → DB → flag). Show ATT&CK
+      chain.
+
 ## Infra / shipping
 
 - [x] **Ollama sidecar in compose** — run Ollama in its own container on a

@@ -9,13 +9,24 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from schemas import (
+    AircrackAssessment,
+    AircrackResult,
     AttackRequest,
     DeepAttackRequest,
     FuzzRequest,
     Job,
+    JohnHashes,
+    JohnResult,
+    NmapNSERequest,
+    NmapNSEResult,
     Report,
     ScanRequest,
+    TsharkPcapAnalysis,
+    TsharkRequest,
+    TsharkResult,
     VulnLeadsRequest,
+    ZapRequest,
+    ZapResult,
 )
 from services.cve_lookup import CveDb
 from services.discovery import NeighborFinder
@@ -52,8 +63,12 @@ def _get_cve_db() -> CveDb | None:
 
 
 def _cache_key(req: ScanRequest) -> str:
+    # depth MUST be part of the key: a cached top-1000 result must never be
+    # served to a caller who asked for a full 1-65535 sweep.
+    depth = getattr(req, "depth", None)
     return (
         f"{req.mode.value}::{req.target}::"
+        f"depth={depth.value if depth else 'standard'}::"
         f"creds={int(req.try_default_creds)}::"
         f"attack={int(req.do_attack)}"
     )
@@ -110,6 +125,7 @@ def _run_scan(job: dict[str, Any], req: ScanRequest) -> None:
             attacks=raw.get("attacks", []),
             security=raw.get("security", []),
             log=job.get("log", []),
+            coverage=raw.get("coverage"),
         )
         _scan_cache[_cache_key(req)] = {
             "created": time.time(),
@@ -444,6 +460,102 @@ def _target_matches_svc(rec: dict[str, Any], target: str) -> bool:
         return str(rec.get("host") or "") == target or target in str(
             rec.get("host") or ""
         )
+
+
+@router.post("/zap", response_model=ZapResult)
+def zap_scan_api(req: ZapRequest) -> ZapResult:
+    """OWASP ZAP web application scan."""
+    from services.zap import zap_scan
+
+    result = zap_scan(req.target, mode=req.mode)
+    return ZapResult(**result)
+
+
+@router.post("/john", response_model=JohnResult)
+def john_crack(req: JohnHashes) -> JohnResult:
+    """John the Ripper hash cracking for CTF."""
+    from services.john import JohnRunner
+
+    runner = JohnRunner()
+    result = runner.crack_ctf_hashes(req.hashes, req.formats)
+    return JohnResult(**result)
+
+
+@router.post("/aircrack", response_model=AircrackResult)
+def aircrack_assessment(req: AircrackAssessment) -> AircrackResult:
+    """Aircrack-ng wireless assessment."""
+    from services.aircrack import AircrackRunner
+
+    runner = AircrackRunner()
+    result = runner.full_wpa_assessment(req.interface, req.target_essid, req.wordlist)
+    return AircrackResult(**result)
+
+
+@router.post("/tshark/pcap", response_model=TsharkResult)
+def tshark_pcap_analysis(req: TsharkPcapAnalysis) -> TsharkResult:
+    """Tshark full pcap analysis."""
+    from services.tshark import TsharkRunner
+
+    runner = TsharkRunner()
+    result = runner.full_pcap_analysis(req.pcap_file)
+    return TsharkResult(**result)
+
+
+@router.post("/tshark/live", response_model=TsharkResult)
+def tshark_live_capture(req: TsharkRequest) -> TsharkResult:
+    """Tshark live capture and analysis."""
+    from services.tshark import TsharkRunner
+
+    runner = TsharkRunner()
+    if not req.interface:
+        raise HTTPException(status_code=400, detail="interface required")
+    result = runner.live_capture_analysis(req.interface, req.duration, req.filter)
+    return TsharkResult(**result)
+
+
+@router.post("/nmap/nse", response_model=NmapNSEResult)
+def nmap_nse_scan(req: NmapNSERequest) -> NmapNSEResult:
+    """Enhanced Nmap with NSE vulnerability scripts."""
+    from services.toolkit import ToolkitRunner
+
+    runner = ToolkitRunner()
+    argv = ["nmap", "-sV", "-sC", "--script", req.scripts, f"-{req.timing}"]
+    if req.ports:
+        argv += ["-p", req.ports]
+    argv += [req.target]
+    out = runner.run_tool("nmap_nse", argv, timeout=600)
+    return NmapNSEResult(
+        target=req.target,
+        open_ports=[],
+        scripts_output=[{"tool": "nmap", **out}],
+    )
+
+
+@router.post("/container_escape")
+def container_escape_check() -> dict:
+    """Check container escape vectors."""
+    from services.container_escape import ContainerEscape
+
+    ce = ContainerEscape()
+    return ce.detect()
+
+
+@router.post("/lateral")
+def lateral_movement(cidr: str = "192.168.1.0/24") -> dict:
+    """Network discovery and lateral movement planning."""
+    from services.lateral import LateralMovement
+
+    lm = LateralMovement()
+    return lm.discover_network(cidr)
+
+
+@router.post("/db_interrogate")
+def db_interrogate(target: str = "127.0.0.1") -> dict:
+    """Interrogate internal APIs and databases."""
+    from services.db_interrogate import DBInterrogate
+
+    di = DBInterrogate()
+    return di.interrogate_all(target)
 
 
 @router.get("/health")

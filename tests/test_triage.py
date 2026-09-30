@@ -47,8 +47,37 @@ def test_build_triage_with_finding():
     assert "shell" in r.suggested_patch.lower()
 
 
-def test_attempt_minimize_format():
-    assert _attempt_minimize("anything", "format-string") == "%s"
+def test_attempt_minimize_does_not_fabricate_a_trigger():
+    """Triage has no artifact/harness, so it must NOT invent a 'minimized'
+    trigger. It used to return hardcoded "%s" / "; id" / "../../../etc/passwd"
+    regardless of the candidate -- strings that were never derived from the
+    crash and may not reproduce it at all."""
+    for cls in ("format-string", "command-injection", "path-traversal", "unknown"):
+        trig, reduced, note = _attempt_minimize("some-real-payload", cls)
+        assert trig == "some-real-payload"
+        assert reduced is False
+        assert note
+
+
+def test_attempt_minimize_empty_candidate():
+    trig, reduced, note = _attempt_minimize("", "format-string")
+    assert trig == ""
+    assert reduced is False
+    assert note
+
+
+def test_triage_report_flags_unminimized():
+    r = build_triage("A" * 5000)
+    assert r.minimized is False
+    # the trigger is the untouched candidate, never a truncated lie
+    assert r.minimized_trigger == "A" * 5000
+    assert r.minimize_note
+
+
+def test_triage_to_dict_exposes_minimized_flag():
+    d = build_triage("x").to_dict()
+    assert d["minimized"] is False
+    assert "minimize_note" in d
 
 
 # --- triage -> exploit/download round-trip shape (no import cycles) ---

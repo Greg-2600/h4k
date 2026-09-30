@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ldap-utils samba-common-bin \
     bettercap aircrack-ng sshuttle \
     git \
+    openjdk-17-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
 # chisel (TCP pivoting) — not in Debian apt; grab the release binary
@@ -56,6 +57,16 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir impacket \
 RUN git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto \
     && ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto
 
+# OWASP ZAP (Zed Attack Proxy) — web app scanner with active/passive scan,
+# spider, AJAX spider, fuzzer, API. Headless mode for automation.
+RUN ZAP_VER="2.17.0" \
+    && curl -sSfL "https://github.com/zaproxy/zaproxy/releases/download/v${ZAP_VER}/ZAP_${ZAP_VER}_Linux.tar.gz" \
+       -o /tmp/zap.tar.gz \
+    && tar -xzf /tmp/zap.tar.gz -C /opt \
+    && mv /opt/ZAP_${ZAP_VER} /opt/zap \
+    && ln -s /opt/zap/zap.sh /usr/local/bin/zap \
+    && rm /tmp/zap.tar.gz
+
 # Rapid7 official Metasploit apt repository
 RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \
     | gpg --dearmor -o /usr/share/keyrings/metasploit.gpg \
@@ -67,7 +78,8 @@ RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \
 
 # Python automation stack (container images: break-system-packages is fine)
 RUN python3 -m pip install --break-system-packages --no-cache-dir \
-    pymetasploit3 fastapi uvicorn python-multipart semgrep
+    pymetasploit3 fastapi uvicorn python-multipart semgrep \
+    python-owasp-zap-v2.4
 
 # SCA / supply-chain tools: osv-scanner (Google) validates a repo/SBOM against
 # the OSV vulnerability DB; trivy (Aqua) can emit a CycloneDX SBOM.

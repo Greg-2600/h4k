@@ -92,6 +92,10 @@ def ingest_scan(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]:
         found = job.get("report")
         if found is None:
             raise HTTPException(status_code=404, detail="report not ready")
+        # A finished job stores a pydantic Report, not a dict -- the old
+        # isinstance(dict) check rejected every real job. Normalise first.
+        if hasattr(found, "model_dump"):
+            found = found.model_dump()
         report = found
     if not isinstance(report, dict) or "hosts" not in report:
         raise HTTPException(status_code=400, detail="report with 'hosts' required")

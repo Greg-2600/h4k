@@ -124,7 +124,30 @@ def test_fuzz_defaults_iterations(client):
     r = client.post("/api/fuzz", json={"target": "127.0.0.1"})
     assert r.status_code == 200
     job = client.get(f"/api/fuzz/{r.json()['job_id']}").json()
-    assert job["iterations"] == 1
+    # A default of 1 request is not a fuzzing run; the default is a real
+    # (still bounded) iteration count.
+    assert job["iterations"] == 200
+
+
+def test_fuzz_iterations_are_bounded(client):
+    for bad in (0, -1, 200_001):
+        r = client.post("/api/fuzz", json={"target": "127.0.0.1", "iterations": bad})
+        assert r.status_code == 422, bad
+
+
+def test_fuzz_request_bounds_at_the_schema_level():
+    """Checked on the model, not the endpoint, so no requests are sent."""
+    from pydantic import ValidationError
+    from schemas import FuzzRequest
+
+    assert FuzzRequest(target="h", iterations=200_000).iterations == 200_000
+    assert FuzzRequest(target="h").iterations == 200
+    for bad in (0, -5, 200_001, 10**9):
+        with pytest.raises(ValidationError):
+            FuzzRequest(target="h", iterations=bad)
+    for bad_timeout in (0, -1, 61, 1000):
+        with pytest.raises(ValidationError):
+            FuzzRequest(target="h", timeout=bad_timeout)
 
 
 def test_fuzz_job_reports_dedup_counts_not_raw_crash_count(client, monkeypatch):

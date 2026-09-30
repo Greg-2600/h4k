@@ -41,9 +41,11 @@ class TriageReport:
     candidate: str  # the input/payload that triggered it
     bug_class: str  # e.g. stack-buffer-overflow / format-string
     cwe: str
-    minimized_trigger: str  # smallest repro (or n/a if not fuzz-derived)
+    minimized_trigger: str  # smallest repro (== candidate if we didn't reduce)
     suggested_patch: str  # direction of fix (teaching template)
     steps: list[str]  # how to confirm root cause + fix
+    minimized: bool = False  # did we ACTUALLY reduce it, or just echo it back?
+    minimize_note: str = ""  # why not, when minimized is False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -51,6 +53,8 @@ class TriageReport:
             "bug_class": self.bug_class,
             "cwe": self.cwe,
             "minimized_trigger": self.minimized_trigger,
+            "minimized": self.minimized,
+            "minimize_note": self.minimize_note,
             "suggested_patch": self.suggested_patch,
             "steps": self.steps,
         }
@@ -97,9 +101,11 @@ def build_triage(candidate: str, finding: Any = None) -> TriageReport:
         "# own, confirm root cause, then implement the fix.\n",
     )
 
-    # A candidate string IS the smallest thing we have; note it (true auto-min
-    # is via libFuzzer -minimize_crash / afl-tmin, which we flag as a next step).
-    minimized = _attempt_minimize(candidate, bug_class)
+    # Real reduction only. Triage has no crash artifact or fuzz harness, so
+    # the honest answer is usually "we did not reduce this" -- previously we
+    # returned hardcoded strings ("%s", "; id") that were not derived from
+    # the candidate at all and would not necessarily reproduce anything.
+    minimized, did_reduce, min_note = _attempt_minimize(candidate, bug_class)
 
     # Sanitizer-first: name the exact flags + expected trace for this CWE so the
     # "confirm it's really a <class>" step is concrete, not hand-wavy.
@@ -132,17 +138,26 @@ def build_triage(candidate: str, finding: Any = None) -> TriageReport:
         minimized_trigger=minimized,
         suggested_patch=patch,
         steps=steps,
+        minimized=did_reduce,
+        minimize_note=min_note,
     )
 
 
-def _attempt_minimize(payload: str, bug_class: str) -> str:
-    """Very light reducer: for some classes the shortest meaningful trigger
-    is known (e.g. format string '%%n'). Otherwise return payload truncated."""
-    if bug_class == "format-string":
-        return "%s"
-    if bug_class == "command-injection":
-        return "; id"
-    if bug_class == "path-traversal":
-        return "../../../etc/passwd"
-    # else: return the payload as-is (full minimization is a fuzz-tool feature)
-    return payload[:400]
+def _attempt_minimize(candidate: str, bug_class: str) -> tuple[str, bool, str]:
+    """Return (trigger, actually_reduced, note).
+
+    Triage has only a candidate string -- no crash artifact and no fuzz
+    harness -- so it cannot genuinely reduce anything. When the caller
+    supplies a real artifact (see services.fuzzer.libfuzzer_minimize) that
+    path does the real work; this function refuses to invent a "minimized"
+    trigger out of thin air.
+    """
+    if not candidate:
+        return "", False, "empty candidate; nothing to reduce"
+    return (
+        candidate,
+        False,
+        f"not reduced: triage has no crash artifact or harness for the "
+        f"{bug_class} candidate. Use POST /api/fuzz/minimize (libFuzzer "
+        f"-minimize_crash) or afl-tmin on the real artifact.",
+    )

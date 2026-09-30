@@ -277,11 +277,20 @@ def run_custom_rules(req: SourceScanRequest) -> dict[str, Any]:
 
 @router.post("/triage/minimize")
 def minimize(req: TriageRequest) -> dict[str, Any]:
-    """Automatically minimize a crash candidate (best-effort)."""
-    best = triage_service._attempt_minimize(
+    """Best-effort minimize of a crash candidate.
+
+    Triage has no crash artifact/harness, so this usually reports that it did
+    NOT reduce the input. Real reduction is `POST /api/fuzz/minimize`.
+    """
+    trigger, reduced, note = triage_service._attempt_minimize(
         req.candidate, req.finding.cwe if req.finding else "unknown"
     )
-    return {"original": req.candidate, "minimized": best}
+    return {
+        "original": req.candidate,
+        "minimized": trigger,
+        "reduced": reduced,
+        "note": note,
+    }
 
 
 def _finding_from_src(f: SourceFinding) -> sast.Finding:

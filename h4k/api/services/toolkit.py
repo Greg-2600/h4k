@@ -1,9 +1,12 @@
 # Opt-in non-Metasploit attack toolkit: a per-service runner that shells out to
 # classic offensive tools (hydra, john, sqlmap, gobuster/ffuf, nikto, smbmap,
-# masscan, ncrack, dnsrecon...) against an authorized lab target. Separate from
-# the Metasploit RPC path; only runs when a deep-attack is explicitly requested.
+# masscan, ncrack, dnsrecon, zap, aircrack-ng, tshark...) against an authorized
+# lab target. Separate from the Metasploit RPC path; only runs when a deep-attack
+# is explicitly requested. Also includes container escape, lateral movement,
+# DB interrogation, hash cracking, wireless, and packet analysis.
 import logging
 import subprocess  # nosec B404 - runs external offensive tools
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -16,6 +19,15 @@ USERLIST = "/opt/h4k/data/users.txt"
 PASSLIST = "/opt/h4k/data/passwords.txt"
 
 
+def _as_text(data: str | bytes | None) -> str:
+    """TimeoutExpired hands back bytes or str depending on text mode."""
+    if data is None:
+        return ""
+    if isinstance(data, bytes):
+        return data.decode("utf-8", errors="replace")
+    return data
+
+
 class ToolkitRunner:
     def __init__(
         self,
@@ -24,8 +36,16 @@ class ToolkitRunner:
         self.progress = progress or (lambda msg, pct: None)
 
     def run_tool(self, tool: str, argv: list[str], timeout: int = 300) -> dict:
-        """Run an external tool; returns {tool, stdout, stderr, rc, elapsed}."""
+        """Run an external tool.
+
+        Returns {tool, stdout, stderr, rc, elapsed, timed_out, status}. On a
+        timeout we keep whatever partial output the tool produced -- brute
+        force tools stream progress continuously and may well have found
+        something before the deadline, so discarding stdout on timeout can
+        hide a real result.
+        """
         self.progress(f"[toolkit:{tool}] {' '.join(argv[:6])}…", 0)
+        started = time.time()
         try:
             proc = subprocess.run(  # nosec B603 B607 - fixed argv, no shell
                 argv,
@@ -39,6 +59,9 @@ class ToolkitRunner:
                 "stdout": (proc.stdout or "")[-4000:],
                 "stderr": (proc.stderr or "")[-2000:],
                 "rc": proc.returncode,
+                "elapsed": round(time.time() - started, 2),
+                "timed_out": False,
+                "status": "ok",
             }
         except FileNotFoundError:
             return {
@@ -46,11 +69,30 @@ class ToolkitRunner:
                 "stdout": "",
                 "stderr": "tool not installed",
                 "rc": -1,
+                "elapsed": round(time.time() - started, 2),
+                "timed_out": False,
+                "status": "missing",
             }
-        except subprocess.TimeoutExpired:
-            return {"tool": tool, "stdout": "timed out", "stderr": "", "rc": -1}
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "tool": tool,
+                "stdout": _as_text(exc.stdout)[-4000:],
+                "stderr": _as_text(exc.stderr)[-2000:],
+                "rc": None,
+                "elapsed": round(time.time() - started, 2),
+                "timed_out": True,
+                "status": "timeout",
+            }
         except Exception as exc:  # pragma: no cover - defensive
-            return {"tool": tool, "stdout": "", "stderr": str(exc), "rc": -1}
+            return {
+                "tool": tool,
+                "stdout": "",
+                "stderr": str(exc),
+                "rc": -1,
+                "elapsed": round(time.time() - started, 2),
+                "timed_out": False,
+                "status": "error",
+            }
 
 
 class ToolkitPlan:
@@ -117,6 +159,25 @@ class ToolkitPlan:
                         "-s",
                         "-t",
                         "10",
+                    ],
+                }
+            )
+
+            # OWASP ZAP web app scan
+            runs.append(
+                {
+                    "tool": "zap",
+                    "argv": [
+                        "python3",
+                        "-c",
+                        f"""
+import sys
+sys.path.insert(0, '/opt/h4k/api')
+from services.zap import zap_scan
+result = zap_scan('{url}', mode='full')
+import json
+print(json.dumps(result, default=str))
+""",
                     ],
                 }
             )
@@ -226,6 +287,148 @@ class ToolkitPlan:
                     "argv": ["dnsrecon", "-d", req.host, "-t", "std,zone"],
                 }
             )
+
+        # John the Ripper hash cracking
+        if (
+            _has("ssh", req.services)
+            or _has("smb", req.services)
+            or _has("ldap", req.services)
+        ):
+            runs.append(
+                {
+                    "tool": "john",
+                    "argv": [
+                        "python3",
+                        "-c",
+                        """
+import sys
+sys.path.insert(0, '/opt/h4k/api')
+from services.john import JohnRunner
+jr = JohnRunner()
+# Try common CTF hash formats
+result = jr.crack_ctf_hashes(["$1$salt$hash", "hash"], formats=["md5", "sha256", "nt"])
+import json
+print(json.dumps(result, default=str))
+""",
+                    ],
+                }
+            )
+
+        # Enhanced Nmap with NSE scripts
+        runs.append(
+            {
+                "tool": "nmap_nse",
+                "argv": [
+                    "nmap",
+                    "-sV",
+                    "-sC",
+                    "--script",
+                    "vuln,auth,default",
+                    "-T4",
+                    host,
+                ],
+            }
+        )
+
+        # Container escape checks
+        runs.append(
+            {
+                "tool": "container_escape",
+                "argv": [
+                    "python3",
+                    "-c",
+                    """
+import sys
+sys.path.insert(0, '/opt/h4k/api')
+from services.container_escape import ContainerEscape
+ce = ContainerEscape()
+result = ce.detect()
+import json
+print(json.dumps(result, default=str))
+""",
+                ],
+            }
+        )
+
+        # Lateral movement / network discovery
+        runs.append(
+            {
+                "tool": "network_discovery",
+                "argv": [
+                    "python3",
+                    "-c",
+                    """
+import sys
+sys.path.insert(0, '/opt/h4k/api')
+from services.lateral import LateralMovement
+lm = LateralMovement()
+result = lm.discover_network()
+import json
+print(json.dumps(result, default=str))
+""",
+                ],
+            }
+        )
+
+        # Database interrogation
+        runs.append(
+            {
+                "tool": "db_interrogate",
+                "argv": [
+                    "python3",
+                    "-c",
+                    """
+import sys
+sys.path.insert(0, '/opt/h4k/api')
+from services.db_interrogate import DBInterrogate
+di = DBInterrogate()
+result = di.interrogate_all()
+import json
+print(json.dumps(result, default=str))
+""",
+                ],
+            }
+        )
+
+        # Aircrack-ng wireless (if wireless interface available)
+        runs.append(
+            {
+                "tool": "aircrack_check",
+                "argv": [
+                    "python3",
+                    "-c",
+                    """
+import sys
+sys.path.insert(0, '/opt/h4k/api')
+from services.aircrack import AircrackService
+svc = AircrackService()
+result = svc.check_interfaces()
+import json
+print(json.dumps(result, default=str))
+""",
+                ],
+            }
+        )
+
+        # Tshark packet analysis (if pcap available)
+        runs.append(
+            {
+                "tool": "tshark_check",
+                "argv": [
+                    "python3",
+                    "-c",
+                    """
+import sys
+sys.path.insert(0, '/opt/h4k/api')
+from services.tshark import TsharkService
+svc = TsharkService()
+result = svc.list_interfaces()
+import json
+print(json.dumps(result, default=str))
+""",
+                ],
+            }
+        )
 
         return runs
 

@@ -83,3 +83,68 @@ def test_host_from_dict_normalizes_services():
         }
     )
     assert h.services[0].port == 80
+
+
+# --- port-scan coverage honesty --------------------------------------------
+def test_report_carries_coverage():
+    r = build_report(
+        target="h",
+        mode="overt",
+        hosts=[],
+        vulns=[],
+        notes=[],
+        coverage={
+            "depth": "standard",
+            "ports_spec": "top-1000",
+            "max_ports": 1000,
+            "complete": False,
+        },
+    )
+    assert r.coverage is not None
+    assert r.coverage.depth == "standard"
+    assert r.coverage.complete is False
+
+
+def test_partial_scan_is_flagged_in_notes():
+    """A top-N sweep must never read as 'nothing found on this host'."""
+    r = build_report(
+        target="h",
+        mode="overt",
+        hosts=[],
+        vulns=[],
+        notes=[],
+        coverage={
+            "depth": "standard",
+            "ports_spec": "top-1000",
+            "max_ports": 1000,
+            "complete": False,
+        },
+    )
+    cov_notes = [n for n in r.notes if n.startswith("[coverage]")]
+    assert cov_notes, r.notes
+    assert "PARTIAL" in cov_notes[0]
+    assert "top-1000" in cov_notes[0]
+    assert "depth=full" in cov_notes[0]
+
+
+def test_full_scan_produces_no_partial_warning():
+    r = build_report(
+        target="h",
+        mode="overt",
+        hosts=[],
+        vulns=[],
+        notes=[],
+        coverage={
+            "depth": "full",
+            "ports_spec": "1-65535",
+            "max_ports": 65535,
+            "complete": True,
+        },
+    )
+    assert not [n for n in r.notes if n.startswith("[coverage]")]
+
+
+def test_report_without_coverage_has_no_warning():
+    r = build_report(target="h", mode="overt", hosts=[], vulns=[], notes=[])
+    assert r.coverage is None
+    assert not [n for n in r.notes if n.startswith("[coverage]")]

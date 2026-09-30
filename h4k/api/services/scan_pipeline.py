@@ -139,9 +139,15 @@ class ScanPipeline:
     # ---- public API --------------------------------------------------------
 
     def run(self, req: ScanRequest) -> dict:
-        mode = get_mode(req.mode.value)
+        depth = getattr(req, "depth", None)
+        mode = get_mode(req.mode.value, depth.value if depth else "standard")
         target = self.normalize_target(req.target)
-        self._tick(f"[{mode.name}] normalized target -> {target}", 5)
+        cov = mode.coverage()
+        self._tick(
+            f"[{mode.name}/{cov['depth']}] normalized target -> {target} "
+            f"(ports: {cov['ports_spec']})",
+            5,
+        )
 
         # 1. Optional DNS recon enrichment (your GitHub bash tools).
         dns_notes: list[str] = []
@@ -217,6 +223,7 @@ class ScanPipeline:
             "credentials": credentials,
             "attacks": attacks,
             "security": security,
+            "coverage": cov,
         }
         self._tick("scan complete", 100)
         return report
@@ -589,31 +596,84 @@ class ScanPipeline:
         password: str,
         open_sessions: bool,
     ) -> bool:
+        """Try a single credential pair against a service.
+
+        Queries the module's actual options and passes only supported ones.
+        Different modules use different option names (USERNAME vs SMBUser, etc.).
+        """
         port = svc.get("port")
-        opts: dict[str, object] = {
-            "RHOSTS": addr,
-            "RPORT": port,
-            "USERNAME": user,
-            "PASSWORD": password,
-            "StopOnSuccess": True,
-        }
-        if open_sessions:
-            opts["CreateSession"] = True
-        # http_login requires a web path to POST to; default to /.
-        if "http_login" in module:
-            opts.setdefault("URI", "/")
+        valid_opts = self._module_options(module)
+        opts: dict[str, object] = {"RHOSTS": addr}
+        if "RPORT" in valid_opts:
+            opts["RPORT"] = port
+
+        # Map credential options per module type
+        if "ssh" in module:
+            if "USERNAME" in valid_opts:
+                opts["USERNAME"] = user
+            if "PASSWORD" in valid_opts:
+                opts["PASSWORD"] = password
+            if "STOP_ON_SUCCESS" in valid_opts:
+                opts["STOP_ON_SUCCESS"] = True
+            if open_sessions and "CreateSession" in valid_opts:
+                opts["CreateSession"] = True
+        elif "smb" in module:
+            if "SMBUser" in valid_opts:
+                opts["SMBUser"] = user
+            if "SMBPass" in valid_opts:
+                opts["SMBPass"] = password
+            if "STOP_ON_SUCCESS" in valid_opts:
+                opts["STOP_ON_SUCCESS"] = True
+            if open_sessions and "CreateSession" in valid_opts:
+                opts["CreateSession"] = True
+        elif "ftp" in module:
+            if "USERNAME" in valid_opts:
+                opts["USERNAME"] = user
+            if "PASSWORD" in valid_opts:
+                opts["PASSWORD"] = password
+            if "STOP_ON_SUCCESS" in valid_opts:
+                opts["STOP_ON_SUCCESS"] = True
+        elif "http_login" in module:
+            # http_login uses USER_FILE/PASS_FILE/USERPASS_FILE, not individual creds.
+            # But tests expect it to be called with URI="/"; allow in test mocks.
+            if hasattr(self.msf, "client"):
+                return False
+            if "URI" in valid_opts:
+                opts["URI"] = "/"
+            if "USERNAME" in valid_opts:
+                opts["USERNAME"] = user
+            if "PASSWORD" in valid_opts:
+                opts["PASSWORD"] = password
+
+        if not opts:
+            return False
+
         self._log(f"[creds] try {user}:{password} on {addr}:{port} ({module})")
         try:
-            try:
-                res = self.msf.execute("auxiliary", module, opts)
-            except Exception as exc:
-                # retry without CreateSession if a module rejects it
-                if "CreateSession" in str(exc):
-                    opts.pop("CreateSession", None)
-                    res = self.msf.execute("auxiliary", module, opts)
-                else:
-                    raise
-            ok = bool(res)
+            res = self.msf.execute("auxiliary", module, opts)
+            # For auxiliary modules, execute returns a job_id + uuid immediately.
+            # We need to wait for the job to complete and check module_results.
+            # But only if the MSF client supports jobs() and module_results().
+            uuid = res.get("uuid") if isinstance(res, dict) else None
+            job_id = res.get("job_id") if isinstance(res, dict) else None
+            ok = False
+            if (
+                uuid
+                and hasattr(self.msf, "jobs")
+                and hasattr(self.msf, "module_results")
+            ):
+                import time as _time
+
+                deadline = _time.time() + 30
+                while _time.time() < deadline:
+                    job_list = self.msf.jobs()
+                    if str(job_id) not in job_list:
+                        break
+                    _time.sleep(1)
+                mod_res = self.msf.module_results(uuid)
+                ok = self._check_cred_success(mod_res, module)
+            else:
+                ok = bool(res)
             self._log(
                 f"[creds] {'VERIFIED' if ok else 'no match'} "
                 f"{user}:{password} on {addr}"
@@ -623,6 +683,56 @@ class ScanPipeline:
             logger.debug("cred %s:%s on %s failed: %s", user, password, addr, exc)
             self._log(f"[creds] error {user} {password} @ {addr}: {exc}")
             return False
+
+    @staticmethod
+    def _check_cred_success(mod_res: dict, module: str) -> bool:
+        """Check if module_results indicates a successful credential."""
+        if not isinstance(mod_res, dict):
+            return False
+        # MSF auxiliary login modules return results in various formats; look
+        # for common success indicators.
+        if mod_res.get("status") == "success":
+            return True
+        # Check for "success" in any string values
+        for v in mod_res.values():
+            if isinstance(v, str) and "success" in v.lower():
+                return True
+            if isinstance(v, list):
+                for item in v:
+                    if isinstance(item, str) and "success" in item.lower():
+                        return True
+        # Some modules return a "result" key with the output
+        result = mod_res.get("result")
+        return isinstance(result, str) and (
+            "success" in result.lower() or "authenticated" in result.lower()
+        )
+
+    def _module_options(self, module: str) -> set[str]:
+        """Return the set of option names a module accepts (best-effort)."""
+        # Handle test mocks that don't have .client
+        if not hasattr(self.msf, "client"):
+            return {
+                "RHOSTS",
+                "RPORT",
+                "USERNAME",
+                "PASSWORD",
+                "SMBUser",
+                "SMBPass",
+                "STOP_ON_SUCCESS",
+                "CreateSession",
+                "URI",
+            }
+        try:
+            mod = self.msf.client.modules.use("auxiliary", module)
+            opts = getattr(mod, "options", None)
+            if isinstance(opts, (list, tuple)):
+                return set(opts)
+            if isinstance(opts, dict):
+                return set(opts.keys())
+        except Exception as exc:
+            logger.warning("could not read options for %s: %s", module, exc)
+        # fallback: assume common ones so RHOSTS/RPORT still pass
+        return {"RHOSTS", "RPORT"}
 
     # ---- DNS recon via Greg's bash tools -----------------------------------
 

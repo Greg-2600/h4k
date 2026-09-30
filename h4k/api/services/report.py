@@ -4,9 +4,11 @@
 # launches anything (exploitation is opt-in upstream in the pipeline).
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 from schemas import (
     Attack,
+    Coverage,
     Credential,
     Fingerprint,
     Host,
@@ -79,6 +81,7 @@ def build_report(
     attacks: list[dict] | None = None,
     security: list[dict] | None = None,
     log: list[str] | None = None,
+    coverage: dict[str, Any] | None = None,
 ) -> Report:
     host_models = [_host_from_dict(h) for h in hosts]
     vuln_models = [_vuln_from_dict(v) for v in vulns]
@@ -111,6 +114,17 @@ def build_report(
                 f"(score {s.score:.0f}, confidence {s.confidence})."
             )
 
+    # A partial port sweep must never read as a clean bill of health. This is
+    # the difference between "nothing found" and "we didn't look".
+    if coverage and not coverage.get("complete", False):
+        notes_out.append(
+            f"[coverage] PARTIAL SCAN: enumerated {coverage.get('ports_spec')} "
+            f"(depth={coverage.get('depth')}, max {coverage.get('max_ports')} "
+            f"ports). Services outside that set were NOT checked - absence of "
+            f"a finding is not absence of a service. Re-run with depth=full "
+            f"for a complete 1-65535 sweep."
+        )
+
     return Report(
         target=target,
         mode=mode,  # type: ignore[arg-type]
@@ -124,6 +138,7 @@ def build_report(
         attacks=attack_models,
         security=security_models,
         log=log or [],
+        coverage=Coverage(**coverage) if coverage else None,
     )
 
 
