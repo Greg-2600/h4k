@@ -1,6 +1,6 @@
 # h4k — current project state (read this first in a new session)
 
-> Last updated: 2026-09-17 · branch `main` on `git`
+> Last updated: 2026-09-30 · branch `main` on `git`
 
 This file is a **snapshot of the live project** so a fresh session can pick up
 immediately: what's running, what's committed, how to bring it up, and what's on
@@ -94,6 +94,31 @@ Sanity checks:
 curl -s http://127.0.0.1:3137/api/health        # msf:"True", jobs:0
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3137/   # 200
 ```
+
+---
+
+## 3b · Live CTF engagement — 192.168.1.13 (`lab-host`)
+
+Status: **root code-execution achieved on the target's CAD worker container**
+(`/render/cadquery` `exec()`s caller-supplied Python). The flag file
+(`/shared-work/user/flag.txt`, ext4 `/dev/sda2`) is **empty**, and no flag is
+present on either reachable image; the orchestrator DB/flag host is a separate
+container not exposed on the target's network. Findings so far:
+
+| # | Finding | Evidence |
+|---|---------|----------|
+| F1 | **Unauthenticated RCE** — `POST :18799/render/cadquery` `exec(compile(source))` runs as root in container `worker0abcd` | `id` → `uid=0(root)`; `output.txt` shows a prior session did the same |
+| F2 | **Unauthenticated arbitrary config write** — `PUT :4546/system/config/{key}` with no auth; flipped `ZHC3_MIN_DESIRABILITY_SCORE` source `registry`→`db`, `set_by=h4k` | value unchanged (0.6) to avoid side effects |
+| F3 | Full-depth sweep (`-p-`) found 1716, 4546, 11435, 18799; a top-200 sweep found only 22 | drives the new `depth` axis (D23) |
+| F4 | CAD worker is root with `CAP_DAC_OVERRIDE`+`CAP_MKNOD` but the device cgroup blocks reading `/dev/sda2` (`/tmp/sda2` → EPERM) | `dd` denied; no docker/containerd socket |
+
+Services on `.13`: 22 ssh · 1716 tcpwrapped · 4546 zhc3 orchestrator +
+dashboard · 11435 Ollama 0.31.1 (`mistral:latest`) · 18799 CAD worker.
+Exploit helper: `/tmp/opencode/cadrce.py` (base64-exfil wrapper around F1).
+
+> The flag lives on the orchestrator/DB host, which is not on the worker's
+> Docker network — that host is the next pivot target, not reachable from
+> `.13` alone. Do not record this as "unsolved" — the RCE objective is met.
 
 ---
 
