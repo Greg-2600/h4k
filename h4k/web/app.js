@@ -1400,3 +1400,91 @@ $("ctf-tshark-btn").addEventListener("click", () => {
   if (!pcap) { log("[!] enter a pcap path", "err"); return; }
   ctfPost("/api/tshark/pcap", { pcap_file: pcap }, "pcap analysis of " + pcap);
 });
+
+/* ---------- pipeline / process monitor ---------- */
+let pipePollTimer = null;
+
+function showPipelinePanel() {
+  $("pipeline-panel").hidden = false;
+  refreshPipeline();
+  if (!pipePollTimer) {
+    pipePollTimer = setInterval(refreshPipeline, 5000);
+  }
+}
+
+function hidePipelinePanel() {
+  if (pipePollTimer) {
+    clearInterval(pipePollTimer);
+    pipePollTimer = null;
+  }
+  $("pipeline-panel").hidden = true;
+}
+
+async function refreshPipeline() {
+  try {
+    const resp = await fetch("/api/pipeline/status");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    renderPipeline(data);
+  } catch (e) {
+    log("pipeline refresh failed: " + e.message, "err");
+  }
+}
+
+function renderPipeline(data) {
+  $("pipe-status").textContent = data.status || "idle";
+
+  // Running jobs
+  const running = data.running || [];
+  const runningHtml = running.length
+    ? running.map(j => `<div class="pipe-job"><span class="pipe-job-id">${esc(j.id)}</span><span class="pipe-job-type">${esc(j.type)}</span><span class="pipe-job-progress"><div class="mini-bar"><div class="mini-bar-fill" style="width:${j.progress||0}%"></div></div><span>${j.progress||0}%</span></span></div>`).join("")
+    : '<div class="pipe-empty">no running jobs</div>';
+  $("pipe-running-list").innerHTML = runningHtml;
+
+  // Pipeline stages
+  const stages = data.pipeline || [];
+  const stageOrder = ["research", "opportunities", "score", "brief", "candidates", "preview", "listing_copy", "bundle", "publish"];
+  const stageHtml = stageOrder.map(sid => {
+    const s = stages.find(s => s.id === sid);
+    if (!s) return "";
+    const statusClass = s.status === "done" ? "ok" : s.status === "running" ? "warn" : s.status === "failed" ? "err" : "";
+    return `<div class="pipeline-stage ${statusClass}"><span class="pipe-stage-label">${esc(s.label)}</span><span class="pipe-stage-status">${esc(s.status)}</span><span class="pipe-stage-detail">${esc(s.detail||"")}</span></div>`;
+  }).join("");
+  $("pipeline-stages").innerHTML = stageHtml || '<div class="pipe-empty">no pipeline data</div>';
+
+  // History
+  const history = data.history || [];
+  const histHtml = history.length
+    ? history.map(h => `<div class="hist-item"><span class="hist-time">${esc(h.started_at)}</span><span class="hist-type">${esc(h.type)}</span><span class="hist-status ${h.status==='done'?'ok':h.status==='failed'?'err':''}">${esc(h.status)}</span><span class="hist-target">${esc(h.target||"")}</span></div>`).join("")
+    : '<div class="pipe-empty">no history</div>';
+  $("pipe-history-list").innerHTML = histHtml;
+
+  // Processes
+  const procs = data.processes || [];
+  const procHtml = procs.length
+    ? procs.map(p => `<div class="proc-row"><span class="proc-pid">${p.pid}</span><span class="proc-cmd">${esc(p.cmd)}</span><span class="proc-cpu">${p.cpu}%</span><span class="proc-mem">${p.mem}%</span></div>`).join("")
+    : '<div class="pipe-empty">no process data</div>';
+  $("process-list").innerHTML = procHtml;
+}
+
+// Tab switching
+document.querySelectorAll(".pipe-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".pipe-tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".pipe-pane").forEach(p => p.classList.remove("active"));
+    $(`pipe-${btn.dataset.pipeTab}`).classList.add("active");
+  });
+});
+
+// Auto-show pipeline panel when a scan/attack starts
+const originalStartScan = window.startScan || (() => {});
+window.startScan = function() {
+  showPipelinePanel();
+  return originalStartScan.apply(this, arguments);
+};
+
+// Expose for other modules
+window.showPipelinePanel = showPipelinePanel;
+window.hidePipelinePanel = hidePipelinePanel;
+window.refreshPipeline = refreshPipeline;

@@ -324,19 +324,36 @@
     <section class="pane results" id="ossfuzz-panel" hidden><div class="pane-head"><span class="pane-title">/oss-fuzz auto-run</span><span id="ossfuzz-status" class="pane-status">idle</span></div><pre class="notes" id="tab-ossfuzz"></pre></section>
     <section class="pane results" id="ctf-panel" hidden><div class="pane-head"><span class="pane-title">/ctf toolkit</span><span id="ctf-status" class="pane-status">idle</span></div><pre class="notes" id="tab-ctf"></pre></section>
 
-    <!-- consolidated one-click assessment report -->
-    <section class="pane results" id="merged-panel">
+    <!-- pipeline / process monitor -->
+    <section class="pane results" id="pipeline-panel" hidden>
       <div class="pane-head">
-        <span class="pane-title">/consolidated report</span>
-        <span class="pane-meta" id="merged-meta"></span>
+        <span class="pane-title">/pipeline monitor</span>
+        <span class="pane-status" id="pipe-status">idle</span>
       </div>
-      <div class="merged-summary" id="merged-summary"></div>
-      <div class="btn-row">
-        <button type="button" id="merged-run" class="btn-primary">build report</button>
-        <button type="button" id="merged-md" class="btn-sub">download .md</button>
-        <button type="button" id="merged-json" class="btn-sub">download .json</button>
+      <div class="pipe-tabs">
+        <button type="button" class="pipe-tab active" data-pipe-tab="running">running</button>
+        <button type="button" class="pipe-tab" data-pipe-tab="pipeline">pipeline</button>
+        <button type="button" class="pipe-tab" data-pipe-tab="history">history</button>
+        <button type="button" class="pipe-tab" data-pipe-tab="processes">processes</button>
+      </div>
+      <div class="pipe-content">
+        <div class="pipe-pane active" id="pipe-running">
+          <div class="pipe-list" id="pipe-running-list"></div>
+        </div>
+        <div class="pipe-pane" id="pipe-pipeline">
+          <div class="pipeline-stages" id="pipeline-stages"></div>
+        </div>
+        <div class="pipe-pane" id="pipe-history">
+          <div class="history-list" id="pipe-history-list"></div>
+        </div>
+        <div class="pipe-pane" id="pipe-processes">
+          <div class="process-list" id="process-list"></div>
+        </div>
       </div>
     </section>
+
+    <!-- consolidated one-click assessment report -->
+    <section class="pane results" id="merged-panel">
 
   </div>
   <div class="legal">
