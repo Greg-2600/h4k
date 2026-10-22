@@ -802,6 +802,19 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 .ex-output .t-line { margin: 2px 0; white-space: pre-wrap; word-break: break-all; }
 .ex-output .t-line.ex-mod { color: var(--accent); cursor: pointer; border-bottom: 1px dotted var(--accent); display: inline-block; }
 
+/* Session console inside exploit card */
+.ex-console { margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.ex-console-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 600;
+}
+.ex-quick { display: flex; gap: 8px; padding: 8px 12px; flex-wrap: wrap; }
+.ex-quick .btn { font-size: 11px; }
+.ex-console .input-row { padding: 0 12px 8px; gap: 10px; display: flex; align-items: flex-end; }
+.ex-console .input-row .input-group { flex: 1; }
+.ex-output.visible { margin: 0; border: none; border-radius: 0; border-top: 1px solid var(--border); max-height: 220px; }
+
 /* Session badge */
 .session-badge {
   font-family: var(--font-mono);
@@ -812,4 +825,18 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
   white-space: nowrap;
+}
+.scope-select {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 8px;
+  max-width: 180px;
+}
+.scope-select.scope-active {
+  color: var(--success);
+  border-color: var(--success);
 }

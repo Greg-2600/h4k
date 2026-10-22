@@ -29,6 +29,7 @@ const state = {
   exploitAlternatives: [],
   credTargets: [],
   lastCredTargetsLoad: 0,
+  activeSession: null,
 };
 
 // XP table: level -> XP required to reach it
@@ -703,6 +704,9 @@ function pollExploitJob(jobId, btn) {
           unlockAchievement('exploiter');
           logXp(50, '(exploit)');
           state.stats.pwned++;
+          openSessionConsole(atk.session_id, row.ip);
+          refreshSessionBadge();
+          loadGraph();
         } else if (job.status === 'done') {
           $('ex-status').textContent = 'Exploit finished — no session opened.';
           appendExOutput('no session. escalation ladder:');
@@ -812,7 +816,25 @@ async function launchPassAttack() {
           } else {
             playSound('error');
           }
-          refreshSessionBadge();
+  refreshSessionBadge();
+  loadScopeSelect();
+
+  // Scope selector: pick the engagement whose CIDRs constrain aggressive actions
+  $('scope-select').addEventListener('change', async (e) => {
+    const engId = e.target.value || null;
+    try {
+      const res = await api('/api/session/scope', { method: 'POST', body: { engagement_id: engId } });
+      if (res.status === 'scoped') {
+        log(`Scope engaged: ${res.name} — actions restricted to ${res.scope.join(', ')}`, 'warn');
+        unlockAchievement('os_intel');
+      } else {
+        log('Scope cleared — actions unrestricted (use only on your own lab)', 'warn');
+      }
+      updateScopeHint();
+      refreshSessionBadge();
+    } catch (err) { log('Scope change failed: ' + err.message, 'error'); }
+  });
+  updateScopeHint();
         }
       } catch (e) {
         clearInterval(paPollTimer); paPollTimer = null;
@@ -835,6 +857,60 @@ function appendPaOutput(text) {
     el.appendChild(p);
     el.scrollTop = el.scrollHeight;
   }
+}
+
+// ---- session console ----
+
+function openSessionConsole(sessionId, host) {
+  state.activeSession = sessionId;
+  const con = $('ex-console');
+  if (!con) return;
+  con.hidden = false;
+  $('ex-console-target').textContent = `session ${sessionId} @ ${host}`;
+  $('ex-console-output').hidden = false;
+  $('ex-console-output').innerHTML = '';
+  appendConsoleLine(`session ${sessionId} opened on ${host} — try a quick action or type a command`);
+  con.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function appendConsoleLine(text) {
+  const el = $('ex-console-output');
+  if (!el) return;
+  const p = document.createElement('p');
+  p.className = 't-line';
+  p.textContent = text;
+  el.appendChild(p);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function runSessionCmd(cmd) {
+  const sid = state.activeSession;
+  if (!sid) { log('No active session', 'warn'); return; }
+  appendConsoleLine(`> ${cmd}`);
+  try {
+    const res = await api(`/api/sessions/${sid}/cmd`, { method: 'POST', body: { command: cmd } });
+    if (res.output !== undefined) {
+      (res.output || '(no output)').split('\n').slice(0, 40).forEach(l => appendConsoleLine('  ' + l));
+    } else {
+      appendConsoleLine('  error: ' + (res.detail || JSON.stringify(res)));
+    }
+  } catch (e) { appendConsoleLine('  error: ' + e.message); }
+}
+
+async function downloadSessionReport() {
+  try {
+    const fmt = 'md';
+    const res = await api(`/api/session/report?fmt=${fmt}`);
+    const blob = new Blob([res.content], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const s = await api('/api/session');
+    a.download = `h4k-session-${s.id}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    log(`Session report ${a.download} downloaded`, 'success');
+    logXp(10, '(report)');
+  } catch (e) { log('Report failed: ' + e.message, 'error'); }
 }
 
 function renderPaFound(creds) {
@@ -1384,7 +1460,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const probeBtn = e.target.closest('.webprobe-btn');
     if (probeBtn) launchWebProbe(parseInt(probeBtn.dataset.index, 10));
+    const quickBtn = e.target.closest('[data-excmd]');
+    if (quickBtn) runSessionCmd(quickBtn.dataset.excmd);
+    if (e.target.closest('#btn-ex-cmd') || (e.target.id === 'ex-cmd' && e.key === 'Enter')) {
+      const input = $('ex-cmd');
+      if (input && input.value.trim()) {
+        runSessionCmd(input.value.trim());
+        input.value = '';
+      }
+    }
     if (e.target.closest('#btn-cred-targets-refresh')) { loadCredTargets(); loadCveStatus(); }
+    const rpt = e.target.closest('#btn-session-report');
+    if (rpt) downloadSessionReport();
   });
 
   // Theme toggle
@@ -1431,6 +1518,34 @@ async function refreshSessionBadge() {
     const s = await api('/api/session');
     el.textContent = `${s.id} · ${s.hosts}h ${s.services}s ${s.vulns}v`;
   } catch { el.textContent = 'session: unavailable'; }
+}
+
+async function loadScopeSelect() {
+  const sel = $('scope-select');
+  if (!sel) return;
+  try {
+    const res = await api('/api/engagement');
+    const engs = res.engagements || [];
+    const s = await api('/api/session');
+    const cur = s.scope?.engagement_id || '';
+    while (sel.options.length) sel.remove(0);
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = 'scope: none';
+    sel.appendChild(none);
+    engs.forEach(e => {
+      const o = document.createElement('option');
+      o.value = e.id;
+      o.textContent = `scope: ${e.name}`;
+      sel.appendChild(o);
+    });
+    sel.value = cur;
+  } catch { /* msf down / no engagements */ }
+}
+
+function updateScopeHint() {
+  const sel = $('scope-select');
+  if (sel) sel.classList.toggle('scope-active', !!sel.value);
 }
 
 async function loadPersistedVulns() {

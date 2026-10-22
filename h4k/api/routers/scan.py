@@ -252,6 +252,87 @@ def _new_session_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
+# ---- engagement scope enforcement ------------------------------------------
+# Aggressive actions (password attack, exploit, web probe) must fall inside the
+# active engagement's declared CIDRs. Read-only recon (ARP sweep, fingerprint)
+# still runs anywhere but out-of-scope results are *not recorded*, so the
+# accumulated picture can never grow outside the operator's authorization.
+
+
+def _active_scope() -> tuple[str | None, Any | None]:
+    """(engagement_id, store) for the active engagement, or (None, None)."""
+    try:
+        import app_state
+    except Exception:  # pragma: no cover - tests run flat-loaded
+        return None, None
+    eng_id = getattr(app_state, "active_engagement_id", None)
+    if not eng_id:
+        return None, None
+    try:
+        from services.engagement import EngagementStore
+
+        store = EngagementStore()
+        # stale id (engagement deleted) clears itself
+        if not any(e["id"] == eng_id for e in store.list_engagements()):
+            app_state.active_engagement_id = None
+            return None, None
+        return eng_id, store
+    except Exception:
+        return None, None
+
+
+def _host_in_scope(ip: str) -> tuple[bool, str]:
+    """(allowed, reason). No active engagement = allowed (read-only posture)."""
+    eng_id, store = _active_scope()
+    if eng_id is None or store is None:
+        return True, ""
+    if store.in_scope(eng_id, str(ip)):
+        return True, ""
+    return False, f"{ip} is outside the active engagement's authorized scope"
+
+
+def _demand_scope(ip: str) -> None:
+    ok, reason = _host_in_scope(ip)
+    if not ok:
+        raise HTTPException(status_code=403, detail=reason)
+
+
+@router.post("/session/scope")
+def set_session_scope(req: dict[str, Any]) -> dict[str, Any]:
+    """Activate/deactivate the engagement whose CIDRs constrain actions."""
+    import app_state
+
+    eng_id = req.get("engagement_id")
+    if eng_id:
+        from services.engagement import EngagementStore
+
+        store = EngagementStore()
+        engs = store.list_engagements()
+        if not any(e["id"] == eng_id for e in engs):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        app_state.active_engagement_id = eng_id
+        scope = store.scope_of(eng_id)
+        name = next(e["name"] for e in engs if e["id"] == eng_id)
+        return {
+            "status": "scoped",
+            "engagement_id": eng_id,
+            "name": name,
+            "scope": scope,
+        }
+    app_state.active_engagement_id = None
+    return {"status": "unscoped"}
+
+
+def _session_scope_info() -> dict[str, Any]:
+    eng_id, store = _active_scope()
+    if eng_id is None or store is None:
+        return {"engagement_id": None, "name": None, "scope": []}
+    cidrs = store.scope_of(eng_id)
+    engs = store.list_engagements()
+    name = next((e["name"] for e in engs if e["id"] == eng_id), eng_id)
+    return {"engagement_id": eng_id, "name": name, "scope": cidrs}
+
+
 def _ensure_session_row() -> dict[str, str]:
     from datetime import UTC, datetime
 
@@ -280,7 +361,7 @@ def _ensure_session_row() -> dict[str, str]:
 
 @router.get("/session")
 def get_session() -> dict[str, Any]:
-    """Current recon session: id, start time, and accumulated asset counts."""
+    """Current recon session: id, start time, asset counts, active scope."""
     meta = _ensure_session_row()
     conn = _neighbor_db()
     counts = {
@@ -293,7 +374,159 @@ def get_session() -> dict[str, Any]:
         ).fetchone()[0],
     }
     conn.close()
-    return {**meta, **counts}
+    return {**meta, **counts, "scope": _session_scope_info()}
+
+
+@router.get("/session/report")
+def session_report(fmt: str = "json") -> dict[str, Any]:
+    """Full session writeup: hosts, services, vulns, creds, sessions, attacks.
+
+    Markdown for the disclosure writeup, JSON for further processing.
+    """
+    meta = _ensure_session_row()
+    conn = _neighbor_db()
+
+    hosts = [
+        {"ip": r[0], "mac": r[1], "vendor": r[2], "hostname": r[3], "os": r[4]}
+        for r in conn.execute(
+            "SELECT ip, mac, vendor, hostname, os_guess FROM discovered_hosts ORDER BY ip"
+        )
+    ]
+    svcs = conn.execute(
+        "SELECT ip, port, proto, service, product, version, state FROM discovered_services ORDER BY ip, port"
+    ).fetchall()
+    vulns = [
+        {
+            "ip": r[0],
+            "port": r[1],
+            "proto": r[2],
+            "kind": r[3],
+            "vid": r[4],
+            "severity": r[5],
+            "detail": r[6],
+        }
+        for r in conn.execute(
+            "SELECT ip, port, proto, kind, vid, severity, detail "
+            "FROM discovered_service_vulns ORDER BY severity DESC"
+        )
+    ]
+    creds = [
+        {
+            "host": r[0],
+            "port": r[1],
+            "service": r[2],
+            "user": r[3],
+            "password": r[4],
+            "found_at": r[5],
+        }
+        for r in conn.execute(
+            "SELECT host, port, service, user, password, found_at FROM found_creds ORDER BY found_at"
+        )
+    ]
+    sessions = [
+        {
+            "msf_session_id": r[0],
+            "host": r[1],
+            "port": r[2],
+            "module": r[3],
+            "opened_at": r[4],
+        }
+        for r in conn.execute(
+            "SELECT msf_session_id, host, port, module, opened_at FROM exploit_sessions ORDER BY opened_at"
+        )
+    ]
+    attempts: list[dict[str, Any]] = []
+    for job in _attack_jobs.values():
+        for a in job.get("attacks", []) or []:
+            attempts.append(
+                {
+                    "job": job.get("id"),
+                    "host": a.get("host"),
+                    "module": a.get("module"),
+                    "result": a.get("result"),
+                    "detail": (a.get("detail") or "")[:120],
+                    "session_id": a.get("session_id"),
+                }
+            )
+    conn.close()
+
+    report = {
+        **meta,
+        "scope": _session_scope_info(),
+        "generated": datetime.now(UTC).isoformat(),
+        "hosts": hosts,
+        "services": [
+            {
+                "ip": s[0],
+                "port": s[1],
+                "proto": s[2],
+                "service": s[3],
+                "product": s[4],
+                "version": s[5],
+                "state": s[6],
+            }
+            for s in svcs
+        ],
+        "vulns": vulns,
+        "credentials": creds,
+        "sessions": sessions,
+        "exploit_attempts": attempts,
+    }
+
+    scope_info: Any = report["scope"]
+    service_rows: Any = report["services"]
+
+    if fmt == "md":
+        lines = [
+            f"# h4k session report — {meta['session_id']}",
+            f"*generated {report['generated']}*",
+            "",
+        ]
+        if scope_info.get("engagement_id"):
+            lines.append(
+                f"**Scope:** {scope_info.get('name')} — {', '.join(scope_info.get('scope') or [])}"
+            )
+            lines.append("")
+        lines.append("## Hosts discovered")
+        for h in hosts:
+            lines.append(
+                f"- `{h['ip']}` {h['vendor'] or ''} {h['hostname'] or ''} {h['os'] or ''}".rstrip()
+            )
+        lines.append("")
+        lines.append("## Open services")
+        lines.append("| Host | Port | Service | Product | Version |")
+        lines.append("|---|---|---|---|---|")
+        for s in service_rows:
+            lines.append(
+                f"| `{s['ip']}` | {s['port']} | {s['service'] or '?'} | {s['product'] or ''} | {s['version'] or ''} |"
+            )
+        lines.append("")
+        lines.append("## Likely vulnerable")
+        for v in vulns:
+            lines.append(f"- **{v['vid']}** on `{v['ip']}:{v['port']}` — {v['detail']}")
+        lines.append("")
+        lines.append("## Credentials verified")
+        lines += [
+            f"- `{c['host']}:{c['port']}` {c['service']} — {c['user']}:{c['password']}"
+            for c in creds
+        ] or ["- none"]
+        lines.append("")
+        lines.append("## Sessions opened")
+        lines += [
+            f"- 💀 `{s['host']}` via {s['module']} (session {s['msf_session_id']})"
+            for s in sessions
+        ] or ["- none"]
+        lines.append("")
+        lines.append("## Exploit attempts")
+        lines += [
+            f"- `{a['host']}` {a['module']} → {a['result']}" for a in attempts
+        ] or ["- none"]
+        lines.append("")
+        lines.append(
+            "> Generated for authorized lab use — verify every target was owned before citing it."
+        )
+        return {"fmt": "md", "content": "\n".join(lines)}
+    return {"fmt": "json", "report": report}
 
 
 @router.post("/session/reset")
@@ -844,15 +1077,21 @@ def _run_neighbor_discovery(job: dict[str, Any], msf: MsfClient) -> None:
         data = NeighborFinder.neighbors_to_dicts(found)
         job["hosts"] = data
 
+        skipped_out_of_scope = 0
         for h in found:
             ip = h.ip
             if not ip or ":" in ip or len(ip.split(".")) != 4:
                 continue
+            ok, _reason = _host_in_scope(ip)
+            if not ok:
+                skipped_out_of_scope += 1
+                continue
             _save_neighbor_host(ip, h.mac, h.vendor, h.hostname)
 
-        _update(
-            job, status="done", progress=100.0, message=f"found {len(data)} host(s)"
-        )
+        msg = f"found {len(data)} host(s)"
+        if skipped_out_of_scope:
+            msg += f" ({skipped_out_of_scope} skipped: outside engagement scope)"
+        _update(job, status="done", progress=100.0, message=msg)
         _neighbors_cache[default_cidr] = data
     except Exception as exc:
         logger.exception("neighbor discovery failed")
@@ -954,6 +1193,7 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
             progress=lambda msg, pct: _update(job, message=msg, progress=pct)
         )
         ips = [n["ip"] for n in neighbors if n.get("ip")]
+        ips = [ip for ip in ips if _host_in_scope(ip)[0]]
         total = len(ips)
 
         def _tick(msg: str, pct: float) -> None:
@@ -1186,6 +1426,7 @@ def pass_attack(req: dict[str, Any], background: BackgroundTasks) -> dict[str, A
             status_code=422,
             detail="host + service required (ssh/ftp/telnet/mysql/http-basic)",
         )
+    _demand_scope(host)
     msf = _get_msf()
     if msf is None:
         raise HTTPException(status_code=503, detail="msf unavailable")
@@ -1419,6 +1660,7 @@ def web_probe(req: dict[str, Any]) -> dict[str, Any]:
     port = int(req.get("port") or 80)
     if not host:
         raise HTTPException(status_code=422, detail="host required")
+    _demand_scope(host)
     scheme = "https" if req.get("tls") or port in (443, 8443) else "http"
     base = f"{scheme}://{host}:{port}"
 
@@ -1558,6 +1800,9 @@ def get_graph() -> dict[str, Any]:
     hosts = msf.hosts(workspace)
     services = msf.services(workspace)
 
+    eng_id, eng_store = _active_scope()
+    out_of_scope_probe = eng_store.in_scope if (eng_id and eng_store) else None
+
     vuln_count_by_host: dict[str, int] = {}
     for v in _load_neighbor_vulns():
         vuln_count_by_host[v["ip"]] = vuln_count_by_host.get(v["ip"], 0) + 1
@@ -1592,6 +1837,9 @@ def get_graph() -> dict[str, Any]:
                 "service_count": 0,
                 "vuln_count": vuln_count_by_host.get(addr, 0),
                 "has_session": addr in session_hosts,
+                "out_of_scope": bool(
+                    addr and out_of_scope_probe and not out_of_scope_probe(addr)
+                ),
             }
         )
 
@@ -1633,6 +1881,7 @@ def get_graph() -> dict[str, Any]:
                 "service_count": len(neighbor_svcs.get(ip, [])),
                 "vuln_count": vuln_count_by_host.get(ip, 0),
                 "has_session": ip in session_hosts,
+                "out_of_scope": bool(out_of_scope_probe and not out_of_scope_probe(ip)),
             }
         )
         msf_node_ids.add(ip)
@@ -1666,6 +1915,7 @@ def attack_target(req: AttackRequest, background: BackgroundTasks) -> dict[str, 
     msf = _get_msf()
     if msf is None:
         raise HTTPException(status_code=503, detail="msf unavailable")
+    _demand_scope(req.host or req.target)
     job_id = uuid.uuid4().hex[:12]
     job = {
         "id": job_id,
@@ -1771,6 +2021,94 @@ def attack_status(job_id: str) -> dict[str, Any]:
     if not job:
         raise HTTPException(status_code=404, detail="attack job not found")
     return job
+
+
+# ---- session console --------------------------------------------------------
+
+
+@router.get("/sessions")
+def list_sessions() -> dict[str, Any]:
+    """Live MSF sessions + sessions recorded from this session's own exploits."""
+    msf = _get_msf()
+    live: list[dict[str, Any]] = []
+    if msf is not None:
+        with suppress(Exception):
+            for sid, info in (msf.sessions() or {}).items():
+                live.append(
+                    {
+                        "msf_session_id": str(sid),
+                        "host": info.get("target_host") or info.get("host") or "",
+                        "type": info.get("type") or info.get("info") or "",
+                        "source": "msf",
+                    }
+                )
+    recorded: list[dict[str, Any]] = []
+    conn = _neighbor_db()
+    try:
+        rows = conn.execute(
+            "SELECT msf_session_id, host, port, module, opened_at FROM exploit_sessions"
+        ).fetchall()
+        recorded = [
+            {
+                "msf_session_id": r[0],
+                "host": r[1],
+                "port": r[2],
+                "module": r[3],
+                "source": "recorded",
+            }
+            for r in rows
+        ]
+    finally:
+        conn.close()
+    known = {s["msf_session_id"] for s in live}
+    merged = live + [r for r in recorded if r["msf_session_id"] not in known]
+    return {"sessions": merged, "count": len(merged)}
+
+
+@router.post("/sessions/{msf_session_id}/cmd")
+def session_cmd(msf_session_id: str, req: dict[str, Any]) -> dict[str, Any]:
+    """Run a command on an open session (post-exploit console)."""
+    msf = _get_msf()
+    if msf is None:
+        raise HTTPException(status_code=503, detail="msf unavailable")
+    cmd = (req.get("command") or "").strip()
+    if not cmd:
+        raise HTTPException(status_code=422, detail="command required")
+
+    try:
+        sess = msf.client.sessions.session(msf_session_id)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"no such session: {exc}") from exc
+    if sess is None:
+        raise HTTPException(status_code=404, detail="session closed or unknown")
+
+    try:
+        if hasattr(sess, "run_shell_cmd"):
+            out = sess.run_shell_cmd(cmd)
+            return {
+                "session": msf_session_id,
+                "command": cmd,
+                "output": (out or "")[:4000],
+            }
+        # plain shell session: interactive read/write
+        sess.write(cmd.encode() if isinstance(cmd, str) else cmd)
+        import time as _time
+
+        buf: str = ""
+        deadline = _time.time() + 6
+        while _time.time() < deadline:
+            chunk = sess.read()
+            if chunk:
+                buf += chunk
+                if _time.time() > deadline - 1:
+                    break
+            else:
+                _time.sleep(0.4)
+        return {"session": msf_session_id, "command": cmd, "output": buf[:4000]}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500, detail=f"session command failed: {exc}"
+        ) from exc
 
 
 _toolkit_jobs: dict[str, dict[str, Any]] = {}

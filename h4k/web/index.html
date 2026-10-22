@@ -40,6 +40,7 @@
 
       <div class="header-right">
         <span class="session-badge" id="session-badge" title="Current recon session">—</span>
+        <select id="scope-select" class="scope-select" title="Active engagement scope — aggressive actions are restricted to these CIDRs"></select>
         <button class="icon-btn" id="btn-session-reset" title="Reset session (clears discovered hosts/services/vulns)">⟳</button>
         <button class="icon-btn" id="sound-toggle" title="Sound effects">🔊</button>
         <button class="icon-btn" id="cmd-palette-btn" title="Command palette (Ctrl+K)">⌘</button>
@@ -299,6 +300,26 @@
                 <span class="ex-status" id="ex-status">Ready — verify the target is yours to test.</span>
               </div>
               <div class="ex-output" id="ex-output" hidden></div>
+              <div class="ex-console" id="ex-console" hidden>
+                <div class="ex-console-head">
+                  <span>🖥 Session Console</span>
+                  <span class="fp-chip" id="ex-console-target">—</span>
+                </div>
+                <div class="ex-quick">
+                  <button class="btn btn-secondary btn-sm" data-excmd="sysinfo">sysinfo</button>
+                  <button class="btn btn-secondary btn-sm" data-excmd="getuid">getuid</button>
+                  <button class="btn btn-secondary btn-sm" data-excmd="ifconfig">ifconfig</button>
+                  <button class="btn btn-secondary btn-sm" data-excmd="hashdump">hashdump</button>
+                </div>
+                <div class="input-row">
+                  <div class="input-group grow">
+                    <label>Command</label>
+                    <input type="text" id="ex-cmd" placeholder="meterpreter/shell command…" />
+                  </div>
+                  <button class="btn btn-primary" id="btn-ex-cmd">Run</button>
+                </div>
+                <div class="ex-output visible" id="ex-console-output"></div>
+              </div>
             </div>
           </div>
 
@@ -385,6 +406,7 @@
               <h2>🕸️ Network Graph</h2>
               <div class="graph-controls">
                 <button class="btn btn-secondary" id="btn-graph-refresh">↻ Refresh</button>
+                <button class="btn btn-secondary" id="btn-session-report" title="Download the full session writeup">⇩ Report</button>
                 <span class="graph-stat" id="graph-host-count">0 hosts</span>
                 <span class="graph-stat" id="graph-svc-count">0 services</span>
               </div>
