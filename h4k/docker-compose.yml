@@ -1,5 +1,6 @@
 services:
   h4k:
+    container_name: h4k_h4k
     build: .
     image: h4k:latest
     network_mode: host
@@ -9,35 +10,50 @@ services:
       MSF_PASSWORD: h4k_msf_rocks
       TOR_PORT: "9050"
       API_PORT: "3137"
-      # Local LLM (root-cause/patch assist). Point at the host/sidecar Ollama.
       H4K_AI_PROVIDER: ollama
-      OLLAMA_BASE_URL: http://127.0.0.1:11434
+      OLLAMA_BASE_URL: http://127.0.0.1:3139
       H4K_AI_MODEL: qwen2.5:latest
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3137/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
-  # lab-only intentionally-vulnerable fuzzing target (teaches 0-day discovery)
   vulnlab:
+    container_name: h4k_vulnlab
     build: ../vulnlab
     image: vulnlab:latest
     network_mode: host
     environment:
-      VULNLAB_PORT: "8080"
+      VULNLAB_PORT: "3138"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --timeout=3 http://127.0.0.1:3138/ | grep -q vulnlab || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
-  # optional local LLM sidecar. Runs Ollama on a NON-standard host port so it
-  # doesn't collide with a host daemon. To use it, point h4k's OLLAMA_BASE_URL
-  # at http://127.0.0.1:11435 (or the compose service hostname on a custom net).
   ollama-sidecar:
     image: ollama/ollama:latest
+    container_name: h4k_ollama
     ports:
-      - "127.0.0.1:11435:11434"
+      - "127.0.0.1:3139:11434"
     volumes:
       - ollama-data:/root/.ollama
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
     command: serve
     restart: unless-stopped
-    profiles: ["llm"]  # start with: docker compose --profile llm up
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    profiles: ["llm"]
 
 volumes:
   ollama-data:

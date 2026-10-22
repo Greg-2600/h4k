@@ -5,6 +5,7 @@
 # is explicitly requested. Also includes container escape, lateral movement,
 # DB interrogation, hash cracking, wireless, and packet analysis.
 import logging
+import shutil
 import subprocess  # nosec B404 - runs external offensive tools
 import time
 from collections.abc import Callable
@@ -28,12 +29,74 @@ def _as_text(data: str | bytes | None) -> str:
     return data
 
 
+def _which(tool: str) -> str | None:
+    """Return path to tool if installed, else None."""
+    return shutil.which(tool)
+
+
+# Map of tool names to their binary paths (checked at startup)
+TOOL_CHECKS = {
+    "hydra": ["hydra"],
+    "nikto": ["nikto"],
+    "gobuster": ["gobuster"],
+    "ffuf": ["ffuf"],
+    "sqlmap": ["sqlmap"],
+    "nmap": ["nmap"],
+    "john": ["john"],
+    "zip": ["zip"],
+    "smbmap": ["smbmap"],
+    "smbclient": ["smbclient"],
+    "rpcclient": ["rpcclient"],
+    "secretsdump": ["secretsdump"],
+    "ldapsearch": ["ldapsearch"],
+    "getnpusers": ["GetNPUsers.py"],
+    "getuserspns": ["GetUserSPNs.py"],
+    "wpscan": ["wpscan"],
+    "dnsrecon": ["dnsrecon"],
+    "zap": ["zap"],
+    "aircrack": ["aircrack-ng"],
+    "tshark": ["tshark"],
+    "tcpdump": ["tcpdump"],
+    "snmpwalk": ["snmpwalk"],
+    "netdiscover": ["netdiscover"],
+    "ping": ["ping"],
+    "nc": ["nc", "netcat"],
+    "ncat": ["ncat"],
+    "socat": ["socat"],
+    "chisel": ["chisel"],
+    "proxychains": ["proxychains"],
+}
+
+
 class ToolkitRunner:
     def __init__(
         self,
         progress: Callable[[str, float], None] | None = None,
     ):
         self.progress = progress or (lambda msg, pct: None)
+        self._available_tools: dict[str, str] = {}
+        self._check_tools()
+
+    def _check_tools(self) -> None:
+        """Check which tools are available and cache their paths."""
+        for tool, names in TOOL_CHECKS.items():
+            for name in names:
+                path = _which(name)
+                if path:
+                    self._available_tools[tool] = path
+                    break
+
+    def is_tool_available(self, tool: str) -> bool:
+        """Check if a tool is available."""
+        return tool in self._available_tools
+
+    def get_available_tools(self) -> dict[str, str]:
+        """Return dict of available tool -> path."""
+        return dict(self._available_tools)
+
+    def get_missing_tools(self, tools: list[str]) -> list[str]:
+        """Return list of tools from the given list that are not available."""
+        return [t for t in tools if t not in self._available_tools]
 
     def run_tool(self, tool: str, argv: list[str], timeout: int = 300) -> dict:
         """Run an external tool.

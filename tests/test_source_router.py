@@ -46,6 +46,7 @@ def client(monkeypatch):
 
     app_state.msf_client = FakeMsf()
     app_state.cve_db = CveDbStub()
+    main_module._rate_store = None
 
     @asynccontextmanager
     async def _noop(_app):

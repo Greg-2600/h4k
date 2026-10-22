@@ -81,6 +81,10 @@ class AttackRequest(BaseModel):
     host: str | None = None  # specific host to attack, else all
     services: list[str] = []  # services to attack (ssh/http/smb/...)
     open_sessions: bool = False
+    # an operator triaging a specific finding can name the module and port
+    # instead of letting the service->module heuristic choose; both optional.
+    module: str | None = None
+    port: int | None = None
 
 
 class FuzzRequest(BaseModel):
@@ -153,6 +157,8 @@ class Fingerprint(BaseModel):
     vendor: str | None = None
     model: str | None = None
     os: str | None = None
+    version: str | None = None
+    product: str | None = None
     technology: list[str] = []
     source: list[str] = []
 
@@ -236,11 +242,20 @@ class Report(BaseModel):
 class Job(BaseModel):
     id: str
     status: str  # queued | running | done | error | aborted
-    progress: float = 0.0
+    progress: float | None = None
     message: str = ""
     report: Report | None = None
     error: str | None = None
     cached: bool = False
+    # Without these, response_model filtering drops them and the UI's
+    # incremental log tail is dead code.
+    log: list[str] = []
+    created: str | None = None
+    updated: str | None = None
+    # so a client that holds only a job id can still say what it is scanning
+    target: str | None = None
+    # job family type injected by _job_summary for the monitor
+    type: str | None = None
 
 
 class Neighbor(BaseModel):
@@ -539,3 +554,86 @@ class ADMitm6Request(BaseModel):
 class ADResponderRequest(BaseModel):
     interface: str
     options: dict[str, Any] = Field(default_factory=dict)
+
+
+# ---- Ollama Exploit ----
+
+
+class OllamaResult(BaseModel):
+    """Result from Ollama exploit/discover operations."""
+
+    ollama_detected: bool = False
+    auth_bypass: bool = False
+    tool_calling_available: bool = False
+    models: list[dict[str, Any]] = Field(default_factory=list)
+    dangerous_capabilities: list[dict[str, Any]] = Field(default_factory=list)
+    recommendations: list[dict[str, Any]] = Field(default_factory=list)
+    error: str | None = None
+
+
+class OllamaRceResult(BaseModel):
+    """Result from Ollama tool-calling RCE execution."""
+
+    target: str
+    port: int
+    command: str
+    stdout: str = ""
+    stderr: str = ""
+    rc: int = 0
+    error: str | None = None
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# ---- API improvements ----
+
+
+class PaginatedJobs(BaseModel):
+    """Paginated job list response."""
+
+    jobs: list[Job]
+    total: int
+    active: int
+    page: int
+    per_page: int
+    pages: int
+
+
+class BatchScanRequest(BaseModel):
+    """Scan multiple targets in one call."""
+
+    targets: list[str]
+    mode: ScanMode = ScanMode.overt
+    depth: ScanDepth = ScanDepth.standard
+    do_dns_recon: bool = False
+    do_vuln_scan: bool = True
+    try_default_creds: bool = False
+    open_sessions: bool = False
+    do_attack: bool = False
+
+
+class BatchScanResult(BaseModel):
+    """Result of a batch scan launch."""
+
+    batch_id: str
+    jobs: list[Job]
+    launched: int
+    message: str
+
+
+class StreamEvent(BaseModel):
+    """Server-Sent Event payload for job log streaming."""
+
+    event: str  # "log" | "progress" | "status" | "complete"
+    job_id: str
+    data: dict[str, Any]
+
+
+class HealthDetail(BaseModel):
+    """Detailed health with component status."""
+
+    status: str
+    msf: dict[str, Any]
+    jobs: dict[str, Any]
+    cache_entries: int
+    updater: str
+    version: str

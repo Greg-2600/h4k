@@ -39,7 +39,7 @@ HACKING/                 git root
       routers/           scan.py, source.py, update.py
       services/          ~24 modules (see below)
     data/                cves.json, creds.json, wordlists, custom_rules.json (runtime)
-    web/                 terminal/zsh-style UI (index.html, app.js, style.css)
+    web/                 light dashboard UI (index.html, app.js, style.css)
     scripts/             DNS recon bash tools
     README.md            main human doc (PHRACK-style)
   vulnlab/               intentionally-vulnerable fuzzing TARGET (separate container)
@@ -95,7 +95,8 @@ coverage (CI gate 70%), pylint ~9.88.
 
 Host recon/scan:
 - `POST /scan` `{target, mode, do_dns_recon, do_vuln_scan, try_default_creds, open_sessions, do_attack}`
-- `GET /jobs/{id}`, `GET /report/{id}`, `POST /scan/{id}/abort`
+- `GET /jobs` `?active=true` (job monitor: merges **all** job families), `GET /jobs/{id}`
+- `GET /report/{id}`, `POST /scan/{id}/abort`
 - `GET /export/{id}?fmt=json|md`
 - `GET /neighbors` (ARP)
 - `POST /attack`, `GET /attack/{id}`

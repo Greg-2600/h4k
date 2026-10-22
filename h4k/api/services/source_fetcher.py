@@ -155,10 +155,10 @@ class SourceFetcher:
         cmd = ["git", "clone", "--depth", "1"]
         if branch:
             cmd += ["-b", branch]
-        cmd += [url, str(target_dir)]
+        cmd += [clone_url, str(target_dir)]
 
         try:
-            subprocess.run(
+            subprocess.run(  # nosec B603 B607
                 cmd, capture_output=True, text=True, timeout=self.timeout, check=True
             )
         except subprocess.CalledProcessError as e:
@@ -282,7 +282,7 @@ class SourceFetcher:
     def _get_repo_name(self, url: str) -> str:
         """Extract repository name from URL."""
         parsed = urlparse(url)
-        path = parsed.path.rstrip("/").rstrip(".git")
+        path = parsed.path.rstrip("/").removesuffix(".git")
         parts = path.strip("/").split("/")
         return parts[-1] if parts else "repo"
 
@@ -301,7 +301,7 @@ class SourceFetcher:
             if git_dir.exists():
                 # Get remote URL
                 try:
-                    result = subprocess.run(
+                    result = subprocess.run(  # nosec B603 B607
                         [
                             "git",
                             "-C",
@@ -316,12 +316,12 @@ class SourceFetcher:
                     )
                     if result.returncode == 0:
                         info["remote_url"] = result.stdout.strip()
-                except Exception:
+                except Exception:  # nosec B110
                     pass
 
                 # Get commit hash
                 try:
-                    result = subprocess.run(
+                    result = subprocess.run(  # nosec B603 B607
                         ["git", "-C", str(repo_path), "rev-parse", "HEAD"],
                         capture_output=True,
                         text=True,

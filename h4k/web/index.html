@@ -3,363 +3,443 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>h4k — metasploit recon tui</title>
+  <title>h4k // operations</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=4" />
 </head>
 <body>
-  <div class="app">
+  <div class="app" id="app">
 
-    <!-- top status bar (zsh-ish info line) -->
-    <div class="statusbar">
-      <div class="seg left"><span class="dir">~/h4k</span></div>
-      <div class="seg center">
-        <span class="branch">● main</span>
-        <span class="job" id="job-ind">idle</span>
-      </div>
-      <div class="seg right">
-        <span class="msf" id="msf-state">msf: —</span>
-        <span class="time" id="clock">--:--:--</span>
-      </div>
-    </div>
+    <!-- GLITCH OVERLAY -->
+    <div class="glitch-overlay" id="glitch-overlay" hidden></div>
 
-    <header class="titlebar">
-      <div class="title-dots"><span></span><span></span><span></span></div>
-      <div class="title-label">h4k · zsh — recon <a class="title-link" href="/readme" target="_blank">[read the ezine]</a></div>
-      <div class="title-right" id="sess">session: local</div>
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">h4k</span>
+        <span class="logo-sub">operations</span>
+      </div>
+
+      <!-- XP BAR -->
+      <div class="xp-section">
+        <div class="xp-info">
+          <span class="xp-level">LVL <span id="player-level">1</span></span>
+          <span class="xp-bar-wrap">
+            <span class="xp-bar" id="xp-bar"></span>
+          </span>
+          <span class="xp-num"><span id="player-xp">0</span> / <span id="player-xp-next">100</span> XP</span>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-btn active" data-phase="recon" data-shortcut="1">Recon</button>
+        <button class="nav-btn" data-phase="analyze" data-shortcut="2">Analyze</button>
+        <button class="nav-btn" data-phase="prepare" data-shortcut="3">Prepare</button>
+        <button class="nav-btn" data-phase="execute" data-shortcut="4">Execute</button>
+        <button class="nav-btn" data-phase="pwned" data-shortcut="5">Pwned</button>
+        <button class="nav-btn" data-phase="graph" data-shortcut="6">Graph</button>
+      </nav>
+
+      <div class="header-right">
+        <button class="icon-btn" id="sound-toggle" title="Sound effects">🔊</button>
+        <button class="icon-btn" id="cmd-palette-btn" title="Command palette (Ctrl+K)">⌘</button>
+        <button class="icon-btn" id="theme-toggle" title="Toggle theme">◐</button>
+      </div>
     </header>
 
-    <!-- persistent target-under-assessment banner, pinned on scroll -->
-    <div class="target-banner" id="target-banner" hidden>
-      <span class="tb-label">target</span>
-      <span class="tb-value" id="tb-value">—</span>
-      <span class="tb-mode" id="tb-mode"></span>
-      <button type="button" class="tb-clear" id="tb-clear" title="clear target">clear</button>
-    </div>
+    <!-- MAIN CONTENT -->
+    <main class="main">
 
-    <!-- stage navigation -->
-    <nav class="stage-nav" id="stage-nav" aria-label="workflow stage">
-      <button type="button" class="stage-btn active" data-stage="recon" id="st-recon">
-        <span class="st-num">1</span><span class="st-name">recon</span>
-      </button>
-      <button type="button" class="stage-btn" data-stage="source" id="st-source">
-        <span class="st-num">2</span><span class="st-name">source · supply</span>
-      </button>
-      <button type="button" class="stage-btn" data-stage="fix" id="st-fix">
-        <span class="st-num">3</span><span class="st-name">fix</span>
-      </button>
-    </nav>
+      <!-- LEFT SIDEBAR -->
+      <aside class="sidebar">
 
-    <main>
-      <!-- console / activity feed (left) -->
-      <section class="pane">
-        <div class="pane-head"><span class="pane-title">activity</span><span class="pane-caret">●</span></div>
-        <div class="console" id="console"></div>
-        <div class="prompt-row">
-          <span class="prompt-user">h4k</span>
-          <span class="prompt-sep">➜</span>
-          <span class="prompt-dir">~</span>
-          <input id="cmd" autocomplete="off" spellcheck="false" placeholder="scan 192.168.1.248 · help · status · clear" />
+        <!-- MISSION BRIEFING -->
+        <div class="card briefing-card" id="briefing-card">
+          <div class="card-header">
+            <h3>📋 Mission Briefing</h3>
+          </div>
+          <div class="card-body">
+            <div class="briefing-content" id="briefing-content">
+              <p class="briefing-target">Target: <strong id="brief-target">—</strong></p>
+              <div class="briefing-objectives" id="brief-objectives">
+                <div class="obj" data-obj="host">
+                  <span class="obj-check">○</span>
+                  <span>Discover host</span>
+                </div>
+                <div class="obj" data-obj="services">
+                  <span class="obj-check">○</span>
+                  <span>Enumerate services</span>
+                </div>
+                <div class="obj" data-obj="vuln">
+                  <span class="obj-check">○</span>
+                  <span>Find vulnerability</span>
+                </div>
+                <div class="obj" data-obj="exploit">
+                  <span class="obj-check">○</span>
+                  <span>Exploit target</span>
+                </div>
+                <div class="obj" data-obj="pwned">
+                  <span class="obj-check">○</span>
+                  <span>Gain shell</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- XP STATS -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🏆 Achievements</h3>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-num" id="stat-hosts">0</span>
+              <span class="stat-label">Hosts</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-num" id="stat-services">0</span>
+              <span class="stat-label">Services</span>
+            </div>
+            <div class="stat-card danger">
+              <span class="stat-num" id="stat-vulns">0</span>
+              <span class="stat-label">Vulns</span>
+            </div>
+            <div class="stat-card success">
+              <span class="stat-num" id="stat-pwned">0</span>
+              <span class="stat-label">Pwned</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUICK TOOLS -->
+        <div class="card">
+          <div class="card-header">
+            <h3>⚡ Quick Tools</h3>
+          </div>
+          <div class="tool-grid">
+            <button class="tool-btn" id="tool-neighbors">🌐 Neighbors</button>
+            <button class="tool-btn" id="tool-deep">⚔️ Deep Attack</button>
+            <button class="tool-btn" id="tool-nse">🔍 NSE Vuln</button>
+            <button class="tool-btn" id="tool-john">🔓 Crack</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CENTER CONTENT -->
+      <section class="content">
+
+        <!-- RECON PHASE -->
+        <div class="phase" id="phase-recon" data-phase="recon">
+          <div class="card">
+            <div class="card-header">
+              <h2>🎯 Target Acquisition</h2>
+            </div>
+            <div class="card-body">
+              <div class="target-form">
+                <div class="input-group">
+                  <label>Target</label>
+                  <div class="scan-type-tabs" id="scan-type-tabs">
+                    <button class="st-tab active" data-type="ip" id="tab-ip">IP / CIDR</button>
+                    <button class="st-tab" data-type="neighbors" id="tab-neighbors">Local Network</button>
+                  </div>
+                  <input type="text" id="target" placeholder="192.168.1.13 or 192.168.1.0/24" />
+                  <div class="input-hint" id="target-hint">Enter a single IP or CIDR range (e.g. 192.168.1.0/24)</div>
+                </div>
+                <div class="input-row">
+                  <div class="input-group">
+                    <label>Mode</label>
+                    <select id="mode-select">
+                      <option value="stealth">Stealth</option>
+                      <option value="tor">Tor</option>
+                      <option value="overt" selected>Overt</option>
+                    </select>
+                  </div>
+                  <div class="input-group">
+                    <label>Depth</label>
+                    <select id="depth-select">
+                      <option value="quick">Quick</option>
+                      <option value="standard" selected>Standard</option>
+                      <option value="full">Full</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="checkbox-row">
+                  <label><input type="checkbox" id="creds-toggle" /> Try default creds</label>
+                </div>
+                <button class="btn btn-primary btn-large" id="btn-launch-recon">
+                  <span class="btn-text">Launch Recon</span>
+                  <span class="btn-loading" hidden>◌ Scanning...</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scan Progress -->
+          <div class="card" id="scan-progress-card" hidden>
+            <div class="card-header">
+              <h2>📡 Scanning...</h2>
+              <span class="progress-pct" id="sp-pct">0%</span>
+            </div>
+            <div class="card-body">
+              <div class="progress-bar"><div class="progress-fill" id="sp-fill"></div></div>
+              <div class="scan-stages" id="sp-stages"></div>
+              <p class="scan-status" id="sp-status">Initializing...</p>
+            </div>
+          </div>
+
+          <!-- Target Results -->
+          <div class="card target-results" id="target-results-card" hidden>
+            <div class="card-header success">
+              <h2>🎯 Target Discovered</h2>
+            </div>
+            <div class="card-body">
+              <div class="target-header">
+                <div class="target-main">
+                  <span class="target-ip" id="result-ip">—</span>
+                  <span class="target-hostname" id="result-hostname"></span>
+                  <span class="target-os" id="result-os"></span>
+                </div>
+                <span class="target-status">● Online</span>
+              </div>
+              <h3>Services Discovered</h3>
+              <div class="service-list" id="service-list"></div>
+            </div>
+          </div>
+
+          <!-- Service Map (fingerprint results) -->
+          <div class="card" id="fingerprint-panel" hidden>
+            <div class="card-header">
+              <h2>🔍 Service Map</h2>
+              <span class="fp-status" id="fp-status">Idle</span>
+            </div>
+            <div class="card-body">
+              <div class="neighbors-progress-wrap">
+                <div class="progress-bar"><div class="progress-fill fp-fill" id="fp-fill"></div></div>
+                <span class="fp-pct" id="fp-pct">0%</span>
+              </div>
+              <div class="fp-summary" id="fp-summary">
+                <span class="fp-chip" id="fp-chip-hosts">0 hosts</span>
+                <span class="fp-chip" id="fp-chip-ports">0 open ports</span>
+              </div>
+              <div class="fp-table-wrap">
+                <table class="fp-map">
+                  <thead>
+                    <tr>
+                      <th>Host</th>
+                      <th>Port</th>
+                      <th>Service</th>
+                      <th>Product</th>
+                      <th>Version</th>
+                      <th>Vendor</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fp-tbody"></tbody>
+                </table>
+                <div class="fp-empty" id="fp-empty">No fingerprint data yet — run “Scan Services &amp; Fingerprint”.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ANALYZE PHASE -->
+        <div class="phase" id="phase-analyze" data-phase="analyze" hidden>
+          <div class="two-col">
+            <div class="card">
+              <div class="card-header">
+                <h2>⚠️ Vulnerabilities</h2>
+              </div>
+              <div class="card-body">
+                <div class="vuln-list" id="vuln-list"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <h2>📋 Details</h2>
+              </div>
+              <div class="card-body">
+                <div class="vuln-detail" id="vuln-detail">
+                  <p class="placeholder">Select a vulnerability to analyze</p>
+                </div>
+                <button class="btn btn-primary" id="btn-to-prepare" disabled>Prepare Exploit →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PREPARE PHASE -->
+        <div class="phase" id="phase-prepare" data-phase="prepare" hidden>
+          <div class="card">
+            <div class="card-header">
+              <h2>⚙️ Exploit Configuration</h2>
+            </div>
+            <div class="card-body">
+              <div class="config-summary" id="config-summary"></div>
+              <div class="config-form" id="config-form">
+                <div class="input-group">
+                  <label>RHOSTS</label>
+                  <input type="text" id="cfg-rhosts" />
+                </div>
+                <div class="input-group">
+                  <label>RPORT</label>
+                  <input type="text" id="cfg-rport" />
+                </div>
+                <div class="input-group">
+                  <label>LHOST (callback)</label>
+                  <input type="text" id="cfg-lhost" />
+                </div>
+              </div>
+              <button class="btn btn-danger btn-large" id="btn-to-execute" disabled>Execute Exploit →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- EXECUTE PHASE -->
+        <div class="phase" id="phase-execute" data-phase="execute" hidden>
+          <div class="card">
+            <div class="card-header">
+              <h2>⚡ Executing Exploit</h2>
+            </div>
+            <div class="card-body">
+              <div class="exploit-display">
+                <div class="exploit-name" id="er-exploit">—</div>
+                <div class="progress-bar large"><div class="progress-fill" id="er-fill"></div></div>
+                <p class="exploit-status" id="er-status">Connecting...</p>
+
+                <!-- TERMINAL OUTPUT -->
+                <div class="terminal-output" id="terminal-output">
+                  <div class="terminal-header">
+                    <span>📟 Terminal Output</span>
+                    <button class="terminal-clear" id="terminal-clear">Clear</button>
+                  </div>
+                  <div class="terminal-content" id="terminal-content"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PWNED PHASE -->
+        <div class="phase" id="phase-pwned" data-phase="pwned" hidden>
+          <div class="card pwned-card">
+            <div class="card-header success">
+              <h2>💀 TARGET PWNED!</h2>
+            </div>
+            <div class="card-body">
+              <div class="pwned-display">
+                <div class="pwned-icon" id="pwned-icon">💀</div>
+                <div class="pwned-target" id="pwned-target">192.168.1.13</div>
+                <div class="pwned-xp" id="pwned-xp">+100 XP</div>
+                <h3>Session Info</h3>
+                <div class="session-info" id="session-info"></div>
+                <div class="btn-row">
+                  <button class="btn btn-secondary" id="btn-next-target">Next Target</button>
+                  <button class="btn btn-outline" id="btn-new-mission">New Mission</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GRAPH PHASE -->
+        <div class="phase" id="phase-graph" data-phase="graph" hidden>
+          <div class="card">
+            <div class="card-header">
+              <h2>🕸️ Network Graph</h2>
+              <div class="graph-controls">
+                <button class="btn btn-secondary" id="btn-graph-refresh">↻ Refresh</button>
+                <span class="graph-stat" id="graph-host-count">0 hosts</span>
+                <span class="graph-stat" id="graph-svc-count">0 services</span>
+              </div>
+            </div>
+            <div class="card-body" style="padding:0; position:relative;">
+              <div id="graph-tooltip" class="graph-tooltip" hidden></div>
+              <svg id="graph-svg" width="100%" height="600"></svg>
+              <div id="graph-empty" class="graph-empty">
+                <p>No hosts discovered yet.</p>
+                <p>Run a scan or find neighbors to populate the graph.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Selected node detail -->
+          <div class="card" id="graph-detail-card" hidden>
+            <div class="card-header">
+              <h2 id="graph-detail-title">Host Details</h2>
+            </div>
+            <div class="card-body">
+              <div id="graph-detail-body"></div>
+            </div>
+          </div>
+        </div>
+
       </section>
 
-      <!-- stage panes (right; only the active stage is shown) -->
-      <div class="stages">
-
-        <!-- ============ STAGE 1 · RECON ============ -->
-        <section class="pane stage" data-stage="recon" id="stage-recon">
-          <div class="pane-head"><span class="pane-title">1 · recon</span></div>
-          <p class="stage-desc">Enumerate a host or network: ports, services, versions, posture, and neighbors.</p>
-
-          <form id="scan-form">
-            <label class="field">
-              <span class="field-lbl">target</span>
-              <input id="target" name="target" placeholder="ip · host · cidr" required />
-            </label>
-
-            <div class="field">
-              <span class="field-lbl">mode</span>
-              <div class="segmented" id="mode-select">
-                <label class="opt"><input type="radio" name="mode" value="stealth" /><span>stealth</span></label>
-                <label class="opt"><input type="radio" name="mode" value="tor" /><span>tor</span></label>
-                <label class="opt"><input type="radio" name="mode" value="overt" checked /><span>overt</span></label>
-              </div>
-            </div>
-
-            <div class="toggles">
-              <label class="field inline"><input type="checkbox" id="cve-toggle" checked /><span>enrich from local cve db</span></label>
-              <label class="field inline"><input type="checkbox" id="creds-toggle" /><span>try default credentials <em class="danger">(opt-in)</em></span></label>
-              <label class="field inline"><input type="checkbox" id="attack-toggle" /><span>active exploit attempts <em class="danger">(opt-in)</em></span></label>
-            </div>
-
-            <div class="btn-row">
-              <button type="submit" id="scan-btn">run scan</button>
-              <button type="button" id="stop-btn" class="btn-stop" disabled>stop</button>
-            </div>
-            <div class="btn-row">
-              <button type="button" id="export-json" class="btn-sub">export .json</button>
-              <button type="button" id="export-md" class="btn-sub">export .md</button>
-            </div>
-          </form>
-
-          <!-- secondary / lab tools -->
-          <details class="more-tools" id="recon-more">
-            <summary>more tools<span class="mt-hint">arp · version leads · deep attack · lab fuzz</span></summary>
-            <div class="mt-body">
-              <div class="btn-row">
-                <button type="button" id="neighbors-btn" class="btn-sub">find neighbors (arp)</button>
-                <button type="button" id="vulnleads-btn" class="btn-sub">version leads (EOL/beta)</button>
-              </div>
-              <div class="btn-row">
-                <button type="button" id="deep-attack-btn" class="btn-sub btn-danger">deep toolkit attack <em class="danger">(opt-in)</em></button>
-              </div>
-              <div class="deep-row">
-                <label class="field inline"><input type="checkbox" id="deep-ssh" checked /><span>ssh brute</span></label>
-                <label class="field inline"><input type="checkbox" id="deep-http" checked /><span>web vuln</span></label>
-                <label class="field inline"><input type="checkbox" id="deep-smb" checked /><span>smb enum</span></label>
-                <label class="field inline"><input type="checkbox" id="deep-dns" checked /><span>dns</span></label>
-              </div>
-              <div class="btn-row">
-                <button type="button" id="fuzz-btn" class="btn-sub btn-danger">lab fuzz <em class="danger">(own target)</em></button>
-              </div>
-              <div class="deep-row">
-                <label class="field inline"><input type="checkbox" id="fuzz-http" checked /><span>http</span></label>
-                <span class="field inline">target port</span>
-                <input type="text" id="fuzz-port" class="tiny-input" placeholder="auto" />
-                <span class="field inline">execs</span>
-                <input type="text" id="fuzz-iters" class="tiny-input" placeholder="500" />
-              </div>
-              <div class="mnet">
-                <div class="btn-row">
-                  <button type="button" id="iface-btn" class="btn-sub">list interfaces</button>
-                  <button type="button" id="tls-status-btn" class="btn-sub">TLS lab: status</button>
-                </div>
-                <input type="text" id="net-iface" class="full-input" placeholder="network interface (e.g. eth0 / wlan0mon)" />
-                <div class="btn-row">
-                  <button type="button" id="sniff-btn" class="btn-sub">sniff (tcpdump)</button>
-                  <button type="button" id="arp-btn" class="btn-sub">arp / arp-scan</button>
-                </div>
-                <div class="btn-row">
-                  <button type="button" id="mitm-btn" class="btn-sub btn-danger">ARP-spoof <em class="danger">(lab only)</em></button>
-                  <button type="button" id="wifi-scan-btn" class="btn-sub">wifi: scan APs</button>
-                  <button type="button" id="wifi-cap-btn" class="btn-sub">wifi: capture</button>
-                </div>
-                <div class="btn-row">
-                  <button type="button" id="tls-setup-btn" class="btn-sub btn-danger">TLS: build CA + cert</button>
-                  <button type="button" id="tls-trust-btn" class="btn-sub btn-danger">TLS: install CA</button>
-                  <button type="button" id="tls-proxy-btn" class="btn-sub btn-danger">TLS: https proxy</button>
-                </div>
-              </div>
-            </div>
-          </details>
-
-          <details class="mt-block">
-            <summary>engagement<span class="mt-hint">persistent scope · asset graph · cred propagation</span></summary>
-            <div class="mt-body">
-              <p class="stage-desc">Accumulate every host, service and credential across a whole engagement, then replay verified credentials against the rest of the in-scope estate. Scope is enforced server-side on every write and every login attempt.</p>
-              <div class="btn-row">
-                <button type="button" id="eng-new-btn" class="btn-sub">new engagement</button>
-                <button type="button" id="eng-list-btn" class="btn-sub">list</button>
-                <select id="eng-select" class="tiny-input"></select>
-              </div>
-              <div class="deep-row">
-                <input type="text" id="eng-scope" class="full-input" placeholder="authorized scope, e.g. 10.0.0.0/24, 10.1.1.5" />
-              </div>
-              <div class="btn-row">
-                <button type="button" id="eng-ingest-btn" class="btn-sub">ingest last scan</button>
-                <button type="button" id="eng-graph-btn" class="btn-sub">asset graph</button>
-                <button type="button" id="eng-creds-btn" class="btn-sub">credentials</button>
-              </div>
-              <div class="btn-row">
-                <button type="button" id="eng-plan-btn" class="btn-sub">propagation plan <em>(dry run)</em></button>
-                <button type="button" id="eng-propagate-btn" class="btn-sub btn-danger">propagate creds <em class="danger">(opt-in)</em></button>
-              </div>
-            </div>
-          </details>
-
-          <details class="mt-block" id="ctf-more">
-            <summary>ctf toolkit<span class="mt-hint">web scan · nse · john · pcap · container · db</span></summary>
-            <div class="mt-body">
-              <p class="stage-desc">CTF/lab tools that run only when you press a button. Each prints its result to the <code>/ctf toolkit</code> panel below. Authorized scope only.</p>
-
-              <input type="text" id="ctf-web-url" class="full-input" placeholder="web app URL for ZAP (http://target:8080)" />
-              <div class="btn-row">
-                <button type="button" id="ctf-zap-btn" class="btn-sub btn-danger">ZAP web scan <em class="danger">(active)</em></button>
-                <button type="button" id="ctf-nse-btn" class="btn-sub">nmap vuln NSE</button>
-              </div>
-
-              <textarea id="ctf-hashes" class="full-input" rows="2" placeholder="hashes to crack (one per line, or pasted john/htpasswd format)"></textarea>
-              <div class="btn-row">
-                <button type="button" id="ctf-john-btn" class="btn-sub btn-danger">crack hashes (john)</button>
-              </div>
-
-              <div class="deep-row">
-                <input type="text" id="ctf-pcap" class="full-input" placeholder="pcap path to analyze (e.g. /opt/h4k/data/cap.pcap)" />
-                <button type="button" id="ctf-tshark-btn" class="btn-sub">analyze pcap</button>
-              </div>
-
-              <div class="deep-row">
-                <input type="text" id="ctf-cidr" class="full-input" placeholder="lateral map CIDR (e.g. 192.168.1.0/24)" />
-                <button type="button" id="ctf-lateral-btn" class="btn-sub">map routes</button>
-              </div>
-
-              <div class="btn-row">
-                <button type="button" id="ctf-escape-btn" class="btn-sub">container escape check</button>
-                <button type="button" id="ctf-db-btn" class="btn-sub btn-danger">interrogate DB / APIs</button>
-              </div>
-            </div>
-          </details>
-        </section>
-
-        <!-- ============ STAGE 2 · SOURCE & SUPPLY ============ -->
-        <section class="pane stage" data-stage="source" id="stage-source" hidden>
-          <div class="pane-head"><span class="pane-title">2 · source &amp; supply</span></div>
-          <p class="stage-desc">Analyze a project's source (SAST) and dependency supply chain (SCA/SBOM) for vulnerabilities.</p>
-
-          <div class="btn-row">
-            <button type="button" id="source-btn" class="btn-primary">SAST source analysis</button>
-          </div>
-          <div class="deep-row" id="source-controls">
-            <input type="file" id="source-file" accept=".zip,.tar,.tar.gz,.tgz" class="file-input" />
-            <input type="text" id="source-url" class="full-input" placeholder="or git URL (https://gitlab.com/org/repo.git)" />
-            <button type="button" id="source-run" class="btn-sub">analyze</button>
-          </div>
-
-          <div class="btn-row">
-            <button type="button" id="sca-btn" class="btn-sub">SBOM / SCA (dependencies→CVEs)</button>
-            <button type="button" id="sca-map-btn" class="btn-sub">supply-chain map</button>
-          </div>
-
-          <details class="more-tools" id="source-more">
-            <summary>more<span class="mt-hint">custom semgrep rules · save + rerun over a tree</span></summary>
-            <div class="mt-body" id="custom-rule">
-              <input type="text" id="rule-pattern" class="full-input" placeholder="custom semgrep pattern, e.g. exec(request.GET[&quot;cmd&quot;])" />
-              <input type="text" id="rule-name" class="full-input" placeholder="rule name (e.g. exec-cmd-injection)" />
-              <select id="rule-severity" class="full-input">
-                <option value="medium">severity: medium</option>
-                <option value="high">severity: high</option>
-                <option value="critical">severity: critical</option>
-                <option value="low">severity: low</option>
-              </select>
-              <div class="btn-row">
-                <button type="button" id="rule-test" class="btn-sub">test custom rule</button>
-                <button type="button" id="rule-save" class="btn-sub">save rule</button>
-              </div>
-              <div class="btn-row">
-                <input type="text" id="rule-tree" class="full-input" placeholder="git URL to re-run saved rules over" />
-                <button type="button" id="rule-run-tree" class="btn-sub">run saved rules on repo</button>
-              </div>
-              <div class="btn-row">
-                <button type="button" id="rule-list" class="btn-sub">list saved rules</button>
-              </div>
-              <div id="rules-out" class="notes"></div>
-            </div>
-          </details>
-        </section>
-
-        <!-- ============ STAGE 3 · FIX ============ -->
-        <section class="pane stage" data-stage="fix" id="stage-fix" hidden>
-          <div class="pane-head"><span class="pane-title">3 · fix</span></div>
-          <p class="stage-desc">Fuzz a crash, minimize it, and get an AI exploit (minimal trigger confirming the vuln) → patch → verify plan for code you own.</p>
-
-          <div class="ai-reach"><span id="ai-reach" class="msg">ai: —</span>
-            <select id="ai-model" hidden></select>
-          </div>
-
-          <div class="btn-row">
-            <button type="button" id="ai-loop-btn" class="btn-primary">AI exploit + fix <span class="btn-sub-txt">confirm → patch → verify</span></button>
-            <button type="button" id="ai-btn" class="btn-sub">AI root-cause + patch</button>
-          </div>
-
-          <div class="btn-row">
-            <button type="button" id="ossfuzz-btn" class="btn-sub btn-danger">OSS-Fuzz auto-run <em class="danger">(own repo)</em></button>
-          </div>
-          <div class="deep-row" id="ossfuzz-controls">
-            <input type="text" id="ossfuzz-url" class="full-input" placeholder="git URL of a fuzz-harness repo you own (e.g. vulnlab)" />
-            <div class="btn-row">
-              <button type="button" id="ossfuzz-run" class="btn-sub btn-danger">build + fuzz (ASan)</button>
-              <button type="button" id="minimize-btn" class="btn-sub">minimize crash(s)</button>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <!-- progress (scan/attack jobs) -->
-      <section class="pane" id="status-pane" hidden>
-        <div class="pane-head"><span class="pane-title">/job</span><span class="pane-status" id="status-tag">queued</span></div>
-        <div class="pct" id="pct">0</div>
-        <div class="bar"><div class="bar-fill" id="prog"></div></div>
-        <div class="msg" id="status-msg">waiting…</div>
-      </section>
     </main>
 
-    <!-- ================= results (consolidated below the stages) ================= -->
-    <section class="results-head" id="results" hidden>
-      <div class="pane-head">
-        <span class="pane-title">/report</span>
-        <span class="pane-meta" id="report-meta"></span>
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div class="footer-left">
+        <span class="msf-status" id="msf-status">
+          <span class="status-dot offline"></span>
+          <span>MSF: offline</span>
+        </span>
       </div>
-    </section>
-
-    <section class="pane results report-box" id="box-hosts" hidden><div class="pane-head"><span class="pane-title">/hosts</span></div><div id="tab-hosts"></div></section>
-    <section class="pane results report-box" id="box-fp" hidden><div class="pane-head"><span class="pane-title">/fingerprint</span></div><div id="tab-fp"></div></section>
-    <section class="pane results report-box" id="box-vulns" hidden><div class="pane-head"><span class="pane-title">/vulns</span></div><div id="tab-vulns"></div></section>
-    <section class="pane results report-box" id="box-creds" hidden><div class="pane-head"><span class="pane-title">/credentials</span></div><div id="tab-creds"></div></section>
-    <section class="pane results report-box" id="box-attacks" hidden><div class="pane-head"><span class="pane-title">/attacks</span></div><div id="tab-attacks"></div></section>
-    <section class="pane results report-box" id="box-sec" hidden><div class="pane-head"><span class="pane-title">/security posture</span></div><div id="tab-sec"></div></section>
-    <section class="pane results report-box" id="box-recs" hidden><div class="pane-head"><span class="pane-title">/recommended attack</span></div><div id="tab-recs"></div></section>
-    <section class="pane results report-box" id="box-notes" hidden><div class="pane-head"><span class="pane-title">/raw notes</span></div><div id="tab-notes"></div></section>
-
-    <!-- action result panels (each action shows its output here) -->
-    <section class="pane results" id="neighbors-panel" hidden><div class="pane-head"><span class="pane-title">/neighbors</span></div><div id="tab-neighbors"></div></section>
-    <section class="pane results" id="deep-panel" hidden><div class="pane-head"><span class="pane-title">/deep toolkit</span><span class="pane-status" id="deep-status">idle</span></div><div id="tab-deep"></div></section>
-    <section class="pane results" id="vulnleads-panel" hidden><div class="pane-head"><span class="pane-title">/version leads</span></div><div id="tab-vulnleads"></div></section>
-    <section class="pane results" id="fuzz-panel" hidden><div class="pane-head"><span class="pane-title">/lab fuzz</span><span class="pane-status" id="fuzz-status">idle</span></div><div id="tab-fuzz"></div></section>
-    <section class="pane results" id="source-panel" hidden><div class="pane-head"><span class="pane-title">/source analysis</span><span class="pane-status" id="source-status">idle</span></div><div id="tab-source"></div></section>
-    <section class="pane results" id="exploit-panel" hidden><div class="pane-head"><span class="pane-title">/poc disclosure skeleton</span></div><pre class="notes" id="tab-exploit"></pre></section>
-    <section class="pane results" id="sca-panel" hidden><div class="pane-head"><span class="pane-title">/sbom · supply-chain</span></div><div id="tab-sca"></div><div class="btn-row" id="sca-actions" hidden><button type="button" id="sbom-download" class="btn-sub">download SBOM (.cdx.json)</button></div></section>
-    <section class="pane results" id="ai-panel" hidden><div class="pane-head"><span class="pane-title">/ai</span><span id="ai-model-used" class="pane-status"></span></div><div class="ai-block"><div class="pane-head sub"><span class="pane-title">→ prompt</span></div><pre class="notes" id="ai-prompt"></pre></div><div class="ai-block"><div class="pane-head sub"><span class="pane-title">← response</span></div><pre class="notes" id="tab-ai"></pre></div></section>
-    <section class="pane results" id="net-panel" hidden><div class="pane-head"><span class="pane-title">/network layer</span><span id="net-status" class="pane-status">idle</span></div><pre class="notes" id="tab-net"></pre></section>
-    <section class="pane results" id="ossfuzz-panel" hidden><div class="pane-head"><span class="pane-title">/oss-fuzz auto-run</span><span id="ossfuzz-status" class="pane-status">idle</span></div><pre class="notes" id="tab-ossfuzz"></pre></section>
-    <section class="pane results" id="ctf-panel" hidden><div class="pane-head"><span class="pane-title">/ctf toolkit</span><span id="ctf-status" class="pane-status">idle</span></div><pre class="notes" id="tab-ctf"></pre></section>
-
-    <!-- pipeline / process monitor -->
-    <section class="pane results" id="pipeline-panel" hidden>
-      <div class="pane-head">
-        <span class="pane-title">/pipeline monitor</span>
-        <span class="pane-status" id="pipe-status">idle</span>
+      <div class="footer-center">
+        <span class="hint" id="footer-hint">Select a target to begin</span>
       </div>
-      <div class="pipe-tabs">
-        <button type="button" class="pipe-tab active" data-pipe-tab="running">running</button>
-        <button type="button" class="pipe-tab" data-pipe-tab="pipeline">pipeline</button>
-        <button type="button" class="pipe-tab" data-pipe-tab="history">history</button>
-        <button type="button" class="pipe-tab" data-pipe-tab="processes">processes</button>
+      <div class="footer-right">
+        <span class="time" id="clock">--:--:--</span>
       </div>
-      <div class="pipe-content">
-        <div class="pipe-pane active" id="pipe-running">
-          <div class="pipe-list" id="pipe-running-list"></div>
+    </footer>
+
+    <!-- COMMAND PALETTE -->
+    <div class="cmd-palette" id="cmd-palette" hidden>
+      <div class="cmd-input-wrap">
+        <input type="text" class="cmd-input" id="cmd-input" placeholder="Type a command..." />
+      </div>
+      <div class="cmd-results" id="cmd-results">
+        <div class="cmd-item" data-cmd="scan">
+          <span class="cmd-label">Launch Scan</span>
+          <span class="cmd-key">Ctrl+Enter</span>
         </div>
-        <div class="pipe-pane" id="pipe-pipeline">
-          <div class="pipeline-stages" id="pipeline-stages"></div>
+        <div class="cmd-item" data-cmd="neighbors">
+          <span class="cmd-label">Find Neighbors</span>
+          <span class="cmd-key"></span>
         </div>
-        <div class="pipe-pane" id="pipe-history">
-          <div class="history-list" id="pipe-history-list"></div>
+        <div class="cmd-item" data-cmd="deep">
+          <span class="cmd-label">Deep Attack</span>
+          <span class="cmd-key"></span>
         </div>
-        <div class="pipe-pane" id="pipe-processes">
-          <div class="process-list" id="process-list"></div>
+        <div class="cmd-item" data-cmd="theme">
+          <span class="cmd-label">Toggle Theme</span>
+          <span class="cmd-key">T</span>
+        </div>
+        <div class="cmd-item" data-cmd="clear">
+          <span class="cmd-label">Clear Log</span>
+          <span class="cmd-key"></span>
         </div>
       </div>
-    </section>
+    </div>
 
-    <!-- consolidated one-click assessment report -->
-    <section class="pane results" id="merged-panel">
+    <!-- ACHIEVEMENT POPUP -->
+    <div class="achievement-popup" id="ach-popup" hidden>
+      <span class="ap-icon" id="ap-icon">🏆</span>
+      <div class="ap-text">
+        <span class="ap-title">Achievement Unlocked</span>
+        <span class="ap-name" id="ap-name">—</span>
+      </div>
+    </div>
+
+    <!-- XP POPUP -->
+    <div class="xp-popup" id="xp-popup" hidden>
+      <span class="xp-popup-text" id="xp-popup-text">+10 XP</span>
+    </div>
 
   </div>
-  <div class="legal">
-    authorized-scope only · targets you own or have written permission to test (school lab / own VMs).
-  </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=4"></script>
 </body>
 </html>

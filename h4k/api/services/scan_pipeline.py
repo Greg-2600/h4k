@@ -5,12 +5,14 @@ import ipaddress
 import logging
 import subprocess  # nosec B404 - required to drive msfconsole / bash recon tools
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import suppress
 
 from schemas import ScanRequest, Service
 from services.creds import CredArchive
 from services.modes import ScanModeConfig, get_mode, scanners_for_service
 from services.msfrpc import MsfClient
+from services.version_detector import VersionDetector
 
 logger = logging.getLogger("h4k.pipeline")
 
@@ -158,9 +160,9 @@ class ScanPipeline:
 
         self._raises_if_aborted()
 
-        # 2. Port scan into the DB.
+        # 2. Port scan into the DB (TCP + optional UDP).
         self._tick("starting port scan (db_nmap)", 20)
-        self._db_nmap(target, mode.nmap_args)
+        self._db_nmap(target, mode.nmap_args, getattr(mode, "udp_nmap_args", None))
         self._raises_if_aborted()
 
         # 3. Pull hosts + services from DB.
@@ -178,17 +180,21 @@ class ScanPipeline:
         fingerprints = self._fingerprint(hosts, mode)
         self._raises_if_aborted()
 
-        # 5. Run auxiliary scanners per detected service.
+        # 5b. Probe mystery/tcpwrapped/unknown ports with protocol-specific probes.
+        self._tick("probing mystery ports", 40)
+        self._probe_mystery_ports(hosts, mode)
+
+        # 6. Run auxiliary scanners per detected service.
         self._tick("running auxiliary vuln/enum scanners", 45)
         self._run_aux_scanners(hosts, mode)
         self._raises_if_aborted()
 
-        # 6. Collect vulnerabilities.
+        # 7. Collect vulnerabilities.
         vulns = self._collect_vulns(target)
         self._tick("collecting vulnerability findings", 80)
         self._raises_if_aborted()
 
-        # 7. OPT-IN: try default/known credentials against matched services.
+        # 8. OPT-IN: try default/known credentials against matched services.
         credentials: list[dict] = []
         if req.try_default_creds:
             self._tick("attempting default credential verification (opt-in)", 88)
@@ -197,7 +203,7 @@ class ScanPipeline:
             )
             self._raises_if_aborted()
 
-        # 8. OPT-IN: attempt active exploitation.
+        # 9. OPT-IN: attempt active exploitation.
         attacks: list[dict] = []
         if req.do_attack:
             self._tick("attempting active exploitation (opt-in)", 92)
@@ -306,13 +312,21 @@ class ScanPipeline:
 
     # ---- steps -------------------------------------------------------------
 
-    def _db_nmap(self, target: str, args: list[str]) -> None:
+    def _db_nmap(
+        self, target: str, args: list[str], udp_args: list[str] | None = None
+    ) -> None:
         with suppress(ValueError):
             target = str(ipaddress.ip_address(target))
         # db_nmap writes host/service/vuln rows straight into the Metasploit DB
         # (reuses the framework's nmap + import path rather than reimplementing).
         cmd = ["db_nmap", *args, target]
         self._msfconsole_run(cmd)
+
+        # UDP scan for common services (if not stealth/tor)
+        if udp_args and args and "-sT" not in args and "-sS" not in args:
+            self._tick("starting UDP port scan", 22)
+            udp_cmd = ["db_nmap", *udp_args, target]
+            self._msfconsole_run(udp_cmd)
 
     def _msfconsole_run(self, argv: list[str]) -> str:
         # The DB is already connected by msfrpcd, so just run db_nmap.
@@ -467,9 +481,11 @@ class ScanPipeline:
 
     def _fingerprint(self, hosts: list[dict], mode: ScanModeConfig) -> list[dict]:
         """Best-effort make/model/os/tech identification from nmap banners and
-        (for web services) whatweb output. Never definitive, always a hint."""
-        results: list[dict] = []
-        for host in hosts:
+        (for web services) whatweb output. Uses VersionDetector for detailed
+        version extraction. Uses parallel workers for whatweb across hosts."""
+        detector = VersionDetector()
+
+        def fingerprint_one(host: dict) -> dict:
             addr = host["address"]
             text_pool = [
                 host.get("os") or "",
@@ -481,8 +497,21 @@ class ScanPipeline:
             os_guess = _match_hints(text, OS_HINTS)
             tech = _match_hints_many(text, TECH_HINTS)
             source = ["nmap-banner"]
+            version = None
+            product = None
 
-            # whatweb gives much better web tech fingerprinting.
+            for svc in host["services"]:
+                banner = svc.get("info") or ""
+                if banner:
+                    detected = detector.detect(
+                        banner, svc.get("port", 0), svc.get("proto", "tcp")
+                    )
+                    if detected.get("product") and detected["product"] != "unknown":
+                        product = detected["product"]
+                    if detected.get("version"):
+                        version = detected["version"]
+                        break
+
             if mode.name != "tor":
                 www = self._whatweb(addr)
                 if www:
@@ -494,18 +523,185 @@ class ScanPipeline:
                     tech = list(
                         dict.fromkeys(tech + _match_hints_many(text, TECH_HINTS))
                     )
+                    for svc in host["services"]:
+                        if svc.get("service") in ("http", "https"):
+                            detected = detector.detect(www, svc.get("port", 0), "tcp")
+                            if detected.get("version") and not version:
+                                version = detected["version"]
+                            if detected.get("product") and not product:
+                                product = detected["product"]
 
-            results.append(
-                {
-                    "host": addr,
-                    "vendor": vendor,
-                    "model": None,
-                    "os": os_guess or host.get("os"),
-                    "technology": tech,
-                    "source": sorted(set(source)),
-                }
-            )
+            return {
+                "host": addr,
+                "vendor": vendor,
+                "model": None,
+                "os": os_guess or host.get("os"),
+                "version": version,
+                "product": product,
+                "technology": tech,
+                "source": sorted(set(source)),
+            }
+
+        max_workers = min(8, len(hosts)) if hosts else 1
+        if max_workers <= 1:
+            return [fingerprint_one(h) for h in hosts]
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(fingerprint_one, h): h for h in hosts}
+            results = []
+            for future in as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as exc:
+                    host = futures[future]
+                    logger.warning(
+                        "fingerprint failed for %s: %s", host.get("address"), exc
+                    )
+                    results.append(
+                        {
+                            "host": host.get("address"),
+                            "vendor": None,
+                            "model": None,
+                            "os": None,
+                            "version": None,
+                            "product": None,
+                            "technology": [],
+                            "source": ["error"],
+                        }
+                    )
         return results
+
+    def _probe_mystery_ports(self, hosts: list[dict], mode: ScanModeConfig) -> None:
+        """Send protocol-specific probes to mystery/tcpwrapped/unknown ports to
+        identify the service. Updates the host services in-place."""
+        import socket
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        PROBES: list[tuple[int, bytes, float, str]] = [
+            (7, b"\xff\xff\xff\xff\xff\xff", 1.0, "echo"),
+            (13, b"", 1.0, "daytime"),
+            (37, b"", 1.0, "time"),
+            (53, b"", 2.0, "dns"),
+            (123, b"\xdb\x06\x00\x01\x00\x00\x00\x00\x00\x01", 2.0, "ntp"),
+            (137, b"\x00" * 50, 2.0, "netbios-ns"),
+            (138, b"\x00" * 50, 2.0, "netbios-dgm"),
+            (139, b"\x00" * 50, 2.0, "netbios-ssn"),
+            (161, b"\x30\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 2.0, "snmp"),
+            (445, b"\x00" * 50, 2.0, "smb"),
+            (514, b"", 1.0, "syslog"),
+            (520, b"", 1.5, "rip"),
+            (1234, b"", 2.0, "vlsi-lm"),
+            (1701, b"\x00" * 60, 2.0, "l2tp"),
+            (1812, b"\x00" * 60, 1.5, "radius"),
+            (1813, b"\x00" * 60, 1.5, "radius-acct"),
+            (
+                1900,
+                b'M-SEARCH * HTTP/1.1\r\nHost:239.255.255.250:1900\r\nMan:"ssdp:discover"\r\n\r\n',
+                2.0,
+                "ssdp",
+            ),
+            (2049, b"\x00" * 50, 2.0, "nfs"),
+            (5060, b"\x00" * 60, 2.0, "sip"),
+            (5353, b"\x00" * 60, 1.5, "mdns"),
+            (11211, b"stats\r\n", 2.0, "memcache"),
+            (27017, b"\x00" * 16, 2.0, "mongodb"),
+        ]
+
+        def do_probe(addr: str, port: int, proto: str) -> dict | None:
+            for p, payload, timeout, name in PROBES:
+                if p != port:
+                    continue
+                try:
+                    sock = socket.socket(
+                        socket.AF_INET,
+                        socket.SOCK_DGRAM if proto == "udp" else socket.SOCK_STREAM,
+                    )
+                    sock.settimeout(timeout)
+                    if proto == "tcp":
+                        try:
+                            sock.connect((addr, port))
+                            if payload:
+                                sock.sendall(payload)
+                            resp = sock.recv(256)
+                        except (
+                            TimeoutError,
+                            ConnectionRefusedError,
+                            ConnectionResetError,
+                            OSError,
+                        ):
+                            continue
+                        finally:
+                            sock.close()
+                    else:
+                        try:
+                            sock.sendto(payload, (addr, port))
+                            resp, _ = sock.recvfrom(256)
+                        except (
+                            TimeoutError,
+                            ConnectionRefusedError,
+                            ConnectionResetError,
+                            OSError,
+                        ):
+                            continue
+                        finally:
+                            sock.close()
+                    if resp is None:
+                        continue
+                    banner = resp[:200].hex() if resp else ""
+                    return {
+                        "host": addr,
+                        "port": port,
+                        "proto": proto,
+                        "service": name,
+                        "banner": banner,
+                    }
+                except Exception:  # nosec B112
+                    continue
+            return None
+
+        tasks: list[tuple[str, int, str]] = []
+        for host in hosts:
+            for svc in host.get("services", []):
+                if svc.get("state") != "open":
+                    continue
+                info = svc.get("info") or ""
+                svc_name = svc.get("service") or ""
+                if (
+                    svc_name not in ("unknown", "tcpwrapped", "")
+                    and info
+                    and info != "tcpwrapped"
+                ):
+                    continue
+                tasks.append((host["address"], svc["port"], svc.get("proto", "tcp")))
+
+        if not tasks:
+            return
+
+        results: list[dict] = []
+        with ThreadPoolExecutor(max_workers=min(8, len(tasks))) as executor:
+            futures = {
+                executor.submit(do_probe, addr, port, proto): (addr, port, proto)
+                for addr, port, proto in tasks
+            }
+            for future in as_completed(futures):
+                try:
+                    r = future.result()
+                    if r:
+                        results.append(r)
+                except Exception:  # nosec B110
+                    pass
+
+        svc_map: dict[tuple[str, int, str], dict] = {}
+        for host in hosts:
+            for svc in host.get("services", []):
+                key = (host["address"], svc["port"], svc.get("proto", "tcp"))
+                svc_map[key] = svc
+
+        for r in results:
+            key = (r["host"], r["port"], r["proto"])
+            if key in svc_map:
+                svc_map[key]["service"] = r["service"]
+                svc_map[key]["info"] = r.get("banner", "")
 
     def _whatweb(self, addr: str) -> str:
         """Run whatweb (if present) for web tech fingerprinting. Returns plain text."""
@@ -649,6 +845,14 @@ class ScanPipeline:
             return False
 
         self._log(f"[creds] try {user}:{password} on {addr}:{port} ({module})")
+        logger.info(
+            "trying credential %s:%s on %s:%s via %s",
+            user,
+            password,
+            addr,
+            port,
+            module,
+        )
         try:
             res = self.msf.execute("auxiliary", module, opts)
             # For auxiliary modules, execute returns a job_id + uuid immediately.
@@ -867,7 +1071,7 @@ def _match_hints(
         return _match_hints_many(text, hints)
     lowered = text.lower()
     for token, label in hints:
-        if token in lowered:
+        if token.lower() in lowered:
             return label
     return ""
 
@@ -875,7 +1079,7 @@ def _match_hints(
 def _match_hints_many(text: str, hints: list[tuple[str, str]]) -> list[str]:
     """Return every matching hint label as a list."""
     lowered = text.lower()
-    hits = [label for token, label in hints if token in lowered]
+    hits = [label for token, label in hints if token.lower() in lowered]
     return list(dict.fromkeys(hits))
 
 
@@ -889,7 +1093,7 @@ def _cred_vendor(fp: dict, vendor_creds: list[dict], cred: dict) -> str:
 def _service_from_dict(s: dict) -> Service:
     """Build a schemas.Service from a raw host-services dict."""
     return Service(
-        port=s.get("port"),
+        port=s.get("port", 0),
         proto=s.get("proto", "tcp"),
         service=s.get("service"),
         state=s.get("state"),

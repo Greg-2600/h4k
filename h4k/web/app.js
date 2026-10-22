@@ -1,1490 +1,1336 @@
-/* ============================================================
-   h4k — terminal UI (zsh/opencode-style)
-   ============================================================ */
+// h4k Operations Center - Full Game UI Logic
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const state = {
+  currentPhase: 'recon',
+  scanResults: null,
+  selectedVuln: null,
+  selectedExploit: null,
+  selectedService: null,
+  stats: { hosts: 0, services: 0, vulns: 0, pwned: 0 },
+  logs: [],
+  lastLogCount: 0,
+  soundEnabled: true,
+  vimIndex: 0,
+  xp: 0,
+  level: 1,
+  xpToNext: 100,
+  achievements: new Set(),
+  missionComplete: false,
+  graphData: null,
+  selectedGraphNode: null,
+  scanType: 'ip', // 'ip' or 'neighbors'
+  discoveredTarget: null,
+  fingerprintJobId: null,
+};
+
+// XP table: level -> XP required to reach it
+const XP_LEVELS = [0, 100, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000];
+
+const ACHIEVEMENTS = [
+  { id: 'first_host', name: 'First Blood', icon: '🎯', xp: 10 },
+  { id: 'port_scanner', name: 'Port Scanner', icon: '🔍', xp: 15 },
+  { id: 'vuln_finder', name: 'Vuln Hunter', icon: '⚠️', xp: 20 },
+  { id: 'exploiter', name: 'Exploiter', icon: '💀', xp: 50 },
+  { id: 'shell_stealer', name: 'Shell Stealer', icon: '🐚', xp: 75 },
+  { id: 'port_knight', name: 'Port Knight', icon: '🏆', xp: 25 },
+  { id: 'service_ enumerate', name: 'Service Spy', icon: '🕵️', xp: 15 },
+  { id: 'os_intel', name: 'OS Intel', icon: '💻', xp: 10 },
+];
+
+const LEVEL_NAMES = ['Script Kiddie', 'Hacker', 'Elite', 'Master', 'Wizard', 'Sage', 'Overlord', 'God Mode'];
+
+// ═══════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-}[c]));
+const api = (url, opts = {}) => fetch(url, {
+  headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  ...opts,
+  body: opts.body ? JSON.stringify(opts.body) : undefined,
+}).then(r => r.json());
 
-/* ---------- clock / status ---------- */
-function tick() {
-  $("clock").textContent = new Date().toLocaleTimeString("en-GB", { hour12: false });
+function log(msg, level = 'info') {
+  const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+  state.logs.push({ ts, msg, level });
+  appendActivityLog(ts, msg, level);
+  playSound('log');
 }
-tick();
-setInterval(tick, 1000);
 
-/* ---------- console ---------- */
-const consoleEl = $("console");
-function log(msg, cls = "") {
-  const ln = document.createElement("div");
-  ln.className = "ln " + cls;
-  ln.textContent = msg;
-  consoleEl.appendChild(ln);
-  // keep a bounded scrollback so the TUI stays tight
-  while (consoleEl.childElementCount > 800) consoleEl.removeChild(consoleEl.firstChild);
-  consoleEl.scrollTop = consoleEl.scrollHeight;
+function logXp(amount, reason = '') {
+  state.xp += amount;
+  const oldLevel = state.level;
+  while (state.level < XP_LEVELS.length && state.xp >= XP_LEVELS[state.level]) {
+    state.level++;
+  }
+  if (state.level > oldLevel) {
+    showAchievement(`LEVEL UP! ${LEVEL_NAMES[state.level - 1] || 'Level ' + state.level}`, '⬆️', 0);
+  }
+  updateXpDisplay();
+  showXpPopup(`+${amount} XP${reason ? ' ' + reason : ''}`);
 }
-function boot() {
-  log("h4k terminal · metasploit recon suite", "sys");
-  log("choose a stage · authorized scope only", "sys");
-}
-boot();
 
-/* ---------- pipeline stage routing ---------- */
-function setStage(name) {
-  document.querySelectorAll(".stage-btn").forEach((b) => {
-    b.classList.toggle("active", b.dataset.stage === name);
+function unlockAchievement(id) {
+  if (state.achievements.has(id)) return;
+  state.achievements.add(id);
+  const ach = ACHIEVEMENTS.find(a => a.id === id);
+  if (ach) {
+    showAchievement(ach.name, ach.icon, ach.xp);
+    logXp(ach.xp, `(${ach.name})`);
+  }
+}
+
+function playSound(type) {
+  if (!state.soundEnabled) return;
+  // Sound effects via Web Audio API - subtle beeps
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const sounds = {
+      log: { freq: 800, dur: 0.05, type: 'sine' },
+      success: { freq: 1200, dur: 0.15, type: 'sine' },
+      error: { freq: 300, dur: 0.2, type: 'sawtooth' },
+      xp: { freq: 600, dur: 0.1, type: 'triangle' },
+      scan: { freq: 440, dur: 0.08, type: 'square' },
+    };
+    const s = sounds[type] || sounds.log;
+    osc.type = s.type;
+    osc.frequency.setValueAtTime(s.freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + s.dur);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + s.dur);
+  } catch (e) { /* audio not supported */ }
+}
+
+function glitchEffect() {
+  const el = $('glitch-overlay');
+  el.hidden = false;
+  el.classList.add('active');
+  playSound('success');
+  setTimeout(() => { el.classList.remove('active'); el.hidden = true; }, 500);
+}
+
+function showXpPopup(text) {
+  const el = $('xp-popup');
+  $('xp-popup-text').textContent = text;
+  el.hidden = false;
+  setTimeout(() => { el.hidden = true; }, 1000);
+}
+
+function showAchievement(name, icon, xp) {
+  const popup = $('ach-popup');
+  $('ap-name').textContent = name;
+  $('ap-icon').textContent = icon;
+  popup.hidden = false;
+  playSound('xp');
+  setTimeout(() => { popup.hidden = true; }, 3000);
+}
+
+function updateXpDisplay() {
+  const xpForCurrentLevel = XP_LEVELS[state.level - 1] || 0;
+  const xpForNextLevel = XP_LEVELS[state.level] || XP_LEVELS[XP_LEVELS.length - 1];
+  const progress = state.xp - xpForCurrentLevel;
+  const needed = xpForNextLevel - xpForCurrentLevel;
+  const pct = Math.min(100, (progress / needed) * 100);
+
+  $('player-level').textContent = state.level;
+  $('player-xp').textContent = state.xp;
+  $('player-xp-next').textContent = xpForNextLevel;
+  $('xp-bar').style.width = pct + '%';
+}
+
+// ═══════════════════════════════════════════
+// PHASE MANAGEMENT
+// ═══════════════════════════════════════════
+function setPhase(phase) {
+  state.currentPhase = phase;
+  document.querySelectorAll('.phase').forEach(el => {
+    el.hidden = el.dataset.phase !== phase;
   });
-  document.querySelectorAll(".stage").forEach((p) => {
-    p.hidden = p.dataset.stage !== name;
+  document.querySelectorAll('.nav-btn').forEach(el => {
+    el.classList.toggle('active', el.dataset.phase === phase);
+  });
+  updateHint();
+}
+
+function updateHint() {
+  const hints = {
+    recon: 'Enter target IP, configure options, and hit Launch Recon',
+    analyze: 'Select a vulnerability to analyze and prepare an exploit',
+    prepare: 'Configure exploit options (LHOST is auto-detected)',
+    execute: 'Execute the exploit and await session',
+    pwned: 'Session established! Use Next Target or start New Mission',
+    graph: 'Explore the discovered host graph — click nodes for details',
+  };
+  $('footer-hint').textContent = hints[state.currentPhase] || '';
+}
+
+function updateMissionObjective(obj, done = true) {
+  const el = document.querySelector(`[data-obj="${obj}"]`);
+  if (!el) return;
+  el.classList.toggle('done', done);
+  el.classList.remove('active');
+  if (done) {
+    el.querySelector('.obj-check').textContent = '✓';
+    playSound('success');
+  }
+}
+
+// ═══════════════════════════════════════════
+// ACTIVITY LOG
+// ═══════════════════════════════════════════
+function appendActivityLog(ts, msg, level = 'info') {
+  let el = $('activity-log');
+  if (!el) return;
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${ts}</span><span class="log-msg ${level}">${escHtml(msg)}</span>`;
+  el.appendChild(entry);
+  el.scrollTop = el.scrollHeight;
+  // keep max 200 entries
+  while (el.children.length > 200) el.removeChild(el.firstChild);
+}
+
+function clearActivityLog() {
+  const el = $('activity-log');
+  if (el) while (el.firstChild) el.removeChild(el.firstChild);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════════════════
+// COMMAND PALETTE
+// ═══════════════════════════════════════════
+function toggleCmdPalette(show) {
+  const el = $('cmd-palette');
+  if (show === undefined) show = el.hidden;
+  el.hidden = !show;
+  if (!show) $('cmd-input').value = '';
+  else setTimeout(() => $('cmd-input').focus(), 50);
+}
+
+function executeCmd(cmd) {
+  toggleCmdPalette(false);
+  switch (cmd) {
+    case 'scan': launchScan(); break;
+    case 'neighbors': findNeighbors(); break;
+    case 'deep': deepAttack(); break;
+    case 'theme': toggleTheme(); break;
+    case 'clear': clearActivityLog(); break;
+  }
+}
+
+// ═══════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════
+function toggleTheme() {
+  const cur = document.documentElement.dataset.theme || 'light';
+  setTheme(cur === 'light' ? 'dark' : 'light');
+}
+
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('h4k-theme', theme);
+}
+
+// ═══════════════════════════════════════════
+// SCAN LAUNCH
+// ═══════════════════════════════════════════
+let scanJobId = null;
+let pollInterval = null;
+let neighborJobId = null;
+let neighborPollInterval = null;
+
+async function launchScan() {
+  const scanType = state.scanType;
+  let target;
+
+  if (scanType === 'neighbors') {
+    const res = await api('/api/neighbors/scan', { method: 'POST' });
+    if (res.job_id) {
+      neighborJobId = res.job_id;
+      startNeighborDiscovery();
+    }
+    return;
+  } else {
+    target = $('target').value.trim();
+    if (!target) { alert('Enter a target IP or CIDR'); return; }
+  }
+
+  const btn = $('btn-launch-recon');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  $('brief-target').textContent = target;
+  document.querySelector('[data-obj="host"]').classList.add('active');
+
+  setPhase('recon');
+  log(`Starting recon on ${target}...`, 'info');
+  logXp(5, '(recon started)');
+
+  try {
+    const res = await api('/api/scan', {
+      method: 'POST',
+      body: {
+        target,
+        mode: $('mode-select').value,
+        depth: $('depth-select').value,
+        do_dns_recon: false,
+        do_vuln_scan: true,
+        try_default_creds: $('creds-toggle').checked,
+        open_sessions: false,
+        do_attack: false,
+      }
+    });
+
+    if (res.job_id) {
+      scanJobId = res.job_id;
+      log(`Job ${scanJobId} created`, 'info');
+      startScanPolling();
+    } else {
+      log('Scan failed: ' + JSON.stringify(res), 'error');
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  } catch (e) {
+    log('Scan error: ' + e.message, 'error');
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function startScanPolling() {
+  $('scan-progress-card').hidden = false;
+  updateScanProgress({ stage: 'recon', pct: 0, status: 'Initializing...' });
+  pollInterval = setInterval(pollScanProgress, 2000);
+}
+
+function startNeighborDiscovery() {
+  $('neighbors-panel') || buildNeighborsPanel();
+  $('neighbors-panel').hidden = false;
+  $('neighbors-status').textContent = 'Discovering local network...';
+  $('neighbors-list').innerHTML = '';
+  $('neighbors-progress').style.width = '0%';
+  $('neighbors-progress-wrap').hidden = false;
+  $('btn-launch-recon').disabled = true;
+  log('Local network discovery started', 'info');
+  neighborPollInterval = setInterval(pollNeighborDiscovery, 1500);
+}
+
+async function pollNeighborDiscovery() {
+  if (!neighborJobId) return;
+  try {
+    const res = await api(`/api/neighbors/status/${neighborJobId}`);
+    updateNeighborProgress(res);
+    if (res.status === 'done' || res.status === 'error') {
+      clearInterval(neighborPollInterval);
+      onNeighborDiscoveryDone(res);
+    }
+  } catch (e) { log('Neighbor poll error: ' + e.message, 'error'); }
+}
+
+function updateNeighborProgress(job) {
+  const pct = job.progress || 0;
+  $('neighbors-progress').style.width = pct + '%';
+  $('neighbors-status').textContent = job.message || job.status;
+  $('neighbors-progress-pct').textContent = Math.round(pct) + '%';
+
+  const hosts = job.hosts || [];
+  const list = $('neighbors-list');
+  const existingIPs = new Set(Array.from(list.querySelectorAll('.neighbor-item')).map(el => el.dataset.ip));
+
+  hosts.forEach(h => {
+    if (!existingIPs.has(h.ip)) {
+      existingIPs.add(h.ip);
+      const el = document.createElement('div');
+      el.className = 'neighbor-item';
+      el.dataset.ip = h.ip;
+      el.innerHTML = `
+        <span class="ni-ip">${h.ip}</span>
+        <span class="ni-vendor">${h.vendor || 'unknown'}</span>
+        <span class="ni-hostname">${h.hostname || ''}</span>
+        <span class="ni-status">discovered</span>
+      `;
+      list.appendChild(el);
+      setTimeout(() => el.classList.add('pop'), 50);
+    }
   });
 }
-document.querySelectorAll(".stage-btn").forEach((b) => {
-  b.addEventListener("click", () => setStage(b.dataset.stage));
-});
 
-/* ---------- target banner ---------- */
-const targetBanner = $("target-banner");
-function setTargetBanner(target, mode) {
-  if (!target) { targetBanner.hidden = true; return; }
-  $("tb-value").textContent = target;
-  $("tb-mode").textContent = mode || "";
-  targetBanner.hidden = false;
-}
-$("tb-clear").addEventListener("click", () => setTargetBanner("", ""));
+async function onNeighborDiscoveryDone(job) {
+  const hosts = job.hosts || [];
+  clearInterval(neighborPollInterval);
 
-/* ---------- action button busy state ---------- */
-function busy(btn, on) {
-  if (!btn) return;
-  btn.classList.toggle("busy", !!on);
-  btn.disabled = !!on;
-}
+  $('neighbors-progress').style.width = '100%';
+  $('btn-launch-recon').disabled = false;
 
-/* ---------- scan form ---------- */
-const form = $("scan-form"), scanBtn = $("scan-btn");
-const statusPane = $("status-pane"), results = $("results");
-const prog = $("prog"), pctEl = $("pct"), statusMsg = $("status-msg");
-let pollTimer = null;
-let currentJob = null;
-// capture each source's results so the consolidated report can merge them all
-let lastScanReport = null;   // host scan render() payload
-let lastSast = null;         // SAST findings
-let lastSca = null;          // SCA result
-let lastFuzz = null;         // lab-fuzz candidates
-let lastMergedReport = null; // last consolidated report (JSON)
-// last SAST scan result (findings); AI button refuses to run without real data
-// last OSS-Fuzz minimized crash so the AI loop can reason about a real trigger
-let lastMinimized = null;
-// last OSS-Fuzz auto-run result (crashes carry server-side minimized inputs)
-let lastOssFuzz = null;
-
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const target = $("target").value.trim();
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-  const useCve = $("cve-toggle").checked;
-  const tryCreds = $("creds-toggle").checked;
-  const doAttack = $("attack-toggle").checked;
-  if ((tryCreds || doAttack) && !window.confirm(
-    "You are about to run an ACTIVE action against " + target +
-    " (default-cred test / exploit attempt).\n\n" +
-    "Only proceed if you own this system or have WRITTEN permission to test it.\n\nProceed?"
-  )) {
-    log("scan cancelled — active action not confirmed", "err");
+  if (job.status === 'error') {
+    log('Neighbor discovery failed: ' + (job.error || 'unknown error'), 'error');
+    $('neighbors-status').textContent = 'Discovery failed';
     return;
   }
-  setTargetBanner(target, "mode:" + mode);
-  $("target").value = "";
-  busy(scanBtn, true);
-  $("stop-btn").disabled = false;
-  $("neighbors-panel").hidden = true;
-  statusPane.hidden = false;
-  results.hidden = true;
-  prog.style.width = "0%"; pctEl.textContent = "0";
-  $("status-msg").textContent = "queued…";
-  $("status-tag").textContent = "queued";
-    log(`scan ${target} · mode=${mode}` + (useCve ? " · cve-db" : "")
-      + (tryCreds ? " · creds" : "") + (doAttack ? " · attack" : ""), "info");
-    setStage("recon");
-    try {
-    const resp = await fetch("/api/scan", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target, mode, do_dns_recon: true, do_vuln_scan: true,
-        try_default_creds: tryCreds, open_sessions: tryCreds, do_attack: doAttack }),
+
+  if (hosts.length === 0) {
+    log('No neighbors found. Is arp-scan available?', 'warn');
+    $('neighbors-status').textContent = 'No hosts found';
+    return;
+  }
+
+  log(`Found ${hosts.length} neighbor(s) on local network`, 'success');
+  $('neighbors-status').textContent = `${hosts.length} host(s) found — ready to scan`;
+
+  unlockAchievement('first_host');
+  logXp(10, '(neighbors found)');
+
+  const cidrs = [];
+  for (const h of hosts) {
+    const parts = h.ip.split('.');
+    cidrs.push(`${parts[0]}.${parts[1]}.${parts[2]}.0/24`);
+  }
+  const unique = [...new Set(cidrs)];
+  const target = unique.join(',');
+  $('brief-target').textContent = target;
+  document.querySelector('[data-obj="host"]').classList.add('active');
+
+  const btnArea = $('neighbors-btn-area');
+  if (btnArea) btnArea.hidden = false;
+
+  state.discoveredTarget = target;
+}
+
+function buildNeighborsPanel() {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'neighbors-panel';
+  card.hidden = true;
+  card.innerHTML = `
+    <div class="card-header">
+      <h2>🌐 Local Network Discovery</h2>
+      <span class="neighbors-status" id="neighbors-status">Initializing...</span>
+    </div>
+    <div class="card-body">
+      <div class="neighbors-progress-wrap" id="neighbors-progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="neighbors-progress"></div></div>
+        <span class="neighbors-progress-pct" id="neighbors-progress-pct">0%</span>
+      </div>
+      <div class="neighbors-list" id="neighbors-list"></div>
+      <div class="neighbors-btn-area" id="neighbors-btn-area" hidden>
+        <div class="btn-row neighbors-actions">
+          <button class="btn btn-primary" id="btn-fingerprint">
+            🔍 Scan Services &amp; Fingerprint
+          </button>
+          <button class="btn btn-outline" id="btn-full-scan">
+            ⚡ Full Port Scan
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  $('phase-recon').insertBefore(card, $('scan-progress-card'));
+}
+
+let fingerprintPollInterval = null;
+
+async function startFingerprintScan() {
+  const btn = $('btn-fingerprint');
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+  log('Starting service fingerprint scan...', 'info');
+
+  try {
+    const res = await api('/api/neighbors/fingerprint', { method: 'POST' });
+    if (res.job_id) {
+      state.fingerprintJobId = res.job_id;
+      log(`Fingerprint job ${res.job_id} started`, 'info');
+      startFingerprintPolling();
+    } else {
+      log('Fingerprint failed: ' + JSON.stringify(res), 'error');
+      if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+    }
+  } catch (e) {
+    log('Fingerprint error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+  }
+}
+
+function startFingerprintPolling() {
+  const panel = $('fingerprint-panel');
+  if (panel) panel.hidden = false;
+  fingerprintPollInterval = setInterval(pollFingerprintProgress, 2000);
+}
+
+async function pollFingerprintProgress() {
+  if (!state.fingerprintJobId) return;
+  try {
+    const res = await api(`/api/neighbors/fingerprint/status/${state.fingerprintJobId}`);
+    updateFingerprintProgress(res);
+    if (res.status === 'done' || res.status === 'error') {
+      clearInterval(fingerprintPollInterval);
+      onFingerprintDone(res);
+    }
+  } catch (e) { log('Fingerprint poll error: ' + e.message, 'error'); }
+}
+
+function updateFingerprintProgress(job) {
+  const panel = $('fingerprint-panel');
+  if (!panel) return;
+  const pct = job.progress || 0;
+  const statusEl = $('fp-status');
+  const fillEl = $('fp-fill');
+  const pctEl = $('fp-pct');
+  if (statusEl) statusEl.textContent = job.message || job.status;
+  if (fillEl) fillEl.style.width = pct + '%';
+  if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+
+  renderFingerprintTable(job.results || []);
+}
+
+function renderFingerprintTable(results) {
+  const tbody = $('fp-tbody');
+  const empty = $('fp-empty');
+  if (!tbody) return;
+
+  const rows = [];
+  results.forEach(r => {
+    const open = (r.services || []).filter(s => s.state === 'open');
+    open.forEach(s => {
+      rows.push({
+        ip: r.ip,
+        port: `${s.port}/${s.proto}`,
+        service: s.service || '?',
+        product: s.product || '',
+        version: s.version || '',
+        vendor: r.vendor || r.hostname || '',
+      });
     });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const job = await resp.json();
-    currentJob = job.id;
-    log(`[tracking] job ${job.id}` + (job.cached ? " (cached)" : ""), "ok");
-    $("job-ind").textContent = "job:" + job.id;
-    poll(job.id);
-  } catch (err) {
-    log("error " + err.message, "err");
-    busy(scanBtn, false);
-  }
-});
+  });
 
-$("stop-btn").addEventListener("click", async () => {
-  if (!currentJob) return;
-  log("[!] requesting abort of job " + currentJob + "…", "err");
-  try {
-    await fetch("/api/scan/" + currentJob + "/abort", { method: "POST" });
-  } catch (err) { log("abort error " + err.message, "err"); }
-});
+  empty.hidden = rows.length > 0;
+  const hosts = new Set(rows.map(x => x.ip));
 
-async function doExport(fmt) {
-  if (!currentJob) { log("[!] no job to export", "err"); return; }
-  try {
-    const resp = await fetch(`/api/export/${currentJob}?fmt=${fmt}`);
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const data = await resp.json();
-    const blob = new Blob([data.content], { type: "text/plain" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = data.filename;
-    a.click();
-    log(`[+] exported ${data.filename} (${fmt})`, "ok");
-  } catch (err) { log("export error " + err.message, "err"); }
+  const chipHosts = $('fp-chip-hosts');
+  const chipPorts = $('fp-chip-ports');
+  if (chipHosts) chipHosts.textContent = `${hosts.size} hosts`;
+  if (chipPorts) chipPorts.textContent = `${rows.length} open ports`;
+
+  // cheap diff: only rebuild if row count changed (poll is 2s, scan is slow)
+  if (tbody.dataset.rowCount === String(rows.length)) return;
+  tbody.dataset.rowCount = String(rows.length);
+  tbody.innerHTML = rows.map(x => `
+    <tr>
+      <td class="fp-ip">${escHtml(x.ip)}</td>
+      <td class="fp-port">${escHtml(x.port)}</td>
+      <td>${escHtml(x.service)}</td>
+      <td>${escHtml(x.product)}</td>
+      <td>${escHtml(x.version)}</td>
+      <td class="fp-vendor">${escHtml(x.vendor)}</td>
+    </tr>
+  `).join('');
 }
-$("export-json").addEventListener("click", () => doExport("json"));
-$("export-md").addEventListener("click", () => doExport("md"));
 
-$("neighbors-btn").addEventListener("click", async () => {
-  $("neighbors-panel").hidden = false;
-  $("tab-neighbors").innerHTML = "sweeping local net (arp)…";
-  log("[*] discovering neighbors via arp…", "info");
+async function onFingerprintDone(job) {
+  const btn = $('btn-fingerprint');
+  if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+
+  if (job.status === 'error') {
+    log('Fingerprint scan failed: ' + (job.error || 'unknown'), 'error');
+    return;
+  }
+
+  const results = job.results || [];
+  renderFingerprintTable(results);
+
+  const statusEl = $('fp-status');
+  if (statusEl) statusEl.textContent = 'Complete';
+  const fillEl = $('fp-fill');
+  if (fillEl) fillEl.style.width = '100%';
+  const pctEl = $('fp-pct');
+  if (pctEl) pctEl.textContent = '100%';
+
+  const openPorts = results.reduce((n, r) => n + (r.services || []).filter(s => s.state === 'open').length, 0);
+  const hosts = new Set(
+    results.flatMap(r => (r.services || []).filter(s => s.state === 'open').length ? [r.ip] : [])
+  );
+  log(`Service map complete — ${hosts.size} hosts, ${openPorts} open ports`, 'success');
+  logXp(15, '(fingerprint)');
+  unlockAchievement('port_scanner');
+}
+
+async function startFullScan() {
+  if (!state.discoveredTarget) {
+    log('No target — run neighbor discovery first', 'warn');
+    return;
+  }
+  log('Starting full port scan...', 'info');
+  logXp(5, '(recon started)');
+
+  const btn = $('btn-full-scan');
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+
+  $('btn-launch-recon').classList.add('loading');
+  $('btn-launch-recon').disabled = true;
+
+  setPhase('recon');
+
   try {
-    const resp = await fetch("/api/neighbors");
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const data = await resp.json();
-    const nbs = data.neighbors || [];
-    if (!nbs.length) { $("tab-neighbors").innerHTML = "<p class='msg'>no neighbors found via arp</p>"; return; }
-    let h = "<table><tr><th>ip</th><th>mac</th><th>vendor</th><th>hostname</th></tr>";
-    for (const n of nbs) {
-      h += `<tr><td>${esc(n.ip)}</td><td>${esc(n.mac || "—")}</td>` +
-        `<td>${esc(n.vendor || "—")}</td><td>${esc(n.hostname || "—")}</td></tr>`;
-    }
-    $("tab-neighbors").innerHTML = h + "</table>";
-    log(`[+] ${nbs.length} neighbor(s) found`, "ok");
-  } catch (err) { log("neighbors error " + err.message, "err"); $("tab-neighbors").innerHTML = "<p class='msg'>error: " + esc(err.message) + "</p>"; }
-});
-
-function poll(id) {
-  clearInterval(pollTimer);
-  let last = -1;
-  let logCursor = 0;
-  pollTimer = setInterval(async () => {
-    try {
-      const resp = await fetch("/api/jobs/" + id);
-      if (!resp.ok) throw new Error("http " + resp.status);
-      const j = await resp.json();
-      const pct = Math.round(j.progress || 0);
-      prog.style.width = pct + "%";
-      pctEl.textContent = String(pct);
-      $("status-msg").textContent = j.message || "";
-      $("status-tag").textContent = j.status;
-      if (pct !== last) { last = pct; log(`[${pct}%] ${j.message}`, "info"); }
-      if (j.log && j.log.length > logCursor) {
-        for (const line of j.log.slice(logCursor)) log(line);
-        logCursor = j.log.length;
+    const res = await api('/api/scan', {
+      method: 'POST',
+      body: {
+        target: state.discoveredTarget,
+        mode: $('mode-select').value,
+        depth: $('depth-select').value,
+        do_dns_recon: false,
+        do_vuln_scan: false,
+        try_default_creds: $('creds-toggle').checked,
+        open_sessions: false,
+        do_attack: false,
       }
-      if (j.status === "done") {
-        clearInterval(pollTimer);
-        log("scan complete", "ok");
-        $("job-ind").textContent = "idle";
-        $("stop-btn").disabled = true;
-        render(j.report);
-        busy(scanBtn, false);
-      } else if (j.status === "aborted") {
-        clearInterval(pollTimer);
-        log("scan aborted by operator", "err");
-        $("job-ind").textContent = "idle";
-        $("stop-btn").disabled = true;
-        busy(scanBtn, false);
-      } else if (j.status === "error") {
-        clearInterval(pollTimer);
-        log("error: " + (j.error || "unknown"), "err");
-        $("job-ind").textContent = "idle";
-        $("stop-btn").disabled = true;
-        busy(scanBtn, false);
+    });
+
+    if (res.job_id) {
+      scanJobId = res.job_id;
+      log(`Job ${scanJobId} created`, 'info');
+      startScanPolling();
+    } else {
+      log('Scan failed: ' + JSON.stringify(res), 'error');
+      if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+      $('btn-launch-recon').classList.remove('loading');
+      $('btn-launch-recon').disabled = false;
+    }
+  } catch (e) {
+    log('Scan error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+    $('btn-launch-recon').classList.remove('loading');
+    $('btn-launch-recon').disabled = false;
+  }
+}
+
+async function pollScanProgress() {
+  if (!scanJobId) return;
+  try {
+    const res = await api(`/api/jobs/${scanJobId}`);
+    updateScanProgressFromJob(res);
+    if (res.status === 'completed' || res.status === 'failed') {
+      clearInterval(pollInterval);
+      onScanComplete(res);
+    }
+  } catch (e) { log('Poll error: ' + e.message, 'error'); }
+}
+
+function updateScanProgress(data) {
+  $('sp-pct').textContent = data.pct + '%';
+  $('sp-fill').style.width = data.pct + '%';
+  $('sp-status').textContent = data.status || '';
+
+  const stages = ['recon', 'fingerprint', 'scan', 'creds', 'attack'];
+  const stageEl = $('sp-stages');
+  stageEl.innerHTML = stages.map(s => {
+    const cls = s === data.stage ? 'active' : (data.pct > stages.indexOf(s) * 20 ? 'done' : '');
+    return `<span class="scan-stage ${cls}">${s}</span>`;
+  }).join('');
+}
+
+function updateScanProgressFromJob(job) {
+  const stageMap = { running: 'scan', completed: 'attack', failed: 'scan' };
+  const stage = job.current_module ? job.current_module.split('/').pop().split('_')[0] : 'scan';
+  const pct = job.progress || 0;
+  updateScanProgress({ stage, pct, status: job.status });
+
+  // Poll server logs for cred attempts
+  if (job.log && job.log.length > state.lastLogCount) {
+    const newLogs = job.log.slice(state.lastLogCount);
+    newLogs.forEach(line => {
+      const credMatch = line.match(/\[creds\] try (.+?):(.+?) on (.+?):(.+?) \((.+?)\)/);
+      if (credMatch) {
+        log(`AUTH: ${credMatch[1]}:${credMatch[2]} → ${credMatch[3]}:${credMatch[4]}`, 'warn');
+      } else if (line.includes('SUCCESS') || line.includes('success')) {
+        log(`✓ ${line}`, 'success');
+      } else if (line.startsWith('[+]')) {
+        log(line, 'success');
       }
-    } catch (err) {
-      clearInterval(pollTimer);
-      $("job-ind").textContent = "idle";
-      $("stop-btn").disabled = true;
-      busy(scanBtn, false);
+    });
+    state.lastLogCount = job.log.length;
+  }
+}
+
+async function onScanComplete(job) {
+  log('Scan completed', 'success');
+  unlockAchievement('first_host');
+  logXp(20, '(host discovered)');
+
+  $('btn-launch-recon').classList.remove('loading');
+  $('btn-launch-recon').disabled = false;
+
+  try {
+    const report = await api(`/api/report/${scanJobId}`);
+    if (report && report.hosts && report.hosts.length > 0) {
+      displayScanResults(report.hosts[0]);
     }
-  }, 1000);
+  } catch (e) { log('Failed to fetch report: ' + e.message, 'error'); }
 }
 
-/* ---------- rendering ---------- */
-function render(r) {
-  results.hidden = false;
-  lastScanReport = r;
-  $("report-meta").textContent =
-    `${r.target} · ${r.mode} · ${(r.created_at || "").slice(11, 19)}`;
-  renderHosts(r.hosts);
-  renderFingerprints(r.fingerprints);
-  renderVulns(r.vulns, r.mode);
-  renderCreds(r.credentials);
-  renderAttacks(r.attacks);
-  renderSecurity(r.security);
-  renderRecs(r.recommendations);
-  renderNotes(r.notes);
-  log(`report: ${r.hosts.length} host(s) · ${r.vulns.length} vuln(s) · ${r.recommendations.length} vector(s)`, "ok");
-}
+function displayScanResults(host) {
+  state.scanResults = host;
+  state.stats.hosts = 1;
 
-function renderFingerprints(fps) {
-  const el = $("tab-fp");
-  const has = fps && fps.length;
-  $("box-fp").hidden = !has;
-  if (!has) { el.innerHTML = "<p class='msg'>no fingerprint data</p>"; return; }
-  let h = "<table><tr><th>host</th><th>vendor</th><th>model</th><th>os</th><th>technology</th><th>source</th></tr>";
-  for (const f of fps) {
-    h += `<tr><td>${esc(f.host)}</td><td>${esc(f.vendor || "?")}</td>` +
-      `<td>${esc(f.model || "—")}</td><td>${esc(f.os || "—")}</td>` +
-      `<td>${esc((f.technology || []).join(", ") || "—")}</td>` +
-      `<td>${esc((f.source || []).join(", "))}</td></tr>`;
+  $('result-ip').textContent = host.address || 'Unknown';
+  $('result-hostname').textContent = host.name || '';
+  $('result-os').textContent = host.os_name || '';
+
+  unlockAchievement('port_scanner');
+  logXp(15, '(port scan)');
+
+  if (host.services) {
+    state.stats.services = host.services.length;
+    const list = $('service-list');
+    list.innerHTML = '';
+    host.services.forEach((svc, i) => {
+      const el = document.createElement('div');
+      el.className = 'service-item';
+      el.dataset.index = i;
+      el.innerHTML = `
+        <span class="svc-port">${svc.port}/${svc.proto}</span>
+        <span class="svc-name">${svc.name} ${svc.product || ''}</span>
+        <span class="svc-state ${svc.state}">${svc.state}</span>
+      `;
+      el.addEventListener('click', () => selectService(i));
+      list.appendChild(el);
+      // Pulse animation delay
+      setTimeout(() => el.classList.add('pulse'), i * 100);
+    });
   }
-  el.innerHTML = h + "</table>";
-}
 
-function renderAttacks(attacks) {
-  const el = $("tab-attacks");
-  const has = attacks && attacks.length;
-  $("box-attacks").hidden = !has;
-  if (!has) { el.innerHTML = "<p class='msg'>no attack attempts (opt-in exploit).</p>"; return; }
-  let h = "<table><tr><th>host</th><th>service</th><th>module</th><th>result</th><th>session</th><th>detail</th></tr>";
-  for (const a of attacks) {
-    const ok = a.result === "success";
-    h += `<tr><td>${esc(a.host)}</td><td>${esc(a.service)}:${esc(a.port ?? "?")}</td>` +
-      `<td>${esc(a.module)}</td>` +
-      `<td>${ok ? '<span class="ok">success</span>' : '<span class="err">' + esc(a.result) + '</span>'}</td>` +
-      `<td>${esc(a.session_id != null ? "s" + a.session_id : "—")}</td>` +
-      `<td>${esc((a.detail || "").slice(0, 80))}</td></tr>`;
-  }
-  el.innerHTML = h + "</table>";
-}
+  updateMissionObjective('host');
+  updateMissionObjective('services');
+  document.querySelector('[data-obj="vuln"]').classList.add('active');
 
-function renderCreds(creds) {
-  const el = $("tab-creds");
-  const has = creds && creds.length;
-  $("box-creds").hidden = !has;
-  if (!has) { el.innerHTML = "<p class='msg'>no credentials tested (opt-in default).</p>"; return; }
-  let h = "<table><tr><th>host</th><th>service</th><th>user</th><th>password</th><th>vendor</th><th>status</th></tr>";
-  for (const c of creds) {
-    h += `<tr><td>${esc(c.host)}</td><td>${esc(c.service)}:${esc(c.port ?? "?")}</td>` +
-      `<td>${esc(c.user)}</td><td>${esc(c.password)}</td>` +
-      `<td>${esc(c.vendor || "common")}</td>` +
-      `<td>${c.verified ? '<span class="ok">verified</span>' : '<span>tested</span>'}</td></tr>`;
-  }
-  el.innerHTML = h + "</table>";
-}
+  $('target-results-card').hidden = false;
+  log('Host discovered: ' + host.address, 'success');
+  playSound('success');
 
-function renderSecurity(sec) {
-  const el = $("tab-sec");
-  const has = sec && sec.length;
-  $("box-sec").hidden = !has;
-  if (!has) { el.innerHTML = "<p class='msg'>no security assessment (traceroute)</p>"; return; }
-  let h = "";
-  for (const s of sec) {
-    const cls = s.level === "low" ? "badge-critical" : (s.level === "medium" ? "badge-high" : "badge-sec");
-    h += '<div class="rec-card"><span class="rec-rank">◉</span>' +
-      '<span class="rec-title">' + esc(s.host) + '</span> ' +
-      '<span class="' + cls + '">' + esc(s.level.toUpperCase()) + ' posture</span>' +
-      ' <span class="rec-diff">score ' + esc(Math.round(s.score || 0)) + '/100 · confidence ' + esc(s.confidence || "low") + '</span><br/>' +
-      '<div class="rec-why">';
-    for (const r of (s.rationale || [])) h += '<div>· ' + esc(r) + '</div>';
-    h += "</div></div>";
-  }
-  el.innerHTML = h;
-}
-
-function renderHosts(hosts) {
-  const el = $("tab-hosts");
-  const has = hosts && hosts.length;
-  $("box-hosts").hidden = !has;
-  if (!has) { el.innerHTML = "<p class='msg'>no hosts responding</p>"; return; }
-  let h = "<table><tr><th>host</th><th>os</th><th>state</th></tr>";
-  for (const hd of hosts) {
-    h += `<tr><td>${esc(hd.address)}</td><td>${esc(hd.os || "—")}</td>` +
-         `<td>${esc(hd.state || "—")}</td></tr>`;
-    // per-service detail rows: port/proto, service, version banner (info), state
-    for (const s of (hd.services || [])) {
-      h += `<tr class="svc-row"><td> </td>` +
-        `<td colspan="2"><span class="svc-port">${esc(s.port)}/${esc(s.proto||"tcp")}</span> ` +
-        `<span class="svc-name">${esc(s.service || "?")}</span>` +
-        (s.info ? ` <span class="svc-info">${esc(s.info)}</span>` : "") +
-        ` <span class="svc-state">${esc(s.state || "")}</span></td></tr>`;
-    }
-  }
-  el.innerHTML = h + "</table>";
-}
-
-function renderVulns(vulns, mode) {
-  const el = $("tab-vulns");
-  const has = vulns && vulns.length;
-  $("box-vulns").hidden = !has;
-  if (!has) { el.innerHTML = "<p class='msg'>no logged findings</p>"; return; }
-  let h = "<table><tr><th>finding</th><th>port</th><th>refs</th></tr>";
-  for (const v of vulns) {
-    const refs = (v.refs || []).map(esc).join(" · ") || "—";
-    h += `<tr><td>${esc(v.name || "unknown")}</td><td>${esc(v.port ?? "—")}</td><td>${refs}</td></tr>`;
-  }
-  el.innerHTML = h + "</table>";
-}
-
-function renderRecs(recs) {
-  const el = $("tab-recs");
-  const has = recs && recs.length;
-  $("box-recs").hidden = !has;
-  if (!has) { el.innerHTML = "<p class='msg'>no vectors prioritized</p>"; return; }
-  el.innerHTML = recs.map((r) => {
-    const cve = (r.refs || []).find((x) => /CVE-\d/.test(x)) || "";
-    return `<div class="rec-card">
-      <span class="rec-rank">${r.rank}.</span>
-      <span class="rec-title">${esc(r.title)}</span>
-      ${cve ? ` <span class="cvss ${r.difficulty==="easy"?"max":""}">${esc(cve)}</span>` : ""}
-      ${r.difficulty ? ` <span class="rec-diff">// ${esc(r.difficulty)}</span>` : ""}<br/>
-      ${r.module ? `<span class="rec-modal">${esc(r.module)}</span><br/>` : ""}
-      <span class="rec-why">${esc(r.why)}</span>
-    </div>`;
-  }).join("");
-}
-
-function renderNotes(notes) {
-  const el = $("tab-notes");
-  const has = notes && notes.length;
-  $("box-notes").hidden = !has;
-  if (!has) { el.innerHTML = "<p class='msg'>no notes</p>"; return; }
-  el.innerHTML = "<pre class='notes'>" + esc(notes.join("\n\n")) + "</pre>";
-}
-
-/* ---------- command input ---------- */
-const cmd = $("cmd");
-cmd.addEventListener("keydown", async (e) => {
-  if (e.key !== "Enter") return;
-  const raw = cmd.value.trim();
-  cmd.value = "";
-  if (!raw) return;
-  log(raw, "ok");
-  if (raw === "help" || raw === "?") {
-    log("commands:  help · status · clear · scan <target> [stealth|tor|overt]");
-  } else if (raw === "clear") {
-    consoleEl.innerHTML = "";
-  } else if (raw === "status") {
-    try {
-      const r = await (await fetch("/api/health")).json();
-      log(`msf: ${r.msf.reachable ? "up" : "down"} · v${r.msf.version ? r.msf.version.version.trim() : "?"} · ${r.jobs} jobs`, "info");
-    } catch (err) { log("error " + err.message, "err"); }
-  } else if (raw.startsWith("scan ")) {
-    const parts = raw.slice(5).trim().split(/\s+/);
-    $("target").value = parts[0] || "";
-    const m = parts[1];
-    if (["stealth", "tor", "overt"].includes(m))
-      document.querySelector(`input[value="${m}"]`).checked = true;
-    form.requestSubmit();
+  // If vulns found, go to analyze
+  if (host.vulnerabilities && host.vulnerabilities.length > 0) {
+    state.stats.vulns = host.vulnerabilities.length;
+    unlockAchievement('vuln_finder');
+    logXp(20, '(vuln found)');
+    displayVulns(host.vulnerabilities);
+    setTimeout(() => setPhase('analyze'), 1000);
   } else {
-    log("unknown: '" + raw + "' — try 'help'", "err");
+    setTimeout(() => setPhase('analyze'), 1000);
   }
-});
+}
 
-/* ---------- deep toolkit attack ---------- */
-let deepTimer = null;
-$("deep-attack-btn").addEventListener("click", async () => {
-  const target = $("target").value.trim();
-  if (!target) { log("[!] enter a target first for deep attack", "err"); return; }  if (!window.confirm(
-    "DEEP TOOLKIT attack on " + target + "\n" +
-    "Runs brute-force (hydra), web vuln (nikto/sqlmap), smb & dns tools.\n\n" +
-    "Only proceed if you own this system or have WRITTEN permission to test it.\n\nProceed?"
-  )) { log("deep toolkit attack cancelled — not confirmed", "err"); return; }
-  const services = [];
-  if ($("deep-ssh").checked) services.push("ssh");
-  if ($("deep-http").checked) services.push("http");
-  if ($("deep-smb").checked) services.push("smb");
-  if ($("deep-dns").checked) services.push("dns");
-  $("deep-panel").hidden = false;
-  $("deep-status").textContent = "queued";
-  $("tab-deep").innerHTML = "<p class='msg'>launching deep toolkit sweep…</p>";
-  log(`[!] deep toolkit attack on ${target} :: ${services.join(",")}`, "err");
-  busy($("deep-attack-btn"), true);
+function selectService(idx) {
+  document.querySelectorAll('.service-item').forEach((el, i) => {
+    el.classList.toggle('selected', i === idx);
+  });
+  state.selectedService = state.scanResults.services[idx];
+  log(`Selected: ${state.selectedService.port}/${state.selectedService.proto} (${state.selectedService.name})`, 'info');
+}
+
+// ═══════════════════════════════════════════
+// VULNERABILITIES
+// ═══════════════════════════════════════════
+function displayVulns(vulns) {
+  const list = $('vuln-list');
+  if (!list) return;
+  list.innerHTML = '';
+  vulns.forEach((v, i) => {
+    const el = document.createElement('div');
+    el.className = 'vuln-item';
+    el.innerHTML = `
+      <div class="vi-name">${v.name || 'Unknown Vulnerability'}</div>
+      <div class="vi-meta">
+        <span class="vi-cve">${v.references?.[0] || 'N/A'}</span>
+        <span class="vi-difficulty ${v.difficulty || 'moderate'}">${v.difficulty || 'moderate'}</span>
+      </div>
+    `;
+    el.addEventListener('click', () => selectVuln(v));
+    list.appendChild(el);
+  });
+}
+
+function selectVuln(vuln) {
+  state.selectedVuln = vuln;
+  document.querySelectorAll('.vuln-item').forEach(el => el.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+
+  const detail = $('vuln-detail');
+  detail.innerHTML = `
+    <div class="vd-title">${vuln.name}</div>
+    <div class="vd-row"><span class="vd-label">CVE</span><span class="vd-value">${vuln.references?.[0] || 'N/A'}</span></div>
+    <div class="vd-row"><span class="vd-label">Severity</span><span class="vd-value">${vuln.severity || 'Medium'}</span></div>
+    <div class="vd-row"><span class="vd-label">Description</span><span class="vd-value">${vuln.description || 'No description'}</span></div>
+    ${vuln.exploits ? `<div class="vd-exploit"><div class="vd-exploit-name">Recommended Exploit</div><div class="vd-exploit-path">${vuln.exploits[0]?.name || vuln.exploits[0]?.module || 'N/A'}</div></div>` : ''}
+  `;
+  $('btn-to-prepare').disabled = false;
+}
+
+// ═══════════════════════════════════════════
+// EXECUTE PHASE
+// ═══════════════════════════════════════════
+async function executeExploit() {
+  const exploit = state.selectedExploit;
+  if (!exploit) return;
+
+  setPhase('execute');
+  log(`Executing ${exploit}...`, 'warn');
+  playSound('scan');
+
+  $('er-exploit').textContent = exploit;
+  $('er-fill').style.width = '30%';
+  $('er-status').textContent = 'Connecting to target...';
+
   try {
-    const resp = await fetch("/api/deepattack", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target, host: target, services }),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const job = await resp.json();
-    pollDeep(job.job_id);
-  } catch (err) { log("deep attack error " + err.message, "err"); }
-});
-
-function pollDeep(jobId) {
-  clearInterval(deepTimer);
-  deepTimer = setInterval(async () => {
-    try {
-      const resp = await fetch("/api/deepattack/" + jobId);
-      if (!resp.ok) { clearInterval(deepTimer); return; }
-      const job = await resp.json();
-      $("deep-status").textContent = job.status;
-      if (job.results && job.results.length) renderDeep(job.results);
-      if (job.status === "done" || job.status === "error") {
-        clearInterval(deepTimer);
-        busy($("deep-attack-btn"), false);
-        log("[+] deep toolkit attack complete", "ok");
+    const res = await api('/api/attack', {
+      method: 'POST',
+      body: {
+        module: exploit,
+        rhosts: $('cfg-rhosts').value || state.scanResults.address,
+        rport: $('cfg-rport').value || state.selectedVuln?.port,
+        lhost: $('cfg-lhost').value || await getLocalIP(),
       }
-    } catch (err) { clearInterval(deepTimer); }
+    });
+
+    if (res.attack_id) {
+      pollAttackStatus(res.attack_id);
+    } else if (res.session_id) {
+      onExploitSuccess(res);
+    } else {
+      log('Exploit failed: ' + JSON.stringify(res), 'error');
+      $('er-status').textContent = 'Exploit failed';
+      $('er-fill').style.width = '100%';
+      $('er-fill').style.background = 'var(--danger)';
+      playSound('error');
+    }
+  } catch (e) {
+    log('Exploit error: ' + e.message, 'error');
+    $('er-status').textContent = 'Error: ' + e.message;
+  }
+}
+
+async function pollAttackStatus(attackId) {
+  $('er-fill').style.width = '60%';
+  $('er-status').textContent = 'Exploiting...';
+
+  for (let i = 0; i < 15; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await api(`/api/attack/${attackId}`);
+      appendTerminal(res.output || '...');
+      if (res.status === 'completed') {
+        if (res.success) onExploitSuccess(res);
+        else {
+          $('er-fill').style.background = 'var(--danger)';
+          $('er-status').textContent = 'Exploit failed';
+          playSound('error');
+        }
+        return;
+      }
+    } catch (e) { /* continue polling */ }
+  }
+  $('er-status').textContent = 'Timeout waiting for result';
+}
+
+function onExploitSuccess(res) {
+  $('er-fill').style.width = '100%';
+  $('er-status').textContent = 'EXPLOIT SUCCESSFUL!';
+  glitchEffect();
+  unlockAchievement('exploiter');
+  logXp(50, '(exploit)');
+
+  setTimeout(() => {
+    unlockAchievement('shell_stealer');
+    logXp(75, '(shell)');
+    state.stats.pwned++;
+    $('pwned-target').textContent = state.scanResults.address;
+    $('pwned-xp').textContent = '+125 XP';
+    updateMissionObjective('exploit');
+    updateMissionObjective('pwned');
+    setPhase('pwned');
   }, 1500);
 }
 
-function renderDeep(results) {
-  const el = $("tab-deep");
-  let h = "<table><tr><th>tool</th><th>service</th><th>rc</th><th>output</th></tr>";
-  for (const r of results) {
-    const out = (r.stdout || "").trim();
-    const shown = out ? out.slice(0, 140) : (r.stderr || "").slice(0, 100) || "—";
-    h += `<tr><td>${esc(r.tool)}</td><td>${esc(r.service || "—")}</td>` +
-      `<td>${esc(r.rc)}</td><td>${esc(shown)}</td></tr>`;
-  }
-  el.innerHTML = h + "</table>";
-}
-
-/* ---------- version-lead scan ---------- */
-$("vulnleads-btn").addEventListener("click", async () => {
-  const target = $("target").value.trim();
-  if (!target) { log("[!] enter a target first for version-lead scan", "err"); return; }
-  $("vulnleads-panel").hidden = false;
-  $("tab-vulnleads").innerHTML = "<p class='msg'>scanning for EOL/beta/old versions…</p>";
-  log(`[*] version-lead scan on ${target}`, "info");
+async function getLocalIP() {
   try {
-    const resp = await fetch("/api/vulnleads", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target }),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const d = await resp.json();
-    const leads = d.leads || [];
-    if (!leads.length) { $("tab-vulnleads").innerHTML = "<p class='msg'>no outdated/EOL/beta version leads found</p>"; return; }
-    let h = "<table><tr><th>host</th><th>service</th><th>product</th><th>version</th><th>lead</th><th>why</th></tr>";
-    for (const l of leads) {
-      h += `<tr><td>${esc(l.host)}</td><td>${esc(l.service)}</td><td>${esc(l.product)}</td>` +
-        `<td>${esc(l.version)}</td><td>${esc(l.level)}</td><td>${esc(l.reason)} <a href="${esc(l.cve_link || "#")}" target="_blank">[ref]</a></td></tr>`;
-    }
-    $("tab-vulnleads").innerHTML = h + "</table>";
-    log(`[+] ${leads.length} version lead(s)`, "ok");
-  } catch (err) { log("version-lead error " + err.message, "err"); $("tab-vulnleads").innerHTML = "<p class='msg'>error: " + esc(err.message) + "</p>"; }
-});
-
-/* ---------- lab fuzzer ---------- */
-let fuzzTimer = null;
-$("fuzz-btn").addEventListener("click", async () => {
-  const target = $("target").value.trim();
-  if (!target) { log("[!] enter a lab target you OWN to fuzz", "err"); return; }
-  if (!window.confirm(
-    "LAB FUZZ " + target + "\n" +
-    "Mutates HTTP inputs toward this service to trip crashes/anomalies.\n\n" +
-    "This must be a system YOU OWN (it may crash or hang during fuzzing). Proceed?"
-  )) { log("fuzz cancelled — not confirmed", "err"); return; }
-  const portText = $("fuzz-port").value.trim();
-  const port = portText ? parseInt(portText, 10) : null;
-  const itersText = $("fuzz-iters").value.trim();
-  const iterations = itersText ? parseInt(itersText, 10) : 500;
-  const body = { target, host: target, service: "http", iterations };
-  if (port) body.port = port;
-  $("fuzz-panel").hidden = false;
-  $("fuzz-status").textContent = "running";
-  $("tab-fuzz").innerHTML = "<p class='msg'>fuzzing…</p>";
-  log(`[!] lab fuzz on ${target}` + (port ? ":" + port : ""), "err");
-  busy($("fuzz-btn"), true);
-  try {
-    const resp = await fetch("/api/fuzz", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const job = await resp.json();
-    pollFuzz(job.job_id);
-  } catch (err) { log("fuzz error " + err.message, "err"); }
-});
-
-function pollFuzz(jobId) {
-  clearInterval(fuzzTimer);
-  fuzzTimer = setInterval(async () => {
-    try {
-      const resp = await fetch("/api/fuzz/" + jobId);
-      if (!resp.ok) { clearInterval(fuzzTimer); return; }
-      const job = await resp.json();
-      $("fuzz-status").textContent = job.status;
-      if (job.candidates && job.candidates.length) { renderFuzz(job.candidates); lastFuzz = job.candidates; }
-      if (job.status === "done" || job.status === "error") {
-        clearInterval(fuzzTimer);
-        if (job.candidates && job.candidates.length) lastFuzz = job.candidates;
-        busy($("fuzz-btn"), false);
-        const s = job.stats && job.stats.crashes;
-        // Report distinct bugs and raw crashes as two separate numbers. A
-        // fuzzer that hits one bug 69 times has found ONE bug, and showing
-        // only the raw count is the classic way to oversell a fuzz run.
-        if (s) {
-          log(
-            "[+] fuzz complete — " + (job.count || 0) + " distinct bug(s) from " +
-            (s.total_occurrences || 0) + " crash(es) in " +
-            ((job.stats && job.stats.executed) || 0) + " execs " +
-            "(" + (s.confirmed_bugs || 0) + " confirmed, " +
-            (s.unconfirmed_leads || 0) + " unconfirmed lead(s))", "ok");
-        } else {
-          log("[+] fuzz complete — " + (job.count || 0) + " candidate(s)", "ok");
-        }
-      }
-    } catch (err) { clearInterval(fuzzTimer); }
-  }, 1600);
+    const res = await api('/api/neighbors');
+    return res.interfaces?.[0]?.ip || '127.0.0.1';
+  } catch { return '127.0.0.1'; }
 }
 
-function renderFuzz(cands) {
-  const el = $("tab-fuzz");
-  if (!cands.length) { el.innerHTML = "<p class='msg'>no anomalies detected (clean)</p>"; return; }
-  const total = cands.reduce((n, c) => n + (c.occurrences || 1), 0);
-  const confirmed = cands.filter((c) => c.confirmed).length;
-  let h = `<p class='msg'><b>${cands.length} distinct bug(s)</b> from ${total} crash(es). ` +
-    `Same bug reached by many inputs is counted once, not once per input. ` +
-    `Reproduce on a lab box, then disclose responsibly.</p>`;
-  h += `<p class='stage-desc'>Signal-guided black-box fuzzing, not coverage-guided: there is no instrumentation, so this cannot tell "reached new code" from "looks new". ${confirmed} of ${cands.length} carry a real sanitizer trace and are <b>confirmed</b>; the rest are unconfirmed leads. For coverage-guided fuzzing of an instrumented binary use the OSS-Fuzz auto-runner.</p>`;
-  h += "<p class='stage-desc'>Sanitizer-first: each signal carries the exact rebuild+replay recipe. A black-box signal is <b>not</b> a verdict — rebuild the service under ASan/UBSan and replay to get a clean trace that names the bug class.</p>";
-  h += "<table><tr><th>bug</th><th>class</th><th>vector</th><th>crashes</th><th>evidence</th><th>confirm under sanitizer</th></tr>";
-  for (const c of cands) {
-    const s = c.sanitizer || {};
-    let cell = "<span class='err'>no plan</span>";
-    if (s.relevant) {
-      cell = `<span class="ok">${esc(s.build_flags)}</span>` +
-        `<div class='msg'>then replay this vector; expect one of: ${esc((s.class_candidates || []).join(" | "))}</div>`;
-    } else {
-      cell = `<span class='msg'>${esc(s.note || "not sanitizer-adjudicable")}</span>`;
-    }
-    const conf = c.confirmed
-      ? `<span class="ok">confirmed</span> <span class='msg'>${esc(c.crash_id || "")}</span>`
-      : `<span class='msg'>unconfirmed lead</span>`;
-    h += `<tr><td>${conf}</td><td>${esc(c.bug_class || c.signal)}</td>` +
-      `<td>${esc(c.vector)}</td>` +
-      `<td>${c.occurrences || 1}</td>` +
-      `<td>${esc((c.evidence || "").slice(0, 80))}</td><td>${cell}</td></tr>`;
-  }
-  el.innerHTML = h + "</table>";
-}
-
-/* ---------- source analysis (SAST) ---------- */
-$("source-run").addEventListener("click", async () => {
-  const file = $("source-file").files[0];
-  const gitUrl = $("source-url").value.trim();
-  if (!file && !gitUrl) { log("[!] provide a file or git URL to analyze", "err"); return; }
-  $("source-panel").hidden = false;
-  $("exploit-panel").hidden = true;
-  $("source-status").textContent = "running";
-  $("tab-source").innerHTML = "<p class='msg'>analyzing source…</p>";
-  try {
-    let resp;
-    if (file) {
-      const fd = new FormData();
-      fd.append("file", file);
-      resp = await fetch("/api/source/scan/upload", { method: "POST", body: fd });
-    } else {
-      resp = await fetch("/api/source/scan", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ git_url: gitUrl }),
-      });
-    }
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const result = await resp.json();
-    $("source-status").textContent = "done";
-    renderSource(result);
-  } catch (err) {
-    $("source-status").textContent = "error";
-    $("tab-source").innerHTML = "<p class='err'>" + esc(err.message) + "</p>";
-    log("source analysis error " + err.message, "err");
-  }
-});
-
-function renderSource(result) {
-  lastSast = result; // keep for AI analysis
-  const el = $("tab-source");
-  let html = `<p class='msg'>source: ${esc(result.name)} · files scanned: ${esc(result.files_scanned)} · findings: ${esc(result.findings.length)}</p>`;
-  if (!result.findings.length) { html += "<p class='ok'>no risky patterns found</p>"; el.innerHTML = html; return; }
-  html += "<p class='stage-desc'>Sanitizer-first: each finding shows the flags + expected trace that would <b>confirm or refute</b> it. A static hit is a hypothesis, not a verdict.</p>";
-  html += "<table><tr><th>sev</th><th>cwe</th><th>file</th><th>line</th><th>issue</th><th>confirm under sanitizer</th><th></th></tr>";
-  for (const f of result.findings) {
-    const sev = f.severity === "critical" || f.severity === "high" ? "err" : "";
-    const s = f.sanitizer || {};
-    let san = "<span class='msg'>—</span>";
-    if (s.relevant) {
-      san = `<span class="ok">${esc(s.sanitizer)}</span>` +
-        `<div class='msg'>build: ${esc(s.build_flags)}</div>` +
-        `<div class='msg'>expect: ${esc(s.expect)}</div>`;
-    } else {
-      san = `<span class='msg'>${esc((s.note || "not sanitizer-adjudicable").slice(0, 150))}</span>`;
-    }
-    html += `<tr><td class="${sev}">${esc(f.severity)}</td><td>${esc(f.cwe)}</td>` +
-      `<td>${esc(f.file)}:${esc(f.line)}</td><td>${esc(f.code || "—").slice(0, 40)}</td>` +
-      `<td>${esc(f.name)}</td>` +
-      `<td>${san}</td>` +
-      `<td>` +
-      `<button class="btn-sub" onclick="genExploit(${JSON.stringify(f)})">poc</button> ` +
-      `<button class="btn-sub" onclick="downloadExploit(${JSON.stringify(f)})">dl</button>` +
-      `</td></tr>`;
-  }
-  el.innerHTML = html + "</table>";
-}
-
-async function genExploit(finding) {
-  $("exploit-panel").hidden = false;
-  $("tab-exploit").textContent = "generating disclosure PoC…";
-  try {
-    const resp = await fetch("/api/source/exploit", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rule_id: finding.rule_id, finding }),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const poc = await resp.text();
-    $("tab-exploit").textContent = poc;
-    log("[+] PoC skeleton generated for " + finding.rule_id, "ok");
-  } catch (err) { $("tab-exploit").textContent = "error: " + err.message; }
-}
-
-async function downloadExploit(finding) {
-  try {
-    const resp = await fetch("/api/source/exploit/download", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rule_id: finding.rule_id, finding }),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const blob = await resp.blob();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "h4k-poc-" + (finding.rule_id || "finding") + ".txt";
-    a.click();
-    URL.revokeObjectURL(a.href);
-    log("[+] PoC downloaded for " + finding.rule_id, "ok");
-  } catch (err) { log("PoC download error " + err.message, "err"); }
-}
-
-/* ---------- SCA / SBOM ---------- */
-$("sca-btn").addEventListener("click", async () => {
-  const url = $("source-url").value.trim();
-  if (!url) { log("[!] enter a git URL for SCA", "err"); return; }
-  $("sca-panel").hidden = false;
-  $("tab-sca").innerHTML = "<p class='msg'>building SBOM + checking dependencies…</p>";
-  log(`[*] SCA on ${url}`, "info");
-  try {
-    const resp = await fetch("/api/source/sca/git?git_url=" + encodeURIComponent(url));
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const d = await resp.json();
-    renderSca(d);
-  } catch (err) { $("tab-sca").innerHTML = "<p class='err'>" + esc(err.message) + "</p>"; log("SCA error " + err.message, "err"); }
-});
-
-function renderSca(d) {
-  const el = $("tab-sca");
-  lastSca = d;
-  const cves = d.cves || [];
-  const pkgs = d.packages || [];
-  const secrets = d.secrets || [];
-  const licenses = d.licenses || [];
-  $("sca-actions").hidden = !d.sbom_available;
-  let h = `<p class='msg'>SBOM available: ${esc(d.sbom_available ? "yes" : "no")} · packages: ${esc(pkgs.length)} · known CVEs: ${esc(cves.length)} · secrets: ${esc(secrets.length)} · licenses: ${esc(licenses.length)}</p>`;
-  if (cves.length) {
-    h += "<h3>Known CVEs</h3><table><tr><th>CVE</th></tr>";
-    for (const c of cves) h += `<tr><td>${esc(c)}</td></tr>`;
-    h += "</table>";
-  } else if (pkgs.length) {
-    h += "<p class='ok'>no known CVEs across " + esc(pkgs.length) + " package(s)</p>";
-  } else {
-    h += "<p class='msg'>no lockfiles/manifests found to scan</p>";
-  }
-  if (licenses.length) {
-    h += "<h3>Licenses (trivy)</h3><table><tr><th>package</th><th>version</th><th>licenses</th><th>target</th></tr>";
-    for (const l of licenses) {
-      h += `<tr><td>${esc(l.package)}</td><td>${esc(l.version || "—")}</td>` +
-        `<td>${esc((l.licenses || []).join(", ") || "—")}</td><td>${esc(l.target)}</td></tr>`;
-    }
-    h += "</table>";
-  }
-  if (secrets.length) {
-    h += "<h3>Hardcoded-secret candidates (heuristic)</h3><table><tr><th>kind</th><th>file</th><th>line</th><th>match</th></tr>";
-    for (const s of secrets) {
-      h += `<tr><td>${esc(s.kind)}</td><td>${esc(s.file)}:${esc(s.line)}</td>` +
-        `<td>${esc((s.code || "").slice(0, 40))}</td></tr>`;
-    }
-    h += "</table><p class='msg'>secret hits are candidates — confirm before acting.</p>";
-  }
-  el.innerHTML = h;
-  log("[+] SCA done", "ok");
-}
-
-/* ---------- SBOM download ---------- */
-$("sbom-download").addEventListener("click", async () => {
-  const url = $("source-url").value.trim();
-  if (!url) { log("[!] enter a git URL to download its SBOM", "err"); return; }
-  busy($("sbom-download"), true);
-  try {
-    const resp = await fetch("/api/source/sca/sbom?git_url=" + encodeURIComponent(url));
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const text = await resp.text();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-    a.download = "sbom.cdx.json";
-    a.click();
-    URL.revokeObjectURL(a.href);
-    log("[+] SBOM downloaded: sbom.cdx.json", "ok");
-  } catch (err) {
-    log("SBOM download error " + err.message, "err");
-  } finally {
-    busy($("sbom-download"), false);
-  }
-});
-
-/* ---------- AI root-cause + patch ---------- */
-/* ---------- AI model picker + reachability ---------- */
-async function refreshAiModels() {
-  try {
-    const resp = await fetch("/api/source/ai/models");
-    const d = await resp.json();
-    const reach = $("ai-reach");
-    if (d.ollama_reachable) {
-      reach.textContent = "ai: online (" + (d.model || "?") + ")";
-      reach.classList.add("ok");
-    } else {
-      reach.textContent = "ai: offline — no local ollama";
-      reach.classList.remove("ok");
-    }
-    const sel = $("ai-model");
-    sel.innerHTML = "";
-    for (const m of (d.models || [])) {
-      const opt = document.createElement("option");
-      opt.value = m; opt.textContent = m;
-      sel.appendChild(opt);
-    }
-    // pre-select configured model if present
-    if (d.model && (d.models || []).includes(d.model)) sel.value = d.model;
-    sel.hidden = !(d.models || []).length;
-  } catch (e) {
-    $("ai-reach").textContent = "ai: unreachable";
-    $("ai-model").hidden = true;
-    log("AI health check failed: " + e.message, "err");
-  }
-}
-refreshAiModels();
-
-function buildAiInput(fromFindings) {
-  // For the one-click full-loop demo, prefer a real minimized crash trigger
-  // (that's the actual "exploit -> fix -> verify" story).
-  if (!fromFindings && lastMinimized) {
-    return {
-      source: "minimized crash (" + (lastMinimized.source || "OSS-Fuzz") + ")",
-      text: "Analyze this minimized crash repro from a fuzzer the user owns:\n" +
-        "file: " + (lastMinimized.file || "—") + "\ninput:\n" +
-        (lastMinimized.input || "—") +
-        "\n\nPlease give ROOT_CAUSE, TRIGGER (minimal PoC confirming the vuln on this owned system), PATCH_CANDIDATE, VERIFY.",
-    };
-  }
-  // Prefer real SAST findings; else fall back to the last minimized crash.
-  if (fromFindings && lastSast && lastSast.findings && lastSast.findings.length) {
-    const f = lastSast.findings.slice(0, 10).map((x) =>
-      (x.severity || "?") + " " + (x.cwe || "") + " " + (x.name || "") +
-      " @ " + (x.file || "?") + ":" + (x.line || "?"));
-    return {
-      source: "SAST findings",
-      text: "Analyze these SAST findings in source code the user owns:\n" +
-        "Target: " + (lastSast.name || "project") + "\n" + f.join("\n") +
-        "\n\nPlease give ROOT_CAUSE, TRIGGER (minimal PoC confirming the vuln on this owned system), PATCH_CANDIDATE, VERIFY.",
-    };
-  }
-  return null;
-}
-
-async function runAi(endpoint, label, useFindings) {
-  const prompt = buildAiInput(useFindings) || buildAiInput(!useFindings);
-  if (!prompt) {
-    $("ai-panel").hidden = false;
-    $("ai-prompt").textContent = "";
-    $("ai-model-used").textContent = "";
-    $("tab-ai").textContent =
-      "No source analysis yet. Run a SAST scan (upload zip/tar or clone a git URL) or an OSS-Fuzz run + minimize so the AI has a real finding/minimized crash to reason about.";
-    log("[!] AI skipped: nothing to analyze", "err");
-    return;
-  }
-  const model = ($("ai-model").value || "").trim() || null;
-  const payload = prompt.text + "\n(analyzed from: " + prompt.source + ")";
-  $("ai-panel").hidden = false;
-  $("ai-prompt").textContent = payload;
-  $("ai-model-used").textContent = model ? "model: " + model + " · " + prompt.source : "source: " + prompt.source;
-  $("tab-ai").textContent = "asking model…";
-  try {
-    const resp = await fetch(endpoint, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: payload, model }),
-    });
-    const d = await resp.json();
-    if (d.ok) {
-      $("tab-ai").textContent = (d.parsed && (d.parsed.patch_candidate || d.parsed.verify || d.parsed.root_cause))
-        ? renderAiParsed(d.parsed, d.raw)
-        : d.raw;
-      log("[+] AI " + label + " returned", "ok");
-    } else {
-      $("tab-ai").textContent = "AI unavailable: " + (d.error || "no provider").replace(/^"|"$/g, "");
-      log("[!] AI: " + d.error, "err");
-    }
-  } catch (err) { $("tab-ai").textContent = "error: " + err.message; }
-}
-
-function renderAiParsed(parsed, raw) {
-  let h = "";
-  if (parsed.trigger) h += "TRIGGER (confirms the vuln):\n" + parsed.trigger + "\n\n";
-  if (parsed.root_cause) h += "ROOT_CAUSE:\n" + parsed.root_cause + "\n\n";
-  if (parsed.patch_candidate) h += "PATCH_CANDIDATE:\n" + parsed.patch_candidate + "\n\n";
-  if (parsed.verify) h += "VERIFY:\n" + parsed.verify + "\n\n";
-  return (h || raw || "").trim();
-}
-
-$("ai-btn").addEventListener("click", () => { setStage("fix"); runAi("/api/source/ai", "analysis", true); });
-$("ai-loop-btn").addEventListener("click", () => { setStage("fix"); runAi("/api/source/ai/loop", "full-loop", false); });
-
-/* ---------- OSS-Fuzz auto-run + crash minimization ---------- */
-$("ossfuzz-btn").addEventListener("click", () => {
-  setStage("fix");
-  $("ossfuzz-panel").hidden = false;
-  $("ossfuzz-status").textContent = "ready";
-  $("ossfuzz-url").focus();
-  log("[*] open OSS-Fuzz auto-runner — paste a git URL to a fuzz harness you own", "info");
-});
-
-$("ossfuzz-run").addEventListener("click", async () => {
-  const url = $("ossfuzz-url").value.trim();
-  if (!url) { log("[!] enter a git URL to the fuzz-harness repo you own", "err"); return; }
-  if (!window.confirm(
-    "OSS-FUZZ AUTO-RUN on " + url + "\n\n" +
-    "Clones the repo, builds with AddressSanitizer/UBSan, and runs libFuzzer for a short window. " +
-    "This compiles and executes code and may crash — only on a repo YOU OWN. Proceed?"
-  )) { log("OSS-Fuzz cancelled", "err"); return; }
-  $("ossfuzz-status").textContent = "running";
-  $("tab-ossfuzz").innerHTML = "<p class='msg'>building with ASan + fuzzing…</p>";
-  log("[!] OSS-Fuzz auto-run on " + url, "err");
-  busy($("ossfuzz-run"), true);
-  try {
-    const resp = await fetch("/api/source/ossfuzz", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ git_url: url, seconds: 10 }),
-    });
-    if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || "http " + resp.status); }
-    const d = await resp.json();
-    busy($("ossfuzz-run"), false);
-    renderOssFuzz(d);
-  } catch (err) {
-    busy($("ossfuzz-run"), false);
-    $("ossfuzz-status").textContent = "error";
-    $("tab-ossfuzz").innerHTML = "<p class='err'>" + esc(err.message) + "</p>";
-    log("OSS-Fuzz error: " + err.message, "err");
-  }
-});
-
-function renderOssFuzz(d) {
-  const el = $("tab-ossfuzz");
-  lastOssFuzz = d;
-  $("ossfuzz-status").textContent = d.ok ? "done" : "error";
-  if (!d.ok) { el.innerHTML = "<p class='err'>" + esc(d.error || "run failed") + "</p>"; return; }
-  const crashes = (d.crashes || []).filter((c) => c.exists || c.summary);
-  let h = `<p class='msg'>built: ${esc(d.built)} · fuzz bin: ${esc(d.fuzz_bin)} · fuzzed ${esc(d.seconds)}s · crashes: ${crashes.length}</p>`;
-  if (!crashes.length) {
-    h += "<p class='ok'>no crashes in this window — try more seconds or richer seed data.</p>";
-  } else {
-    h += "<table><tr><th>crash/artifact</th><th>path</th><th>summary</th><th>minimized input</th></tr>";
-    for (const c of crashes) {
-      h += `<tr><td>${esc(c.name)}</td><td>${esc(c.path || "—")}</td><td>${esc((c.summary || "").slice(0, 80))}</td>` +
-        `<td>${esc((c.minimized || "—").slice(0, 80))}</td></tr>`;
-    }
-    h += "</table>";
-    h += "<p class='msg'>hint: use “minimize crash(s)” to reduce to the smallest repro, then “AI exploit + fix” for minimal trigger → patch → verify.</p>";
-  }
-  if (d.steps && d.steps.length) h += "<p class='notes'>" + esc(d.steps.join(" · ")) + "</p>";
-  if (d.log_tail) h += "<pre class='notes'>" + esc(d.log_tail.slice(-600)) + "</pre>";
-  el.innerHTML = h;
-  log("[+] OSS-Fuzz run complete — " + crashes.length + " crash lead(s)", crashes.length ? "err" : "ok");
-}
-
-$("minimize-btn").addEventListener("click", () => {
-  const minimized = (lastOssFuzz || {}).crashes || [];
-  const have = minimized.filter((c) => c.minimized && c.minimized.length);
-  if (!have.length) {
-    $("ossfuzz-status").textContent = "no-op";
-    $("tab-ossfuzz").innerHTML = "<p class='msg'>No minimized crash artifacts from the last OSS-Fuzz run. Run a build+fuzz first on a harness that trips a crash, and minimization will be reported per-crash above.</p>";
-    log("[!] minimize: no crash artifacts to reduce", "err");
-    return;
-  }
-  if (have[0]) lastMinimized = { source: "OSS-Fuzz", input: have[0].minimized, file: have[0].name };
-  $("ossfuzz-status").textContent = "done";
-  $("tab-ossfuzz").innerHTML =
-    "<p class='ok'>Minimization done for " + have.length + " crash(s). Reduced repro ready — run “AI exploit + fix” in the Fix stage for minimal trigger → patch → verify.</p>";
-  log("[+] minimize: reduced repro ready for AI exploit + fix", "ok");
-  setStage("fix");
-});
-
-/* ---------- consolidated one-click report ---------- */
-function mergePayload() {
-  // scan: map hosts/services into the merged_report schema
-  const scanHosts = (lastScanReport && lastScanReport.hosts) || [];
-  const scan = scanHosts.map((hd) => ({
-    address: hd.address, os: hd.os, state: hd.state,
-    services: (hd.services || []).map((s) => ({
-      port: s.port, service: s.service, proto: s.proto, info: s.info, state: s.state,
-    })),
-  }));
-  // sast: keep the fields the renderer/markdown need
-  const sast = (lastSast && lastSast.findings) || [];
-  return {
-    scan,
-    sast,
-    sca: lastSca || {},
-    fuzz: lastFuzz || [],
-    triage: [],
-  };
-}
-
-function mergedCounts() {
-  const p = mergePayload();
-  const hosts = p.scan.length;
-  const sast = p.sast.length;
-  const cves = ((p.sca && p.sca.cves) || []).length;
-  const fuzz = p.fuzz.length;
-  return { hosts, sast, cves, fuzz };
-}
-
-function refreshMergedSummary() {
-  const c = mergedCounts();
-  $("merged-meta").textContent =
-    `hosts ${c.hosts} · SAST ${c.sast} · SCA CVEs ${c.cves} · fuzz ${c.fuzz}`;
-  $("merged-summary").innerHTML =
-    `<p class="msg">Collects everything from this session: ` +
-    `<b>${c.hosts}</b> host(s), <b>${c.sast}</b> SAST finding(s), ` +
-    `<b>${c.cves}</b> known dependency CVE(s), <b>${c.fuzz}</b> fuzz candidate(s). ` +
-    `Run an analysis first so the report is populated.</p>`;
-}
-
-$("merged-run").addEventListener("click", async () => {
-  busy($("merged-run"), true);
-  try {
-    const resp = await fetch("/api/source/report/merge", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(mergePayload()),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const rep = await resp.json();
-    lastMergedReport = rep;
-    const s = rep.summary || {};
-    $("merged-meta").textContent =
-      `generated ${(rep.generated || "").slice(0, 19).replace("T", " ")} · ` +
-      `hosts ${s.hosts_scanned} · SAST ${s.sast_findings} · SCA ${s.sca_cves} · fuzz ${s.fuzz_candidates}`;
-    $("merged-summary").innerHTML =
-      `<p class='ok'>Report built. Download as .md or .json.</p>`;
-    log("[+] consolidated report built", "ok");
-  } catch (err) {
-    $("merged-summary").innerHTML = "<p class='err'>" + esc(err.message) + "</p>";
-    log("merged report error " + err.message, "err");
-  } finally {
-    busy($("merged-run"), false);
-  }
-});
-
-async function mergedDownload(btn, endpoint, filename) {
-  busy(btn, true);
-  try {
-    const resp = await fetch(endpoint, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(mergePayload()),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const text = await resp.text();
-    const isJson = endpoint.endsWith("merge");
-    // /report/merge returns JSON; /report/md returns a JSON-encoded string of markdown.
-    let finalText = text;
-    if (isJson) {
-      finalText = JSON.stringify(JSON.parse(text), null, 2);
-    } else {
-      try { finalText = JSON.parse(text); } catch (_) { /* already plain */ }
-    }
-    const finalBlob = new Blob([finalText], { type: "text/plain" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(finalBlob);
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    log("[+] report downloaded: " + filename, "ok");
-  } catch (err) {
-    log("report download error " + err.message, "err");
-  } finally {
-    busy(btn, false);
-  }
-}
-$("merged-md").addEventListener("click", () => mergedDownload($("merged-md"), "/api/source/report/md", "h4k-assessment.md"));
-$("merged-json").addEventListener("click", () => mergedDownload($("merged-json"), "/api/source/report/merge", "h4k-assessment.json"));
-refreshMergedSummary();
-
-/* ---------- supply-chain map ---------- */
-$("sca-map-btn").addEventListener("click", async () => {
-  const url = $("source-url").value.trim();
-  if (!url) { log("[!] enter a git URL for the supply-chain map", "err"); return; }
-  $("sca-panel").hidden = false;
-  $("tab-sca").innerHTML = "<p class='msg'>building dependency graph + reachability…</p>";
-  log("[*] supply-chain map on " + url, "info");
-  try {
-    const resp = await fetch("/api/source/sca/map?git_url=" + encodeURIComponent(url));
-    if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.detail || "http " + resp.status); }
-    const d = await resp.json();
-    if (d.error) throw new Error(d.error);
-    renderSupplyChainMap(d);
-  } catch (err) { $("tab-sca").innerHTML = "<p class='err'>" + esc(err.message) + "</p>"; log("map error " + err.message, "err"); }
-});
-
-function renderSupplyChainMap(d) {
-  const el = $("tab-sca");
-  const gr = d.graph || {};
-  const nodes = gr.nodes || [];
-  const edits = gr.edges || [];
-  const s = d.summary || {};
-  let h = `<p class='msg'>components: ${s.components||0} · edges: ${edits.length} · known CVEs: ${s.cves||0} · reachable: ${s.reachable_nodes||0} · <span class="${s.vulnerable_reachable ? "err" : "ok"}">vulnerable + reachable: ${s.vulnerable_reachable||0}</span></p>`;
-  h += "<h3>Dependency graph + reachability</h3>";
-  h += "<p class='stage-desc'>Reachability = on an active dependency path from the app/root. A package that is <b>not</b> reachable is dead weight — its CVEs still matter less than reachable ones.</p>";
-  h += "<table><tr><th>node</th><th>type</th><th>dependencies</th><th>known CVEs</th><th>reachable</th></tr>";
-  const childByParent = {};
-  for (const e of edits) (childByParent[e.from] = childByParent[e.from]||[]).push(e.to);
-  for (const n of nodes) {
-    const kids = (childByParent[n.id]||[]).map(x=>esc(x)).join(", ")||"—";
-    const cves = (n.cves||[]).map(esc).join(", ")||"—";
-    const reach = n.reachable ? "<span class='ok'>yes</span>" : "<span class='err'>no</span>";
-    const cls = (n.reachable && n.cves && n.cves.length) ? "err" : "";
-    h += `<tr class="${cls}"><td>${esc(n.label)}</td><td>${esc(n.type||"—")}</td><td>${kids}</td><td>${cves}</td><td>${reach}</td></tr>`;
-  }
-  h += "</table>";
-  h += "<p class='msg'>honest note: reachability here is dependency-graph reachability (is the package on an active path), not a code-level call-graph claim — we don't fabricate call paths.</p>";
-  el.innerHTML = h;
-  log("[+] supply-chain map built (" + nodes.length + " nodes, " + s.cves + " CVEs, " + (s.vulnerable_reachable||0) + " reachable)", "ok");
-}
-
-/* ---------- network layer (sniff / arp / mitm / wifi) ---------- */
-const netIf = () => ($("net-iface").value.trim() || "eth0");
-const netOut = (d) => {
-  $("net-status").textContent = "done";
-  $("tab-net").textContent = (d.stdout || d.error || d.stderr || JSON.stringify(d, null, 2)).slice(0, 3000);
-};
-
-$("iface-btn").addEventListener("click", async () => {
-  try { const d = await (await fetch("/api/net/interfaces")).json();
-    $("net-panel").hidden = false; $("tab-net").textContent = JSON.stringify(d.interfaces, null, 2);
-    log("[+] interfaces listed", "ok"); } catch (e) { log("interfaces error " + e.message, "err"); }
-});
-
-$("sniff-btn").addEventListener("click", async () => {
-  $("net-panel").hidden = false; $("net-status").textContent = "running"; $("tab-net").textContent = "sniffing…";
-  try { const r = await (await fetch("/api/net/sniff", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf()})})).json(); netOut(r); log("[+] sniff done", "ok"); }
-  catch (e) { $("tab-net").textContent = "error: " + e.message; }
-});
-
-$("arp-btn").addEventListener("click", async () => {
-  $("net-panel").hidden = false; $("net-status").textContent = "running";
-  try { const r = await (await fetch("/api/net/arp", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf()})})).json(); netOut(r); log("[+] arp done", "ok"); }
-  catch (e) { $("tab-net").textContent = "error: " + e.message; }
-});
-
-$("mitm-btn").addEventListener("click", async () => {
-  if (!window.confirm("bettercap ARP-spoof MITM on " + netIf() + " — only on a lab interface/net you control. Continue?")) { log("mitm cancelled", "err"); return; }
-  $("net-panel").hidden = false; $("net-status").textContent = "running";
-  // target the gateway? We let the user pass any single host; default to the local subnet broadcast-ish target note.
-  const target = window.prompt("ARP-spoof target IP (lab only):", "") || "";
-  if (!target) { log("mitm cancelled — no target", "err"); return; }
-  try { const r = await (await fetch("/api/net/mitm", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf(), target})})).json(); netOut(r); log("[+] mitm done", "ok"); }
-  catch (e) { $("tab-net").textContent = "error: " + e.message; }
-});
-
-$("wifi-scan-btn").addEventListener("click", async () => {
-  $("net-panel").hidden = false; $("net-status").textContent = "running"; $("tab-net").textContent = "scanning (need monitor interface)…";
-  try { const r = await (await fetch("/api/net/wifi/scan", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf()})})).json(); netOut(r); log("[+] wifi scan done", "ok"); }
-  catch (e) { $("tab-net").textContent = "error: " + e.message; }
-});
-
-$("wifi-cap-btn").addEventListener("click", async () => {
-  $("net-panel").hidden = false; $("net-status").textContent = "running"; $("tab-net").textContent = "capturing frames (offline crack later)…";
-  try { const r = await (await fetch("/api/net/wifi/capture", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({interface: netIf()})})).json(); netOut(r); log("[+] wifi capture done — feed .cap to aircrack-ng", "ok"); }
-  catch (e) { $("tab-net").textContent = "error: " + e.message; }
-});
-
-/* ---------- local TLS interception lab ---------- */
-const tlsPost = async (path, body) => await (await fetch("/api/net/tls/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })).json();
-
-$("tls-status-btn").addEventListener("click", async () => {
-  $("net-panel").hidden = false; $("net-status").textContent = "loading"; $("tab-net").textContent = "checking TLS lab…";
-  try { const r = await (await fetch("/api/net/tls/status")).json(); netOut(r); log("[+] TLS lab status: " + (r.ready ? "ready" : r.error || r.next || "pending"), r.ready ? "ok" : "err"); }
-  catch (e) { $("tab-net").textContent = "error: " + e.message; }
-});
-
-$("tls-setup-btn").addEventListener("click", async () => {
-  $("net-panel").hidden = false; $("net-status").textContent = "running"; $("tab-net").textContent = "building lab CA + localhost cert…";
-  try { const r = await tlsPost("setup"); netOut(r);
-    if (r.error) log("[-] TLS setup failed: " + r.error, "err");
-    else if (r.ready) log("[+] TLS CA + cert built (ready)", "ok");
-    else log("[+] TLS CA + cert built — " + (r.next || "not ready yet"), "err"); }
-  catch (e) { $("tab-net").textContent = "error: " + e.message; }
-});
-
-$("tls-trust-btn").addEventListener("click", async () => {
-  $("net-panel").hidden = false; $("net-status").textContent = "running";
-  if (!window.confirm("Install the lab CA into the container's system trust store? Loopback-only lab cert, authorized work.")) { log("CA install cancelled", "err"); return; }
-  $("tab-net").textContent = "installing lab CA…";
-  try { const r = await tlsPost("trust"); netOut(r); log("[+] CA install: " + (r.ok ? "ok" : "failed"), r.ok ? "ok" : "err"); }
-  catch (e) { $("tab-net").textContent = "error: " + e.message; }
-});
-
-$("tls-proxy-btn").addEventListener("click", async () => {
-  $("net-panel").hidden = false; $("net-status").textContent = "starting";
-  $("tab-net").textContent = "starting loopback HTTPS proxy (127.0.0.1:8443 -> 127.0.0.1:8080)…";
-  try { const r = await tlsPost("proxy", { backend_host: "127.0.0.1", backend_port: 8080, listen_port: 8443 }); netOut(r); log("[+] TLS proxy: " + (r.ok ? r.listening : "failed"), r.ok ? "ok" : "err"); }
-  catch (e) { $("tab-net").textContent = "error: " + e.message; }
-});
-
-/* ---------- custom rule test ---------- */
-$("rule-test").addEventListener("click", async () => {
-  const pattern = $("rule-pattern").value.trim();
-  if (!pattern) { log("[!] enter a semgrep pattern to test", "err"); return; }
-  try {
-    const resp = await fetch("/api/source/rules/test", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        rule_id: "custom-rule-" + Math.random().toString(36).slice(2, 6),
-        name: "Custom rule", severity: "medium", languages: ["python"],
-        pattern, message: "custom rule hit", test_code: "exec('id')",
-      }),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const d = await resp.json();
-    if (d.ok) log("[+] custom rule " + (d.matched ? "matched (vuln found)" : "did not match") + " sample code", d.matched ? "err" : "ok");
-    else log("[!] rule test error: " + (d.error || "").slice(0, 120), "err");
-  } catch (err) { log("rule test error " + err.message, "err"); }
-});
-
-function currentRule() {
-  const pattern = $("rule-pattern").value.trim();
-  const name = $("rule-name").value.trim() || "custom-rule-" + Math.random().toString(36).slice(2, 6);
-  const severity = $("rule-severity").value || "medium";
-  return { rule_id: name.replace(/\s+/g, "-").toLowerCase(), name, severity, languages: ["python"], pattern, message: "custom rule hit", test_code: "exec('id')" };
-}
-
-$("rule-save").addEventListener("click", async () => {
-  const rule = currentRule();
-  if (!rule.pattern) { log("[!] enter a pattern to save", "err"); return; }
-  try {
-    const resp = await fetch("/api/source/rules/save", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(rule),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const d = await resp.json();
-    log("[+] rule saved: " + (d.rule && d.rule.name) + " (" + d.rule.rule_id + ")", "ok");
-    $("rules-out").innerHTML = "<p class='ok'>saved: " + esc(d.rule.rule_id) + "</p>";
-  } catch (err) { log("rule save error " + err.message, "err"); }
-});
-
-$("rule-list").addEventListener("click", async () => {
-  try {
-    const resp = await fetch("/api/source/rules");
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const d = await resp.json();
-    const rules = d.rules || [];
-    if (!rules.length) { $("rules-out").innerHTML = "<p class='msg'>no saved rules</p>"; return; }
-    $("rules-out").innerHTML = rules.map((r) =>
-      `<span class='msg'>${esc(r.rule_id)} · ${esc(r.severity)} · ${esc((r.pattern || "").slice(0, 40))}</span><br/>`
-    ).join("");
-    log("[+] " + rules.length + " saved rule(s)", "ok");
-  } catch (err) { log("rule list error " + err.message, "err"); }
-});
-
-$("rule-run-tree").addEventListener("click", async () => {
-  const url = $("rule-tree").value.trim();
-  if (!url) { log("[!] enter a git URL to run saved rules over", "err"); return; }
-  busy($("rule-run-tree"), true);
-  try {
-    const resp = await fetch("/api/source/rules/run", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ git_url: url }),
-    });
-    if (!resp.ok) throw new Error("http " + resp.status);
-    const d = await resp.json();
-    const hits = d.findings || [];
-    $("rules-out").innerHTML = hits.length
-      ? hits.map((f) => `<span class='err'>${esc(f.severity)} ${esc(f.name)} @ ${esc(f.file)}:${esc(f.line)}</span><br/>`).join("")
-      : "<p class='ok'>no saved-rule hits across the repo</p>";
-    log("[+] saved-rule sweep: " + hits.length + " hit(s) over " + url, hits.length ? "err" : "ok");
-  } catch (err) { log("rule run error " + err.message, "err"); }
-  finally { busy($("rule-run-tree"), false); }
-});
-
-/* ---------- session indicator toggling ---------- */
-(async () => {
-  try {
-    const r = await (await fetch("/api/health")).json();
-    if (r.msf.reachable) {
-      const m = $("msf-state");
-      m.classList.add("on");
-      m.textContent = "msf: up · v" + (r.msf.version ? r.msf.version.version.trim() : "?");
-    }
-  } catch (_) {}
-})();
-
-/* ---------- engagement (persistent scope · asset graph · cred propagation) ---------- */
-const engId = () => $("eng-select").value || "";
-const engOut = (d) => { $("tab-net").textContent = JSON.stringify(d, null, 2).slice(0, 4000); };
-
-const engRefreshList = async () => {
-  const r = await (await fetch("/api/engagement")).json();
-  const sel = $("eng-select");
-  const keep = sel.value;
-  sel.innerHTML = "";
-  for (const e of r.engagements || []) {
-    const o = document.createElement("option");
-    o.value = e.id;
-    o.textContent = `${e.name} (${e.id}) — ${e.summary.assets} hosts / ${e.summary.verified_credentials} creds`;
-    sel.appendChild(o);
-  }
-  if (keep) sel.value = keep;
-};
-
-$("eng-list-btn").addEventListener("click", async () => {
-  try { await engRefreshList(); log("[+] engagements listed", "ok"); }
-  catch (e) { log("[-] engagement list failed: " + e.message, "err"); }
-});
-
-$("eng-new-btn").addEventListener("click", async () => {
-  const name = prompt("Engagement name?");
-  if (!name) return;
-  const scope = ($("eng-scope").value || "").trim();
-  try {
-    const r = await (await fetch("/api/engagement", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, scope: scope.split(/[,\s]+/).filter(Boolean) }),
-    })).json();
-    if (r.detail) { log("[-] " + r.detail, "err"); return; }
-    await engRefreshList();
-    $("eng-select").value = r.id;
-    log(`[+] engagement ${r.id} created · scope ${(r.scope || []).join(", ")}`, "ok");
-  } catch (e) { log("[-] engagement create failed: " + e.message, "err"); }
-});
-
-$("eng-ingest-btn").addEventListener("click", async () => {
-  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
-  if (!currentJob) { log("[!] no scan job to ingest — run a scan first", "err"); return; }
-  try {
-    const r = await (await fetch(`/api/engagement/${engId()}/ingest`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ job_id: currentJob }),
-    })).json();
-    if (r.detail) { log("[-] " + r.detail, "err"); return; }
-    const a = r.added;
-    log(`[+] ingested: +${a.assets} hosts, +${a.services} services, +${a.credentials} creds, +${a.vulns} vulns`, "ok");
-    if ((r.skipped_out_of_scope || []).length)
-      log(`[!] ${r.skipped_out_of_scope.length} host(s) skipped as out of scope: ${r.skipped_out_of_scope.join(", ")}`, "err");
-    engOut(r);
-    await engRefreshList();
-  } catch (e) { log("[-] ingest failed: " + e.message, "err"); }
-});
-
-$("eng-graph-btn").addEventListener("click", async () => {
-  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
-  const g = await (await fetch(`/api/engagement/${engId()}/graph`)).json();
-  const pivots = (g.edges || []).filter((e) => e.type === "pivot");
-  log(`[+] graph: ${(g.nodes || []).length} hosts, ${(g.edges || []).length} edges, ${pivots.length} pivotable credential(s)`, "ok");
-  for (const p of pivots) log(`    ${p.user}@${p.service || "any"} from ${p.source} reaches ${p.reaches.join(", ")}`, "ok");
-  engOut(g);
-});
-
-$("eng-creds-btn").addEventListener("click", async () => {
-  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
-  const d = await (await fetch(`/api/engagement/${engId()}/credentials`)).json();
-  for (const c of d.credentials || [])
-    log(`    ${c.user}@${c.service || "any"} ${c.verified ? "verified" : "unverified"} on ${(c.hosts || []).map((h) => h.host).join(", ") || "-"}`, c.verified ? "ok" : "err");
-  engOut(d);
-});
-
-$("eng-plan-btn").addEventListener("click", async () => {
-  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
-  const d = await (await fetch(`/api/engagement/${engId()}/propagate/plan`)).json();
-  if (d.detail) { log("[-] " + d.detail, "err"); return; }
-  log(`[+] dry run: ${d.credentials} verified cred(s) x ${d.targets} in-scope service(s) = ${d.attempts} login attempt(s)${d.capped ? " (capped)" : ""} — nothing sent yet`, "ok");
-  engOut(d);
-});
-
-$("eng-propagate-btn").addEventListener("click", async () => {
-  if (!engId()) { log("[!] pick an engagement first", "err"); return; }
-  if (!confirm("Replay every credential already verified in this engagement against the other in-scope services? Authorized scope only.")) { log("propagation cancelled", "err"); return; }
-  $("tab-net").textContent = "replaying verified credentials across in-scope services…";
-  try {
-    const d = await (await fetch(`/api/engagement/${engId()}/propagate`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}),
-    })).json();
-    if (d.detail) { log("[-] " + d.detail, "err"); return; }
-    log(`[+] propagation: ${d.attempted} attempted, ${d.verified} verified, ${d.failed} failed, ${d.lateral_moves} lateral move(s)`, d.verified ? "ok" : "err");
-    for (const r of d.reached || []) log(`    ${r.user}:*** reached ${r.new_host}:${r.port} (${r.service})${r.lateral ? " — lateral" : ""}`, "ok");
-    engOut(d);
-  } catch (e) { log("[-] propagation failed: " + e.message, "err"); }
-});
-
-/* ---------- ctf / lab toolkit (opt-in) ---------- */
-/* Each button POSTs to a dedicated endpoint and renders the raw JSON into the
-   /ctf toolkit panel. Nothing here runs on its own. */
-function ctfOut(d, note) {
-  $("ctf-panel").hidden = false;
-  $("ctf-status").textContent = "done";
-  $("tab-ctf").textContent = (note ? note + "\n\n" : "") + JSON.stringify(d, null, 2).slice(0, 12000);
-}
-
-async function ctfPost(path, body, okNote) {
-  $("ctf-panel").hidden = false;
-  $("ctf-status").textContent = "running";
-  $("tab-ctf").textContent = "working…";
-  try {
-    const resp = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}),
-    });
-    const d = await resp.json();
-    if (!resp.ok) throw new Error(d.detail || "http " + resp.status);
-    ctfOut(d, okNote);
-    log("[+] " + okNote, "ok");
-    return d;
-  } catch (e) {
-    $("ctf-status").textContent = "error";
-    $("tab-ctf").textContent = "error: " + e.message;
-    log("[-] " + okNote + " failed: " + e.message, "err");
-    return null;
-  }
-}
-
-$("ctf-escape-btn").addEventListener("click", async () => {
-  const d = await ctfPost("/api/container_escape", {}, "container escape check");
-  if (d) log(`    ${(d.dangerous_caps || []).length} dangerous cap(s), ${(d.dangerous_mounts || []).length} risky mount(s)${d.is_privileged ? " — PRIVILEGED" : ""}`, (d.dangerous_caps || []).length || d.is_privileged ? "err" : "ok");
-});
-
-$("ctf-lateral-btn").addEventListener("click", () => {
-  ctfPost("/api/lateral", { cidr: ($("ctf-cidr").value || "192.168.1.0/24").trim() }, "lateral route map");
-});
-
-$("ctf-db-btn").addEventListener("click", () => {
-  if (!confirm("Interrogate local APIs/DBs/configs on the container/host? Authorized scope only.")) { log("db interrogation cancelled", "err"); return; }
-  ctfPost("/api/db_interrogate", { target: "127.0.0.1" }, "db/API interrogation");
-});
-
-$("ctf-nse-btn").addEventListener("click", () => {
-  const target = $("target").value.trim();
-  if (!target) { log("[!] enter a target in the recon stage first", "err"); return; }
-  ctfPost("/api/nmap/nse", { target }, "nmap vuln NSE scan of " + target);
-});
-
-$("ctf-zap-btn").addEventListener("click", () => {
-  const url = $("ctf-web-url").value.trim();
-  if (!url) { log("[!] enter a web app URL", "err"); return; }
-  if (!confirm("Run an ACTIVE ZAP scan against " + url + "? Authorized web apps only.")) { log("zap cancelled", "err"); return; }
-  ctfPost("/api/zap", { target: url, mode: "full" }, "ZAP scan of " + url);
-});
-
-$("ctf-john-btn").addEventListener("click", () => {
-  const hashes = $("ctf-hashes").value.split(/\n+/).map((s) => s.trim()).filter(Boolean);
-  if (!hashes.length) { log("[!] paste at least one hash", "err"); return; }
-  ctfPost("/api/john", { hashes }, `john against ${hashes.length} hash(es)`);
-});
-
-$("ctf-tshark-btn").addEventListener("click", () => {
-  const pcap = $("ctf-pcap").value.trim();
-  if (!pcap) { log("[!] enter a pcap path", "err"); return; }
-  ctfPost("/api/tshark/pcap", { pcap_file: pcap }, "pcap analysis of " + pcap);
-});
-
-/* ---------- pipeline / process monitor ---------- */
-let pipePollTimer = null;
-
-function showPipelinePanel() {
-  $("pipeline-panel").hidden = false;
-  refreshPipeline();
-  if (!pipePollTimer) {
-    pipePollTimer = setInterval(refreshPipeline, 5000);
-  }
-}
-
-function hidePipelinePanel() {
-  if (pipePollTimer) {
-    clearInterval(pipePollTimer);
-    pipePollTimer = null;
-  }
-  $("pipeline-panel").hidden = true;
-}
-
-async function refreshPipeline() {
-  try {
-    const resp = await fetch("/api/pipeline/status");
-    if (!resp.ok) return;
-    const data = await resp.json();
-    renderPipeline(data);
-  } catch (e) {
-    log("pipeline refresh failed: " + e.message, "err");
-  }
-}
-
-function renderPipeline(data) {
-  $("pipe-status").textContent = data.status || "idle";
-
-  // Running jobs
-  const running = data.running || [];
-  const runningHtml = running.length
-    ? running.map(j => `<div class="pipe-job"><span class="pipe-job-id">${esc(j.id)}</span><span class="pipe-job-type">${esc(j.type)}</span><span class="pipe-job-progress"><div class="mini-bar"><div class="mini-bar-fill" style="width:${j.progress||0}%"></div></div><span>${j.progress||0}%</span></span></div>`).join("")
-    : '<div class="pipe-empty">no running jobs</div>';
-  $("pipe-running-list").innerHTML = runningHtml;
-
-  // Pipeline stages
-  const stages = data.pipeline || [];
-  const stageOrder = ["research", "opportunities", "score", "brief", "candidates", "preview", "listing_copy", "bundle", "publish"];
-  const stageHtml = stageOrder.map(sid => {
-    const s = stages.find(s => s.id === sid);
-    if (!s) return "";
-    const statusClass = s.status === "done" ? "ok" : s.status === "running" ? "warn" : s.status === "failed" ? "err" : "";
-    return `<div class="pipeline-stage ${statusClass}"><span class="pipe-stage-label">${esc(s.label)}</span><span class="pipe-stage-status">${esc(s.status)}</span><span class="pipe-stage-detail">${esc(s.detail||"")}</span></div>`;
-  }).join("");
-  $("pipeline-stages").innerHTML = stageHtml || '<div class="pipe-empty">no pipeline data</div>';
-
-  // History
-  const history = data.history || [];
-  const histHtml = history.length
-    ? history.map(h => `<div class="hist-item"><span class="hist-time">${esc(h.started_at)}</span><span class="hist-type">${esc(h.type)}</span><span class="hist-status ${h.status==='done'?'ok':h.status==='failed'?'err':''}">${esc(h.status)}</span><span class="hist-target">${esc(h.target||"")}</span></div>`).join("")
-    : '<div class="pipe-empty">no history</div>';
-  $("pipe-history-list").innerHTML = histHtml;
-
-  // Processes
-  const procs = data.processes || [];
-  const procHtml = procs.length
-    ? procs.map(p => `<div class="proc-row"><span class="proc-pid">${p.pid}</span><span class="proc-cmd">${esc(p.cmd)}</span><span class="proc-cpu">${p.cpu}%</span><span class="proc-mem">${p.mem}%</span></div>`).join("")
-    : '<div class="pipe-empty">no process data</div>';
-  $("process-list").innerHTML = procHtml;
-}
-
-// Tab switching
-document.querySelectorAll(".pipe-tab").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".pipe-tab").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    document.querySelectorAll(".pipe-pane").forEach(p => p.classList.remove("active"));
-    $(`pipe-${btn.dataset.pipeTab}`).classList.add("active");
+function appendTerminal(text) {
+  const el = $('terminal-content');
+  if (!el) return;
+  const lines = text.split('\n');
+  lines.forEach(line => {
+    const p = document.createElement('p');
+    p.className = 't-line';
+    if (line.includes('error') || line.includes('failed')) p.className += ' error';
+    else if (line.includes('success') || line.includes('started')) p.className += ' success';
+    else if (line.startsWith('[*]')) p.className += ' info';
+    else if (line.startsWith('[!]')) p.className += ' warn';
+    p.textContent = line;
+    el.appendChild(p);
   });
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════
+// TOOL ACTIONS
+// ═══════════════════════════════════════════
+async function findNeighbors() {
+  log('Scanning neighbors...', 'info');
+  try {
+    const res = await api('/api/neighbors', { method: 'GET' });
+    if (res.hosts) {
+      log(`Found ${res.hosts.length} neighbors`, 'success');
+      res.hosts.forEach(h => log(`  ${h.ip} (${h.mac})`, 'info'));
+    }
+  } catch (e) { log('Neighbors scan failed: ' + e.message, 'error'); }
+}
+
+async function deepAttack() {
+  if (!state.scanResults) { alert('Run a scan first'); return; }
+  log('Starting deep attack...', 'warn');
+  try {
+    const res = await api('/api/deepattack', {
+      method: 'POST',
+      body: { target: state.scanResults.address }
+    });
+    log('Deep attack job: ' + (res.job_id || res.attack_id || 'started'), 'info');
+  } catch (e) { log('Deep attack failed: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════
+// VIM NAVIGATION
+// ═══════════════════════════════════════════
+function vimNavigate(dir) {
+  const phases = ['recon', 'analyze', 'prepare', 'execute', 'pwned', 'graph'];
+  const idx = phases.indexOf(state.currentPhase);
+  if (dir === 'j' && idx < phases.length - 1) setPhase(phases[idx + 1]);
+  if (dir === 'k' && idx > 0) setPhase(phases[idx - 1]);
+  if (dir === 'h') setPhase(phases[Math.max(0, idx - 1)]);
+  if (dir === 'l') setPhase(phases[Math.min(phases.length - 1, idx + 1)]);
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // Load saved theme
+  const savedTheme = localStorage.getItem('h4k-theme') || 'light';
+  setTheme(savedTheme);
+
+  // Clock
+  setInterval(() => {
+    $('clock').textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
+  }, 1000);
+
+  // MSF status check
+  checkMsfStatus();
+  setInterval(checkMsfStatus, 30000);
+
+  // Scan button
+  $('btn-launch-recon').addEventListener('click', launchScan);
+
+  // Target input enter
+  $('target').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && state.scanType === 'ip') launchScan();
+  });
+
+  // Scan type tabs
+  document.querySelectorAll('.st-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const type = tab.dataset.type;
+      state.scanType = type;
+      document.querySelectorAll('.st-tab').forEach(t => t.classList.toggle('active', t === tab));
+      const targetInput = $('target');
+      const hint = $('target-hint');
+      if (type === 'neighbors') {
+        targetInput.value = 'All local neighbors';
+        targetInput.readOnly = true;
+        targetInput.style.cursor = 'not-allowed';
+        hint.textContent = 'Will scan all hosts found on your local network(s)';
+        $('btn-launch-recon').disabled = false;
+      } else {
+        targetInput.value = '';
+        targetInput.readOnly = false;
+        targetInput.style.cursor = '';
+        targetInput.placeholder = '192.168.1.13 or 192.168.1.0/24';
+        hint.textContent = 'Enter a single IP or CIDR range (e.g. 192.168.1.0/24)';
+        $('btn-launch-recon').disabled = false;
+      }
+    });
+  });
+
+  // Phase nav
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setPhase(btn.dataset.phase);
+      if (btn.dataset.phase === 'graph') loadGraph();
+    });
+  });
+
+  // Prepare button
+  $('btn-to-prepare').addEventListener('click', () => {
+    if (!state.selectedVuln) return;
+    const vuln = state.selectedVuln;
+    $('config-summary').innerHTML = `<pre>${JSON.stringify(vuln, null, 2)}</pre>`;
+    $('cfg-rhosts').value = state.scanResults?.address || '';
+    $('cfg-rport').value = vuln.port || '';
+    $('cfg-lhost').value = ''; // auto
+    state.selectedExploit = vuln.exploits?.[0]?.module || null;
+    $('btn-to-execute').disabled = !state.selectedExploit;
+    setPhase('prepare');
+  });
+
+  // Execute button
+  $('btn-to-execute').addEventListener('click', executeExploit);
+
+  // Terminal clear
+  $('terminal-clear')?.addEventListener('click', () => {
+    const el = $('terminal-content');
+    if (el) el.innerHTML = '';
+  });
+
+  // Sound toggle
+  $('sound-toggle').addEventListener('click', () => {
+    state.soundEnabled = !state.soundEnabled;
+    $('sound-toggle').textContent = state.soundEnabled ? '🔊' : '🔇';
+  });
+
+  // Command palette
+  $('cmd-palette-btn').addEventListener('click', () => toggleCmdPalette(true));
+  $('cmd-input').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('.cmd-item').forEach(item => {
+      const match = item.dataset.cmd.includes(q) || item.querySelector('.cmd-label').textContent.toLowerCase().includes(q);
+      item.style.display = match || !q ? 'flex' : 'none';
+    });
+  });
+  $('cmd-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const first = document.querySelector('.cmd-item:not([style*="none"])');
+      if (first) executeCmd(first.dataset.cmd);
+    }
+    if (e.key === 'Escape') toggleCmdPalette(false);
+  });
+
+  // Cmd palette item clicks
+  document.querySelectorAll('.cmd-item').forEach(item => {
+    item.addEventListener('click', () => executeCmd(item.dataset.cmd));
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    // Ctrl+K = command palette
+    if (e.ctrlKey && e.key === 'k') { e.preventDefault(); toggleCmdPalette(true); return; }
+    // Don't handle if typing in input
+    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+    // Vim keys
+    if (['j', 'k', 'h', 'l'].includes(e.key)) vimNavigate(e.key);
+    // Number phases
+    if (e.key >= '1' && e.key <= '6') setPhase(['recon','analyze','prepare','execute','pwned','graph'][parseInt(e.key) - 1]);
+    // T = theme
+    if (e.key === 't') toggleTheme();
+    // ? = help
+    if (e.key === '?') log('Shortcuts: j/k/h/l=navigate, 1-5=phases, t=theme, Ctrl+K=palette, Esc=close', 'info');
+    // Ctrl+Enter = scan
+    if (e.ctrlKey && e.key === 'Enter' && state.currentPhase === 'recon') launchScan();
+  });
+
+  // Tool buttons
+  $('tool-neighbors').addEventListener('click', findNeighbors);
+  $('tool-deep').addEventListener('click', deepAttack);
+  $('btn-graph-refresh').addEventListener('click', loadGraph);
+
+  // Neighbor panel action buttons (delegated since panel is built dynamically)
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#btn-fingerprint')) startFingerprintScan();
+    if (e.target.closest('#btn-full-scan')) startFullScan();
+  });
+
+  // Pwned buttons
+  $('btn-next-target')?.addEventListener('click', () => {
+    setPhase('recon');
+    $('target').value = '';
+    $('target').focus();
+  });
+  $('btn-new-mission')?.addEventListener('click', () => {
+    state.scanResults = null;
+    state.selectedVuln = null;
+    state.selectedExploit = null;
+    $('target-results-card').hidden = true;
+    $('scan-progress-card').hidden = true;
+    document.querySelectorAll('.obj').forEach(o => { o.classList.remove('done', 'active'); o.querySelector('.obj-check').textContent = '○'; });
+    setPhase('recon');
+  });
+
+  // Theme toggle
+  $('theme-toggle').addEventListener('click', toggleTheme);
+
+  // Close cmd palette on backdrop click
+  $('cmd-palette').addEventListener('click', e => {
+    if (e.target === $('cmd-palette')) toggleCmdPalette(false);
+  });
+
+  updateXpDisplay();
+  log('h4k operations center ready', 'system');
+  log('Press Ctrl+K for command palette, ? for shortcuts', 'info');
 });
 
-// Auto-show pipeline panel when a scan/attack starts
-const originalStartScan = window.startScan || (() => {});
-window.startScan = function() {
-  showPipelinePanel();
-  return originalStartScan.apply(this, arguments);
-};
+async function checkMsfStatus() {
+  try {
+    const res = await fetch('/api/health').then(r => r.json()).catch(() => ({ status: 'unknown' }));
+    const dot = document.querySelector('.status-dot');
+    const text = dot?.nextElementSibling;
+    if (res.status === 'ok' || res.msf === 'connected') {
+      dot?.classList.replace('offline', 'online');
+      if (text) text.textContent = 'MSF: online';
+    } else {
+      dot?.classList.replace('online', 'offline');
+      if (text) text.textContent = 'MSF: offline';
+    }
+  } catch { /* ignore */ }
+}
 
-// Expose for other modules
-window.showPipelinePanel = showPipelinePanel;
-window.hidePipelinePanel = hidePipelinePanel;
-window.refreshPipeline = refreshPipeline;
+// ═══════════════════════════════════════════
+// GRAPH
+// ═══════════════════════════════════════════
+let graphSimulation = null;
+
+async function loadGraph() {
+  try {
+    const res = await api('/api/graph');
+    state.graphData = res;
+    renderGraph(res);
+    $('graph-host-count').textContent = (res.nodes || []).length + ' hosts';
+    $('graph-svc-count').textContent = (res.edges || []).length + ' services';
+  } catch (e) {
+    log('Graph load failed: ' + e.message, 'error');
+  }
+}
+
+function renderGraph(data) {
+  const svg = $('graph-svg');
+  const empty = $('graph-empty');
+  const nodes = data.nodes || [];
+  const edges = data.edges || [];
+
+  svg.innerHTML = '';
+  empty.hidden = nodes.length > 0;
+  if (nodes.length === 0) return;
+
+  const W = svg.clientWidth || 800;
+  const H = 600;
+
+  // Build node map
+  const nodeMap = {};
+  nodes.forEach((n, i) => {
+    nodeMap[n.id] = {
+      ...n,
+      x: W / 2 + (Math.random() - 0.5) * 400,
+      y: H / 2 + (Math.random() - 0.5) * 300,
+      vx: 0, vy: 0,
+    };
+  });
+
+  // Force-directed simulation (simple link + charge + center)
+  const nodes_list = Object.values(nodeMap);
+  const edges_list = edges.map(e => ({
+    ...e,
+    source: nodeMap[e.source],
+    target: nodeMap[e.target],
+  })).filter(e => e.source && e.target);
+
+  if (graphSimulation) graphSimulation.stop();
+
+  // Run simulation ticks
+  let tick = 0;
+  const run = () => {
+    for (let i = 0; i < 60; i++) tickSimulation(nodes_list, edges_list);
+    renderGraphFrame(svg, nodes_list, edges_list);
+    tick++;
+    if (tick < 200) graphSimulation = setTimeout(run, 10);
+    else renderGraphFrame(svg, nodes_list, edges_list);
+  };
+  graphSimulation = setTimeout(run, 10);
+}
+
+function tickSimulation(nodes, edges) {
+  const W = 800, H = 600;
+  const alpha = 0.3;
+  // Center gravity
+  nodes.forEach(n => {
+    n.vx += (W / 2 - n.x) * 0.01 * alpha;
+    n.vy += (H / 2 - n.y) * 0.01 * alpha;
+  });
+  // Charge (repulsion)
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dx = nodes[j].x - nodes[i].x;
+      const dy = nodes[j].y - nodes[i].y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const force = 2000 / (dist * dist);
+      const fx = dx / dist * force * alpha;
+      const fy = dy / dist * force * alpha;
+      nodes[i].vx -= fx; nodes[i].vy -= fy;
+      nodes[j].vx += fx; nodes[j].vy += fy;
+    }
+  }
+  // Link (spring)
+  edges.forEach(e => {
+    if (!e.source || !e.target) return;
+    const dx = e.target.x - e.source.x;
+    const dy = e.target.y - e.source.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const force = (dist - 80) * 0.05 * alpha;
+    const fx = dx / dist * force;
+    const fy = dy / dist * force;
+    e.source.vx += fx; e.source.vy += fy;
+    e.target.vx -= fx; e.target.vy -= fy;
+  });
+  // Apply velocity
+  nodes.forEach(n => {
+    n.x += n.vx; n.y += n.vy;
+    n.x = Math.max(30, Math.min(W - 30, n.x));
+    n.y = Math.max(30, Math.min(H - 30, n.y));
+    n.vx *= 0.8; n.vy *= 0.8;
+  });
+}
+
+function renderGraphFrame(svg, nodes, edges) {
+  const selected = state.selectedGraphNode;
+  let html = `<g class="edges">`;
+  edges.forEach(e => {
+    if (!e.source || !e.target) return;
+    const cls = `edge edge-service edge-${e.proto || 'tcp'}`;
+    html += `<line class="${cls}" x1="${e.source.x}" y1="${e.source.y}" x2="${e.target.x}" y2="${e.target.y}"/>`;
+  });
+  html += `</g>`;
+
+  html += `<g class="nodes">`;
+  // Service nodes
+  const svcByHost = {};
+  edges.forEach(e => {
+    if (!e.source || !e.target) return;
+    const hostId = e.source.id;
+    if (!svcByHost[hostId]) svcByHost[hostId] = [];
+    svcByHost[hostId].push(e);
+  });
+  nodes.forEach(n => {
+    const isHost = n.type === 'host';
+    const isSelected = selected && selected.id === n.id;
+    const svcList = svcByHost[n.id] || [];
+    // Service nodes cluster near host
+    svcList.forEach((e, i) => {
+      const angle = (i / svcList.length) * 2 * Math.PI;
+      const r = 40 + svcList.length * 6;
+      const sx = n.x + Math.cos(angle) * r;
+      const sy = n.y + Math.sin(angle) * r;
+      e.source.x = sx; e.source.y = sy;
+      e.source.label = e.service || e.port;
+      const scls = `node-service${isSelected ? ' selected' : ''}`;
+      html += `<g class="${scls}" data-node-id="${e.target.id}" data-node-type="service" data-node-data="${escAttr(JSON.stringify(e))}">`;
+      html += `<circle cx="${sx}" cy="${sy}" r="5"/>`;
+      html += `<text x="${sx + 8}" y="${sy + 4}">${e.port}/${e.proto || 'tcp'}</text>`;
+      html += `</g>`;
+    });
+    // Host node
+    const hcls = `node-host${isSelected ? ' selected' : ''}`;
+    html += `<g class="${hcls}" data-node-id="${n.id}" data-node-type="host" data-node-data="${escAttr(JSON.stringify(n))}">`;
+    html += `<circle cx="${n.x}" cy="${n.y}" r="18"/>`;
+    const shortLabel = n.label.length > 12 ? n.label.slice(0, 10) + '…' : n.label;
+    html += `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle">${shortLabel}</text>`;
+    html += `</g>`;
+  });
+  html += `</g>`;
+  svg.innerHTML = html;
+
+  // Attach click events
+  svg.querySelectorAll('.node-host, .node-service').forEach(el => {
+    el.addEventListener('click', () => {
+      const type = el.dataset.nodeType;
+      const data = JSON.parse(el.dataset.nodeData);
+      selectGraphNode(type, data);
+    });
+    el.addEventListener('mouseenter', (ev) => showGraphTooltip(ev, el));
+    el.addEventListener('mouseleave', hideGraphTooltip);
+  });
+}
+
+function selectGraphNode(type, data) {
+  state.selectedGraphNode = data;
+  const edges = (state.graphData?.edges || []).filter(e => {
+    if (type === 'host') return e.source === data.id;
+    return e.target === data.id;
+  });
+  const detailTitle = $('graph-detail-title');
+  const detailBody = $('graph-detail-body');
+  const detailCard = $('graph-detail-card');
+  detailCard.hidden = false;
+  if (type === 'host') {
+    detailTitle.textContent = data.label || data.id;
+    const svcList = edges.map(e => ({
+      port: e.port, proto: e.proto, service: e.service, state: e.state, info: e.info
+    }));
+    detailBody.innerHTML = `
+      <div class="graph-detail-row"><span class="graph-detail-label">Address</span><span class="graph-detail-value">${data.id}</span></div>
+      <div class="graph-detail-row"><span class="graph-detail-label">OS</span><span class="graph-detail-value">${data.os || 'unknown'}</span></div>
+      <div class="graph-detail-row"><span class="graph-detail-label">Vendor</span><span class="graph-detail-value">${data.vendor || '—'}</span></div>
+      <div class="graph-detail-row"><span class="graph-detail-label">Services</span><span class="graph-detail-value">${svcList.length}</span></div>
+      <div class="graph-detail-services">
+        ${svcList.map(s => `<span class="graph-svc-chip ${s.state === 'open' ? 'open' : 'closed'}">${s.port}/${s.proto} ${s.service || ''}</span>`).join('')}
+      </div>
+    `;
+  } else {
+    const hostEdge = (state.graphData?.edges || []).find(e => e.target === data.id);
+    detailTitle.textContent = `Port ${data.port}/${data.proto}`;
+    detailBody.innerHTML = `
+      <div class="graph-detail-row"><span class="graph-detail-label">Host</span><span class="graph-detail-value">${hostEdge?.source || '?'}</span></div>
+      <div class="graph-detail-row"><span class="graph-detail-label">Port</span><span class="graph-detail-value">${data.port}</span></div>
+      <div class="graph-detail-row"><span class="graph-detail-label">Proto</span><span class="graph-detail-value">${data.proto || 'tcp'}</span></div>
+      <div class="graph-detail-row"><span class="graph-detail-label">Service</span><span class="graph-detail-value">${data.service || 'unknown'}</span></div>
+      <div class="graph-detail-row"><span class="graph-detail-label">State</span><span class="graph-detail-value">${data.state || 'unknown'}</span></div>
+      <div class="graph-detail-row"><span class="graph-detail-label">Info</span><span class="graph-detail-value">${data.info || '—'}</span></div>
+    `;
+  }
+}
+
+function showGraphTooltip(ev, el) {
+  const type = el.dataset.nodeType;
+  const data = JSON.parse(el.dataset.nodeData);
+  const tip = $('graph-tooltip');
+  if (type === 'host') {
+    tip.innerHTML = `<div class="gt-host">${data.id}</div>
+      <div class="gt-row"><span class="gt-label">OS</span><span class="gt-value">${data.os || '—'}</span></div>
+      <div class="gt-row"><span class="gt-label">Vendor</span><span class="gt-value">${data.vendor || '—'}</span></div>`;
+  } else {
+    const edges = (state.graphData?.edges || []).filter(e => e.target === data.id);
+    const host = edges[0]?.source || '?';
+    tip.innerHTML = `<div class="gt-host">${data.service || data.port}</div>
+      <div class="gt-row"><span class="gt-label">Host</span><span class="gt-value">${host}</span></div>
+      <div class="gt-row"><span class="gt-label">Port</span><span class="gt-value">${data.port}/${data.proto}</span></div>
+      <div class="gt-row"><span class="gt-label">State</span><span class="gt-value">${data.state || '—'}</span></div>`;
+  }
+  const rect = el.getBoundingClientRect();
+  tip.style.left = (rect.right + 10) + 'px';
+  tip.style.top = rect.top + 'px';
+  tip.hidden = false;
+}
+
+function hideGraphTooltip() {
+  $('graph-tooltip').hidden = true;
+}
+
+function escAttr(s) {
+  return s.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}

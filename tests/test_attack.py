@@ -1,4 +1,5 @@
 # Tests for the opt-in attack service and module mapping.
+from schemas import AttackRequest
 from services.attack import AttackService
 
 
@@ -17,6 +18,91 @@ def test_module_for_service_mapping():
         == "exploit/unix/ftp/vsftpd_234_backdoor"
     )
     assert AttackService._module_for_service("weird") is None
+
+
+class _RecordingMsf:
+    """Records what was executed so we can assert on the module/port chosen."""
+
+    def __init__(self):
+        self.calls = []
+
+    def execute(self, mtype, mname, opts):
+        self.calls.append((mtype, mname, opts))
+        return {"job_id": 7}
+
+    @property
+    def client(self):
+        class _Mod:
+            options = ("RHOSTS", "RPORT", "USERNAME", "PASSWORD", "LHOST", "LPORT")
+
+        class _Modules:
+            def use(self, mtype, mname):
+                return _Mod()
+
+        return type("C", (), {"modules": _Modules()})()
+
+
+def test_pinned_module_from_finding_is_used():
+    # the triage drawer names the module; the heuristic must not override it
+    msf = _RecordingMsf()
+    svc = AttackService(msf)
+    req = AttackRequest(
+        target="10.0.0.5",
+        host="10.0.0.5",
+        module="exploit/multi/http/struts_code_exec",
+        port=8080,
+    )
+    attacks = svc.run(req, [])
+    assert [a["module"] for a in attacks] == ["exploit/multi/http/struts_code_exec"]
+    assert msf.calls[0][1] == "exploit/multi/http/struts_code_exec"
+    # the operator's port beats the service-name guess
+    assert msf.calls[0][2]["RPORT"] == 8080
+    assert attacks[0]["result"] == "success"
+
+
+def test_pinned_module_runs_once_without_services():
+    # no services and no msf db lookup: the named module is the whole job
+    svc = AttackService(_RecordingMsf())
+    req = AttackRequest(
+        target="10.0.0.5", host="10.0.0.5", module="exploit/multi/handler"
+    )
+    assert svc._resolve_services(req, "10.0.0.5") == [""]
+
+
+def test_module_must_look_like_a_module_path():
+    svc = AttackService(_RecordingMsf())
+    req = AttackRequest(target="10.0.0.5", host="10.0.0.5", module="rm -rf /")
+    try:
+        svc.run(req, [])
+    except ValueError as exc:
+        assert "refusing to run" in str(exc)
+    else:  # pragma: no cover - the guard must fire
+        raise AssertionError("a non-module string was accepted")
+
+
+def test_heuristic_module_still_used_when_none_pinned():
+    msf = _RecordingMsf()
+    svc = AttackService(msf)
+    req = AttackRequest(
+        target="10.0.0.5",
+        host="10.0.0.5",
+        services=["ssh"],
+        open_sessions=True,
+    )
+    attacks = svc.run(
+        req,
+        [
+            {
+                "host": "10.0.0.5",
+                "service": "ssh",
+                "user": "root",
+                "password": "toor",
+                "verified": True,
+            }
+        ],
+    )
+    assert attacks[0]["module"] == "exploit/multi/ssh/sshexec"
+    assert msf.calls[0][2]["RPORT"] == 22
 
 
 class _FakeMsf:

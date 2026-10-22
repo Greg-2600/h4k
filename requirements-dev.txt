@@ -9,7 +9,7 @@ pytest
 pytest-cov
 httpx
 
-# Linting & static analysis
+# Python linting & static analysis
 black
 ruff
 isort
@@ -18,3 +18,8 @@ pylint
 mypy
 bandit
 safety
+
+# System linting (install via your package manager):
+#   apt install shellcheck hadolint
+#   brew install shellcheck hadolint
+# These are NOT pip-installable; the Makefile checks for them via `command -v`.

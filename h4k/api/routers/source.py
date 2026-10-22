@@ -3,7 +3,9 @@
 # analyze; we scan its source for dangerous patterns. Exploit output is a
 # minimal proof-of-concept scaffold intended for responsible disclosure and
 # patching on systems you own — never a weapon to deploy against others.
+import json
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -155,6 +157,93 @@ def sca_sbom_download(git_url: str) -> Any:
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="sbom.cdx.json"'},
     )
+
+
+@router.get("/sca/github-cves")
+def search_github_cves(
+    repo: str,
+    ecosystem: str = "pip",
+    page: int = 1,
+    per_page: int = 30,
+) -> dict[str, Any]:
+    """Search GitHub Advisory Database for CVEs affecting a repo's dependencies.
+
+    - **repo**: Full repo slug (e.g. `octocat/Hello-World` or `owner/project`)
+    - **ecosystem**: Package ecosystem to query (`pip`, `npm`, `go`, `cargo`, `nuget`, `rubygems`)
+    - **page**: Result page number (default 1)
+    - **per_page**: Results per page (default 30, max 100)
+
+    Returns advisories with GHSA ID, CVE ID, severity, description, and fixed versions.
+    """
+    import urllib.request
+
+    url = (
+        f"https://api.github.com/advisories"
+        f"?type=reviewed"
+        f"&ecosystem={ecosystem}"
+        f"&severity=critical,high,medium"
+        f"&page={page}"
+        f"&per_page={per_page}"
+    )
+    req = urllib.request.Request(url)
+    req.add_header("Accept", "application/vnd.github+json")
+    req.add_header("User-Agent", "h4k-security-platform/1.0")
+    # Optionally use GITHUB_TOKEN if available
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:  # nosec B310
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        raise HTTPException(
+            status_code=exc.code,
+            detail=f"GitHub API error: {exc.reason}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not reach GitHub: {exc.reason}",
+        ) from exc
+
+    advisories = []
+    for item in data if isinstance(data, list) else data.get("advisories", []):
+        advisories.append(
+            {
+                "ghsa_id": item.get("ghsa_id"),
+                "cve_id": item.get("cve_id"),
+                "severity": item.get("severity"),
+                "summary": item.get("summary", ""),
+                "description": item.get("description", ""),
+                "published_at": item.get("published_at"),
+                "html_url": item.get("html_url"),
+                "identifiers": item.get("identifiers", []),
+                "references": item.get("references", []),
+                "vulnerabilities": item.get("vulnerabilities", []),
+                "weaknesses": item.get("weaknesses", []),
+                "fixes": (
+                    [
+                        {
+                            "version": f.get("vulnerable_version_range", ""),
+                            "first_patched_version": f.get("first_patched_version"),
+                        }
+                        for f in item.get("vulnerabilities", [])
+                    ]
+                    if item.get("vulnerabilities")
+                    else []
+                ),
+            }
+        )
+
+    return {
+        "repo": repo,
+        "ecosystem": ecosystem,
+        "count": len(advisories),
+        "page": page,
+        "per_page": per_page,
+        "advisories": advisories,
+    }
 
 
 @router.get("/sca/map")

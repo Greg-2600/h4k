@@ -38,24 +38,50 @@ class CveDb:
 
     # ---- matching ----------------------------------------------------------
 
-    def match_service(self, svc: Service) -> list[dict]:
-        """Return CVEs relevant to a discovered service, sorted by CVSS desc."""
+    def match_service(
+        self, svc: Service, version: str | None = None, product: str | None = None
+    ) -> list[dict]:
+        """Return CVEs relevant to a discovered service, sorted by CVSS desc.
+
+        When version is provided, performs version-aware matching to avoid
+        false positives (e.g., matching Heartbleed on any OpenSSL banner).
+        """
         if not self.cves:
             return []
         banner = f"{svc.service or ''} {svc.info or ''}".lower()
         banner_words = set(banner.replace("(", " ").replace(")", " ").split())
+
+        # Import here to avoid circular imports at module level
+        from services.version_detector import check_vulnerable_version
+
         hits = []
         for cve in self.cves:
-            product = str(cve.get("product", "")).lower()
-            # Strong match: the CVE's specific product token appears in banner
-            # (e.g. "openssl", "postgresql", "ssh" in OpenSSH banner).
-            if product and product in banner_words:
-                hits.append(cve)
+            product_key = str(cve.get("product", "")).lower()
+            if not product_key:
                 continue
-            # Otherwise, only fall back for a known-broad product if the
-            # product word is somewhere in the banner text.
-            if product and product in banner:
-                hits.append(cve)
+
+            # Check if product matches banner
+            product_match = product_key in banner_words or product_key in banner
+
+            if not product_match:
+                continue
+
+            # Version-aware matching: if we have a version, check against ranges
+            if version:
+                vulnerable = check_vulnerable_version(product_key, version)
+                if vulnerable:
+                    # Filter CVEs to only those affecting this version range
+                    for vuln in vulnerable:
+                        if vuln.get("cve") == cve.get("id"):
+                            cve_with_version = dict(cve)
+                            cve_with_version["_matched_version"] = version
+                            cve_with_version["_vulnerable_range"] = vuln.get("range")
+                            hits.append(cve_with_version)
+                            break
+                    continue
+
+            hits.append(cve)
+
         return sorted(hits, key=lambda c: -float(c.get("cvss", 0.0)))
 
     def match_refs(self, refs: list[str]) -> list[dict]:
@@ -97,8 +123,16 @@ class CveDb:
             logger.info("CVE refresh offline or failed (%s); using bundled db", exc)
             return False
 
-    def enrich(self, hosts: list[Host], vulns: list[Vuln]) -> dict:
+    def enrich(
+        self,
+        hosts: list[Host],
+        vulns: list[Vuln],
+        fingerprints: list[dict] | None = None,
+    ) -> dict:
         """Map host/services and vulns -> matched CVEs.
+
+        When fingerprints with version info are provided, performs
+        version-aware CVE matching to reduce false positives.
 
         Returns {"services": {host_addr: {service_key: [cve,...]}},
                  "vulns":    {vuln_index: [cve,...]}}
@@ -108,9 +142,20 @@ class CveDb:
         if not self.cves:
             return {"services": services, "vulns": vuln_map}
 
+        # Build fingerprint lookup by host
+        fp_by_host: dict[str, dict] = {}
+        if fingerprints:
+            for fp in fingerprints:
+                fp_by_host[fp.get("host", "")] = fp
+
         for host in hosts:
+            host_fp = fp_by_host.get(host.address, {})
             for svc in host.services:
-                matched = self.match_service(svc)
+                matched = self.match_service(
+                    svc,
+                    version=host_fp.get("version"),
+                    product=host_fp.get("product"),
+                )
                 if not matched:
                     continue
                 key = f"{host.address}:{svc.port}"

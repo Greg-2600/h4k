@@ -177,10 +177,29 @@ A per-target scan is stateless and dies with the process. An engagement is not.
 
 ### 2.6 Platform / UX
 
-- **Terminal-style pipeline UI** (zsh/opencode aesthetic): status bar, live
-  console, sticky target banner, and a three-stage workflow — **Recon →
-  Source & Supply → Fix** — with a primary CTA per stage, collapsible
-  secondary/lab tools, and a consolidated results region.
+- **Light operations dashboard** (no build step, plain HTML/CSS/JS): a sticky
+  canonical-target bar, live status pills, a live console, and four
+  always-reachable sections instead of a linear wizard —
+  **Recon → Vulnerabilities → Exploit**, plus **Research** for code you own.
+  Recon declares authorized scope, discovers hosts and scans; Vulnerabilities is
+  one severity-ordered triage list (findings, vulns, hosts, credentials,
+  posture, version leads, fingerprints, notes) with search, a severity filter
+  and per-tab counts; Exploit carries the selected finding into a Metasploit
+  drawer, a deep-toolkit sweep, the planner's ranked vectors and the attempt
+  log; Research holds source analysis, SBOM/SCA, fuzzing, OSS-Fuzz, triage,
+  the disclosure-PoC skeleton, local-LLM assist and the custom-rule library.
+  Every section is reachable from anywhere, so a finding never traps you in a
+  sequence. The nav badges answer "is anything waiting for me" (recon hosts,
+  findings to triage, attempts made, triage rows) without opening anything.
+  Selecting a finding jumps to Exploit with host, port, service and a pinned
+  module; attack output is written to the exploit drawer's own pane, never into
+  the research disclosure PoC. Aggressive actions stay behind an explicit
+  opt-in checkbox group and a `confirm()` that names the target and module.
+- **Always-on job monitor** (`/jobs`) listing every running scan / attack /
+  deepattack / fuzz job with a history tab, so an in-flight job is visible no
+  matter which tab started it. A deepattack or fuzz job still running after a
+  page reload is re-adopted automatically — its own panel reconnects instead of
+  asking the operator to re-run the action.
 - **Report export** to `.json` / `.md`.
 - **Phrack-ezine README view** at `/readme`.
 - **Scan cache** (5 min per target+mode) to avoid re-probing.
@@ -218,6 +237,7 @@ A per-target scan is stateless and dies with the process. An engagement is not.
 | D22 | **Signal-guided is not coverage-guided, and the tool says so** | The HTTP fuzzer has no instrumentation and therefore no edge feedback, so it cannot distinguish "reached new code" from "looks new". `stats.coverage_guided` is `false` in the output and the UI says so, pointing at the libFuzzer path for real coverage guidance. Marketing blind mutation as coverage guidance would be the same lie in a different coat. |
 | D23 | **Port breadth is its own axis, and a partial sweep says so** | Stealth/tor/overt decides *how* we probe; a separate `depth` (quick/standard/full) decides *how much*. Previously every mode shipped `--top-ports`, so an "overt" scan silently checked a few hundred ports and could report nothing open on 11434/18799. Every report now carries `coverage` (`ports_spec`, `max_ports`, `complete`) and a partial sweep emits a `[coverage] PARTIAL SCAN` note: absence of a finding is not absence of a service. |
 | D24 | **CTF tools run only when asked, and each names its target** | ZAP, John, aircrack, tshark, NSE, container-escape, lateral and DB-interrogation are separate opt-in endpoints with their own UI buttons — a scan never triggers a web scan, hash crack or wireless capture. Read-only detectors (container escape, route map) stay read-only; exploit helpers (ptrace/cgroup/docker-socket, tunnels) are never called by detection. This keeps the "aggressive actions are explicit" rule (D5) true of the new surface as well. |
+| D25 | **A job you cannot see is a job you cannot trust** | Every job family used to keep its own private dict with only a `GET /{job_id}` route, so a hydra sweep was visible only in the browser tab that happened to start it: reload, second tab, or `curl` and it vanished mid-run while still burning the target. `GET /api/jobs` now merges all four stores into one honest list, and the UI polls it continuously. A family with no meaningful percentage reports `progress: null` and renders a "working" pulse — a fake `0%` bar reads as stalled, which is the opposite of the truth. |
 
 ---
 
@@ -246,6 +266,7 @@ Or `docker compose up --build` (h4k + vulnlab together).
 
 ```
 POST  /api/scan                       {target, mode, try_default_creds, do_attack...}
+GET   /api/jobs ?active=true          all job families merged, newest first
 GET   /api/jobs/{id}                  status · progress · log · report
 GET   /api/report/{id}
 POST  /api/scan/{id}/abort
@@ -303,6 +324,10 @@ GET   /api/health
 - **The OSS-Fuzz runner does not generate harnesses.** It clones, runs your
   `build_cmd`, and fuzzes `fuzz_bin`; writing `LLVMFuzzerTestOneInput` and
   wiring sanitizers into the build is still the operator's job.
+- **Job state is in-process memory only.** A container restart, reload, or crash
+  drops every job and its history; the monitor then shows an empty list rather
+  than stale rows. Fine for a single-lab deployment, not a multi-user daemon —
+  there is no job table in Postgres and no resumption across restarts.
 - **No binary analysis, reversing, or CTF-category tooling.** No Ghidra/radare2/
   angr/pwntools integration and no pwn/crypto/stego/forensics/web-CTF helpers.
   These are real gaps, not hidden features.
@@ -320,7 +345,7 @@ api/
             attack, toolkit, discovery, security, fuzzer, crashes, vulnleads,
             sast, semgrep, sca, triage, ai, ingest
 data/       cves.json · creds.json · users/passwords/web-words lists
-web/        terminal UI (html/css/js)
+web/        light dashboard UI (html/css/js)
 scripts/    DNS recon bash tools
 vulnlab/    intentionally-vulnerable fuzzing target + harnesses
 tests/      unit + API tests

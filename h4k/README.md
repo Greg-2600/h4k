@@ -227,22 +227,31 @@ serving the UI on **0.0.0.0:3137**.
 
 ### First-run walkthrough (new users)
 
-1. **Open `http://localhost:3137`.** You'll see a terminal-style UI with a
-   status bar, console, and an "operation" pane.
+1. **Open `http://localhost:3137`.** You'll see a light dashboard: a target bar
+   across the top, a four-item sidebar (Recon / Vulnerabilities / Exploit /
+   Research), and a jobs + activity panel on the right.
 2. **Scan a lab target** — enter an IP you own (e.g. a Raspberry Pi or a VM) in
-   the **target** box, keep mode on **Overt**, hit **run scan**. The console
-   streams progress; the report populates under **hosts / fingerprint / vulns /
-   security / recs**.
-3. **Find neighbors** — click **find neighbors (arp)** to list IP/MAC/vendor on
-   your local segment.
-4. **Analyze source** — click **SAST source analysis**, paste a git URL (or
-   upload a `.zip`), and hit **analyze**. Findings appear with severity/CWE.
-5. **Scan supply chain** — click **SBOM / SCA**, paste a git URL **that has a
-   committed lockfile** (see `demos/sca-demo/`) — you'll see known-CVE hits.
-6. **Generate a PoC** — in any SAST finding row, hit **poc** (view) or **dl**
-   (download the disclosure skeleton).
-7. **Fuzz a lab target you own** — start the `vulnlab` container and aim the
-   **lab fuzz** button at `127.0.0.1:8080` to watch anomaly detection.
+   the **target** bar and press Enter (or keep mode on **overt** and hit **Run
+   scan** in Recon). The activity panel streams progress, and the finished
+   report opens **Vulnerabilities**: a severity-ordered triage list with tabs
+   for findings, vulns, hosts, credentials, posture, version leads,
+   fingerprints and notes.
+3. **Find neighbors** — in Recon, click **Sweep for neighbors** to list
+   IP/MAC/vendor on your local segment, and click **select** on any row to load
+   it into the target bar.
+4. **Act on a finding** — click any row in Vulnerabilities; it jumps to
+   **Exploit** with the host, port, service and Metasploit module prefilled.
+   Nothing is sent until you confirm.
+5. **Analyze source** — in **Research**, paste a git URL (or upload a `.zip`)
+   in the **Source** card and hit **Analyze**. Findings appear with
+   severity/CWE, and triage below classifies them.
+6. **Scan supply chain** — in Research, hit **Build SBOM** on a git URL **that
+   has a committed lockfile** (see `demos/sca-demo/`) — you'll see known-CVE
+   hits.
+7. **Generate a PoC** — in the Research **Triage** list, hit **PoC** on a row to
+   view or download the disclosure skeleton.
+8. **Fuzz a lab target you own** — start the `vulnlab` container and aim
+   Research's **Fuzzing** card at `127.0.0.1:8080` to watch anomaly detection.
 
 > **Safety:** default-cred testing, Metasploit exploits, the deep toolkit, and
 > the fuzzer are **all opt-in** and only for systems you own or have written
@@ -273,7 +282,17 @@ soon after returns the stored report instead of re-probing. Long scans can be
 **aborted** mid-flight via the stop button; the job reports `aborted` with the
 log kept.
 
-### Drive it from the terminal UI
+### Drive it from the dashboard
+
+The UI is four sections — **Recon**, **Vulnerabilities**, **Exploit** and
+**Research** — with one target bar at the top that every action reads from. Type
+a target and press Enter to scan it; the finished report lands you in
+Vulnerabilities, where each row loads into the Exploit drawer with its module
+pinned. Active actions (default credentials, exploitation, deep toolkit, CTF
+tools) sit behind an explicit opt-in group and a confirmation that names the
+target before anything is sent.
+
+The console still accepts shortcuts, and the panes still have buttons:
 
 ```
 h4k ➜ ~ scan 192.168.1.248 overt
@@ -281,7 +300,7 @@ h4k ➜ ~ status
 h4k ➜ ~ clear
 ```
 
-Buttons in the operation pane: **stop** (abort in-progress scan), **export .json /
+Buttons in the Recon pane: **stop** (abort in-progress scan), **export .json /
 export .md** (download the report), **find neighbors (arp)** (sweep the local
 segment and list IP/MAC/vendor), plus toggles for **default credentials** and
 **active exploit attempts** — both opt-in, off by default, authorized scope

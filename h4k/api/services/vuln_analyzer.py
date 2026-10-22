@@ -390,21 +390,15 @@ class VulnerabilityAnalyzer:
         if not file_path.is_file():
             return findings
 
-        language = detect_language(file_path)
-        if not language:
-            return findings
-
         try:
             content = file_path.read_text(encoding="utf-8", errors="replace")
         except Exception as e:
             self.logger.warning(f"Failed to read {file_path}: {e}")
             return findings
 
-        # Get patterns for this language
-        patterns = DANGEROUS_PATTERNS.get(language, {})
+        language = detect_language(file_path)
 
-        # Check language-specific patterns
-        self._scan_content(content, file_path, language, patterns, findings)
+        # Generic patterns apply to all files (e.g., private keys, AWS keys)
         self._scan_content(
             content,
             file_path,
@@ -412,6 +406,13 @@ class VulnerabilityAnalyzer:
             DANGEROUS_PATTERNS.get("generic", {}),
             findings,
         )
+
+        if not language:
+            return findings
+
+        # Language-specific patterns
+        patterns = DANGEROUS_PATTERNS.get(language, {})
+        self._scan_content(content, file_path, language, patterns, findings)
 
         return findings
 
