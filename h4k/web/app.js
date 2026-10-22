@@ -165,9 +165,6 @@ function setPhase(phase) {
 function updateHint() {
   const hints = {
     recon: 'Enter target IP, configure options, and hit Launch Recon',
-    prepare: 'Configure exploit options (LHOST is auto-detected)',
-    execute: 'Execute the exploit and await session',
-    pwned: 'Session established! Use Next Target or start New Mission',
     graph: 'Explore the discovered host graph — click nodes for details',
   };
   $('footer-hint').textContent = hints[state.currentPhase] || '';
@@ -1060,7 +1057,7 @@ async function deepAttack() {
 // VIM NAVIGATION
 // ═══════════════════════════════════════════
 function vimNavigate(dir) {
-  const phases = ['recon', 'prepare', 'execute', 'pwned', 'graph'];
+  const phases = ['recon', 'graph'];
   const idx = phases.indexOf(state.currentPhase);
   if (dir === 'j' && idx < phases.length - 1) setPhase(phases[idx + 1]);
   if (dir === 'k' && idx > 0) setPhase(phases[idx - 1]);
@@ -1170,7 +1167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Vim keys
     if (['j', 'k', 'h', 'l'].includes(e.key)) vimNavigate(e.key);
     // Number phases
-    if (e.key >= '1' && e.key <= '5') setPhase(['recon','prepare','execute','pwned','graph'][parseInt(e.key) - 1]);
+    if (e.key >= '1' && e.key <= '2') setPhase(['recon','graph'][parseInt(e.key) - 1]);
     // T = theme
     if (e.key === 't') toggleTheme();
     // ? = help
@@ -1192,22 +1189,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (exBtn) openExploitPanel(parseInt(exBtn.dataset.vulnIndex, 10));
     if (e.target.closest('#btn-launch-exploit')) launchExploit();
     if (e.target.closest('#btn-cve-refresh')) refreshCveDb();
-  });
-
-  // Pwned buttons
-  $('btn-next-target')?.addEventListener('click', () => {
-    setPhase('recon');
-    $('target').value = '';
-    $('target').focus();
-  });
-  $('btn-new-mission')?.addEventListener('click', () => {
-    state.scanResults = null;
-    state.selectedVuln = null;
-    state.selectedExploit = null;
-    $('target-results-card').hidden = true;
-    $('scan-progress-card').hidden = true;
-    document.querySelectorAll('.obj').forEach(o => { o.classList.remove('done', 'active'); o.querySelector('.obj-check').textContent = '○'; });
-    setPhase('recon');
   });
 
   // Theme toggle

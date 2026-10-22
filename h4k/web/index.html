@@ -35,8 +35,7 @@
 
       <nav class="nav">
         <button class="nav-btn active" data-phase="recon" data-shortcut="1">Recon</button>
-        <button class="nav-btn" data-phase="pwned" data-shortcut="2">Pwned</button>
-        <button class="nav-btn" data-phase="graph" data-shortcut="3">Graph</button>
+        <button class="nav-btn" data-phase="graph" data-shortcut="2">Graph</button>
       </nav>
 
       <div class="header-right">
@@ -303,28 +302,6 @@
                 <span class="ex-status" id="ex-status">Ready — verify the target is yours to test.</span>
               </div>
               <div class="ex-output" id="ex-output" hidden></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- PWNED PHASE -->
-        <div class="phase" id="phase-pwned" data-phase="pwned" hidden>
-          <div class="card pwned-card">
-            <div class="card-header success">
-              <h2>💀 TARGET PWNED!</h2>
-            </div>
-            <div class="card-body">
-              <div class="pwned-display">
-                <div class="pwned-icon" id="pwned-icon">💀</div>
-                <div class="pwned-target" id="pwned-target">192.168.1.13</div>
-                <div class="pwned-xp" id="pwned-xp">+100 XP</div>
-                <h3>Session Info</h3>
-                <div class="session-info" id="session-info"></div>
-                <div class="btn-row">
-                  <button class="btn btn-secondary" id="btn-next-target">Next Target</button>
-                  <button class="btn btn-outline" id="btn-new-mission">New Mission</button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
