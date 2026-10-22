@@ -1139,6 +1139,7 @@ def get_graph() -> dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
+@router.post("/attack")
 def attack_target(req: AttackRequest, background: BackgroundTasks) -> dict[str, Any]:
     """OPT-IN only: launch active attacks against an authorized target."""
     msf = _get_msf()

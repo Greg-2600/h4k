@@ -696,3 +696,41 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 .v-kind { color: var(--danger) !important; font-weight: 700; }
 .v-detail { white-space: normal !important; max-width: 340px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted) !important; font-size: 11px; }
 .v-exploit-btn { padding: 4px 10px; font-size: 12px; cursor: pointer; }
+
+/* Exploit Setup card */
+#exploits-panel .card-header.danger,
+#exploit-panel .card-header.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+#exploit-panel .card-header.danger h2 { color: white; }
+#exploit-panel .ex-summary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.input-row .input-group.grow { flex: 1; }
+.ex-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 14px 0 10px;
+}
+.ex-status { font-size: 13px; color: var(--text-secondary); flex: 1; }
+.ex-output {
+  margin-top: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #0e1116;
+  color: #d5dbfa;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+.ex-output .t-line { margin: 2px 0; white-space: pre-wrap; word-break: break-all; }

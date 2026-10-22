@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=6" />
+  <link rel="stylesheet" href="/static/style.css?v=7" />
 </head>
 <body>
   <div class="app" id="app">
@@ -270,6 +270,38 @@
               </div>
             </div>
           </div>
+
+          <!-- Exploit Setup -->
+          <div class="card" id="exploit-panel" hidden>
+            <div class="card-header danger">
+              <h2>⚔ Exploit Setup</h2>
+              <span class="fp-status" id="ex-find">—</span>
+            </div>
+            <div class="card-body">
+              <div class="ex-summary" id="ex-summary"></div>
+              <div class="input-row">
+                <div class="input-group grow">
+                  <label>Module</label>
+                  <input type="text" id="ex-module" placeholder="exploit/…" />
+                </div>
+              </div>
+              <div class="input-row">
+                <div class="input-group">
+                  <label>RHOST</label>
+                  <input type="text" id="ex-rhost" />
+                </div>
+                <div class="input-group">
+                  <label>RPORT</label>
+                  <input type="text" id="ex-rport" />
+                </div>
+              </div>
+              <div class="ex-actions">
+                <button class="btn btn-danger" id="btn-launch-exploit">⚔ Launch Exploit</button>
+                <span class="ex-status" id="ex-status">Ready — verify the target is yours to test.</span>
+              </div>
+              <div class="ex-output" id="ex-output" hidden></div>
+            </div>
+          </div>
         </div>
 
         <!-- ANALYZE PHASE -->
@@ -468,6 +500,6 @@
 
   </div>
 
-  <script src="/static/app.js?v=6"></script>
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

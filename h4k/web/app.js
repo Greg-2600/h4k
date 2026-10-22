@@ -24,6 +24,8 @@ const state = {
   scanType: 'ip', // 'ip' or 'neighbors'
   discoveredTarget: null,
   fingerprintJobId: null,
+  vulnRows: [],
+  selectedVulnRow: null,
 };
 
 // XP table: level -> XP required to reach it
@@ -515,11 +517,14 @@ function renderVulnPanel(results) {
   if (chip) chip.textContent = `${rows.length} findings`;
 
   const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-  rows.sort((a, b) => (severityOrder[(a.detail || '').split(':')[0]] ?? 9) - (severityOrder[(b.detail || '').split(':')[0]] ?? 9));
+  const severityKey = (d) => { const k = (d || '').split(':')[0]; return k in severityOrder ? severityOrder[k] : 9; };
+  rows.sort((a, b) => severityKey(a.detail) - severityKey(b.detail));
 
+  state.vulnRows = rows;
   tbody.innerHTML = rows.map(x => {
     const sev = (x.detail || '').split(':')[0];
     const sevCls = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(sev) ? sev.toLowerCase() : '';
+    const i = rows.indexOf(x);
     return `
     <tr>
       <td class="fp-ip">${escHtml(x.ip)}</td>
@@ -527,9 +532,121 @@ function renderVulnPanel(results) {
       <td class="v-kind">${escHtml(x.vid)}</td>
       <td><span class="v-sev ${sevCls}">${escHtml(sev || 'INFO')}</span></td>
       <td class="v-detail">${escHtml((x.detail || '').split(': ').slice(1).join(': '))}</td>
-      <td><button class="btn btn-danger v-exploit-btn" data-href-host="${escHtml(x.ip)}" data-href-port="${escHtml(x.port)}">⚔</button></td>
+      <td><button class="btn btn-danger v-exploit-btn" data-vuln-index="${i}" title="Prepare exploit">⚔</button></td>
     </tr>`;
   }).join('');
+}
+
+function openExploitPanel(idx) {
+  const row = (state.vulnRows || [])[idx];
+  if (!row) return;
+  state.selectedVulnRow = row;
+
+  const msfHint = (row.detail || '').match(/msf:\s*([^\s|]+)/);
+  const module = msfHint ? msfHint[1] : '';
+  $('ex-module').value = module;
+  $('ex-rhost').value = row.ip;
+  $('ex-rport').value = row.port;
+  $('ex-find').textContent = row.vid || 'manual';
+  $('ex-status').textContent = module
+    ? 'Module suggested from CVE db — confirm then launch.'
+    : 'No msf module hint — enter one or pick a heuristic.';
+  $('ex-output').hidden = true;
+  $('ex-output').innerHTML = '';
+  $('exploit-panel').hidden = false;
+  $('exploit-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function launchExploit() {
+  const row = state.selectedVulnRow;
+  if (!row || !row.ip) { $('ex-status').textContent = 'Pick a finding first.'; return; }
+  const module = $('ex-module').value.trim();
+  if (!module) { $('ex-status').textContent = 'Module is required.'; return; }
+  if (!module.startsWith('exploit/')) {
+    $('ex-status').textContent = 'Only exploit/ modules launch here.';
+    return;
+  }
+
+  const btn = $('btn-launch-exploit');
+  btn.disabled = true;
+  $('ex-status').textContent = 'Launching...';
+  $('ex-output').hidden = false;
+  appendExOutput(`> ${module} @ ${row.ip}:${row.port}`);
+
+  try {
+    const res = await api('/api/attack', {
+      method: 'POST',
+      body: {
+        target: row.ip,
+        host: row.ip,
+        services: [],
+        module,
+        port: parseInt(row.port, 10) || null,
+        open_sessions: false,
+      }
+    });
+    if (!res.job_id) {
+      $('ex-status').textContent = 'Launch failed: ' + (res.detail || JSON.stringify(res));
+      btn.disabled = false;
+      return;
+    }
+    pollExploitJob(res.job_id, btn);
+  } catch (e) {
+    $('ex-status').textContent = 'Launch error: ' + e.message;
+    appendExOutput('launch error: ' + e.message);
+    btn.disabled = false;
+  }
+}
+
+let exploitPollTimer = null;
+
+function pollExploitJob(jobId, btn) {
+  if (exploitPollTimer) clearInterval(exploitPollTimer);
+  let ticks = 0;
+  exploitPollTimer = setInterval(async () => {
+    ticks++;
+    try {
+      const job = await api(`/api/attack/${jobId}`);
+      const atk = (job.attacks || [])[job.attacks?.length - 1] || null;
+      const msg = job.message || job.status || 'working';
+      $('ex-status').textContent = `Attack ${jobId}: ${msg}`;
+      if (atk && !atk._shown) {
+        atk._shown = true;
+        appendExOutput(`[${atk.result}] ${atk.module} — ${atk.detail}`);
+        if (atk.session_id) appendExOutput(`SESSION ESTABLISHED: ${atk.session_id}`);
+      }
+      if (['done', 'error'].includes(job.status) || ticks > 60) {
+        clearInterval(exploitPollTimer);
+        exploitPollTimer = null;
+        btn.disabled = false;
+        if (job.status === 'done' && atk?.session_id) {
+          $('ex-status').textContent = `Pwned — session ${atk.session_id} @ ${row.ip}`;
+          glitchEffect();
+          unlockAchievement('exploiter');
+          logXp(50, '(exploit)');
+          state.stats.pwned++;
+        } else if (job.status === 'done') {
+          $('ex-status').textContent = 'Exploit finished — no session opened.';
+        } else {
+          $('ex-status').textContent = 'Attack failed or timed out.';
+          playSound('error');
+        }
+      }
+    } catch (e) {
+      clearInterval(exploitPollTimer); exploitPollTimer = null;
+      btn.disabled = false;
+      $('ex-status').textContent = 'Poll error: ' + e.message;
+    }
+  }, 2500);
+}
+
+function appendExOutput(text) {
+  const el = $('ex-output');
+  const p = document.createElement('p');
+  p.className = 't-line';
+  p.textContent = text;
+  el.appendChild(p);
+  el.scrollTop = el.scrollHeight;
 }
 
 function renderFingerprintTable(results) {
@@ -1102,6 +1219,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', (e) => {
     if (e.target.closest('#btn-fingerprint')) startFingerprintScan();
     if (e.target.closest('#btn-full-scan')) startFullScan();
+    const exBtn = e.target.closest('.v-exploit-btn');
+    if (exBtn) openExploitPanel(parseInt(exBtn.dataset.vulnIndex, 10));
+    if (e.target.closest('#btn-launch-exploit')) launchExploit();
   });
 
   // Pwned buttons

