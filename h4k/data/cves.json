@@ -5,9 +5,16 @@
   "cves": [
     {
       "id": "CVE-2017-0144",
-      "aliases": ["MS17-010", "EternalBlue"],
+      "aliases": [
+        "MS17-010",
+        "EternalBlue"
+      ],
       "product": "smb",
-      "service": ["smb", "microsoft-ds", "netbios-ssn"],
+      "service": [
+        "smb",
+        "microsoft-ds",
+        "netbios-ssn"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "EternalBlue SMB Remote Code Execution",
@@ -16,9 +23,15 @@
     },
     {
       "id": "CVE-2020-0796",
-      "aliases": ["SMBGhost"],
+      "aliases": [
+        "SMBGhost"
+      ],
       "product": "smb",
-      "service": ["smb", "microsoft-ds", "netbios-ssn"],
+      "service": [
+        "smb",
+        "microsoft-ds",
+        "netbios-ssn"
+      ],
       "cvss": 10.0,
       "severity": "CRITICAL",
       "title": "SMBGhost Windows 10 SMBv3 RCE",
@@ -27,9 +40,15 @@
     },
     {
       "id": "CVE-2019-0708",
-      "aliases": ["BlueKeep"],
+      "aliases": [
+        "BlueKeep"
+      ],
       "product": "rdp",
-      "service": ["rdp", "ms-wbt-server", "remote desktop"],
+      "service": [
+        "rdp",
+        "ms-wbt-server",
+        "remote desktop"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "BlueKeep RDP Remote Code Execution",
@@ -38,9 +57,16 @@
     },
     {
       "id": "CVE-2021-34527",
-      "aliases": ["PrintNightmare"],
+      "aliases": [
+        "PrintNightmare"
+      ],
       "product": "epmap",
-      "service": ["epmap", "print spooler", "msrpc", "netbios-ssn"],
+      "service": [
+        "epmap",
+        "print spooler",
+        "msrpc",
+        "netbios-ssn"
+      ],
       "cvss": 8.8,
       "severity": "HIGH",
       "title": "PrintNightmare Windows Print Spooler RCE",
@@ -49,9 +75,19 @@
     },
     {
       "id": "CVE-2014-0160",
-      "aliases": ["Heartbleed"],
+      "aliases": [
+        "Heartbleed"
+      ],
       "product": "openssl",
-      "service": ["http", "https", "ssl", "ldaps", "imaps", "pop3s", "smtps"],
+      "service": [
+        "http",
+        "https",
+        "ssl",
+        "ldaps",
+        "imaps",
+        "pop3s",
+        "smtps"
+      ],
       "cvss": 7.5,
       "severity": "HIGH",
       "title": "Heartbleed OpenSSL memory disclosure",
@@ -62,7 +98,11 @@
       "id": "CVE-2017-0144-vul",
       "aliases": [],
       "product": "smb",
-      "service": ["smb", "microsoft-ds", "netbios-ssn"],
+      "service": [
+        "smb",
+        "microsoft-ds",
+        "netbios-ssn"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "EternalBlue SMB Remote Code Execution",
@@ -73,7 +113,9 @@
       "id": "CVE-1999-0527",
       "aliases": [],
       "product": "ftp",
-      "service": ["ftp"],
+      "service": [
+        "ftp"
+      ],
       "cvss": 10.0,
       "severity": "CRITICAL",
       "title": "ProFTPD 1.2.7-1.2.9 remote format string RCE",
@@ -82,9 +124,13 @@
     },
     {
       "id": "CVE-2011-2523",
-      "aliases": ["vsftpd 234 backdoor"],
+      "aliases": [
+        "vsftpd 234 backdoor"
+      ],
       "product": "ftp",
-      "service": ["ftp"],
+      "service": [
+        "ftp"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "vsftpd 2.3.4 backdoor command execution",
@@ -95,7 +141,10 @@
       "id": "CVE-2012-1823",
       "aliases": [],
       "product": "php",
-      "service": ["http", "https"],
+      "service": [
+        "http",
+        "https"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "PHP-CGI query string argument injection RCE",
@@ -104,9 +153,17 @@
     },
     {
       "id": "CVE-2014-6271",
-      "aliases": ["Shellshock"],
+      "aliases": [
+        "Shellshock"
+      ],
       "product": "bash",
-      "service": ["http", "https", "ssh", "cgi", "webserver"],
+      "service": [
+        "http",
+        "https",
+        "ssh",
+        "cgi",
+        "webserver"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "Shellshock Bash remote command execution",
@@ -115,9 +172,18 @@
     },
     {
       "id": "CVE-2014-3566",
-      "aliases": ["POODLE"],
+      "aliases": [
+        "POODLE"
+      ],
       "product": "ssl",
-      "service": ["https", "ssl", "ldaps", "imaps", "pop3s", "smtps"],
+      "service": [
+        "https",
+        "ssl",
+        "ldaps",
+        "imaps",
+        "pop3s",
+        "smtps"
+      ],
       "cvss": 4.3,
       "severity": "MEDIUM",
       "title": "POODLE SSLv3 padding oracle",
@@ -126,9 +192,19 @@
     },
     {
       "id": "CVE-2008-0166",
-      "aliases": ["Debian OpenSSL DSA keys"],
+      "aliases": [
+        "Debian OpenSSL DSA keys"
+      ],
       "product": "openssl",
-      "service": ["https", "ssl", "ssh", "ldaps", "pop3s", "imaps", "smtps"],
+      "service": [
+        "https",
+        "ssl",
+        "ssh",
+        "ldaps",
+        "pop3s",
+        "imaps",
+        "smtps"
+      ],
       "cvss": 6.5,
       "severity": "MEDIUM",
       "title": "Debian OpenSSL predictable keys",
@@ -137,9 +213,13 @@
     },
     {
       "id": "CVE-2015-5602",
-      "aliases": ["sshd_user_enum"],
+      "aliases": [
+        "sshd_user_enum"
+      ],
       "product": "ssh",
-      "service": ["ssh"],
+      "service": [
+        "ssh"
+      ],
       "cvss": 7.5,
       "severity": "HIGH",
       "title": "OpenSSH user enumeration",
@@ -148,9 +228,13 @@
     },
     {
       "id": "CVE-2018-15473",
-      "aliases": ["ssh username enumeration"],
+      "aliases": [
+        "ssh username enumeration"
+      ],
       "product": "ssh",
-      "service": ["ssh"],
+      "service": [
+        "ssh"
+      ],
       "cvss": 5.3,
       "severity": "MEDIUM",
       "title": "OpenSSH 2.2-7.7 username enumeration",
@@ -161,7 +245,10 @@
       "id": "CVE-2021-35942",
       "aliases": [],
       "product": "postgresql",
-      "service": ["postgresql", "postgres"],
+      "service": [
+        "postgresql",
+        "postgres"
+      ],
       "cvss": 7.8,
       "severity": "HIGH",
       "title": "PostgreSQL 9.6-13.5 read/write arbitrary files as superuser",
@@ -170,9 +257,14 @@
     },
     {
       "id": "CVE-2019-16239",
-      "aliases": ["PostgreSQL RCE as DB admin"],
+      "aliases": [
+        "PostgreSQL RCE as DB admin"
+      ],
       "product": "postgresql",
-      "service": ["postgresql", "postgres"],
+      "service": [
+        "postgresql",
+        "postgres"
+      ],
       "cvss": 7.2,
       "severity": "HIGH",
       "title": "PostgreSQL CREATE FUNCTION code execution",
@@ -181,9 +273,16 @@
     },
     {
       "id": "CVE-2019-15107",
-      "aliases": ["Webmin password_change"],
+      "aliases": [
+        "Webmin password_change"
+      ],
       "product": "webmin",
-      "service": ["http", "https", "webmin", "10000"],
+      "service": [
+        "http",
+        "https",
+        "webmin",
+        "10000"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "Webmin password_change.cgi command injection RCE",
@@ -192,9 +291,14 @@
     },
     {
       "id": "CVE-2018-7600",
-      "aliases": ["Drupalgeddon2"],
+      "aliases": [
+        "Drupalgeddon2"
+      ],
       "product": "drupal",
-      "service": ["http", "https"],
+      "service": [
+        "http",
+        "https"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "Drupalgeddon2 Drupal RCE",
@@ -203,9 +307,18 @@
     },
     {
       "id": "CVE-2017-5638",
-      "aliases": ["Apache Struts RCE"],
+      "aliases": [
+        "Apache Struts RCE"
+      ],
       "product": "struts",
-      "service": ["http", "https", "java", "8080", "8081", "8443"],
+      "service": [
+        "http",
+        "https",
+        "java",
+        "8080",
+        "8081",
+        "8443"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "Apache Struts 2 Jakarta Multipart OGNL RCE",
@@ -214,9 +327,19 @@
     },
     {
       "id": "CVE-2021-44228",
-      "aliases": ["Log4Shell"],
+      "aliases": [
+        "Log4Shell"
+      ],
       "product": "log4j",
-      "service": ["http", "https", "java", "8080", "8443", "solr", "jndi"],
+      "service": [
+        "http",
+        "https",
+        "java",
+        "8080",
+        "8443",
+        "solr",
+        "jndi"
+      ],
       "cvss": 10.0,
       "severity": "CRITICAL",
       "title": "Log4Shell Log4j 2 JNDI RCE",
@@ -225,9 +348,16 @@
     },
     {
       "id": "CVE-2017-7494",
-      "aliases": ["SAMBA_ismaster"],
+      "aliases": [
+        "SAMBA_ismaster"
+      ],
       "product": "smb",
-      "service": ["smb", "microsoft-ds", "netbios-ssn", "445"],
+      "service": [
+        "smb",
+        "microsoft-ds",
+        "netbios-ssn",
+        "445"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "Samba is_known_pipename RCE",
@@ -236,9 +366,16 @@
     },
     {
       "id": "CVE-2020-1472",
-      "aliases": ["Zerologon"],
+      "aliases": [
+        "Zerologon"
+      ],
       "product": "smb",
-      "service": ["smb", "microsoft-ds", "netbios-ssn", "445"],
+      "service": [
+        "smb",
+        "microsoft-ds",
+        "netbios-ssn",
+        "445"
+      ],
       "cvss": 10.0,
       "severity": "CRITICAL",
       "title": "Zerologon Netlogon privilege escalation",
@@ -249,7 +386,12 @@
       "id": "CVE-2019-19781",
       "aliases": [],
       "product": "citrix",
-      "service": ["http", "https", "citrix", "443"],
+      "service": [
+        "http",
+        "https",
+        "citrix",
+        "443"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "Citrix ADC/Gateway directory traversal RCE",
@@ -260,7 +402,12 @@
       "id": "CVE-2020-3452",
       "aliases": [],
       "product": "citrix",
-      "service": ["http", "https", "citrix", "443"],
+      "service": [
+        "http",
+        "https",
+        "citrix",
+        "443"
+      ],
       "cvss": 7.5,
       "severity": "HIGH",
       "title": "Citrix ADC/Gateway arbitrary file read",
@@ -269,9 +416,17 @@
     },
     {
       "id": "CVE-2003-0352",
-      "aliases": ["DCOM RPC DCOM"],
+      "aliases": [
+        "DCOM RPC DCOM"
+      ],
       "product": "dcom",
-      "service": ["rpc", "dcom", "dcerpc", "135", "msrpc"],
+      "service": [
+        "rpc",
+        "dcom",
+        "dcerpc",
+        "135",
+        "msrpc"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "Blaster MS03-026 DCOM RPC buffer overflow",
@@ -280,9 +435,17 @@
     },
     {
       "id": "CVE-2023-27350",
-      "aliases": ["PaperCut RCE"],
+      "aliases": [
+        "PaperCut RCE"
+      ],
       "product": "papercut",
-      "service": ["http", "https", "papercut", "9191", "9190"],
+      "service": [
+        "http",
+        "https",
+        "papercut",
+        "9191",
+        "9190"
+      ],
       "cvss": 9.8,
       "severity": "CRITICAL",
       "title": "PaperCut MF/NG authentication bypass RCE",
@@ -293,7 +456,10 @@
       "id": "CVE-2021-41773",
       "aliases": [],
       "product": "apache",
-      "service": ["http", "https"],
+      "service": [
+        "http",
+        "https"
+      ],
       "cvss": 7.5,
       "severity": "HIGH",
       "title": "Apache HTTP Server 2.4.49 path traversal + RCE",
@@ -302,9 +468,13 @@
     },
     {
       "id": "CVE-2016-6210",
-      "aliases": ["OpenSSH user enumeration"],
+      "aliases": [
+        "OpenSSH user enumeration"
+      ],
       "product": "ssh",
-      "service": ["ssh"],
+      "service": [
+        "ssh"
+      ],
       "cvss": 5.3,
       "severity": "MEDIUM",
       "title": "OpenSSH username enumeration",
@@ -313,9 +483,15 @@
     },
     {
       "id": "CVE-2021-4034",
-      "aliases": ["PwnKit"],
+      "aliases": [
+        "PwnKit"
+      ],
       "product": "polkit",
-      "service": ["http", "https", "ssh"],
+      "service": [
+        "http",
+        "https",
+        "ssh"
+      ],
       "cvss": 7.8,
       "severity": "HIGH",
       "title": "PwnKit pkexec local privilege escalation",
@@ -324,9 +500,15 @@
     },
     {
       "id": "CVE-2019-14287",
-      "aliases": ["Sudo CVE"],
+      "aliases": [
+        "Sudo CVE"
+      ],
       "product": "sudo",
-      "service": ["ssh", "http", "https"],
+      "service": [
+        "ssh",
+        "http",
+        "https"
+      ],
       "cvss": 7.8,
       "severity": "HIGH",
       "title": "Sudo user ID 4294967295 privilege bypass",
@@ -335,14 +517,292 @@
     },
     {
       "id": "CVE-2021-3156",
-      "aliases": ["Baron Samedit"],
+      "aliases": [
+        "Baron Samedit"
+      ],
       "product": "sudo",
-      "service": ["ssh", "http", "https"],
+      "service": [
+        "ssh",
+        "http",
+        "https"
+      ],
       "cvss": 7.8,
       "severity": "HIGH",
       "title": "Baron Samedit sudo heap overflow LPE",
       "description": "Sudo <1.9.5p2 heap-based buffer overflow in sudoedit allowing root privilege escalation.",
       "msf_module": "exploit/linux/local/sudo_baron_samedit"
+    },
+    {
+      "id": "CVE-2021-43798",
+      "aliases": [
+        "Grafana dir traversal"
+      ],
+      "product": "grafana",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 7.5,
+      "severity": "HIGH",
+      "title": "Grafana 8.x arbitrary file read via plugin path traversal",
+      "description": "Unauthenticated directory traversal in Grafana 8.0.0-beta1 through 8.3.0.",
+      "msf_module": "auxiliary/scanner/http/grafana_plugin_traversal"
+    },
+    {
+      "id": "CVE-2022-22965",
+      "aliases": [
+        "Spring4Shell"
+      ],
+      "product": "spring",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 9.8,
+      "severity": "CRITICAL",
+      "title": "Spring Framework RCE via data binding (Spring4Shell)",
+      "description": "RCE in Spring MVC on JDK9+ when the war deployment is Tomcat.",
+      "msf_module": "exploit/multi/http/spring_framework_rce_spel"
+    },
+    {
+      "id": "CVE-2023-34362",
+      "aliases": [
+        "Moveit Transfer RCE"
+      ],
+      "product": "moveit",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 10.0,
+      "severity": "CRITICAL",
+      "title": "Progress MOVEit Transfer SQLi to RCE",
+      "description": "Unauthenticated SQL injection with remote code execution in MOVEit Transfer.",
+      "msf_module": ""
+    },
+    {
+      "id": "CVE-2021-26084",
+      "aliases": [
+        "Confluence OGNL"
+      ],
+      "product": "confluence",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 9.8,
+      "severity": "CRITICAL",
+      "title": "Atlassian Confluence OGNL injection pre-auth RCE",
+      "description": "OGNL injection in Confluence Server and Data Center allows unauthenticated RCE.",
+      "msf_module": "exploit/multi/http/confluence_ognl_injection"
+    },
+    {
+      "id": "CVE-2022-1388",
+      "aliases": [
+        "F5 BIG-IP iControl REST"
+      ],
+      "product": "big-ip",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 9.8,
+      "severity": "CRITICAL",
+      "title": "F5 BIG-IP iControl REST auth bypass RCE",
+      "description": "Authentication bypass leading to RCE on F5 BIG-IP.",
+      "msf_module": "exploit/linux/http/f5_bigip_icall_rest_rce"
+    },
+    {
+      "id": "CVE-2024-21762",
+      "aliases": [
+        "FortiOS SSL-VPN"
+      ],
+      "product": "fortinet",
+      "service": [
+        "https",
+        "https-alt"
+      ],
+      "cvss": 9.6,
+      "severity": "CRITICAL",
+      "title": "Fortinet FortiOS out-of-bounds write pre-auth RCE",
+      "description": "Out-of-bounds write in FortiOS SSL-VPN allows unauthenticated RCE.",
+      "msf_module": ""
+    },
+    {
+      "id": "CVE-2021-21974",
+      "aliases": [
+        "ESXi OpenSLP heap overflow"
+      ],
+      "product": "vmware",
+      "service": [
+        "vmware",
+        "esxi"
+      ],
+      "cvss": 8.8,
+      "severity": "HIGH",
+      "title": "VMware ESXi OpenSLP heap-overflow pre-auth RCE",
+      "description": "Heap-overflow in the SLP service of ESXi allows pre-auth RCE.",
+      "msf_module": ""
+    },
+    {
+      "id": "CVE-2020-14882",
+      "aliases": [
+        "WebLogic console"
+      ],
+      "product": "weblogic",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 9.8,
+      "severity": "CRITICAL",
+      "title": "Oracle WebLogic console auth-bypass RCE",
+      "description": "Path traversal in the WebLogic Administration Console allows RCE.",
+      "msf_module": "exploit/multi/misc/weblogic_deserialize_iiop"
+    },
+    {
+      "id": "CVE-2017-12149",
+      "aliases": [
+        "JBoss deserialization"
+      ],
+      "product": "jboss",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 9.8,
+      "severity": "CRITICAL",
+      "title": "JBoss JMXInvokerServlet deserialization RCE",
+      "description": "Exposed JMXInvokerServlet endpoint allows unauthenticated deserialization RCE.",
+      "msf_module": "exploit/multi/http/jboss_invoke_deploy"
+    },
+    {
+      "id": "CVE-2019-3396",
+      "aliases": [
+        "Confluence widget"
+      ],
+      "product": "confluence",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 9.8,
+      "severity": "CRITICAL",
+      "title": "Confluence Widget Connector path traversal RCE",
+      "description": "Velocity template injection in Confluence Server prior to 6.6.12.",
+      "msf_module": ""
+    },
+    {
+      "id": "CVE-2016-5195",
+      "aliases": [
+        "Dirty COW"
+      ],
+      "product": "linux",
+      "service": [
+        ""
+      ],
+      "cvss": 7.8,
+      "severity": "HIGH",
+      "title": "Linux kernel Dirty COW privilege escalation",
+      "description": "Copy-on-write race in the kernel memory subsystem.",
+      "msf_module": "exploit/linux/local/dirtycow_podpriv"
+    },
+    {
+      "id": "CVE-2020-1938",
+      "aliases": [
+        "Ghostcat"
+      ],
+      "product": "tomcat",
+      "service": [
+        "http",
+        "http-alt",
+        "ajp"
+      ],
+      "cvss": 9.8,
+      "severity": "CRITICAL",
+      "title": "Tomcat AJP Ghostcat file read / code inclusion",
+      "description": "AJP connector misconfiguration allows file read and JSP inclusion.",
+      "msf_module": "auxiliary/admin/http/tomcat_ghostcat"
+    },
+    {
+      "id": "CVE-2017-3506",
+      "aliases": [
+        "WebLogic XMLDecoder"
+      ],
+      "product": "weblogic",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 7.5,
+      "severity": "HIGH",
+      "title": "Oracle WebLogic XMLDecoder deserialization RCE",
+      "description": "Deserialization of untrusted XML in the WebLogic WLS-WSAT component.",
+      "msf_module": "exploit/multi/misc/weblogic_deserialize_badattrval"
+    },
+    {
+      "id": "CVE-2020-5902",
+      "aliases": [
+        "F5 TMUI RCE"
+      ],
+      "product": "big-ip",
+      "service": [
+        "https",
+        "https-alt"
+      ],
+      "cvss": 9.8,
+      "severity": "CRITICAL",
+      "title": "F5 BIG-IP TMUI traffic-manager RCE",
+      "description": "Unauthenticated path traversal + command injection in the TMUI web interface.",
+      "msf_module": "exploit/linux/http/f5_bigip_tmui_rce"
+    },
+    {
+      "id": "CVE-2019-11510",
+      "aliases": [
+        "Pulse SSL-VPN"
+      ],
+      "product": "pulse",
+      "service": [
+        "https",
+        "https-alt"
+      ],
+      "cvss": 10.0,
+      "severity": "CRITICAL",
+      "title": "Pulse Secure SSL-VPN arbitrary file read",
+      "description": "Unauthenticated file read exposes sessions files / creds.",
+      "msf_module": ""
+    },
+    {
+      "id": "CVE-2021-21985",
+      "aliases": [
+        "vSphere RCE"
+      ],
+      "product": "vmware",
+      "service": [
+        "https",
+        "https-alt"
+      ],
+      "cvss": 9.4,
+      "severity": "CRITICAL",
+      "title": "VMware vSphere Client virtual SAN health check RCE",
+      "description": "RCE in vCenter Server / vSphere Client via vSAN health-check plugin.",
+      "msf_module": ""
+    },
+    {
+      "id": "CVE-2019-11581",
+      "aliases": [
+        "Confluence template injection"
+      ],
+      "product": "confluence",
+      "service": [
+        "http",
+        "http-alt"
+      ],
+      "cvss": 9.1,
+      "severity": "CRITICAL",
+      "title": "Confluence SSTI in user-macro / wiki markup",
+      "description": "Server-side template injection allows RCE in Confluence.",
+      "msf_module": ""
     }
   ]
 }

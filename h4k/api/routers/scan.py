@@ -1405,6 +1405,77 @@ def pass_attack_creds() -> dict[str, Any]:
     }
 
 
+@router.post("/webprobe")
+def web_probe(req: dict[str, Any]) -> dict[str, Any]:
+    """Probe an HTTP(S) service: server header, page title, common admin paths.
+
+    Read-only recon enrichment for the Default-Cred Targets card — no exploit,
+    no brute force, just GETs.
+    """
+    import urllib.error
+    import urllib.request
+
+    host = (req.get("host") or "").strip()
+    port = int(req.get("port") or 80)
+    if not host:
+        raise HTTPException(status_code=422, detail="host required")
+    scheme = "https" if req.get("tls") or port in (443, 8443) else "http"
+    base = f"{scheme}://{host}:{port}"
+
+    headers = {"User-Agent": "h4k-webprobe/1.0"}
+    result: dict[str, Any] = {
+        "host": host,
+        "port": port,
+        "base": base,
+        "title": None,
+        "server": None,
+        "paths": [],
+    }
+
+    def _get(url: str) -> tuple[int, str, dict[str, str]]:
+        try:
+            with urllib.request.urlopen(  # nosec B310 - fixed scheme, lab targets
+                urllib.request.Request(url, headers=headers), timeout=4
+            ) as resp:
+                return (
+                    resp.status,
+                    resp.read(2048).decode("utf-8", errors="replace"),
+                    dict(resp.headers),
+                )
+        except urllib.error.HTTPError as exc:
+            return exc.code, "", dict(exc.headers or {})
+        except Exception:
+            return 0, "", {}
+
+    status, body, hdrs = _get(f"{base}/")
+    if not status:
+        raise HTTPException(status_code=502, detail=f"no HTTP response from {base}")
+    result["server"] = hdrs.get("Server") or hdrs.get("server")
+    import re as _re
+
+    m = _re.search(r"<title[^>]*>(.*?)</title>", body, _re.IGNORECASE | _re.DOTALL)
+    if m:
+        result["title"] = m.group(1).strip()[:120]
+
+    admin_paths = [
+        "/admin",
+        "/admin/",
+        "/login",
+        "/login/",
+        "/api",
+        "/config",
+        "/setup",
+        "/index.php",
+        "/management",
+    ]
+    for p in admin_paths:
+        pstatus, _, _ = _get(f"{base}{p}")
+        if pstatus in (200, 301, 302, 401, 403):
+            result["paths"].append({"path": p, "status": pstatus})
+
+    return result
+
+
 @router.get("/passattack/{job_id}")
 def pass_attack_status(job_id: str) -> dict[str, Any]:
     job = _passattack_jobs.get(job_id)
@@ -1497,6 +1568,12 @@ def get_graph() -> dict[str, Any]:
             host = sess.get("target_host") or sess.get("host") or ""
             if host:
                 session_hosts.add(str(host))
+    with suppress(Exception):
+        conn = _neighbor_db()
+        for row in conn.execute("SELECT host FROM exploit_sessions"):
+            if row[0]:
+                session_hosts.add(str(row[0]))
+        conn.close()
 
     msf_node_ids: set[str] = set()
     nodes = []
@@ -1607,13 +1684,85 @@ def _run_attack(job: dict[str, Any], req: AttackRequest, msf: MsfClient) -> None
 
     svc = AttackService(msf, progress=lambda m, p: _update(job, message=m))
     known = _attack_cache.get(req.target) or []
-    _update(job, status="running", message="running exploit modules")
+    # credential-driven modules unlock with verified creds from password attacks
+    for cred in _load_found_creds(host=req.host or req.target, port=req.port):
+        known.append(
+            {
+                "host": cred["host"],
+                "service": cred["service"],
+                "user": cred["user"],
+                "password": cred["password"],
+                "verified": True,
+            }
+        )
+    if any(c.get("verified") for c in known):
+        _update(
+            job,
+            message="running exploit modules (verified credentials available)",
+        )
+    _update(job, status="running")
     try:
         attacks = svc.run(req, known)
+        _record_sessions(attacks)
         _update(job, attacks=attacks, status="done", message="attack complete")
     except Exception as exc:  # pragma: no cover - defensive
         logger.exception("attack job failed")
         _update(job, status="error", error=str(exc), message="attack failed")
+
+
+def _load_found_creds(host: str | None, port: int | None) -> list[dict[str, Any]]:
+    """Verified credentials from the password-attack card, host/service aware."""
+    conn = _neighbor_db()
+    if host and port:
+        rows = conn.execute(
+            "SELECT host, port, service, user, password FROM found_creds WHERE host = ? AND port = ?",
+            (host, port),
+        ).fetchall()
+    elif host:
+        rows = conn.execute(
+            "SELECT host, port, service, user, password FROM found_creds WHERE host = ?",
+            (host,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT host, port, service, user, password FROM found_creds"
+        ).fetchall()
+    conn.close()
+    return [
+        {"host": r[0], "port": r[1], "service": r[2], "user": r[3], "password": r[4]}
+        for r in rows
+    ]
+
+
+def _record_sessions(attacks: list[dict[str, Any]]) -> int:
+    """Persist sessions opened by successful exploits into the neighbors DB."""
+    from datetime import UTC, datetime
+
+    opened = 0
+    conn = _neighbor_db()
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS exploit_sessions ("
+        "  msf_session_id TEXT PRIMARY KEY,"
+        "  host           TEXT NOT NULL,"
+        "  port           INTEGER,"
+        "  module         TEXT,"
+        "  opened_at      TEXT NOT NULL"
+        ")"
+    )
+    conn.commit()
+    now = datetime.now(UTC).isoformat()
+    for a in attacks:
+        sid = a.get("session_id")
+        if a.get("result") == "success" and sid:
+            conn.execute(
+                "INSERT OR REPLACE INTO exploit_sessions (msf_session_id, host, port, module, opened_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (str(sid), a.get("host", ""), a.get("port"), a.get("module"), now),
+            )
+            opened += 1
+    conn.commit()
+    conn.close()
+    return opened
 
 
 @router.get("/attack/{job_id}")

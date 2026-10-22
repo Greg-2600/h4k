@@ -75,11 +75,16 @@ def test_html_tags_are_balanced():
     assert not stack, f"unclosed tags: {[(name, ln) for name, ln in stack]}"
 
 
-def test_the_five_phases_are_present():
-    """The nav buttons are the whole navigation; a missing phase is a dead end."""
+def test_the_nav_phases_are_present():
+    """The nav buttons are the whole navigation; a missing phase is a dead end.
+
+    The old five-phase pipeline (analyze/prepare/execute/pwned) was collapsed:
+    the recon page hosts the whole flow (discovery -> service map -> vulns ->
+    exploit -> password attack -> cred targets), and the graph is the second
+    view. Keep this pinned so nav and sections never drift apart.
+    """
     html = _html()
-    for name in ("recon", "analyze", "prepare", "execute", "pwned"):
-        assert f'id="phase-{name}"' in html, f"phase {name} missing"
+    for name in ("recon", "graph"):
         assert f'data-phase="{name}"' in html, f"nav entry for {name} missing"
     nav = set(re.findall(r'class="nav-btn[^"]*"[^>]*data-phase="([^"]+)"', html))
     secs = set(re.findall(r'class="phase"[^>]*data-phase="([^"]+)"', html))
@@ -114,11 +119,21 @@ def test_stat_tiles_keep_their_class_list():
 
 
 def test_findings_panels_exist():
-    """The analyze phase hosts vuln details; the prepare phase hosts config."""
+    """The recon flow's operational cards: vulns, exploit setup, password
+    attack, default-cred targets — plus the live-status elements they poll."""
     html = _html()
-    assert 'id="vuln-list"' in html, "vuln-list missing"
-    assert 'id="vuln-detail"' in html, "vuln-detail missing"
-    assert 'id="config-summary"' in html, "config-summary missing"
+    for cid in (
+        "vuln-tbody",
+        "vulns-panel",
+        "exploit-panel",
+        "ex-module",
+        "ex-rhost",
+        "passattack-panel",
+        "pa-service",
+        "cred-targets-tbody",
+        "cred-targets-panel",
+    ):
+        assert f'id="{cid}"' in html, f"{cid} missing"
 
 
 def test_msf_status_footer_present():

@@ -352,3 +352,34 @@ tests/      unit + API tests
 ```
 
 **h4k**, out.
+
+## Operations-UI era (post-D24)
+
+The operations UI collapsed into a single top-to-bottom recon flow on the Recon
+page (nav: Recon / Graph), driven by two persistent stores:
+
+- **neighbors.db** — discovered hosts, fingerprinted open services, correlated
+  CVE/lead findings, credentials found by password attacks, and exploit sessions
+  opened. `GET /api/session` reports counts; `POST /api/session/reset` starts a
+  fresh recon session (engagement store deliberately kept unless asked).
+- **Service lifecycle** — Live Network discovery (ARP, async job w/ live cards)
+  → per-host nmap fingerprint (`/api/neighbors/fingerprint`) → offline CVE db +
+  version-heuristic correlation (`_match_service_vulns`; auxiliary/post-only
+  modules are recon leads and never surface as exploitable findings)
+  → Likely Vulnerable card (severity-sorted table + CVE-db staleness indicator
+  with weekly refresh button) → Exploit Setup card (module prefilled from the
+  CVE db's msf hint; `POST /api/attack` was previously missing its route) →
+  Common Password Attack card (hydra over ssh/ftp/telnet/mysql/http-basic;
+  found creds persist and unlock credential-driven modules on later attacks)
+  → Default-Cred Targets card (every fingerprinted service hydra can attack,
+  with a read-only HTTP con probe for web surfaces) → Network Graph (nodes
+  ring red for vuln-bearing hosts, 💀 for hosts with live sessions).
+
+Weekly CVE refresh job runs in the app lifespan (`H4K_CVE_WEEKLY`, 7-day
+default) and refreshes the *live* matcher instance; the periodic tool updater
+was fixed to do the same instead of writing the data file behind a throwaway
+instance. The offline curated CVE db grew from 31 to 48 entries.
+
+Aggression rules unchanged (D5, D24): discovery + CVE correlation read the
+network; nothing brute-forces or exploits without an operator pressing a
+button, and every aggressive card names exactly one host/service.

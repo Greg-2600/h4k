@@ -614,6 +614,25 @@ function openExploitPanel(idx) {
   $('ex-output').innerHTML = '';
   $('exploit-panel').hidden = false;
   $('exploit-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  hintVerifiedCreds(row);
+}
+
+let credsCache = null;
+let credsCacheAt = 0;
+
+async function hintVerifiedCreds(row) {
+  try {
+    if (!credsCache || Date.now() - credsCacheAt > 30000) {
+      credsCache = await api('/api/passattack/creds/all');
+      credsCacheAt = Date.now();
+    }
+    const c = (credsCache?.creds || []).find(c => c.host === row.ip);
+    if (c) {
+      appendExOutput(`verified creds for ${c.host}: ${c.user}:${c.password} (${c.service}) — login modules unlocked`);
+      const loginMod = { ssh: 'exploit/multi/ssh/ssh_login', telnet: 'exploit/multi/telnet/telnet_rlogin' }[c.service];
+      if (loginMod) appendExOutput(`  [module] ${loginMod}`);
+    }
+  } catch { /* soft fail */ }
 }
 
 async function launchExploit() {
@@ -863,7 +882,30 @@ function renderCredTargets(targets) {
       <td>${escHtml(t.product || '')}</td>
       <td>${escHtml(t.attack_service)}</td>
       <td>${t.creds_found ? '<span class="v-sev low">creds ✓</span>' : `<button class="btn btn-danger cred-target-btn" data-index="${i}" title="Open password attack">🔑</button>`}</td>
+      <td>${t.attack_service === 'http-basic' ? `<button class="btn btn-secondary webprobe-btn" data-index="${i}" title="HTTP recon probe">🔍</button>` : ''}</td>
     </tr>`).join('');
+}
+
+async function launchWebProbe(idx) {
+  const t = (state.credTargets || [])[idx];
+  if (!t) return;
+  try {
+    const res = await api('/api/webprobe', {
+      method: 'POST',
+      body: { host: t.ip, port: t.port, tls: t.port === 443 || t.port === 8443 }
+    });
+    log(`Probe ${t.ip}:${t.port} — server: ${res.server || '?'} | title: ${res.title || '?'} | hit endpoints: ${res.paths.map(p => p.path).join(', ') || 'none'}`, 'info');
+    // stash for the password attack card (webapp context)
+    state.webProbe = { ...t, ...res };
+    const sel = $('pa-service');
+    if (sel) openPassAttackCard(t.ip, t.port, t.attack_service);
+    const out = $('pa-output');
+    if (out) {
+      out.hidden = false;
+      appendPaOutput(`probe ${t.ip}:${t.port}: ${res.server || '?'} | "${res.title || 'no title'}"`);
+      (res.paths || []).forEach(p => appendPaOutput(`  ${p.status} ${p.path}`));
+    }
+  } catch (e) { log(`Probe failed for ${t.ip}:${t.port}: ` + e.message, 'error'); }
 }
 
 async function startLadderDeep() {
@@ -1340,6 +1382,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const t = (state.credTargets || [])[parseInt(ctBtn.dataset.index, 10)];
       if (t) openPassAttackCard(t.ip, t.port, t.attack_service);
     }
+    const probeBtn = e.target.closest('.webprobe-btn');
+    if (probeBtn) launchWebProbe(parseInt(probeBtn.dataset.index, 10));
     if (e.target.closest('#btn-cred-targets-refresh')) { loadCredTargets(); loadCveStatus(); }
   });
 
