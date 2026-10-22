@@ -285,7 +285,7 @@ async function launchScan() {
         depth: $('depth-select').value,
         do_dns_recon: false,
         do_vuln_scan: true,
-        try_default_creds: $('creds-toggle').checked,
+        try_default_creds: false,
         open_sessions: false,
         do_attack: false,
       }
@@ -1022,7 +1022,7 @@ async function startFullScan() {
         depth: $('depth-select').value,
         do_dns_recon: false,
         do_vuln_scan: false,
-        try_default_creds: $('creds-toggle').checked,
+        try_default_creds: false,
         open_sessions: false,
         do_attack: false,
       }
