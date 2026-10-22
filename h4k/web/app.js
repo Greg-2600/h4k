@@ -1031,117 +1031,6 @@ function selectService(idx) {
 }
 
 // ═══════════════════════════════════════════
-
-// ═══════════════════════════════════════════
-// EXECUTE PHASE
-// ═══════════════════════════════════════════
-async function executeExploit() {
-  const exploit = state.selectedExploit;
-  if (!exploit) return;
-
-  setPhase('execute');
-  log(`Executing ${exploit}...`, 'warn');
-  playSound('scan');
-
-  $('er-exploit').textContent = exploit;
-  $('er-fill').style.width = '30%';
-  $('er-status').textContent = 'Connecting to target...';
-
-  try {
-    const res = await api('/api/attack', {
-      method: 'POST',
-      body: {
-        module: exploit,
-        rhosts: $('cfg-rhosts').value || state.scanResults.address,
-        rport: $('cfg-rport').value || state.selectedVuln?.port,
-        lhost: $('cfg-lhost').value || await getLocalIP(),
-      }
-    });
-
-    if (res.attack_id) {
-      pollAttackStatus(res.attack_id);
-    } else if (res.session_id) {
-      onExploitSuccess(res);
-    } else {
-      log('Exploit failed: ' + JSON.stringify(res), 'error');
-      $('er-status').textContent = 'Exploit failed';
-      $('er-fill').style.width = '100%';
-      $('er-fill').style.background = 'var(--danger)';
-      playSound('error');
-    }
-  } catch (e) {
-    log('Exploit error: ' + e.message, 'error');
-    $('er-status').textContent = 'Error: ' + e.message;
-  }
-}
-
-async function pollAttackStatus(attackId) {
-  $('er-fill').style.width = '60%';
-  $('er-status').textContent = 'Exploiting...';
-
-  for (let i = 0; i < 15; i++) {
-    await new Promise(r => setTimeout(r, 2000));
-    try {
-      const res = await api(`/api/attack/${attackId}`);
-      appendTerminal(res.output || '...');
-      if (res.status === 'completed') {
-        if (res.success) onExploitSuccess(res);
-        else {
-          $('er-fill').style.background = 'var(--danger)';
-          $('er-status').textContent = 'Exploit failed';
-          playSound('error');
-        }
-        return;
-      }
-    } catch (e) { /* continue polling */ }
-  }
-  $('er-status').textContent = 'Timeout waiting for result';
-}
-
-function onExploitSuccess(res) {
-  $('er-fill').style.width = '100%';
-  $('er-status').textContent = 'EXPLOIT SUCCESSFUL!';
-  glitchEffect();
-  unlockAchievement('exploiter');
-  logXp(50, '(exploit)');
-
-  setTimeout(() => {
-    unlockAchievement('shell_stealer');
-    logXp(75, '(shell)');
-    state.stats.pwned++;
-    $('pwned-target').textContent = state.scanResults.address;
-    $('pwned-xp').textContent = '+125 XP';
-    updateMissionObjective('exploit');
-    updateMissionObjective('pwned');
-    setPhase('pwned');
-  }, 1500);
-}
-
-async function getLocalIP() {
-  try {
-    const res = await api('/api/neighbors');
-    return res.interfaces?.[0]?.ip || '127.0.0.1';
-  } catch { return '127.0.0.1'; }
-}
-
-function appendTerminal(text) {
-  const el = $('terminal-content');
-  if (!el) return;
-  const lines = text.split('\n');
-  lines.forEach(line => {
-    const p = document.createElement('p');
-    p.className = 't-line';
-    if (line.includes('error') || line.includes('failed')) p.className += ' error';
-    else if (line.includes('success') || line.includes('started')) p.className += ' success';
-    else if (line.startsWith('[*]')) p.className += ' info';
-    else if (line.startsWith('[!]')) p.className += ' warn';
-    p.textContent = line;
-    el.appendChild(p);
-  });
-  el.scrollTop = el.scrollHeight;
-}
-
-// ═══════════════════════════════════════════
 // TOOL ACTIONS
 // ═══════════════════════════════════════════
 async function findNeighbors() {
@@ -1236,9 +1125,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btn.dataset.phase === 'graph') loadGraph();
     });
   });
-
-  // Execute button
-  $('btn-to-execute').addEventListener('click', executeExploit);
 
   // Terminal clear
   $('terminal-clear')?.addEventListener('click', () => {
@@ -1544,8 +1430,15 @@ function renderGraphFrame(svg, nodes, edges) {
       html += `</g>`;
     });
     // Host node
-    const hcls = `node-host${isSelected ? ' selected' : ''}`;
+    const hcls = `node-host${isSelected ? ' selected' : ''}${n.vuln_count > 0 ? ' has-vulns' : ''}${n.has_session ? ' pwned' : ''}`;
     html += `<g class="${hcls}" data-node-id="${n.id}" data-node-type="host" data-node-data="${escAttr(JSON.stringify(n))}">`;
+    if (n.vuln_count > 0) {
+      html += `<circle cx="${n.x}" cy="${n.y}" r="24" class="vuln-ring"/>`;
+      html += `<text x="${n.x}" y="${n.y - 22}" text-anchor="middle" class="vuln-badge">⚠${n.vuln_count}</text>`;
+    }
+    if (n.has_session) {
+      html += `<text x="${n.x}" y="${n.y - 26}" text-anchor="middle" class="pwned-badge">💀</text>`;
+    }
     html += `<circle cx="${n.x}" cy="${n.y}" r="18"/>`;
     const shortLabel = n.label.length > 12 ? n.label.slice(0, 10) + '…' : n.label;
     html += `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle">${shortLabel}</text>`;
@@ -1585,7 +1478,9 @@ function selectGraphNode(type, data) {
       <div class="graph-detail-row"><span class="graph-detail-label">Address</span><span class="graph-detail-value">${data.id}</span></div>
       <div class="graph-detail-row"><span class="graph-detail-label">OS</span><span class="graph-detail-value">${data.os || 'unknown'}</span></div>
       <div class="graph-detail-row"><span class="graph-detail-label">Vendor</span><span class="graph-detail-value">${data.vendor || '—'}</span></div>
+      <div class="graph-detail-row"><span class="graph-detail-label">Status</span><span class="graph-detail-value">${data.has_session ? '💀 session' : '—'}</span></div>
       <div class="graph-detail-row"><span class="graph-detail-label">Services</span><span class="graph-detail-value">${svcList.length}</span></div>
+      ${data.vuln_count ? `<div class="graph-detail-row"><span class="graph-detail-label">Vulns</span><span class="graph-detail-value">⚠ ${data.vuln_count} — see Likely Vulnerable card</span></div>` : ''}
       <div class="graph-detail-services">
         ${svcList.map(s => `<span class="graph-svc-chip ${s.state === 'open' ? 'open' : 'closed'}">${s.port}/${s.proto} ${s.service || ''}</span>`).join('')}
       </div>
@@ -1611,7 +1506,9 @@ function showGraphTooltip(ev, el) {
   if (type === 'host') {
     tip.innerHTML = `<div class="gt-host">${data.id}</div>
       <div class="gt-row"><span class="gt-label">OS</span><span class="gt-value">${data.os || '—'}</span></div>
-      <div class="gt-row"><span class="gt-label">Vendor</span><span class="gt-value">${data.vendor || '—'}</span></div>`;
+      <div class="gt-row"><span class="gt-label">Vendor</span><span class="gt-value">${data.vendor || '—'}</span></div>
+      ${data.vuln_count ? `<div class="gt-row"><span class="gt-label">Vulns</span><span class="gt-value">⚠ ${data.vuln_count}</span></div>` : ''}
+      ${data.has_session ? `<div class="gt-row"><span class="gt-label">Status</span><span class="gt-value">💀 pwned</span></div>` : ''}`;
   } else {
     const edges = (state.graphData?.edges || []).filter(e => e.target === data.id);
     const host = edges[0]?.source || '?';

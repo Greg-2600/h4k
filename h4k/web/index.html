@@ -35,10 +35,8 @@
 
       <nav class="nav">
         <button class="nav-btn active" data-phase="recon" data-shortcut="1">Recon</button>
-        <button class="nav-btn" data-phase="prepare" data-shortcut="2">Prepare</button>
-        <button class="nav-btn" data-phase="execute" data-shortcut="3">Execute</button>
-        <button class="nav-btn" data-phase="pwned" data-shortcut="4">Pwned</button>
-        <button class="nav-btn" data-phase="graph" data-shortcut="5">Graph</button>
+        <button class="nav-btn" data-phase="pwned" data-shortcut="2">Pwned</button>
+        <button class="nav-btn" data-phase="graph" data-shortcut="3">Graph</button>
       </nav>
 
       <div class="header-right">
@@ -305,58 +303,6 @@
                 <span class="ex-status" id="ex-status">Ready — verify the target is yours to test.</span>
               </div>
               <div class="ex-output" id="ex-output" hidden></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- PREPARE PHASE -->
-        <div class="phase" id="phase-prepare" data-phase="prepare" hidden>
-          <div class="card">
-            <div class="card-header">
-              <h2>⚙️ Exploit Configuration</h2>
-            </div>
-            <div class="card-body">
-              <div class="config-summary" id="config-summary"></div>
-              <div class="config-form" id="config-form">
-                <div class="input-group">
-                  <label>RHOSTS</label>
-                  <input type="text" id="cfg-rhosts" />
-                </div>
-                <div class="input-group">
-                  <label>RPORT</label>
-                  <input type="text" id="cfg-rport" />
-                </div>
-                <div class="input-group">
-                  <label>LHOST (callback)</label>
-                  <input type="text" id="cfg-lhost" />
-                </div>
-              </div>
-              <button class="btn btn-danger btn-large" id="btn-to-execute" disabled>Execute Exploit →</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- EXECUTE PHASE -->
-        <div class="phase" id="phase-execute" data-phase="execute" hidden>
-          <div class="card">
-            <div class="card-header">
-              <h2>⚡ Executing Exploit</h2>
-            </div>
-            <div class="card-body">
-              <div class="exploit-display">
-                <div class="exploit-name" id="er-exploit">—</div>
-                <div class="progress-bar large"><div class="progress-fill" id="er-fill"></div></div>
-                <p class="exploit-status" id="er-status">Connecting...</p>
-
-                <!-- TERMINAL OUTPUT -->
-                <div class="terminal-output" id="terminal-output">
-                  <div class="terminal-header">
-                    <span>📟 Terminal Output</span>
-                    <button class="terminal-clear" id="terminal-clear">Clear</button>
-                  </div>
-                  <div class="terminal-content" id="terminal-content"></div>
-                </div>
-              </div>
             </div>
           </div>
         </div>

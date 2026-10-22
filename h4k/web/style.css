@@ -502,6 +502,29 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 #graph-svg .node-host.selected circle { fill: var(--danger); stroke: var(--danger); stroke-width: 3; }
 #graph-svg .node-service.selected circle { fill: var(--warning); stroke: var(--warning); stroke-width: 2; }
 
+/* vuln-flagged + pwned host styling */
+#graph-svg .vuln-ring {
+  fill: none;
+  stroke: var(--danger);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  animation: vulnSpin 8s linear infinite;
+  transform-origin: center;
+}
+@keyframes vulnSpin { to { transform: rotate(360deg); } }
+#graph-svg .vuln-badge {
+  fill: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  pointer-events: none;
+}
+#graph-svg .pwned-badge {
+  pointer-events: none;
+  font-size: 13px;
+}
+#graph-svg .node-host.pwned circle { fill: var(--danger); stroke: var(--danger); }
+
 .graph-detail-row { display: flex; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .graph-detail-row:last-child { border-bottom: none; }
 .graph-detail-label { font-weight: 500; color: var(--text-muted); min-width: 80px; }

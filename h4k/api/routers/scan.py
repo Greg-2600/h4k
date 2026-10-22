@@ -1224,6 +1224,17 @@ def get_graph() -> dict[str, Any]:
     hosts = msf.hosts(workspace)
     services = msf.services(workspace)
 
+    vuln_count_by_host: dict[str, int] = {}
+    for v in _load_neighbor_vulns():
+        vuln_count_by_host[v["ip"]] = vuln_count_by_host.get(v["ip"], 0) + 1
+
+    session_hosts: set[str] = set()
+    with suppress(Exception):
+        for sess in (msf.sessions() or {}).values():
+            host = sess.get("target_host") or sess.get("host") or ""
+            if host:
+                session_hosts.add(str(host))
+
     msf_node_ids: set[str] = set()
     nodes = []
     for h in hosts:
@@ -1239,6 +1250,8 @@ def get_graph() -> dict[str, Any]:
                 "os": h.get("os"),
                 "vendor": h.get("name"),
                 "service_count": 0,
+                "vuln_count": vuln_count_by_host.get(addr, 0),
+                "has_session": addr in session_hosts,
             }
         )
 
@@ -1278,6 +1291,8 @@ def get_graph() -> dict[str, Any]:
                 "os": os_val,
                 "vendor": vendor or hostname or None,
                 "service_count": len(neighbor_svcs.get(ip, [])),
+                "vuln_count": vuln_count_by_host.get(ip, 0),
+                "has_session": ip in session_hosts,
             }
         )
         msf_node_ids.add(ip)
