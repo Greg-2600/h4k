@@ -247,7 +247,11 @@
           <div class="card" id="vulns-panel" hidden>
             <div class="card-header warning">
               <h2>⚠️ Likely Vulnerable</h2>
-              <span class="fp-chip" id="vuln-chip-count">0 findings</span>
+              <div class="vuln-header-right">
+                <span class="cve-status" id="cve-status">CVE db: loading…</span>
+                <button class="btn btn-secondary btn-sm" id="btn-cve-refresh" hidden title="CVE db is 7+ days old">🔄 Update CVEs</button>
+                <span class="fp-chip" id="vuln-chip-count">0 findings</span>
+              </div>
             </div>
             <div class="card-body">
               <div class="fp-table-wrap">

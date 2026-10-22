@@ -496,6 +496,59 @@ function updateFingerprintProgress(job) {
   renderVulnPanel(job.results || []);
 }
 
+async function loadCveStatus() {
+  const el = $('cve-status');
+  if (!el) return;
+  try {
+    const st = await api('/api/cves/status');
+    const date = st.loaded_at ? st.loaded_at.slice(0, 10) : 'never';
+    el.textContent = `CVE db: ${date} · ${st.count} entries · ${st.age_days}d old`;
+    const btn = $('btn-cve-refresh');
+    if (btn) btn.hidden = !st.stale;
+  } catch { el.textContent = 'CVE db: unavailable'; }
+}
+
+let cveRefreshPoll = null;
+
+async function refreshCveDb() {
+  const btn = $('btn-cve-refresh');
+  const el = $('cve-status');
+  if (btn) { btn.disabled = true; }
+  if (el) el.textContent = 'CVE db: updating…';
+  log('Refreshing CVE database (deltas)...', 'info');
+  try {
+    await api('/api/cves/refresh', { method: 'POST' });
+    if (cveRefreshPoll) clearInterval(cveRefreshPoll);
+    let tries = 0;
+    cveRefreshPoll = setInterval(async () => {
+      tries++;
+      if (tries > 30) {
+        clearInterval(cveRefreshPoll);
+        cveRefreshPoll = null;
+        if (btn) btn.disabled = false;
+        log('CVE refresh did not complete — source unreachable? Staying on local db.', 'warn');
+        loadCveStatus();
+        return;
+      }
+      try {
+        const st = await api('/api/cves/status');
+        if (!st.stale) {
+          clearInterval(cveRefreshPoll);
+          cveRefreshPoll = null;
+          if (btn) { btn.disabled = false; btn.hidden = true; }
+          loadCveStatus();
+          log(`CVE db updated — ${st.count} entries`, 'success');
+          logXp(10, '(cve refresh)');
+        }
+      } catch { /* keep polling */ }
+    }, 4000);
+  } catch (e) {
+    log('CVE refresh failed: ' + e.message, 'error');
+    if (btn) btn.disabled = false;
+    loadCveStatus();
+  }
+}
+
 function renderVulnPanel(results) {
   const tbody = $('vuln-tbody');
   const empty = $('vuln-empty');
@@ -510,12 +563,6 @@ function renderVulnPanel(results) {
       });
     });
   });
-
-  panel.hidden = rows.length === 0 ? panel.hidden : false;
-  if (rows.length === 0) { if (empty) empty.hidden = false; return; }
-  empty.hidden = true;
-  const chip = $('vuln-chip-count');
-  if (chip) chip.textContent = `${rows.length} findings`;
 
   const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
   const severityKey = (d) => { const k = (d || '').split(':')[0]; return k in severityOrder ? severityOrder[k] : 9; };
@@ -628,12 +675,14 @@ function pollExploitJob(jobId, btn) {
           state.stats.pwned++;
         } else if (job.status === 'done') {
           $('ex-status').textContent = 'Exploit finished — no session opened.';
-          appendExOutput('no session. escalation options below.');
+          appendExOutput('no session. escalation ladder:');
           showExploitAlternatives(row);
+          appendLadderButtons();
         } else {
           $('ex-status').textContent = 'Attack failed or timed out.';
-          appendExOutput('timed out. escalation options below.');
+          appendExOutput('timed out. escalation ladder:');
           showExploitAlternatives(row);
+          appendLadderButtons();
           playSound('error');
         }
       }
@@ -643,6 +692,56 @@ function pollExploitJob(jobId, btn) {
       $('ex-status').textContent = 'Poll error: ' + e.message;
     }
   }, 2500);
+}
+
+function appendLadderButtons() {
+  const el = $('ex-output');
+  const row = document.createElement('div');
+  row.className = 'ladder-btns';
+  row.innerHTML = `
+    <button class="btn btn-secondary ladder-btn" id="ldr-creds">🔑 Try default creds sweep</button>
+    <button class="btn btn-secondary ladder-btn" id="ldr-deep">⚔️ Deep attack (toolkit)</button>
+  `;
+  el.appendChild(row);
+  row.querySelector('#ldr-creds')?.addEventListener('click', () => startLadderCreds());
+  row.querySelector('#ldr-deep')?.addEventListener('click', () => startLadderDeep());
+}
+
+async function startLadderCreds() {
+  const row = state.selectedVulnRow;
+  if (!row) return;
+  const svc = (row.service || '').toLowerCase();
+  appendExOutput(`> default-cred sweep: ${row.ip}:${row.port} (${svc || 'known services'})`);
+  try {
+    const res = await api('/api/deepattack', {
+      method: 'POST',
+      body: { target: row.ip, host: row.ip, services: svc ? [svc] : [] }
+    });
+    if (res.job_id) {
+      appendExOutput(`  toolkit job ${res.job_id} started — results appear when done (GET /api/deepattack/${res.job_id})`);
+      log(`Default-cred sweep ${res.job_id} launched for ${row.ip}`, 'info');
+    } else {
+      appendExOutput('  sweep failed to start: ' + JSON.stringify(res));
+    }
+  } catch (e) { appendExOutput('  sweep error: ' + e.message); }
+}
+
+async function startLadderDeep() {
+  const row = state.selectedVulnRow;
+  if (!row) return;
+  appendExOutput(`> deep toolkit sweep: ${row.ip}:${row.port}`);
+  try {
+    const res = await api('/api/deepattack', {
+      method: 'POST',
+      body: { target: row.ip, host: row.ip, services: [] }
+    });
+    if (res.job_id) {
+      appendExOutput(`  toolkit job ${res.job_id} started`);
+      log(`Deep attack ${res.job_id} launched for ${row.ip}`, 'info');
+    } else {
+      appendExOutput('  sweep failed to start');
+    }
+  } catch (e) { appendExOutput('  sweep error: ' + e.message); }
 }
 
 async function showExploitAlternatives(row) {
@@ -1253,6 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const exBtn = e.target.closest('.v-exploit-btn');
     if (exBtn) openExploitPanel(parseInt(exBtn.dataset.vulnIndex, 10));
     if (e.target.closest('#btn-launch-exploit')) launchExploit();
+    if (e.target.closest('#btn-cve-refresh')) refreshCveDb();
   });
 
   // Pwned buttons

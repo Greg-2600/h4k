@@ -697,6 +697,19 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 .v-detail { white-space: normal !important; max-width: 340px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted) !important; font-size: 11px; }
 .v-exploit-btn { padding: 4px 10px; font-size: 12px; cursor: pointer; }
 
+/* Vuln card header right: cve status + refresh */
+.vuln-header-right { display: flex; align-items: center; gap: 10px; }
+.cve-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.btn.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* Escalation ladder buttons in exploit output */
+.ladder-btns { display: flex; gap: 10px; margin: 8px 0; }
+.ladder-btn { font-size: 12px; padding: 5px 12px; }
+
 /* Exploit Setup card */
 #exploits-panel .card-header.danger,
 #exploit-panel .card-header.danger {
