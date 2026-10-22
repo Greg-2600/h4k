@@ -1203,8 +1203,6 @@ document.addEventListener('DOMContentLoaded', () => {
   log('h4k operations center ready', 'system');
   log('Press Ctrl+K for command palette, ? for shortcuts', 'info');
 
-  // repopulate persisted findings from previous fingerprint runs
-  loadPersistedVulns();
   refreshSessionBadge();
 
   // Session reset: clears accumulated discovery/services/vulns + job history
