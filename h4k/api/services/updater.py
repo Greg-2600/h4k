@@ -54,16 +54,30 @@ def _which(tool: str) -> str | None:
 
 
 def refresh_cve_data() -> dict[str, Any]:
-    """Best-effort refresh of the bundled CVE/creds archives."""
+    """Best-effort refresh of the bundled CVE/creds archives.
+
+    Refreshes the LIVE app_state.cve_db instance when present: writing the
+    data file without updating the running matcher would leave the session
+    serving a stale dataset until the next restart.
+    """
     report: dict[str, Any] = {}
     try:
         import sys
 
         sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
         from services.creds import CredArchive
-        from services.cve_lookup import CveDb
 
-        cve = CveDb()
+        try:
+            import app_state
+
+            cve = app_state.cve_db
+            if cve is None:
+                raise LookupError("no live cve_db")
+        except LookupError:
+            from services.cve_lookup import CveDb
+
+            cve = CveDb()
+
         cve_before = len(cve.cves)
         cve.refresh()
         report["cve_db"] = {"before": cve_before, "after": len(cve.cves)}

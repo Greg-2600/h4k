@@ -122,11 +122,39 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await asyncio.sleep(_interval)
 
         _task = asyncio.create_task(_periodic_updater())
+
+    # Weekly CVE-database refresh job: keeps the offline matcher current with
+    # the curated upstream dataset. Independent of the tool updater's cadence
+    # (which is hours) because CVE deltas move weekly, not hourly.
+    _cve_task = None
+    if os.environ.get("H4K_CVE_WEEKLY", "1") == "1":
+        _cve_interval = int(os.environ.get("H4K_CVE_REFRESH_INTERVAL", str(7 * 86400)))
+
+        async def _weekly_cve_refresh() -> None:
+            await asyncio.sleep(_cve_interval)
+            while True:
+                try:
+                    cve = app_state.cve_db
+                    if cve is not None:
+                        ok = await asyncio.to_thread(cve.refresh)
+                        if ok:
+                            logging.getLogger("h4k").info(
+                                "weekly CVE refresh complete (%d CVEs)", len(cve.cves)
+                            )
+                except Exception as exc:  # pragma: no cover - defensive
+                    logging.getLogger("h4k").warning(
+                        "weekly CVE refresh failed: %s", exc
+                    )
+                await asyncio.sleep(_cve_interval)
+
+        _cve_task = asyncio.create_task(_weekly_cve_refresh())
     try:
         yield
     finally:
         if _task is not None:
             _task.cancel()
+        if _cve_task is not None:
+            _cve_task.cancel()
 
 
 app = FastAPI(

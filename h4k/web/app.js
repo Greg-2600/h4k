@@ -165,7 +165,6 @@ function setPhase(phase) {
 function updateHint() {
   const hints = {
     recon: 'Enter target IP, configure options, and hit Launch Recon',
-    analyze: 'Select a vulnerability to analyze and prepare an exploit',
     prepare: 'Configure exploit options (LHOST is auto-detected)',
     execute: 'Execute the exploit and await session',
     pwned: 'Session established! Use Next Target or start New Mission',
@@ -1015,15 +1014,11 @@ function displayScanResults(host) {
   log('Host discovered: ' + host.address, 'success');
   playSound('success');
 
-  // If vulns found, go to analyze
+  // vuln leads from the scan feed the Likely Vulnerable card (no phase jump)
   if (host.vulnerabilities && host.vulnerabilities.length > 0) {
     state.stats.vulns = host.vulnerabilities.length;
     unlockAchievement('vuln_finder');
     logXp(20, '(vuln found)');
-    displayVulns(host.vulnerabilities);
-    setTimeout(() => setPhase('analyze'), 1000);
-  } else {
-    setTimeout(() => setPhase('analyze'), 1000);
   }
 }
 
@@ -1036,42 +1031,6 @@ function selectService(idx) {
 }
 
 // ═══════════════════════════════════════════
-// VULNERABILITIES
-// ═══════════════════════════════════════════
-function displayVulns(vulns) {
-  const list = $('vuln-list');
-  if (!list) return;
-  list.innerHTML = '';
-  vulns.forEach((v, i) => {
-    const el = document.createElement('div');
-    el.className = 'vuln-item';
-    el.innerHTML = `
-      <div class="vi-name">${v.name || 'Unknown Vulnerability'}</div>
-      <div class="vi-meta">
-        <span class="vi-cve">${v.references?.[0] || 'N/A'}</span>
-        <span class="vi-difficulty ${v.difficulty || 'moderate'}">${v.difficulty || 'moderate'}</span>
-      </div>
-    `;
-    el.addEventListener('click', () => selectVuln(v));
-    list.appendChild(el);
-  });
-}
-
-function selectVuln(vuln) {
-  state.selectedVuln = vuln;
-  document.querySelectorAll('.vuln-item').forEach(el => el.classList.remove('selected'));
-  event.currentTarget.classList.add('selected');
-
-  const detail = $('vuln-detail');
-  detail.innerHTML = `
-    <div class="vd-title">${vuln.name}</div>
-    <div class="vd-row"><span class="vd-label">CVE</span><span class="vd-value">${vuln.references?.[0] || 'N/A'}</span></div>
-    <div class="vd-row"><span class="vd-label">Severity</span><span class="vd-value">${vuln.severity || 'Medium'}</span></div>
-    <div class="vd-row"><span class="vd-label">Description</span><span class="vd-value">${vuln.description || 'No description'}</span></div>
-    ${vuln.exploits ? `<div class="vd-exploit"><div class="vd-exploit-name">Recommended Exploit</div><div class="vd-exploit-path">${vuln.exploits[0]?.name || vuln.exploits[0]?.module || 'N/A'}</div></div>` : ''}
-  `;
-  $('btn-to-prepare').disabled = false;
-}
 
 // ═══════════════════════════════════════════
 // EXECUTE PHASE
@@ -1212,7 +1171,7 @@ async function deepAttack() {
 // VIM NAVIGATION
 // ═══════════════════════════════════════════
 function vimNavigate(dir) {
-  const phases = ['recon', 'analyze', 'prepare', 'execute', 'pwned', 'graph'];
+  const phases = ['recon', 'prepare', 'execute', 'pwned', 'graph'];
   const idx = phases.indexOf(state.currentPhase);
   if (dir === 'j' && idx < phases.length - 1) setPhase(phases[idx + 1]);
   if (dir === 'k' && idx > 0) setPhase(phases[idx - 1]);
@@ -1278,19 +1237,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Prepare button
-  $('btn-to-prepare').addEventListener('click', () => {
-    if (!state.selectedVuln) return;
-    const vuln = state.selectedVuln;
-    $('config-summary').innerHTML = `<pre>${JSON.stringify(vuln, null, 2)}</pre>`;
-    $('cfg-rhosts').value = state.scanResults?.address || '';
-    $('cfg-rport').value = vuln.port || '';
-    $('cfg-lhost').value = ''; // auto
-    state.selectedExploit = vuln.exploits?.[0]?.module || null;
-    $('btn-to-execute').disabled = !state.selectedExploit;
-    setPhase('prepare');
-  });
-
   // Execute button
   $('btn-to-execute').addEventListener('click', executeExploit);
 
@@ -1338,7 +1284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Vim keys
     if (['j', 'k', 'h', 'l'].includes(e.key)) vimNavigate(e.key);
     // Number phases
-    if (e.key >= '1' && e.key <= '6') setPhase(['recon','analyze','prepare','execute','pwned','graph'][parseInt(e.key) - 1]);
+    if (e.key >= '1' && e.key <= '5') setPhase(['recon','prepare','execute','pwned','graph'][parseInt(e.key) - 1]);
     // T = theme
     if (e.key === 't') toggleTheme();
     // ? = help
