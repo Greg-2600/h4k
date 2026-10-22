@@ -564,6 +564,13 @@ function renderVulnPanel(results) {
     });
   });
 
+  panel.hidden = rows.length === 0 ? panel.hidden : false;
+  if (rows.length === 0) { if (empty) empty.hidden = false; return; }
+  empty.hidden = true;
+  const chip = $('vuln-chip-count');
+  if (chip) chip.textContent = `${rows.length} findings`;
+  loadCveStatus();
+
   const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
   const severityKey = (d) => { const k = (d || '').split(':')[0]; return k in severityOrder ? severityOrder[k] : 9; };
   rows.sort((a, b) => severityKey(a.detail) - severityKey(b.detail));
