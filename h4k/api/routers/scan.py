@@ -67,7 +67,13 @@ _fingerprint_jobs: dict[str, dict[str, Any]] = {}
 _passattack_jobs: dict[str, dict[str, Any]] = {}
 _attack_cache: dict[str, list[dict[str, Any]]] = {}
 
-_NEIGHBOR_DB = Path("/opt/h4k/data/neighbors.db")
+# Runtime store lives next to the bundled data on a host checkout, in
+# /opt/h4k/data in the container image. Whatever path resolves first and is
+# writable wins — tests must not require the container layout.
+_CONTAINER_DATA = Path("/opt/h4k/data")
+_REPO_DATA = Path(__file__).resolve().parent.parent / "data"
+_RUNTIME_DATA = _CONTAINER_DATA if _CONTAINER_DATA.is_dir() else _REPO_DATA
+_NEIGHBOR_DB = _RUNTIME_DATA / "neighbors.db"
 _NEIGHBOR_DB.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -115,6 +121,21 @@ def _neighbor_db() -> sqlite3.Connection:
     )
     conn.execute(
         "DELETE FROM discovered_service_vulns WHERE kind='cve' AND detail LIKE '%msf: post/%'"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS session_meta ("
+        "  key   TEXT PRIMARY KEY,"
+        "  value TEXT NOT NULL"
+        ")"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS exploit_sessions ("
+        "  msf_session_id TEXT PRIMARY KEY,"
+        "  host           TEXT NOT NULL,"
+        "  port           INTEGER,"
+        "  module         TEXT,"
+        "  opened_at      TEXT NOT NULL"
+        ")"
     )
     conn.execute(
         "CREATE TABLE IF NOT EXISTS found_creds ("
@@ -241,6 +262,28 @@ def _load_neighbor_vulns() -> list[dict[str, Any]]:
     ]
 
 
+def passattack_creds() -> dict[str, Any]:
+    """All creds found by password attacks (module-level alias of the endpoint)."""
+    conn = _neighbor_db()
+    rows = conn.execute(
+        "SELECT host, port, service, user, password, found_at FROM found_creds ORDER BY found_at DESC"
+    ).fetchall()
+    conn.close()
+    return {
+        "creds": [
+            {
+                "host": r[0],
+                "port": r[1],
+                "service": r[2],
+                "user": r[3],
+                "password": r[4],
+            }
+            for r in rows
+        ],
+        "count": len(rows),
+    }
+
+
 # ---- session lifecycle -----------------------------------------------------
 # A session brackets a body of recon work: everything discovered, fingerprinted
 # and correlated lives in the neighbors/graph DB until the operator resets.
@@ -337,12 +380,6 @@ def _ensure_session_row() -> dict[str, str]:
     from datetime import UTC, datetime
 
     conn = _neighbor_db()
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS session_meta ("
-        "  key   TEXT PRIMARY KEY,"
-        "  value TEXT NOT NULL"
-        ")"
-    )
     row = dict(conn.execute("SELECT key, value FROM session_meta").fetchall() or [])
     if "session_id" not in row:
         sid = _new_session_id()
@@ -543,6 +580,8 @@ def reset_session(wipe_engagements: bool = False) -> dict[str, Any]:
         "discovered_services",
         "discovered_service_vulns",
         "discovered_hosts",
+        "found_creds",
+        "exploit_sessions",
     ):
         conn.execute(f"DROP TABLE IF EXISTS {table}")
     new_id = _new_session_id()
@@ -1477,8 +1516,8 @@ def _run_pass_attack(
     )
     cfg = PASSATTACK_SERVICES[service]
 
-    userlist = "/opt/h4k/data/users.txt"
-    passlist = "/opt/h4k/data/passwords.txt"
+    userlist = str(_RUNTIME_DATA / "users.txt")
+    passlist = str(_RUNTIME_DATA / "passwords.txt")
     if users:
         with open(userlist + ".run", "w", encoding="utf-8") as fh:
             fh.write("\n".join(users))
@@ -1990,15 +2029,6 @@ def _record_sessions(attacks: list[dict[str, Any]]) -> int:
 
     opened = 0
     conn = _neighbor_db()
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS exploit_sessions ("
-        "  msf_session_id TEXT PRIMARY KEY,"
-        "  host           TEXT NOT NULL,"
-        "  port           INTEGER,"
-        "  module         TEXT,"
-        "  opened_at      TEXT NOT NULL"
-        ")"
-    )
     conn.commit()
     now = datetime.now(UTC).isoformat()
     for a in attacks:
