@@ -25,3 +25,4 @@ vulnlab/*.o
 vulnlab/crash-*
 vulnlab/findings/
 vulnlab/corpus/
+h4k/data/engagements.db
