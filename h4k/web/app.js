@@ -1382,7 +1382,24 @@ document.addEventListener('DOMContentLoaded', () => {
   updateXpDisplay();
   log('h4k operations center ready', 'system');
   log('Press Ctrl+K for command palette, ? for shortcuts', 'info');
+
+  // repopulate persisted findings from previous fingerprint runs
+  loadPersistedVulns();
 });
+
+async function loadPersistedVulns() {
+  try {
+    const res = await api('/api/neighbors/vulns');
+    const vulns = res.vulns || [];
+    if (vulns.length === 0) return;
+    const rows = vulns.map(v => ({
+      services: [{ port: v.port, proto: v.proto, vulns: [v] }],
+      ip: v.ip,
+    }));
+    renderVulnPanel(rows);
+    log(`Restored ${vulns.length} persisted vulnerability finding(s)`, 'info');
+  } catch { /* first run or db empty */ }
+}
 
 async function checkMsfStatus() {
   try {
