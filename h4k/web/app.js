@@ -26,6 +26,7 @@ const state = {
   fingerprintJobId: null,
   vulnRows: [],
   selectedVulnRow: null,
+  exploitAlternatives: [],
 };
 
 // XP table: level -> XP required to reach it
@@ -505,7 +506,7 @@ function renderVulnPanel(results) {
   results.forEach(r => {
     (r.services || []).forEach(s => {
       (s.vulns || []).forEach(v => {
-        rows.push({ ip: r.ip, port: s.port, proto: s.proto, ...v });
+        rows.push({ ip: r.ip, port: s.port, proto: s.proto, service: s.service, product: s.product, ...v });
       });
     });
   });
@@ -620,15 +621,19 @@ function pollExploitJob(jobId, btn) {
         exploitPollTimer = null;
         btn.disabled = false;
         if (job.status === 'done' && atk?.session_id) {
-          $('ex-status').textContent = `Pwned — session ${atk.session_id} @ ${row.ip}`;
+          $('ex-status').textContent = `Pwned — session ${atk.session_id}`;
           glitchEffect();
           unlockAchievement('exploiter');
           logXp(50, '(exploit)');
           state.stats.pwned++;
         } else if (job.status === 'done') {
           $('ex-status').textContent = 'Exploit finished — no session opened.';
+          appendExOutput('no session. escalation options below.');
+          showExploitAlternatives(row);
         } else {
           $('ex-status').textContent = 'Attack failed or timed out.';
+          appendExOutput('timed out. escalation options below.');
+          showExploitAlternatives(row);
           playSound('error');
         }
       }
@@ -640,11 +645,37 @@ function pollExploitJob(jobId, btn) {
   }, 2500);
 }
 
+async function showExploitAlternatives(row) {
+  const svc = row.service || row.vid?.split('@')[0] || '';
+  if (!svc) return;
+  try {
+    const res = await api(`/api/exploit-candidates?service=${encodeURIComponent(svc)}&port=${row.port || ''}`);
+    if (!res.candidates?.length) {
+      appendExOutput('no alternative modules found — try default creds or deep attack.');
+      return;
+    }
+    appendExOutput(`alternative modules for ${svc} (click to switch):`);
+    res.candidates.slice(0, 6).forEach(m => appendExOutput(`  [module] ${m}`));
+    state.exploitAlternatives = res.candidates.slice(0, 6);
+  } catch (e) { /* soft-fail */ }
+}
+
 function appendExOutput(text) {
   const el = $('ex-output');
   const p = document.createElement('p');
   p.className = 't-line';
-  p.textContent = text;
+  const m = text.match(/^\s+\[module\] (.+)$/);
+  if (m) {
+    p.classList.add('ex-mod');
+    p.textContent = m[1];
+    p.title = 'Click to use this module';
+    p.addEventListener('click', () => {
+      $('ex-module').value = m[1];
+      $('ex-status').textContent = 'Module switched — launch when ready.';
+    });
+  } else {
+    p.textContent = text;
+  }
   el.appendChild(p);
   el.scrollTop = el.scrollHeight;
 }

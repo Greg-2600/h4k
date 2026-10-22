@@ -108,6 +108,13 @@ def _neighbor_db() -> sqlite3.Connection:
         "  PRIMARY KEY (ip, port, proto, kind, vid)"
         ")"
     )
+    # auxiliary/post matches are recon leads, not exploitable findings
+    conn.execute(
+        "DELETE FROM discovered_service_vulns WHERE kind='cve' AND detail LIKE '%msf: auxiliary/%'"
+    )
+    conn.execute(
+        "DELETE FROM discovered_service_vulns WHERE kind='cve' AND detail LIKE '%msf: post/%'"
+    )
     conn.commit()
     return conn
 
@@ -979,6 +986,11 @@ def _match_service_vulns(ip: str, svc: dict[str, Any]) -> list[dict[str, Any]]:
             vid = cve.get("id", "")
             if vid in seen:
                 continue
+            msf_module = cve.get("msf_module") or ""
+            # auxiliary scanner matches (ssh_enumusers etc.) are recon leads,
+            # not exploitable findings — leave them out of Likely Vulnerable
+            if msf_module.startswith(("auxiliary/", "post/")):
+                continue
             seen.add(vid)
             detail = cve.get("title") or cve.get("description") or ""
             if cve.get("msf_module"):
@@ -1020,6 +1032,44 @@ def neighbors_vulns() -> dict[str, Any]:
     """Known vulnerabilities correlated against fingerprinted neighbor services."""
     vulns = _load_neighbor_vulns()
     return {"vulns": vulns, "count": len(vulns)}
+
+
+@router.get("/exploit-candidates")
+def exploit_candidates(service: str, port: int | None = None) -> dict[str, Any]:
+    """Alternative MSF exploit modules for a failed-finding escalation ladder.
+
+    Offline-first: modules attached to CVEs that mention this service, plus the
+    static service->module map. (Iterating every MSF module over RPC is slow
+    and unreliable — the curated path is faster and more relevant.)
+    """
+    blob = f"{service} {port or ''}".lower()
+    mods: list[str] = []
+    cve_db = _get_cve_db()
+    if cve_db is not None:
+        for cve in cve_db.cves:
+            mod = cve.get("msf_module") or ""
+            if not mod.startswith("exploit/"):
+                continue
+            svc_list = [s.lower() for s in cve.get("service", [])]
+            prod = str(cve.get("product", "")).lower()
+            if service.lower() in svc_list or prod in blob or prod == service.lower():
+                mods.append(mod)
+    try:
+        from services.attack import STATIC_SERVICE_MODULES
+
+        s = service.lower()
+        mapped = STATIC_SERVICE_MODULES.get(s)
+        if not mapped:
+            for key, module in STATIC_SERVICE_MODULES.items():
+                if key in s:
+                    mapped = module
+                    break
+        if mapped:
+            mods.append(mapped)
+    except Exception:  # pragma: no cover - defensive
+        pass
+    mods = list(dict.fromkeys(mods))[:12]
+    return {"service": service, "candidates": mods, "count": len(mods)}
 
 
 @router.get("/neighbors/fingerprint/status/{job_id}")
