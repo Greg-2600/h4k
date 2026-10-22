@@ -28,6 +28,7 @@ const state = {
   selectedVulnRow: null,
   exploitAlternatives: [],
   credTargets: [],
+  lastCredTargetsLoad: 0,
 };
 
 // XP table: level -> XP required to reach it
@@ -567,6 +568,12 @@ function renderVulnPanel(results) {
   const chip = $('vuln-chip-count');
   if (chip) chip.textContent = `${rows.length} findings`;
   loadCveStatus();
+  // Default-Cred Targets card rides along: populated once the vuln card is
+  // live (throttled — polling fires every 2s, sqlite fetch is cheap but not free)
+  if (!state.lastCredTargetsLoad || Date.now() - state.lastCredTargetsLoad > 10000) {
+    state.lastCredTargetsLoad = Date.now();
+    loadCredTargets();
+  }
 
   const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
   const severityKey = (d) => { const k = (d || '').split(':')[0]; return k in severityOrder ? severityOrder[k] : 9; };
