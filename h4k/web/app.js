@@ -713,20 +713,115 @@ function appendLadderButtons() {
 async function startLadderCreds() {
   const row = state.selectedVulnRow;
   if (!row) return;
-  const svc = (row.service || '').toLowerCase();
-  appendExOutput(`> default-cred sweep: ${row.ip}:${row.port} (${svc || 'known services'})`);
+  const svc = (row.service || '').split('/')[0];
+  openPassAttackCard(row.ip, row.port, svc || 'ssh');
+}
+
+function openPassAttackCard(host, port, service) {
+  $('pa-host').value = host || '';
+  $('pa-port').value = port || '';
+  const sel = $('pa-service');
+  if (sel) {
+    const known = ['ssh', 'ftp', 'telnet', 'mysql', 'http-basic'].find(s => s === service);
+    if (known) sel.value = known;
+  }
+  $('passattack-panel').hidden = false;
+  $('passattack-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+let paPollTimer = null;
+
+async function launchPassAttack() {
+  const host = $('pa-host').value.trim();
+  const port = parseInt($('pa-port').value, 10) || null;
+  const service = $('pa-service').value;
+  if (!host) { $('pa-live-status').textContent = 'Host is required.'; return; }
+
+  const btn = $('btn-launch-passattack');
+  btn.disabled = true;
+  $('pa-live-status').textContent = 'Launching...';
+  $('pa-progress').style.width = '0%';
+  $('pa-output').hidden = false;
+  $('pa-output').innerHTML = '';
+  $('pa-found').hidden = true;
+  appendPaOutput(`> ${service} password attack on ${host}:${port || 'default'}`);
+
   try {
-    const res = await api('/api/deepattack', {
+    const res = await api('/api/passattack', {
       method: 'POST',
-      body: { target: row.ip, host: row.ip, services: svc ? [svc] : [] }
+      body: { host, port, service }
     });
-    if (res.job_id) {
-      appendExOutput(`  toolkit job ${res.job_id} started — results appear when done (GET /api/deepattack/${res.job_id})`);
-      log(`Default-cred sweep ${res.job_id} launched for ${row.ip}`, 'info');
-    } else {
-      appendExOutput('  sweep failed to start: ' + JSON.stringify(res));
+    if (!res.job_id) {
+      $('pa-live-status').textContent = 'Failed: ' + (res.detail || JSON.stringify(res));
+      btn.disabled = false;
+      return;
     }
-  } catch (e) { appendExOutput('  sweep error: ' + e.message); }
+    if (paPollTimer) clearInterval(paPollTimer);
+    paPollTimer = setInterval(async () => {
+      try {
+        const job = await api(`/api/passattack/${res.job_id}`);
+        $('pa-live-status').textContent = job.message || job.status;
+        $('pa-progress').style.width = (job.progress || 0) + '%';
+        (job.log || []).forEach(l => {
+          if (!$('pa-output').dataset[`seen_${btoa(l).slice(0, 8)}`]) {
+            $('pa-output').dataset[`seen_${btoa(l).slice(0, 8)}`] = '1';
+            appendPaOutput('  ' + l);
+          }
+        });
+        if (job.found && job.found.length) renderPaFound(job.found);
+        if (['done', 'error'].includes(job.status)) {
+          clearInterval(paPollTimer);
+          paPollTimer = null;
+          btn.disabled = false;
+          if (job.status === 'error') {
+            $('pa-live-status').textContent = 'Error: ' + (job.error || 'unknown');
+            playSound('error');
+          } else if (job.found && job.found.length) {
+            $('pa-live-status').textContent = `${job.found.length} credential(s) found!`;
+            glitchEffect();
+            unlockAchievement('exploiter');
+            logXp(25, '(password attack)');
+          } else {
+            playSound('error');
+          }
+          refreshSessionBadge();
+        }
+      } catch (e) {
+        clearInterval(paPollTimer); paPollTimer = null;
+        btn.disabled = false;
+        $('pa-live-status').textContent = 'Poll error: ' + e.message;
+      }
+    }, 2500);
+  } catch (e) {
+    $('pa-live-status').textContent = 'Launch error: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+function appendPaOutput(text) {
+  const el = $('pa-output');
+  if (el) {
+    const p = document.createElement('p');
+    p.className = 't-line';
+    p.textContent = text;
+    el.appendChild(p);
+    el.scrollTop = el.scrollHeight;
+  }
+}
+
+function renderPaFound(creds) {
+  const wrap = $('pa-found');
+  const list = $('pa-found-list');
+  if (!wrap || !list) return;
+  wrap.hidden = false;
+  list.innerHTML = creds.map(c => `
+    <div class="pa-cred">
+      <span class="fp-ip">${escHtml(c.host)}:${escHtml(c.port)}</span>
+      <span class="pa-user">${escHtml(c.user)}</span> :
+      <span class="pa-pass">${escHtml(c.password)}</span>
+      <span class="pa-svc">${escHtml(c.service)}</span>
+    </div>
+  `).join('');
 }
 
 async function startLadderDeep() {
@@ -764,6 +859,13 @@ async function showExploitAlternatives(row) {
 
 function appendExOutput(text) {
   const el = $('ex-output');
+  if (!el) return;
+  appendTermLine(el, text);
+}
+
+// shared terminal line appender: [module] x lines clickable to switch module
+function appendTermLine(el, text) {
+  if (!el) return;
   const p = document.createElement('p');
   p.className = 't-line';
   const m = text.match(/^\s+\[module\] (.+)$/);
@@ -1189,6 +1291,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (exBtn) openExploitPanel(parseInt(exBtn.dataset.vulnIndex, 10));
     if (e.target.closest('#btn-launch-exploit')) launchExploit();
     if (e.target.closest('#btn-cve-refresh')) refreshCveDb();
+    if (e.target.closest('#btn-launch-passattack')) launchPassAttack();
   });
 
   // Theme toggle

@@ -733,6 +733,34 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 .ladder-btns { display: flex; gap: 10px; margin: 8px 0; }
 .ladder-btn { font-size: 12px; padding: 5px 12px; }
 
+/* Common Password Attack card */
+#passattack-panel .pa-status {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+#passattack-panel .pa-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.pa-found h3 { margin: 14px 0 8px; font-size: 13px; color: var(--success); }
+.pa-cred {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background: var(--success-light);
+  border: 1px solid var(--success);
+  border-radius: var(--radius-sm);
+}
+.pa-user { color: var(--text); font-weight: 700; }
+.pa-pass { color: var(--success); font-weight: 700; }
+.pa-svc { color: var(--text-muted); font-size: 10px; margin-left: auto; }
+
 /* Exploit Setup card */
 #exploits-panel .card-header.danger,
 #exploit-panel .card-header.danger {

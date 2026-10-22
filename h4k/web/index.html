@@ -304,6 +304,49 @@
               <div class="ex-output" id="ex-output" hidden></div>
             </div>
           </div>
+
+          <!-- Common Password Attack -->
+          <div class="card" id="passattack-panel" hidden>
+            <div class="card-header">
+              <h2>🔑 Common Password Attack</h2>
+              <span class="pa-status" id="pa-status">Idle</span>
+            </div>
+            <div class="card-body">
+              <div class="pa-hint">Bundled lists (users.txt / passwords.txt) — opt-in, targeted at one service on one host. Custom paste lists coming later.</div>
+              <div class="input-row">
+                <div class="input-group">
+                  <label>Host</label>
+                  <input type="text" id="pa-host" />
+                </div>
+                <div class="input-group">
+                  <label>Port</label>
+                  <input type="text" id="pa-port" />
+                </div>
+                <div class="input-group">
+                  <label>Service</label>
+                  <select id="pa-service">
+                    <option value="ssh">ssh (22)</option>
+                    <option value="ftp">ftp (21)</option>
+                    <option value="telnet">telnet (23)</option>
+                    <option value="mysql">mysql (3306)</option>
+                    <option value="http-basic">http basic-auth (80)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="ex-actions">
+                <button class="btn btn-danger" id="btn-launch-passattack">🔑 Launch Password Attack</button>
+                <span class="ex-status" id="pa-live-status">Ready.</span>
+              </div>
+              <div class="neighbors-progress-wrap" id="pa-progress-wrap">
+                <div class="progress-bar"><div class="progress-fill" id="pa-progress"></div></div>
+              </div>
+              <div class="ex-output" id="pa-output" hidden></div>
+              <div class="pa-found" id="pa-found" hidden>
+                <h3>Credentials Found</h3>
+                <div id="pa-found-list"></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- GRAPH PHASE -->

