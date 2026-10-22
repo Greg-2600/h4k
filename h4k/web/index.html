@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=4" />
+  <link rel="stylesheet" href="/static/style.css?v=5" />
 </head>
 <body>
   <div class="app" id="app">
@@ -242,6 +242,34 @@
               </div>
             </div>
           </div>
+
+          <!-- Likely Vulnerable Services -->
+          <div class="card" id="vulns-panel" hidden>
+            <div class="card-header warning">
+              <h2>⚠️ Likely Vulnerable</h2>
+              <span class="fp-chip" id="vuln-chip-count">0 findings</span>
+            </div>
+            <div class="card-body">
+              <div class="fp-table-wrap">
+                <table class="fp-map vuln-map">
+                  <thead>
+                    <tr>
+                      <th>Host</th>
+                      <th>Port</th>
+                      <th>Finding</th>
+                      <th>Severity</th>
+                      <th>Detail</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="vuln-tbody"></tbody>
+                </table>
+                <div class="fp-empty" id="vuln-empty">
+                  No vulnerability candidates. Run a service fingerprint scan first.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- ANALYZE PHASE -->
@@ -440,6 +468,6 @@
 
   </div>
 
-  <script src="/static/app.js?v=4"></script>
+  <script src="/static/app.js?v=5"></script>
 </body>
 </html>

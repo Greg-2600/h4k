@@ -490,6 +490,46 @@ function updateFingerprintProgress(job) {
   if (pctEl) pctEl.textContent = Math.round(pct) + '%';
 
   renderFingerprintTable(job.results || []);
+  renderVulnPanel(job.results || []);
+}
+
+function renderVulnPanel(results) {
+  const tbody = $('vuln-tbody');
+  const empty = $('vuln-empty');
+  const panel = $('vulns-panel');
+  if (!tbody) return;
+
+  const rows = [];
+  results.forEach(r => {
+    (r.services || []).forEach(s => {
+      (s.vulns || []).forEach(v => {
+        rows.push({ ip: r.ip, port: s.port, proto: s.proto, ...v });
+      });
+    });
+  });
+
+  panel.hidden = rows.length === 0 ? panel.hidden : false;
+  if (rows.length === 0) { if (empty) empty.hidden = false; return; }
+  empty.hidden = true;
+  const chip = $('vuln-chip-count');
+  if (chip) chip.textContent = `${rows.length} findings`;
+
+  const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+  rows.sort((a, b) => (severityOrder[(a.detail || '').split(':')[0]] ?? 9) - (severityOrder[(b.detail || '').split(':')[0]] ?? 9));
+
+  tbody.innerHTML = rows.map(x => {
+    const sev = (x.detail || '').split(':')[0];
+    const sevCls = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(sev) ? sev.toLowerCase() : '';
+    return `
+    <tr>
+      <td class="fp-ip">${escHtml(x.ip)}</td>
+      <td class="fp-port">${escHtml(x.port + '/' + x.proto)}</td>
+      <td class="v-kind">${escHtml(x.vid)}</td>
+      <td><span class="v-sev ${sevCls}">${escHtml(sev || 'INFO')}</span></td>
+      <td class="v-detail">${escHtml((x.detail || '').split(': ').slice(1).join(': '))}</td>
+      <td><button class="btn btn-danger v-exploit-btn" data-href-host="${escHtml(x.ip)}" data-href-port="${escHtml(x.port)}">⚔</button></td>
+    </tr>`;
+  }).join('');
 }
 
 function renderFingerprintTable(results) {
@@ -561,6 +601,12 @@ async function onFingerprintDone(job) {
   log(`Service map complete — ${hosts.size} hosts, ${openPorts} open ports`, 'success');
   logXp(15, '(fingerprint)');
   unlockAchievement('port_scanner');
+  unlockAchievement('vuln_finder');
+  // authoritative refresh: persisted vulns (covers earlier runs)
+  api('/api/neighbors/vulns').then(res => {
+    const rows = (res.vulns || []).map(v => ({ services: [{ port: v.port, proto: v.proto, vulns: [v] }], ip: v.ip }));
+    renderVulnPanel(rows);
+  }).catch(() => {});
 }
 
 async function startFullScan() {

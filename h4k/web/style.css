@@ -672,3 +672,27 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
   color: var(--text-muted);
   font-size: 13px;
 }
+
+/* Likely Vulnerable card */
+#vulns-panel .card-header.warning {
+  background: var(--warning);
+  border-color: var(--warning);
+}
+#vulns-panel .card-header.warning h2 { color: #111; }
+.v-sev {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.v-sev.critical { background: var(--danger); color: white; }
+.v-sev.high { background: var(--danger-light); color: var(--danger); }
+.v-sev.medium { background: var(--warning-light); color: var(--warning); }
+.v-sev.low { background: var(--success-light); color: var(--success); }
+.v-kind { color: var(--danger) !important; font-weight: 700; }
+.v-detail { white-space: normal !important; max-width: 340px; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted) !important; font-size: 11px; }
+.v-exploit-btn { padding: 4px 10px; font-size: 12px; cursor: pointer; }

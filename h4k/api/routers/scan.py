@@ -95,6 +95,19 @@ def _neighbor_db() -> sqlite3.Connection:
         "  PRIMARY KEY (ip, port, proto)"
         ")"
     )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS discovered_service_vulns ("
+        "  ip          TEXT NOT NULL,"
+        "  port        INTEGER NOT NULL,"
+        "  proto       TEXT NOT NULL DEFAULT 'tcp',"
+        "  kind        TEXT NOT NULL,"  # 'cve' or 'lead'
+        "  vid         TEXT NOT NULL,"  # CVE id, or lead product@version
+        "  severity    REAL,"
+        "  detail      TEXT,"
+        "  found_at    TEXT NOT NULL,"
+        "  PRIMARY KEY (ip, port, proto, kind, vid)"
+        ")"
+    )
     conn.commit()
     return conn
 
@@ -162,6 +175,51 @@ def _load_neighbor_services() -> dict[str, list[dict[str, Any]]]:
         }
         out.setdefault(r[0], []).append(entry)
     return out
+
+
+def _save_service_vulns(
+    ip: str, port: int, proto: str, rows: list[dict[str, Any]]
+) -> None:
+    from datetime import UTC, datetime
+
+    conn = _neighbor_db()
+    now = datetime.now(UTC).isoformat()
+    for v in rows:
+        conn.execute(
+            "INSERT OR REPLACE INTO discovered_service_vulns "
+            "(ip, port, proto, kind, vid, severity, detail, found_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                ip,
+                port,
+                proto,
+                v.get("kind", "cve"),
+                v.get("vid", ""),
+                v.get("severity"),
+                v.get("detail"),
+                now,
+            ),
+        )
+    conn.commit()
+
+
+def _load_neighbor_vulns() -> list[dict[str, Any]]:
+    conn = _neighbor_db()
+    rows = conn.execute(
+        "SELECT ip, port, proto, kind, vid, severity, detail FROM discovered_service_vulns ORDER BY severity DESC"
+    ).fetchall()
+    conn.close()
+    return [
+        {
+            "ip": r[0],
+            "port": r[1],
+            "proto": r[2],
+            "kind": r[3],
+            "vid": r[4],
+            "severity": r[5],
+            "detail": r[6],
+        }
+        for r in rows
+    ]
 
 
 def _load_neighbor_hosts() -> dict[str, dict[str, Any]]:
@@ -795,6 +853,24 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
                 entry["neighbor_info"] = next(
                     (n for n in neighbors if n.get("ip") == entry["ip"]), {}
                 )
+            # correlate known vulns per open service while we are here
+            for entry in parsed:
+                for svc in entry.get("services", []):
+                    if svc.get("state") != "open":
+                        continue
+                    hits = _match_service_vulns(entry["ip"], svc)
+                    svc["vulns"] = [
+                        {
+                            k: v
+                            for k, v in h.items()
+                            if k in ("kind", "vid", "severity", "detail")
+                        }
+                        for h in hits
+                    ]
+                    if hits:
+                        _save_service_vulns(
+                            entry["ip"], svc["port"], svc.get("proto", "tcp"), hits
+                        )
             all_results.extend(parsed)
             job["results"] = all_results
             _tick(f"scanned {i + 1}/{total}: {ip}", 5 + int((i / total) * 85))
@@ -870,6 +946,80 @@ def _parse_nmap_xml(xml_output: str) -> list[dict[str, Any]]:
             }
         )
     return results
+
+
+def _match_service_vulns(ip: str, svc: dict[str, Any]) -> list[dict[str, Any]]:
+    """Match a fingerprinted service against the offline CVE db + version leads.
+
+    Returns [{kind, vid, severity, detail}] — `kind` is 'cve' for CVE db hits
+    (severity = CVSS) or 'lead' for heuristic outdated/beta-version flags.
+    """
+    out: list[dict[str, Any]] = []
+    banner = " ".join(
+        filter(None, (svc.get("service"), svc.get("product"), svc.get("version")))
+    )
+    if not banner:
+        return out
+
+    cve_db = _get_cve_db()
+    if cve_db is not None:
+        from schemas import Service as SvcSchema
+
+        pseudo = SvcSchema(
+            port=svc.get("port") or 0,
+            proto=svc.get("proto", "tcp"),
+            service=svc.get("service"),
+            state=svc.get("state"),
+            info=banner,
+        )
+        version = svc.get("version")
+        product = svc.get("product")
+        seen: set[str] = set()
+        for cve in cve_db.match_service(pseudo, version=version, product=product):
+            vid = cve.get("id", "")
+            if vid in seen:
+                continue
+            seen.add(vid)
+            detail = cve.get("title") or cve.get("description") or ""
+            if cve.get("msf_module"):
+                detail = f"{detail} | msf: {cve['msf_module']}"
+            severity = cve.get("severity")
+            if not severity:
+                cvss = float(cve.get("cvss") or 0.0)
+                severity = (
+                    "CRITICAL"
+                    if cvss >= 9
+                    else "HIGH" if cvss >= 7 else "MEDIUM" if cvss >= 4 else "LOW"
+                )
+            out.append(
+                {
+                    "kind": "cve",
+                    "vid": vid,
+                    "severity": float(cve.get("cvss") or 0.0) or None,
+                    "detail": f"{severity}: {detail}" if detail else severity,
+                }
+            )
+
+    from services.vulnleads import analyze_service
+
+    for lead in analyze_service(ip, svc.get("service") or "", banner):
+        out.append(
+            {
+                "kind": "lead",
+                "vid": f"{lead.get('product')}@{lead.get('version')}",
+                "severity": None,
+                "detail": f"{lead.get('level')}: {lead.get('reason')}"
+                + (f" (see {lead['cve_link']})" if lead.get("cve_link") else ""),
+            }
+        )
+    return out
+
+
+@router.get("/neighbors/vulns")
+def neighbors_vulns() -> dict[str, Any]:
+    """Known vulnerabilities correlated against fingerprinted neighbor services."""
+    vulns = _load_neighbor_vulns()
+    return {"vulns": vulns, "count": len(vulns)}
 
 
 @router.get("/neighbors/fingerprint/status/{job_id}")
