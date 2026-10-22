@@ -229,6 +229,122 @@ def _load_neighbor_vulns() -> list[dict[str, Any]]:
     ]
 
 
+# ---- session lifecycle -----------------------------------------------------
+# A session brackets a body of recon work: everything discovered, fingerprinted
+# and correlated lives in the neighbors/graph DB until the operator resets.
+# Reset is explicit (a UI button) — never automatic — because the accumulated
+# picture IS the deliverable of a lab engagement.
+
+
+def _new_session_id() -> str:
+    return uuid.uuid4().hex[:12]
+
+
+def _ensure_session_row() -> dict[str, str]:
+    from datetime import UTC, datetime
+
+    conn = _neighbor_db()
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS session_meta ("
+        "  key   TEXT PRIMARY KEY,"
+        "  value TEXT NOT NULL"
+        ")"
+    )
+    row = dict(conn.execute("SELECT key, value FROM session_meta").fetchall() or [])
+    if "session_id" not in row:
+        sid = _new_session_id()
+        now = datetime.now(UTC).isoformat()
+        conn.execute(
+            "INSERT OR REPLACE INTO session_meta (key, value) VALUES ('session_id', ?), "
+            "('started_at', ?)",
+            (sid, now),
+        )
+        conn.commit()
+        conn.close()
+        return {"session_id": sid, "started_at": now}
+    conn.close()
+    return {"session_id": row["session_id"], "started_at": row.get("started_at", "")}
+
+
+@router.get("/session")
+def get_session() -> dict[str, Any]:
+    """Current recon session: id, start time, and accumulated asset counts."""
+    meta = _ensure_session_row()
+    conn = _neighbor_db()
+    counts = {
+        "hosts": conn.execute("SELECT COUNT(*) FROM discovered_hosts").fetchone()[0],
+        "services": conn.execute("SELECT COUNT(*) FROM discovered_services").fetchone()[
+            0
+        ],
+        "vulns": conn.execute(
+            "SELECT COUNT(*) FROM discovered_service_vulns"
+        ).fetchone()[0],
+    }
+    conn.close()
+    return {**meta, **counts}
+
+
+@router.post("/session/reset")
+def reset_session(wipe_engagements: bool = False) -> dict[str, Any]:
+    """Start a fresh session: wipe discovered hosts/services/vulns, job history
+    and caches. Optionally also delete persistent engagements (default: keep).
+    """
+    from datetime import UTC, datetime
+
+    sid = _ensure_session_row()["session_id"]
+
+    conn = _neighbor_db()
+    for table in (
+        "discovered_services",
+        "discovered_service_vulns",
+        "discovered_hosts",
+    ):
+        conn.execute(f"DROP TABLE IF EXISTS {table}")
+    new_id = _new_session_id()
+    conn.execute(
+        "INSERT OR REPLACE INTO session_meta (key, value) VALUES ('session_id', ?), "
+        "('started_at', ?)",
+        (new_id, datetime.now(UTC).isoformat()),
+    )
+    conn.commit()
+    conn.close()
+
+    _neighbors_cache.clear()
+    _neighbor_jobs.clear()
+    _fingerprint_jobs.clear()
+    JOBS.clear()
+    _scan_cache.clear()
+    _attack_cache.clear()
+    _attack_jobs.clear()
+    _toolkit_jobs.clear()
+    _fuzz_jobs.clear()
+
+    engagements_deleted = 0
+    if wipe_engagements:
+        try:
+            from services.engagement import EngagementStore
+
+            store = EngagementStore()
+            for eng in store.list_engagements():
+                if store.delete_engagement(eng["id"]):
+                    engagements_deleted += 1
+        except Exception as exc:
+            logger.warning("engagement wipe failed: %s", exc)
+
+    logger.info(
+        "session reset: %s -> %s (engagements wiped: %d)",
+        sid,
+        new_id,
+        engagements_deleted,
+    )
+    return {
+        "status": "reset",
+        "previous_session_id": sid,
+        "session_id": new_id,
+        "engagements_deleted": engagements_deleted,
+    }
+
+
 def _load_neighbor_hosts() -> dict[str, dict[str, Any]]:
     conn = _neighbor_db()
     rows = conn.execute(

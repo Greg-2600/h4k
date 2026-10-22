@@ -1392,7 +1392,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // repopulate persisted findings from previous fingerprint runs
   loadPersistedVulns();
+  refreshSessionBadge();
+
+  // Session reset: clears accumulated discovery/services/vulns + job history
+  $('btn-session-reset')?.addEventListener('click', async () => {
+    if (!confirm('Reset session? This clears all discovered hosts, services and vulnerability findings (engagements are kept).')) return;
+    try {
+      const res = await api('/api/session/reset?wipe_engagements=false', { method: 'POST' });
+      log(`Session ${res.previous_session_id} reset → ${res.session_id}`, 'warn');
+      // clear UI state
+      state.vulnRows = [];
+      state.selectedVulnRow = null;
+      state.graphData = null;
+      ['neighbors-panel', 'fingerprint-panel', 'vulns-panel', 'scan-progress-card', 'target-results-card', 'exploit-panel'].forEach(id => {
+        const el = $(id);
+        if (el) el.hidden = true;
+      });
+      const tb = $('vuln-tbody'); if (tb) tb.innerHTML = '';
+      const fpt = $('fp-tbody'); if (fpt) fpt.innerHTML = '';
+      const nl = $('neighbors-list'); if (nl) nl.innerHTML = '';
+      refreshSessionBadge();
+      loadGraph();
+    } catch (e) { log('Session reset failed: ' + e.message, 'error'); }
+  });
 });
+
+async function refreshSessionBadge() {
+  const el = $('session-badge');
+  if (!el) return;
+  try {
+    const s = await api('/api/session');
+    el.textContent = `${s.id} · ${s.hosts}h ${s.services}s ${s.vulns}v`;
+  } catch { el.textContent = 'session: unavailable'; }
+}
 
 async function loadPersistedVulns() {
   try {

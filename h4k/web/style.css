@@ -748,3 +748,15 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 }
 .ex-output .t-line { margin: 2px 0; white-space: pre-wrap; word-break: break-all; }
 .ex-output .t-line.ex-mod { color: var(--accent); cursor: pointer; border-bottom: 1px dotted var(--accent); display: inline-block; }
+
+/* Session badge */
+.session-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  white-space: nowrap;
+}
