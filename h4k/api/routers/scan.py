@@ -1226,7 +1226,6 @@ def _run_pass_attack(
     users: list[str] | None = None,
     passwords: list[str] | None = None,
 ) -> None:
-    import os
     import re as _re
     import time as _time
 
@@ -1247,8 +1246,6 @@ def _run_pass_attack(
         with open(passlist + ".run", "w", encoding="utf-8") as fh:
             fh.write("\n".join(passwords))
         passlist += ".run"
-
-    from services.toolkit import USERLIST as bundled_users, PASSLIST as bundled_pass
 
     def _count(path: str) -> int:
         try:
@@ -1336,12 +1333,52 @@ def _run_pass_attack(
     )
 
 
-@router.get("/passattack/{job_id}")
-def pass_attack_status(job_id: str) -> dict[str, Any]:
-    job = _passattack_jobs.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="password attack job not found")
-    return job
+@router.get("/passattack/targets")
+def pass_attack_targets() -> dict[str, Any]:
+    """Fingerprinted hosts running a service a common-password attack applies to.
+
+    Only open services whose name matches a hydra-supported service family
+    (ssh/ftp/telnet/mysql/http) are listed — the Default-Cred Targets card.
+    """
+    eligible = {"ssh", "ftp", "telnet", "mysql", "http", "https", "http-alt"}
+    conn = _neighbor_db()
+    rows = conn.execute(
+        "SELECT ip, port, service, version, product FROM discovered_services "
+        "WHERE state = 'open' ORDER BY ip, port"
+    ).fetchall()
+    conn.close()
+    cred_host_ports: set[tuple[str, int]] = set()
+    with suppress(Exception):
+        for c in pass_attack_creds().get("creds", []):
+            cred_host_ports.add((c["host"], c["port"]))
+    targets: list[dict[str, Any]] = []
+    for r in rows:
+        service = (r[2] or "").lower()
+        # map nmap service names to attackable families
+        family = next((f for f in eligible if f in service), None)
+        if not family:
+            continue
+        attack_svc = {
+            "ssh": "ssh",
+            "ftp": "ftp",
+            "telnet": "telnet",
+            "mysql": "mysql",
+            "http": "http-basic",
+            "https": "http-basic",
+            "http-alt": "http-basic",
+        }.get(family, "http-basic")
+        targets.append(
+            {
+                "ip": r[0],
+                "port": r[1],
+                "service": service,
+                "version": r[3],
+                "product": r[4],
+                "attack_service": attack_svc,
+                "creds_found": (r[0], r[1]) in cred_host_ports,
+            }
+        )
+    return {"targets": targets, "count": len(targets)}
 
 
 @router.get("/passattack/creds/all")
@@ -1366,6 +1403,14 @@ def pass_attack_creds() -> dict[str, Any]:
         ],
         "count": len(rows),
     }
+
+
+@router.get("/passattack/{job_id}")
+def pass_attack_status(job_id: str) -> dict[str, Any]:
+    job = _passattack_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="password attack job not found")
+    return job
 
 
 @router.get("/exploit-candidates")

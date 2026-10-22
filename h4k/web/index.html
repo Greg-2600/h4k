@@ -347,6 +347,37 @@
               </div>
             </div>
           </div>
+
+          <!-- Default-Cred Targets -->
+          <div class="card" id="cred-targets-panel" hidden>
+            <div class="card-header">
+              <h2>🔑 Default-Cred Targets</h2>
+              <div class="vuln-header-right">
+                <span class="fp-chip" id="cred-targets-count">0 targets</span>
+                <button class="btn btn-secondary btn-sm" id="btn-cred-targets-refresh">↻</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="fp-table-wrap">
+                <table class="fp-map">
+                  <thead>
+                    <tr>
+                      <th>Host</th>
+                      <th>Port</th>
+                      <th>Service</th>
+                      <th>Product</th>
+                      <th>Attack</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="cred-targets-tbody"></tbody>
+                </table>
+                <div class="fp-empty" id="cred-targets-empty">
+                  No password-attackable services yet — run “Scan Services &amp; Fingerprint”.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- GRAPH PHASE -->

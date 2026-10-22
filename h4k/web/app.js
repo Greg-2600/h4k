@@ -27,6 +27,7 @@ const state = {
   vulnRows: [],
   selectedVulnRow: null,
   exploitAlternatives: [],
+  credTargets: [],
 };
 
 // XP table: level -> XP required to reach it
@@ -781,6 +782,7 @@ async function launchPassAttack() {
             glitchEffect();
             unlockAchievement('exploiter');
             logXp(25, '(password attack)');
+            loadCredTargets();
           } else {
             playSound('error');
           }
@@ -822,6 +824,39 @@ function renderPaFound(creds) {
       <span class="pa-svc">${escHtml(c.service)}</span>
     </div>
   `).join('');
+}
+
+// ---- Default-Cred Targets card ----
+
+async function loadCredTargets() {
+  try {
+    const res = await api('/api/passattack/targets');
+    renderCredTargets(res.targets || []);
+  } catch (e) { log('Cred targets load failed: ' + e.message, 'error'); }
+}
+
+function renderCredTargets(targets) {
+  const panel = $('cred-targets-panel');
+  const tbody = $('cred-targets-tbody');
+  const empty = $('cred-targets-empty');
+  const chip = $('cred-targets-count');
+  if (!tbody) return;
+
+  panel.hidden = targets.length === 0 ? panel.hidden : false;
+  empty.hidden = targets.length > 0;
+  if (chip) chip.textContent = `${targets.length} targets`;
+  if (targets.length === 0) return;
+
+  state.credTargets = targets;
+  tbody.innerHTML = targets.map((t, i) => `
+    <tr>
+      <td class="fp-ip">${escHtml(t.ip)}</td>
+      <td class="fp-port">${escHtml(String(t.port))}</td>
+      <td>${escHtml(t.service)}</td>
+      <td>${escHtml(t.product || '')}</td>
+      <td>${escHtml(t.attack_service)}</td>
+      <td>${t.creds_found ? '<span class="v-sev low">creds ✓</span>' : `<button class="btn btn-danger cred-target-btn" data-index="${i}" title="Open password attack">🔑</button>`}</td>
+    </tr>`).join('');
 }
 
 async function startLadderDeep() {
@@ -954,6 +989,7 @@ async function onFingerprintDone(job) {
   logXp(15, '(fingerprint)');
   unlockAchievement('port_scanner');
   unlockAchievement('vuln_finder');
+  loadCredTargets();
   // authoritative refresh: persisted vulns (covers earlier runs)
   api('/api/neighbors/vulns').then(res => {
     const rows = (res.vulns || []).map(v => ({ services: [{ port: v.port, proto: v.proto, vulns: [v] }], ip: v.ip }));
@@ -1292,6 +1328,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('#btn-launch-exploit')) launchExploit();
     if (e.target.closest('#btn-cve-refresh')) refreshCveDb();
     if (e.target.closest('#btn-launch-passattack')) launchPassAttack();
+    const ctBtn = e.target.closest('.cred-target-btn');
+    if (ctBtn) {
+      const t = (state.credTargets || [])[parseInt(ctBtn.dataset.index, 10)];
+      if (t) openPassAttackCard(t.ip, t.port, t.attack_service);
+    }
+    if (e.target.closest('#btn-cred-targets-refresh')) { loadCredTargets(); loadCveStatus(); }
   });
 
   // Theme toggle
