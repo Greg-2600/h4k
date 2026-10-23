@@ -395,3 +395,20 @@ engagement scope — without one the endpoint refuses with 403. Out-of-scope
 neighbors are logged and skipped, nothing outside the scope is ever recorded,
 and the live log named-verbatim's every brute-force and exploit attempt. Stop
 button ends stages at the next checkpoint.
+
+### Engagement loop (wave 8)
+
+- Fingerprint/cred/vuln events mirror into the **active engagement's**
+  scope-checked asset graph (`upsert_asset/upsert_service/record_vuln/
+  record_credential`), so the engagement graph page and the propagation
+  planner fill from live recon.
+- Graph page gains a **🧬 Propagation plan** button: dry-run blast radius of
+  replaying verified credentials across in-scope login-capable services —
+  no network calls in a plan, execution stays a separate explicit POST.
+- **Autopilot deep-web flag** (`{"deep_web": true}` or the second start
+  button): nikto + gobuster against up to 6 http surfaces, findings logged
+  per surface.
+- AI triage provider is now **keyless opencode relay** (host-side; see
+  scripts/opencode_relay.py); compose no longer ships an LLM sidecar.
+- Autopilot runs persist and appear in the session report; opened sessions are
+  automatically post-exploit recon'd (sysinfo/getuid/hashdump → session_recon).

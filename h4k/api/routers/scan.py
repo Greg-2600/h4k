@@ -171,6 +171,9 @@ def _save_neighbor_host(
         (ip, mac, vendor, hostname, os_guess, datetime.now(UTC).isoformat()),
     )
     conn.commit()
+    conn.close()
+    # mirror into the active engagement's asset graph (scope-checked there)
+    _eng_ingest_asset(ip, os_=os_guess, vendor=vendor)
 
 
 def _save_neighbor_services(ip: str, services: list[dict[str, Any]]) -> None:
@@ -300,6 +303,68 @@ def _new_session_id() -> str:
 # active engagement's declared CIDRs. Read-only recon (ARP sweep, fingerprint)
 # still runs anywhere but out-of-scope results are *not recorded*, so the
 # accumulated picture can never grow outside the operator's authorization.
+
+
+def _eng_active() -> tuple[str | None, Any]:
+    """(engagement_id, store) — (None, None) when nothing is scoped."""
+    eng_id, store = _active_scope()
+    if eng_id is None or store is None:
+        return None, None
+    return eng_id, store
+
+
+def _eng_ingest_asset(
+    ip: str, os_: str | None = None, vendor: str | None = None
+) -> None:
+    eng_id, store = _eng_active()
+    if not eng_id:
+        return
+    with suppress(Exception):
+        store.upsert_asset(eng_id, str(ip), os=os_, vendor=vendor)
+
+
+def _eng_ingest_service(ip: str, svc: dict[str, Any]) -> None:
+    eng_id, store = _eng_active()
+    if not eng_id:
+        return
+    with suppress(Exception):
+        store.upsert_service(eng_id, str(ip), svc)
+
+
+def _eng_ingest_vuln(ip: str, vuln: dict[str, Any]) -> None:
+    eng_id, store = _eng_active()
+    if not eng_id:
+        return
+    with suppress(Exception):
+        store.record_vuln(
+            eng_id,
+            str(ip),
+            {
+                "name": vuln.get("vid") or "unknown",
+                "severity": vuln.get("severity"),
+                "module": (
+                    (vuln.get("detail") or "").split("msf: ")[-1].split()[0]
+                    if "msf: " in (vuln.get("detail") or "")
+                    else None
+                ),
+            },
+        )
+
+
+def _eng_ingest_cred(cred: dict[str, Any], verified: bool = False) -> None:
+    eng_id, store = _eng_active()
+    if not eng_id:
+        return
+    with suppress(Exception):
+        store.record_credential(
+            eng_id,
+            cred.get("user") or "",
+            cred.get("password") or "",
+            service=cred.get("service"),
+            origin_host=cred.get("host"),
+            origin_port=cred.get("port"),
+            verified=verified,
+        )
 
 
 def _active_scope() -> tuple[str | None, Any | None]:
@@ -2787,7 +2852,7 @@ def _autopilot_job() -> dict[str, Any] | None:
 
 
 @router.post("/autopilot/start")
-def autopilot_start() -> dict[str, Any]:
+def autopilot_start(req: dict[str, Any] | None = None) -> dict[str, Any]:
     """OPT-IN hard: full recon + credential + exploit walk of the local network.
 
     Requires an active engagement scope. Only one run at a time.
@@ -2807,9 +2872,11 @@ def autopilot_start() -> dict[str, Any]:
     if msf is None:
         raise HTTPException(status_code=503, detail="msf unavailable")
 
+    deep_web = bool((req or {}).get("deep_web"))
     scope_cidrs = store.scope_of(eng_id)
     job: dict[str, Any] = {
         "id": uuid.uuid4().hex[:12],
+        "deep_web": deep_web,
         "status": "running",
         "stage": "discovery",
         "progress": 0.0,
@@ -2858,7 +2925,9 @@ def _ap_note_host(job: dict[str, Any], ip: str, **fields: Any) -> None:
     entry.update(fields)
 
 
-def _run_autopilot(job: dict[str, Any], msf: MsfClient, scope_cidrs: list[str]) -> None:
+def _run_autopilot(
+    job: dict[str, Any], msf: MsfClient, scope_cidrs: list[str], deep_web: bool = False
+) -> None:
     from services.toolkit import ToolkitRunner
 
     def _stopped() -> bool:
@@ -3219,6 +3288,70 @@ def _run_autopilot(job: dict[str, Any], msf: MsfClient, scope_cidrs: list[str]) 
                 )
                 session_opens.append(a)
         _update(job, progress=_pct(4, (idx + 1) / max(1, len(attempts_planned))))
+
+    # ---- optional: deep web toolkit (opt-in per run) ------------------------
+    if deep_web and not _stopped():
+        _update(job, stage="web", message="deep web toolkit (nikto/gobuster)...")
+        web_surfaces: list[tuple[str, int]] = []
+        svcs_web = _load_neighbor_services()
+        for ip in found_ips:
+            for svc in svcs_web.get(ip, []):
+                if (
+                    svc.get("state") != "open"
+                    or "http" not in str(svc.get("service") or "").lower()
+                ):
+                    continue
+                web_surfaces.append((ip, int(svc.get("port") or 0)))
+        web_surfaces = web_surfaces[:6]
+        for t_idx, (ip, wport) in enumerate(web_surfaces):
+            if _stopped():
+                break
+            _ap_log(job, f"[web] deep scan {ip}:{wport} (nikto + gobuster)")
+            for tool, argv in (
+                (
+                    "nikto",
+                    ["nikto", "-host", f"http://{ip}:{wport}", "-maxtime", "60s"],
+                ),
+                (
+                    "gobuster",
+                    [
+                        "gobuster",
+                        "dir",
+                        "-u",
+                        f"http://{ip}:{wport}",
+                        "-w",
+                        str(_RUNTIME_DATA / "web-words.txt"),
+                        "-q",
+                        "-t",
+                        "10",
+                    ],
+                ),
+            ):
+                with suppress(Exception):
+                    res = runner.run_tool(tool, argv, timeout=90)
+                    interesting = [
+                        line
+                        for line in (res["stdout"] or "").splitlines()
+                        if (
+                            "200" in line
+                            or "301" in line
+                            or "302" in line
+                            or "401" in line
+                        )
+                    ][:6]
+                    _ap_log(
+                        job,
+                        f"[web:{tool}] {ip}:{wport} "
+                        + (
+                            "; ".join(interesting)
+                            if interesting
+                            else f"rc={res['rc']} (nothing notable)"
+                        ),
+                    )
+            _update(
+                job, progress=round(93 + (t_idx + 1) / max(1, len(web_surfaces)) * 5, 1)
+            )
+        _update(job, message=f"web stage complete ({len(web_surfaces)} surface(s))")
 
     # ---- wrap ---------------------------------------------------------------
     _update(job, stage="done", progress=100.0)

@@ -58,16 +58,23 @@ class MsfClient:
 
     def execute(self, mtype: str, mname: str, opts: dict) -> dict:
         client = self.client
-        mod = client.modules.use(mtype, mname)
+        try:
+            mod = client.modules.use(mtype, mname)
+        except Exception as exc:
+            # pymetasploit3 crashes building some module objects: an MSF RPC
+            # response carries a bool where it expects a {'required': ...}
+            # dict, and ExploitModule.__init__ subscripts it. Surface that as
+            # an honest structured error instead of unwinding the caller.
+            logger.warning("module %s use failed: %s", mname, exc)
+            return {"error": str(exc), "status": "failed"}
         for key, val in opts.items():
             mod[key] = val
         try:
             res = mod.execute()
             return _to_dict(res)
         except Exception as exc:
-            # pymetasploit3 subscripts result['job_id'] and crashes when MSF
-            # returns a bare bool/None for a failed launch — surface that as
-            # an honest structured error instead of unwinding the caller.
+            # same class of pymetasploit3 brittleness: result['job_id'] on a
+            # bool payload for a failed launch
             logger.warning("module %s execute failed: %s", mname, exc)
             return {"error": str(exc), "status": "failed"}
 

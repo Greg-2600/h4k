@@ -451,6 +451,7 @@
               <div class="graph-controls">
                 <button class="btn btn-secondary" id="btn-graph-refresh">↻ Refresh</button>
                 <button class="btn btn-secondary" id="btn-session-report" title="Download the full session writeup">⇩ Report</button>
+                <button class="btn btn-secondary" id="btn-propagate-plan" title="Plan replay of verified credentials across in-scope services (dry run)">🧬 Propagation plan</button>
                 <span class="graph-stat" id="graph-host-count">0 hosts</span>
                 <span class="graph-stat" id="graph-svc-count">0 services</span>
               </div>
@@ -472,6 +473,16 @@
             </div>
             <div class="card-body">
               <div id="graph-detail-body"></div>
+            </div>
+          </div>
+
+          <div class="card" id="propagation-card" hidden>
+            <div class="card-header">
+              <h2>🧬 Credential Propagation Plan</h2>
+              <span class="fp-chip" id="prop-legend">dry run — nothing is logged in</span>
+            </div>
+            <div class="card-body">
+              <div id="prop-body" style="font-size: 12px;"></div>
             </div>
           </div>
         </div>

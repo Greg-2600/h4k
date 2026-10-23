@@ -914,6 +914,38 @@ async function downloadSessionReport() {
   } catch (e) { log('Report failed: ' + e.message, 'error'); }
 }
 
+async function loadPropagationPlan() {
+  const card = $('propagation-card');
+  const body = $('prop-body');
+  if (!card || !body) return;
+  card.hidden = false;
+  try {
+    const s = await api('/api/session');
+    const engId = s.scope?.engagement_id;
+    if (!engId) {
+      body.innerHTML = 'No active engagement scope — set one in the header first.';
+      return;
+    }
+    const plan = await api(`/api/engagement/${engId}/propagate/plan`);
+    const pairs = (plan.pairs || []);
+    body.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <strong>${plan.credentials ?? 0}</strong> verified credential(s),
+        <strong>${plan.targets ?? 0}</strong> candidate service target(s),
+        <strong>${plan.attempts ?? 0}</strong> login pairs${plan.capped ? ` (capped at ${plan.max_attempts})` : ''}
+      </div>
+      ${pairs.length ? pairs.map(p => `
+        <div style="margin-left:14px;">→ <b>${escHtml(p.user || '')}:${escHtml(p.password || '')}</b>
+          ⇒ ${escHtml(p.host || '?')}:${escHtml(String(p.port ?? '?'))} (${escHtml(p.service || '?')})
+          via ${escHtml(p.module || 'login module')}</div>`).join('')
+        : ''}
+    `;
+  } catch (e) {
+    body.textContent = 'Plan failed: ' + e.message;
+  }
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 // ---- autopilot ----
 
 let apPollTimer = null;
@@ -1582,6 +1614,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('.nav-btn[data-phase="autopilot"]')) { if (!apPollTimer) pollAutopilot(); }
     const rpt = e.target.closest('#btn-session-report');
     if (rpt) downloadSessionReport();
+    const pp = e.target.closest('#btn-propagate-plan');
+    if (pp) loadPropagationPlan();
   });
 
   // Theme toggle

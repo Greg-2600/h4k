@@ -443,3 +443,12 @@ and responsible reporting.
 - **A throwaway Linux VM** you provision yourself.
 
 **h4k**, out.
+
+## 8b · Autopilot
+
+The Autopilot page performs the whole walk on the local network in one run:
+scoped discovery → per-host fingerprint → CVE correlation → hydra password
+attacks (best 8 targets) → exploit attempts (CVE-module hints first; verified
+creds unlock credential-driven modules) → optional deep-web pass (nikto +
+gobuster). Requires an active engagement scope. Every brute-force and exploit
+is logged verbatim; the ⇩ Report button on the Graph page emits the writeup.
