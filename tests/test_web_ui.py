@@ -84,7 +84,7 @@ def test_the_nav_phases_are_present():
     view. Keep this pinned so nav and sections never drift apart.
     """
     html = _html()
-    for name in ("recon", "graph"):
+    for name in ("recon", "autopilot", "graph"):
         assert f'data-phase="{name}"' in html, f"nav entry for {name} missing"
     nav = set(re.findall(r'class="nav-btn[^"]*"[^>]*data-phase="([^"]+)"', html))
     secs = set(re.findall(r'class="phase"[^>]*data-phase="([^"]+)"', html))

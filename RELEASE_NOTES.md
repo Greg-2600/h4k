@@ -383,3 +383,15 @@ instance. The offline curated CVE db grew from 31 to 48 entries.
 Aggression rules unchanged (D5, D24): discovery + CVE correlation read the
 network; nothing brute-forces or exploits without an operator pressing a
 button, and every aggressive card names exactly one host/service.
+
+## Autopilot
+
+A dedicated page turns the recon flow into one supervised walk of the local
+network: discovery -> fingerprint -> CVE correlation -> hydra password attacks
+(8 best targets, 120 s each) -> pinned-module exploit attempts (top 10, CVE-db
+module hints first, static service map as fallback, verified creds from the
+password stage feed credential-driven modules). Requirements: an active
+engagement scope — without one the endpoint refuses with 403. Out-of-scope
+neighbors are logged and skipped, nothing outside the scope is ever recorded,
+and the live log named-verbatim's every brute-force and exploit attempt. Stop
+button ends stages at the next checkpoint.

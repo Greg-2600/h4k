@@ -35,7 +35,8 @@
 
       <nav class="nav">
         <button class="nav-btn active" data-phase="recon" data-shortcut="1">Recon</button>
-        <button class="nav-btn" data-phase="graph" data-shortcut="2">Graph</button>
+        <button class="nav-btn" data-phase="autopilot" data-shortcut="2">Autopilot</button>
+        <button class="nav-btn" data-phase="graph" data-shortcut="3">Graph</button>
       </nav>
 
       <div class="header-right">
@@ -395,6 +396,49 @@
                   No password-attackable services yet — run “Scan Services &amp; Fingerprint”.
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AUTOPILOT PHASE -->
+        <div class="phase" id="phase-autopilot" data-phase="autopilot" hidden>
+          <div class="card">
+            <div class="card-header danger">
+              <h2>🤖 Autopilot — Full Network Walk</h2>
+              <div class="vuln-header-right">
+                <span class="fp-chip" id="ap-status-chip">idle</span>
+                <button class="btn btn-danger" id="btn-ap-start">▶ Start Full Attack</button>
+                <button class="btn btn-secondary" id="btn-ap-stop" hidden>■ Stop</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="pa-hint">
+                One run does the whole thing: discovery → fingerprint → CVE correlation →
+                password attacks → exploit attempts. <strong>Requires an active engagement
+                scope</strong> (header). Only hosts inside the scope are touched. Live log shows
+                every action against every host — watch it.
+              </div>
+              <div class="neighbors-progress-wrap" id="ap-progress-wrap">
+                <div class="progress-bar"><div class="progress-fill" id="ap-progress"></div></div>
+                <span class="fp-pct" id="ap-pct">0%</span>
+              </div>
+              <div class="ap-summary" id="ap-summary" hidden>
+                <span class="fp-chip" id="ap-chip-hosts">0 hosts</span>
+                <span class="fp-chip" id="ap-chip-vulns">0 with vulns</span>
+                <span class="fp-chip" id="ap-chip-creds">0 creds</span>
+                <span class="fp-chip" id="ap-chip-sessions">0 sessions</span>
+              </div>
+              <h3 style="font-size:13px; margin: 10px 0 6px;">Hosts</h3>
+              <div class="ap-table-wrap">
+                <table class="fp-map">
+                  <thead>
+                    <tr><th>Host</th><th>Stage</th><th>Services</th><th>Vulns</th><th>Creds</th></tr>
+                  </thead>
+                  <tbody id="ap-tbody"></tbody>
+                </table>
+              </div>
+              <h3 style="font-size:13px; margin: 12px 0 6px;">Live log</h3>
+              <div class="ex-output ap-log" id="ap-log"></div>
             </div>
           </div>
         </div>

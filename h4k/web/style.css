@@ -763,6 +763,11 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 .pa-pass { color: var(--success); font-weight: 700; }
 .pa-svc { color: var(--text-muted); font-size: 10px; margin-left: auto; }
 
+/* Autopilot page */
+.ap-log { max-height: 260px; }
+.ap-table-wrap { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.ap-summary { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+
 /* Exploit Setup card */
 #exploits-panel .card-header.danger,
 #exploit-panel .card-header.danger {

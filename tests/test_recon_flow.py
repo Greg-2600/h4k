@@ -496,3 +496,174 @@ def test_neighbor_scan_endpoint_503_without_msf(client, clean_db, monkeypatch):
 def test_fingerpint_status_404(client):
     r = client.get("/api/neighbors/fingerprint/status/nope")
     assert r.status_code == 404
+
+
+# ---------- autopilot ----------
+
+
+def _run_autopilot_faked(clean_db, monkeypatch, msf):
+    """Drive the full autopilot loop with canned tool output."""
+    from routers.scan import (
+        _AUTOPILOT_STATE,
+        _ensure_session_row,
+        _run_autopilot,
+    )
+
+    _ensure_session_row()
+
+    XML = (
+        '<host starttime="1" endtime="1"><status state="up"/>'
+        '<address addr="192.168.1.10" addrtype="ipv4"/>'
+        '<address addr="01:02:03:04:05:09" addrtype="mac" vendor="Dell"/>'
+        '<ports><port protocol="tcp" portid="22"><state state="open"/>'
+        '<service name="ssh" product="OpenSSH" version="7.4"/></port></ports></host>'
+    )
+    HYDRA = "[22][ssh] host: 192.168.1.10   login: pi   password: raspberry\n"
+
+    class FakeRunner:
+        def __init__(self, progress=None):
+            pass
+
+        def run_tool(self, tool, argv, timeout=300):
+            if tool == "nmap":
+                return {
+                    "stdout": XML,
+                    "stderr": "",
+                    "rc": 0,
+                    "elapsed": 0.1,
+                    "timed_out": False,
+                    "status": "ok",
+                }
+            return {
+                "stdout": HYDRA,
+                "stderr": "",
+                "rc": 0,
+                "elapsed": 0.1,
+                "timed_out": False,
+                "status": "ok",
+            }
+
+    class FakeAttackSvc:
+        def __init__(self, msf_, progress=None):
+            pass
+
+        def run(self, req, known):
+            return [
+                {
+                    "host": req.host,
+                    "module": req.module,
+                    "result": "success",
+                    "detail": "session opened",
+                    "session_id": "31",
+                }
+            ]
+
+    import services.attack as attack_mod
+    import services.toolkit as toolkit_mod
+
+    monkeypatch.setattr(toolkit_mod, "ToolkitRunner", FakeRunner)
+    monkeypatch.setattr(attack_mod, "AttackService", FakeAttackSvc)
+
+    # discovery: 2 hosts, one out of scope
+    class FakeFinder:
+        def __init__(self, msf_, interface=None):
+            pass
+
+        @staticmethod
+        def neighbors_to_dicts(found):
+            return found
+
+        def discover(self, cidr):
+            from schemas import Neighbor
+
+            return [
+                Neighbor(ip="192.168.1.10", mac="01:02:03:04:05:09"),
+                Neighbor(ip="10.9.9.9", mac="01:02:03:04:05:0b"),
+            ]
+
+    import services.discovery as discovery_mod
+
+    monkeypatch.setattr(discovery_mod, "NeighborFinder", FakeFinder)
+
+    job: dict = {
+        "id": "ap",
+        "status": "running",
+        "stage": "discovery",
+        "progress": 0.0,
+        "message": "",
+        "hosts": {},
+        "log": [],
+        "aborted": False,
+    }
+    scope = ["192.168.1.0/24"]
+    _run_autopilot(job, msf, scope)
+    return job, _AUTOPILOT_STATE
+
+
+def test_autopilot_requires_scope(client, clean_db):
+    r = client.post("/api/autopilot/start")
+    assert r.status_code == 403
+    assert "engagement" in r.json()["detail"]
+
+
+def test_autopilot_status_idle(client, clean_db):
+    from routers.scan import _AUTOPILOT_STATE
+
+    _AUTOPILOT_STATE["job"] = None
+    r = client.get("/api/autopilot/status")
+    assert r.status_code == 200
+    assert r.json()["status"] == "idle"
+
+
+def test_autopilot_full_loop(clean_db, monkeypatch):
+    import app_state
+    from routers.scan import _AUTOPILOT_STATE
+
+    eng = _make_engagement()  # scope 192.168.1.0/24
+    app_state.active_engagement_id = eng["id"]
+
+    class _FakeMsf(FakeMsf):
+        pass
+
+    job, _ = _run_autopilot_faked(clean_db, monkeypatch, _FakeMsf())
+    _AUTOPILOT_STATE["job"] = None
+    assert job["status"] == "done"
+    hosts = job["hosts"]
+    assert set(hosts) == {"192.168.1.10"}  # out-of-scope 10.9.9.9 skipped
+    h = hosts["192.168.1.10"]
+    assert h["stage"] == "pwned"
+    assert h["session_id"] == "31"
+    # fingerprint + password stages ran
+    assert any("[passwords]" in line for line in job["log"])
+    assert any(
+        "[!!!] 192.168.1.10:22 login pi:raspberry" in line for line in job["log"]
+    )
+    assert any("[exploit]" in line for line in job["log"])
+    # persisted artifacts
+    assert "192.168.1.10" in clean_db._load_neighbor_hosts()
+    assert clean_db.passattack_creds()["count"] == 1
+    # scope enforced everywhere: out-of-scope host never recorded
+    assert "10.9.9.9" not in clean_db._load_neighbor_hosts()
+
+
+def test_autopilot_stop_flag_aborts_midway(clean_db, monkeypatch):
+    from routers.scan import (
+        _AUTOPILOT_STATE,
+        _ensure_session_row,
+        _run_autopilot,
+    )
+
+    _ensure_session_row()
+    job: dict = {
+        "id": "ap2",
+        "status": "running",
+        "stage": "discovery",
+        "progress": 0.0,
+        "message": "",
+        "hosts": {},
+        "log": [],
+        "aborted": True,
+    }
+    _run_autopilot(job, FakeMsf(), ["192.168.1.0/24"])
+    _AUTOPILOT_STATE["job"] = None
+    assert job["status"] == "aborted"
