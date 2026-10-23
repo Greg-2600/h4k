@@ -211,8 +211,11 @@ docker build -t h4k .
 # run it — --network host so the box can see your local lab hosts
 docker run --rm --network host -p 3137:3137 \
   -e API_PORT=3137 -e MSF_PASSWORD=h4k_msf_rocks \
-# -e H4K_AI_PROVIDER=openai_compatible -e H4K_AI_URL=https://<gateway>/v1/chat/completions \
-#   -e H4K_AI_KEY=<key> -e H4K_AI_MODEL=<free-model-id>\
+#   # AI triage, keyless via the opencode relay (start on the host first):
+#   #   OPENCODE_MODEL=opencode/beam-free python3 h4k/scripts/opencode_relay.py
+#   -e H4K_AI_PROVIDER=openai_compatible -e H4K_AI_KEYLESS=1 \
+#   -e H4K_AI_URL=http://127.0.0.1:3777/v1/chat/completions \
+#   -e H4K_AI_MODEL=opencode/beam-free \
 
   h4k
 

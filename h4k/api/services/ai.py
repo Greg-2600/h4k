@@ -117,10 +117,14 @@ def ai_analyze(input_text: str, model_override: str | None = None) -> dict[str, 
     model = model_override or _model()
 
     if provider == "openai" or provider == "openai_compatible":
-        if not os.environ.get("H4K_AI_KEY"):
+        # a key is only needed for real OpenAI-compatible clouds; local relays
+        # (e.g. the opencode relay) authorize by network position instead
+        if not os.environ.get("H4K_AI_KEY") and os.environ.get(
+            "H4K_AI_KEYLESS", ""
+        ).lower() not in ("1", "true", "yes"):
             return {
                 "ok": False,
-                "error": "no H4K_AI_KEY set",
+                "error": "no H4K_AI_KEY set (set H4K_AI_KEYLESS=1 for local relays)",
                 "provider": provider,
                 "raw": "",
             }
@@ -170,10 +174,10 @@ def _call_openai(input_text: str, model: str) -> dict[str, Any]:
         ],
         "temperature": 0.2,
     }
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {os.environ.get('H4K_AI_KEY')}",
-    }
+    headers = {"Content-Type": "application/json"}
+    key = os.environ.get("H4K_AI_KEY")
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
     try:
         req = urllib.request.Request(
             url, data=json.dumps(payload).encode(), headers=headers, method="POST"
