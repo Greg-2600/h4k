@@ -26,6 +26,23 @@ from routers import (
 )
 
 # ---------------------------------------------------------------------------
+# Logging: everything goes to stdout (container logs) with timestamps and the
+# emitting logger name. Without this the root logger stays at WARNING and every
+# logger.info across the services is silently swallowed. H4K_LOG_LEVEL tunes it.
+# ---------------------------------------------------------------------------
+LOG_LEVEL = os.environ.get("H4K_LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)-7s %(name)s:%(lineno)d - %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S%z",
+    stream=sys.stdout,
+    force=True,
+)
+for _noisy in ("urllib3", "httpx"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+log = logging.getLogger("h4k")
+
+# ---------------------------------------------------------------------------
 # Rate limiting middleware (in-memory, per-IP sliding window)
 # ---------------------------------------------------------------------------
 _RATE_LIMIT = int(os.environ.get("H4K_RATE_LIMIT", "100"))  # req/min per IP
@@ -100,8 +117,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from services.msfrpc import MsfClient
 
     app_state.msf_client = MsfClient(host, port, password)
+    log.info("msf client ready (lazy connect to %s:%s)", host, port)
     # Load the local CVE database.
     app_state.cve_db = CveDb()
+    log.info(
+        "CVE db loaded: %d entries from %s",
+        len(app_state.cve_db.cves),
+        app_state.cve_db.path,
+    )
     # Optional refresh if network is available (keeps bundled snapshot otherwise).
     if os.environ.get("H4K_REFRESH_CVE", "1") == "1":
         app_state.cve_db.refresh()

@@ -2,16 +2,18 @@
 FROM debian:12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
+# AI triage: any OpenAI-compatible gateway; the opencode relay is keyless
+# (H4K_AI_KEYLESS=1 + H4K_AI_URL=http://127.0.0.1:3777/... with relay up)
 ENV MSF_HOST=127.0.0.1 \
     MSF_PORT=55553 \
     MSF_PASSWORD=h4k_msf_rocks \
     TOR_PORT=9050 \
     API_PORT=3137 \
-    # Local LLM (root-cause/patch assist). Point OLLAMA_BASE_URL at a host
-    # Ollama, or a sidecar container later (e.g. http://ollama:11434).
-    H4K_AI_PROVIDER=ollama \
-    OLLAMA_BASE_URL=http://127.0.0.1:11434 \
-    H4K_AI_MODEL=qwen2.5:latest
+    PYTHONUNBUFFERED=1 \
+    H4K_LOG_LEVEL=INFO \
+    H4K_AI_PROVIDER=openai_compatible \
+    H4K_AI_KEYLESS=1 \
+    H4K_AI_MODEL=opencode/beam-free
 
 LABEL org.opencontainers.image.title="h4k" \
       org.opencontainers.image.description="Metasploit Framework automation tool (web UI -> API -> MSFRPC)" \

@@ -425,6 +425,12 @@ def set_session_scope(req: dict[str, Any]) -> dict[str, Any]:
         if not any(e["id"] == eng_id for e in engs):
             raise HTTPException(status_code=404, detail="engagement not found")
         app_state.active_engagement_id = eng_id
+        logger.warning(
+            "[scope] engaged: %s (%s) -> %s",
+            next(e["name"] for e in engs if e["id"] == eng_id),
+            eng_id,
+            ", ".join(store.scope_of(eng_id)),
+        )
         scope = store.scope_of(eng_id)
         name = next(e["name"] for e in engs if e["id"] == eng_id)
         return {
@@ -434,6 +440,7 @@ def set_session_scope(req: dict[str, Any]) -> dict[str, Any]:
             "scope": scope,
         }
     app_state.active_engagement_id = None
+    logger.warning("[scope] cleared - actions unrestricted")
     return {"status": "unscoped"}
 
 
@@ -849,8 +856,19 @@ def _run_scan(job: dict[str, Any], req: ScanRequest) -> None:
 
 
 def _update(job: dict[str, Any], **kwargs: Any) -> None:
+    old_status = job.get("status")
     job.update(kwargs)
     job["updated"] = datetime.now(UTC).isoformat()
+    new_status = job.get("status")
+    if "status" in kwargs and new_status != old_status:
+        logger.info(
+            "[job %s] %s: %s -> %s (%s)",
+            job.get("id"),
+            job.get("kind", "job"),
+            old_status,
+            new_status,
+            str(job.get("message") or "")[:120],
+        )
 
 
 @router.post("/scan", response_model=Job)
@@ -1203,6 +1221,7 @@ def neighbors_scan(background: BackgroundTasks) -> dict[str, Any]:
         "created": datetime.now(UTC).isoformat(),
     }
     _neighbor_jobs[job_id] = job
+    logger.info("[neighbors %s] discovery started", job_id)
     background.add_task(_run_neighbor_discovery, job, msf)
     return {"job_id": job_id, "status": "running"}
 
@@ -1238,6 +1257,7 @@ def _run_neighbor_discovery(job: dict[str, Any], msf: MsfClient) -> None:
         msg = f"found {len(data)} host(s)"
         if skipped_out_of_scope:
             msg += f" ({skipped_out_of_scope} skipped: outside engagement scope)"
+        logger.info("[neighbors %s] %s", job["id"], msg)
         _update(job, status="done", progress=100.0, message=msg)
         _neighbors_cache[default_cidr] = data
     except Exception as exc:
@@ -1327,6 +1347,7 @@ def neighbors_fingerprint(background: BackgroundTasks) -> dict[str, Any]:
         "created": datetime.now(UTC).isoformat(),
     }
     _fingerprint_jobs[job_id] = job
+    logger.info("[fingerprint %s] starting: %d host(s)", job_id, len(neighbor_hosts))
     background.add_task(_run_fingerprint, job, list(neighbor_hosts.values()))
     return {"job_id": job_id, "status": "running"}
 
@@ -1417,6 +1438,16 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
                 _save_neighbor_services(ip, services)
 
         _tick(f"fingerprint complete — {len(all_results)} host(s) with open ports", 100)
+        logger.info(
+            "[fingerprint %s] complete: %d host(s) open, %d scanned",
+            job["id"],
+            sum(
+                1
+                for r in all_results
+                if any(s.get("state") == "open" for s in r.get("services", []))
+            ),
+            len(all_results),
+        )
         _update(job, status="done", progress=100.0)
     except Exception as exc:
         logger.exception("fingerprint failed: %s", exc)
@@ -1614,6 +1645,7 @@ def _run_pass_attack(
     users: list[str] | None = None,
     passwords: list[str] | None = None,
 ) -> None:
+    logger.info("[passattack %s] %s:%s/%s launched", job["id"], host, port, service)
     import re as _re
     import time as _time
 
@@ -2159,6 +2191,12 @@ def _record_sessions(attacks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for a in attacks:
         sid = a.get("session_id")
         if a.get("result") == "success" and sid:
+            logger.warning(
+                "[attack] SESSION OPENED on %s via %s (msf session %s)",
+                a.get("host"),
+                a.get("module"),
+                sid,
+            )
             conn.execute(
                 "INSERT OR REPLACE INTO exploit_sessions (msf_session_id, host, port, module, opened_at) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -2895,6 +2933,12 @@ def autopilot_start(req: dict[str, Any] | None = None) -> dict[str, Any]:
         "created": datetime.now(UTC).isoformat(),
     }
     _AUTOPILOT_STATE["job"] = job
+    logger.warning(
+        "[autopilot %s] STARTED — scope: %s (deep_web=%s)",
+        job["id"],
+        ", ".join(scope_cidrs),
+        deep_web,
+    )
     import threading
 
     t = threading.Thread(
@@ -2925,6 +2969,7 @@ def autopilot_stop() -> dict[str, Any]:
 def _ap_log(job: dict[str, Any], msg: str) -> None:
     job["log"].append(msg)
     job["log"] = job["log"][-400:]
+    logger.info("[autopilot %s] %s", job.get("id", "?"), msg)
 
 
 def _ap_note_host(job: dict[str, Any], ip: str, **fields: Any) -> None:
