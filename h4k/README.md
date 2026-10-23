@@ -211,7 +211,9 @@ docker build -t h4k .
 # run it — --network host so the box can see your local lab hosts
 docker run --rm --network host -p 3137:3137 \
   -e API_PORT=3137 -e MSF_PASSWORD=h4k_msf_rocks \
-  -e H4K_AI_PROVIDER=ollama -e OLLAMA_BASE_URL=http://127.0.0.1:11434 -e H4K_AI_MODEL=qwen2.5:latest \
+# -e H4K_AI_PROVIDER=openai_compatible -e H4K_AI_URL=https://<gateway>/v1/chat/completions \
+#   -e H4K_AI_KEY=<key> -e H4K_AI_MODEL=<free-model-id>\
+
   h4k
 
 # open the terminal

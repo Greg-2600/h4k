@@ -61,8 +61,15 @@ class MsfClient:
         mod = client.modules.use(mtype, mname)
         for key, val in opts.items():
             mod[key] = val
-        res = mod.execute()
-        return _to_dict(res)
+        try:
+            res = mod.execute()
+            return _to_dict(res)
+        except Exception as exc:
+            # pymetasploit3 subscripts result['job_id'] and crashes when MSF
+            # returns a bare bool/None for a failed launch — surface that as
+            # an honest structured error instead of unwinding the caller.
+            logger.warning("module %s execute failed: %s", mname, exc)
+            return {"error": str(exc), "status": "failed"}
 
     def check(self, mtype: str, mname: str, opts: dict) -> dict:
         client = self.client

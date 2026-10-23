@@ -979,7 +979,7 @@ async function pollAutopilot() {
       tbody.innerHTML = Object.entries(hosts).map(([ip, h]) => `
         <tr>
           <td class="fp-ip">${escHtml(ip)}</td>
-          <td>${escHtml(String(h.stage || ''))}${h.session_id ? ' 💀' : ''}</td>
+          <td>${escHtml(String(h.stage || ''))}${h.session_id ? ' 💀' : ''}${h.session_id ? `<button class="btn btn-secondary btn-sm ap-console-btn" data-ssid="${escHtml(h.session_id)}" data-shost="${escHtml(ip)}" title="Open session console">🖥</button>` : ''}</td>
           <td>${escHtml((h.services || []).map(s => s.port + (s.service ? ' ' + s.service : '')).join(', '))}</td>
           <td>${(h.vulns || []).length ? '⚠ ' + escHtml(h.vulns.join(', ')) : ''}</td>
           <td>${escHtml(h.creds || '')}</td>
@@ -1573,6 +1573,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('#btn-cred-targets-refresh')) { loadCredTargets(); loadCveStatus(); }
     if (e.target.closest('#btn-ap-start')) startAutopilot();
     if (e.target.closest('#btn-ap-stop')) stopAutopilot();
+    const apCon = e.target.closest('.ap-console-btn');
+    if (apCon) {
+      setPhase('recon');
+      openSessionConsole(apCon.dataset.ssid, apCon.dataset.shost);
+    }
     // autopilot page visit refreshes the live view
     if (e.target.closest('.nav-btn[data-phase="autopilot"]')) { if (!apPollTimer) pollAutopilot(); }
     const rpt = e.target.closest('#btn-session-report');

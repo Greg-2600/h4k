@@ -10,9 +10,16 @@ services:
       MSF_PASSWORD: h4k_msf_rocks
       TOR_PORT: "9050"
       API_PORT: "3137"
-      H4K_AI_PROVIDER: ollama
-      OLLAMA_BASE_URL: http://127.0.0.1:3139
-      H4K_AI_MODEL: qwen2.5:latest
+      # AI triage: any OpenAI-compatible gateway. Example (opencode/free-model
+      # gateway of your choice):
+      #   H4K_AI_PROVIDER: openai_compatible
+      #   H4K_AI_URL: https://<gateway>/v1/chat/completions
+      #   H4K_AI_KEY: <key>
+      #   H4K_AI_MODEL: <model-id>
+      H4K_AI_PROVIDER: ${H4K_AI_PROVIDER:-}
+      H4K_AI_URL: ${H4K_AI_URL:-}
+      H4K_AI_KEY: ${H4K_AI_KEY:-}
+      H4K_AI_MODEL: ${H4K_AI_MODEL:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:3137/api/health"]
@@ -35,25 +42,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
-
-  ollama-sidecar:
-    image: ollama/ollama:latest
-    container_name: h4k_ollama
-    ports:
-      - "127.0.0.1:3139:11434"
-    volumes:
-      - ollama-data:/root/.ollama
-    environment:
-      OLLAMA_HOST: 0.0.0.0:11434
-    command: serve
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    profiles: ["llm"]
-
-volumes:
-  ollama-data:

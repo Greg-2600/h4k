@@ -401,7 +401,7 @@ def test_sessions_list_merges_recorded(clean_db, client):
             }
         ]
     )
-    assert opened == 1
+    assert len(opened) == 1
 
     tc = client
     r = tc.get("/api/sessions")
