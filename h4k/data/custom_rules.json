@@ -1,0 +1,24 @@
+[
+  {
+    "rule_id": "test-rule-1792783133",
+    "name": "Wave Rule",
+    "severity": "low",
+    "languages": [
+      "python"
+    ],
+    "pattern": "eval($X)",
+    "message": "no eval",
+    "cwe": "CWE-95"
+  },
+  {
+    "rule_id": "test-rule-1792783137",
+    "name": "Wave Rule",
+    "severity": "low",
+    "languages": [
+      "python"
+    ],
+    "pattern": "eval($X)",
+    "message": "no eval",
+    "cwe": "CWE-95"
+  }
+]

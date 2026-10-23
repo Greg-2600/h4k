@@ -347,7 +347,9 @@ class ScanPipeline:
         ws = self.msf.current_workspace() or "default"
         try:
             for rec in self.msf.hosts(ws):
-                addr = rec.get("address")
+                # MSF RPC rows inconsistently carry address vs host depending
+                # on version/import path — read both the way the graph does
+                addr = rec.get("address") or rec.get("host")
                 if addr is None:
                     continue
                 if not _target_matches(addr, target):

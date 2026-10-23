@@ -56,7 +56,7 @@ help:
 	@printf "\n"
 	@printf "$(BOLD)Testing$(RESET)\n"
 	@printf "  make test               run full pytest suite\n"
-	@printf "  make coverage           pytest + coverage report (70%% gate)\n"
+	@printf "  make coverage           pytest + coverage report (90%% gate)\n"
 	@printf "\n"
 	@printf "$(BOLD)Containers$(RESET)\n"
 	@printf "  make build              build h4k + vulnlab images\n"

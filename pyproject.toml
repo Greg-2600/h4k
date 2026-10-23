@@ -65,5 +65,5 @@ source = ["h4k/api"]
 omit = ["h4k/api/services/msfrpc.py"]
 
 [tool.coverage.report]
-fail_under = 77
+fail_under = 90
 show_missing = true

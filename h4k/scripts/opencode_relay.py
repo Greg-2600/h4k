@@ -59,7 +59,9 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(raw or b"{}")
             messages = payload.get("messages") or []
             if not messages:
-                messages = [{"role": "user", "content": str(payload.get("prompt") or "")}]
+                messages = [
+                    {"role": "user", "content": str(payload.get("prompt") or "")}
+                ]
             model = str(payload.get("model") or DEFAULT_MODEL)
             prompt = _flatten(messages)
 

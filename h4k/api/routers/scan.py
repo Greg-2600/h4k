@@ -198,6 +198,9 @@ def _save_neighbor_services(ip: str, services: list[dict[str, Any]]) -> None:
             ),
         )
     conn.commit()
+    for svc in services:
+        # mirror into the active engagement's asset graph (scope-checked there)
+        _eng_ingest_service(ip, svc)
 
 
 def _load_neighbor_services() -> dict[str, list[dict[str, Any]]]:
@@ -225,6 +228,9 @@ def _save_service_vulns(
 ) -> None:
     from datetime import UTC, datetime
 
+    for v in rows:
+        # mirror into the active engagement's asset graph (scope-checked there)
+        _eng_ingest_vuln(ip, v)
     conn = _neighbor_db()
     now = datetime.now(UTC).isoformat()
     for v in rows:
@@ -1101,7 +1107,9 @@ async def stream_job_events(job_id: str) -> StreamingResponse:
 
             yield f"event: progress\ndata: {json.dumps({'pct': progress})}\n\n"
 
-            if status in ("completed", "failed", "aborted", "error"):
+            # "done" is the terminal status the scan router writes; the other
+            # names are defensive for the historical spellings
+            if status in ("done", "completed", "failed", "aborted", "error"):
                 yield f"event: complete\ndata: {json.dumps({'status': status})}\n\n"
                 break
 
