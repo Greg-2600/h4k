@@ -325,7 +325,7 @@ make fmt        black + isort in place
 make fix        ruff --fix
 make lint       black · ruff · isort · flake8 · mypy · pylint · bandit
 make test       pytest (85 tests)
-make coverage   pytest --cov  (70% gate)
+make coverage   pytest --cov   (90% gate)
 ```
 
 Current status: **all green.**

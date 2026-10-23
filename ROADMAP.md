@@ -47,7 +47,7 @@ item is a self-contained, live-demonstrable increment on the current release.
       findings into a single exportable `.md`/`.json` (already partly wired).
   (done: "consolidated report" panel builds + downloads .md/.json from the
   session's captured scan/SAST/SCA/fuzz results)
-- [x] **AI hookup toggle in the UI** — surface Ollama reachability + model picker
+- [x] **AI hookup in the UI** — surface provider reachability + model picker
       + a "verify" button so the AI section is obviously live vs. fallback.
   (done: model picker + AI full-loop + reachability badge in the Fix stage)
 
@@ -139,9 +139,10 @@ item is a self-contained, live-demonstrable increment on the current release.
 
 ## Infra / shipping
 
-- [x] **Ollama sidecar in compose** — run Ollama in its own container on a
-      non-standard port; `OLLAMA_BASE_URL` already makes this a config change.
-  (done: compose `ollama-sidecar` service on `127.0.0.1:11435`, `--profile llm`)
+- [x] **LLM provider choice removed from containers** — the compose ollama
+      sidecar is gone; the AI provider is pure env-config (`H4K_AI_PROVIDER`,
+      `H4K_AI_URL/KEY/MODEL`), with a keyless host-side relay for opencode
+      free models at `h4k/scripts/opencode_relay.py`.
 - [x] **CI**: GitHub Actions running lint + tests on push (reproducible quality
       gate for the class).
   (done: `.github/workflows/ci.yml` runs `make lint` + `make coverage` on push/PR)
@@ -157,7 +158,7 @@ item is a self-contained, live-demonstrable increment on the current release.
   controller. It also clashes with the project's local-first, no-weaponization
   stance. The exploit-first AI loop (minimal trigger → patch → verify) already
   demonstrates the same "AI turns a finding into a confirmed attack" idea
-  locally via Ollama.
+  locally via the keyless opencode relay.
 
 ---
 
@@ -167,6 +168,6 @@ item is a self-contained, live-demonstrable increment on the current release.
    repro → patch candidate → re-fuzz clean.
 2. **Custom Semgrep rule** (Tier 2) matching a pattern you invent live.
 3. **SCA on the fixture repo** (Tier 2) → instant CVE hits from the lockfile.
-4. **AI root-cause + patch** via local Ollama (Tier 1/3), noting the ethics gate.
+4. **AI root-cause + patch** via the local opencode relay (Tier 1/3), noting the ethics gate.
 
 **h4k**, out.

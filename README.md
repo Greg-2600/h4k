@@ -187,7 +187,7 @@ HACKING/                git root
     Dockerfile · docker-compose.yml · entrypoint.sh
   vulnlab/              intentionally-vulnerable fuzzing target + harnesses
   demos/sca-demo/       SCA fixture (pins vulnerable lodash)
-  tests/                pytest suites (442 tests)
+  tests/                pytest suites (1101 tests)
 ```
 
 ## Development
@@ -200,8 +200,8 @@ pip install -r requirements-dev.txt
 
 make fmt     # black + isort
 make lint    # black ruff isort flake8 mypy pylint bandit
-make test    # pytest (442 tests)
-make coverage # pytest --cov (70% gate, currently 79.1%)
+make test    # pytest (1101 tests)
+make coverage # pytest --cov (90% gate)
 ```
 
 All linters pass and the suite is green. Tests run offline (a mocked Metasploit

@@ -9,7 +9,7 @@ repo. Read it before touching code.
 platform** for a school capstone. It drives **Metasploit** over its RPC interface
 and layers a modern analysis stack on top: coverage-guided fuzzing, static
 analysis (Semgrep + heuristics), supply-chain/SBOM checking, an opt-in attack
-toolkit, local-LLM (Ollama) root-cause/patching assistance, and responsible-
+toolkit, keyless local-LLM (opencode relay) root-cause/patching assistance, and responsible-
 disclosure scaffolding.
 
 > **Authorization is not optional.** Every aggressive action (cred testing,
@@ -31,7 +31,7 @@ HACKING/                 git root
   AGENTS.md              (this file — read me first)
   h4k/                   the main platform image
     Dockerfile           debian12 + postgres + tor + metasploit + offensive tools + semgrep/osv/trivy
-    docker-compose.yml   h4k + vulnlab + optional ollama-sidecar
+    docker-compose.yml   h4k + vulnlab (AI provider is env-configured, no sidecar)
     entrypoint.sh        boot: postgres -> msfdb -> tor -> msfrpcd -> uvicorn
     api/                 FastAPI app
       main.py            app + lifespan (starts periodic updater)
@@ -58,14 +58,18 @@ HACKING/                 git root
 # build the platform image
 cd h4k && docker build -t h4k .
 
-# run it (host networking so it can reach lab hosts + local ollama)
-docker run --rm --network host -p 3137:3137 \
+# run it (host networking so it can reach lab hosts + the opencode relay)
+docker run -d --name h4k --network host -p 3137:3137 \
+  -v h4k_data:/opt/h4k/data \
   -e API_PORT=3137 -e MSF_PASSWORD=h4k_msf_rocks \
-  -e H4K_AI_PROVIDER=ollama -e OLLAMA_BASE_URL=http://127.0.0.1:11434 -e H4K_AI_MODEL=qwen2.5:latest \
+  -e H4K_AI_PROVIDER=openai_compatible -e H4K_AI_KEYLESS=1 \
+  -e H4K_AI_URL=http://127.0.0.1:3777/v1/chat/completions \
+  -e H4K_AI_MODEL=opencode/beam-free \
   h4k
 # → web UI at http://localhost:3137
+# (start the relay first: OPENCODE_MODEL=opencode/beam-free python3 h4k/scripts/opencode_relay.py)
 
-# or via compose (h4k + vulnlab; add --profile llm for ollama sidecar)
+# or via compose (h4k + vulnlab)
 docker compose up --build
 
 # fuzzing lab target (separate)
@@ -88,8 +92,9 @@ make test                        # pytest
 make coverage                    # pytest --cov (70% gate)
 ```
 
-All linters must pass before commit. Tests currently **442 passing** at **79.1%**
-coverage (CI gate 70%), pylint ~9.88.
+All linters must pass before commit. Tests currently **1101 passing** at **90%**
+coverage (CI gate 90%), all linters (black/ruff/isort/flake8/mypy/pylint/bandit)
+green. Coverage gate is enforced in pyproject (fail_under = 90).
 
 ## The API surface (FastAPI, all under /api)
 

@@ -165,7 +165,11 @@ def test_exploit_candidates_substring_fallback(client):
 # ---------------- rule library CRUD via API ----------------
 
 
-def test_rules_save_list_delete(client):
+def test_rules_save_list_delete(client, monkeypatch, tmp_path):
+    """CRUD against an isolated rules file — never pollute the bundled one."""
+    import services.rules as rules_mod
+
+    monkeypatch.setattr(rules_mod, "RULES_FILE", tmp_path / "custom_rules.json")
     payload = {
         "rule_id": f"test-rule-{int(__import__('time').time())}",
         "name": "Wave Rule",
