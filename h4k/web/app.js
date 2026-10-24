@@ -30,6 +30,9 @@ const state = {
   credTargets: [],
   lastCredTargetsLoad: 0,
   activeSession: null,
+  propEngagementId: null,
+  propPairs: [],
+  propPlan: null,
 };
 
 // XP table: level -> XP required to reach it
@@ -924,26 +927,62 @@ async function loadPropagationPlan() {
     const engId = s.scope?.engagement_id;
     if (!engId) {
       body.innerHTML = 'No active engagement scope — set one in the header first.';
+      $('btn-propagate-run').hidden = true;
       return;
     }
     const plan = await api(`/api/engagement/${engId}/propagate/plan`);
     const pairs = (plan.pairs || []);
+    state.propEngagementId = engId;
+    state.propPairs = pairs;
+    $('btn-propagate-run').hidden = pairs.length === 0;
+    $('prop-results').hidden = true;
+    state.propPlan = plan;
+    const pairsRender = pairs.slice(0, 40).map(p => `
+        <div style="margin-left:14px;">→ <b>${escHtml(p.user || '')}:${escHtml(p.password || '')}</b>
+          ⇒ ${escHtml(p.host || '?')}:${escHtml(String(p.port ?? '?'))} (${escHtml(p.service || '?')})
+          via ${escHtml(p.module || 'login module')}</div>`).join('');
     body.innerHTML = `
       <div style="margin-bottom:10px;">
         <strong>${plan.credentials ?? 0}</strong> verified credential(s),
         <strong>${plan.targets ?? 0}</strong> candidate service target(s),
         <strong>${plan.attempts ?? 0}</strong> login pairs${plan.capped ? ` (capped at ${plan.max_attempts})` : ''}
       </div>
-      ${pairs.length ? pairs.map(p => `
-        <div style="margin-left:14px;">→ <b>${escHtml(p.user || '')}:${escHtml(p.password || '')}</b>
-          ⇒ ${escHtml(p.host || '?')}:${escHtml(String(p.port ?? '?'))} (${escHtml(p.service || '?')})
-          via ${escHtml(p.module || 'login module')}</div>`).join('')
-        : ''}
+      ${pairsRender}
+      ${pairs.length ? '<div style="color:var(--text-muted);margin-top:6px;">▶ Execute replays each pair once and records the attempt ledger.</div>' : ''}
     `;
   } catch (e) {
     body.textContent = 'Plan failed: ' + e.message;
   }
   card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function executePropagation() {
+  const engId = state.propEngagementId;
+  if (!engId) return;
+  const btn = $('btn-propagate-run');
+  const out = $('prop-results');
+  if (btn) { btn.disabled = true; }
+  if (out) { out.hidden = false; out.innerHTML = '<p class="t-line">replaying verified credentials... (this logs in for real)</p>'; }
+  try {
+    const res = await api(`/api/engagement/${engId}/propagate`, { method: 'POST', body: { open_sessions: false } });
+    if (out) {
+      const reached = res.reached || [];
+      const attempted = res.attempted || res.pairs || [];
+      let html = `<p class="t-line">done — <b>${reached.length}</b> successful login(s), <b>${attempted.length - reached.length}</b> failed:</p>`;
+      attempted.forEach(a => {
+        html += `<p class="t-line ${a.verified ? 'success' : ''}">${a.verified ? '[!!!] ' : '[-] '}${escHtml(a.user)} → ${escHtml(a.host)}:${escHtml(String(a.port))} (${escHtml(a.service)})</p>`;
+      });
+      out.innerHTML = html;
+    }
+    log(`Propagation run: ${(res.reached || []).length} of ${(res.attempted || []).length} pairs verified`, 'info');
+    refreshSessionBadge();
+    loadPropagationPlan();
+  } catch (e) {
+    if (out) out.innerHTML = `<p class="t-line error">propagation failed: ${escHtml(e.message)}</p>`;
+    log('Propagation failed: ' + e.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ---- autopilot ----
@@ -1092,7 +1131,27 @@ function renderCredTargets(targets) {
       <td>${escHtml(t.attack_service)}</td>
       <td>${t.creds_found ? '<span class="v-sev low">creds ✓</span>' : `<button class="btn btn-danger cred-target-btn" data-index="${i}" title="Open password attack">🔑</button>`}</td>
       <td>${t.attack_service === 'http-basic' ? `<button class="btn btn-secondary webprobe-btn" data-index="${i}" title="HTTP recon probe">🔍</button>` : ''}</td>
+      <td><button class="btn btn-secondary recheck-btn" data-index="${i}" data-ip="${escHtml(t.ip)}" title="Re-fingerprint this host">↻</button></td>
     </tr>`).join('');
+}
+
+async function recheckHost(ip) {
+  try {
+    const res = await api('/api/neighbors/fingerprint', { method: 'POST', body: { ip } });
+    if (res.job_id) {
+      log(`Re-fingerprinting ${ip}...`, 'info');
+      const poll = setInterval(async () => {
+        const j = await api(`/api/neighbors/fingerprint/status/${res.job_id}`);
+        if (j.status === 'done' || j.status === 'error') {
+          clearInterval(poll);
+          const open = (j.results || []).reduce((n, r) => n + (r.services || []).filter(s => s.state === 'open').length, 0);
+          log(`${ip} rechecked — ${open} open service(s) now`, 'info');
+          loadCredTargets();
+          loadGraph();
+        }
+      }, 3000);
+    }
+  } catch (e) { log(`Recheck ${ip} failed: ` + e.message, 'error'); }
 }
 
 async function launchWebProbe(idx) {
@@ -1453,7 +1512,7 @@ async function deepAttack() {
 // VIM NAVIGATION
 // ═══════════════════════════════════════════
 function vimNavigate(dir) {
-  const phases = ['recon', 'autopilot', 'graph'];
+  const phases = ['recon', 'autopilot', 'fuzz', 'graph'];
   const idx = phases.indexOf(state.currentPhase);
   if (dir === 'j' && idx < phases.length - 1) setPhase(phases[idx + 1]);
   if (dir === 'k' && idx > 0) setPhase(phases[idx - 1]);
@@ -1563,7 +1622,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Vim keys
     if (['j', 'k', 'h', 'l'].includes(e.key)) vimNavigate(e.key);
     // Number phases
-    if (e.key >= '1' && e.key <= '3') setPhase(['recon','autopilot','graph'][parseInt(e.key) - 1]);
+    if (e.key >= '1' && e.key <= '4') setPhase(['recon','autopilot','fuzz','graph'][parseInt(e.key) - 1]);
     // T = theme
     if (e.key === 't') toggleTheme();
     // ? = help
@@ -1593,6 +1652,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const probeBtn = e.target.closest('.webprobe-btn');
     if (probeBtn) launchWebProbe(parseInt(probeBtn.dataset.index, 10));
+    const recheckBtn = e.target.closest('.recheck-btn');
+    if (recheckBtn) recheckHost(recheckBtn.dataset.ip);
+    if (e.target.closest('#btn-fz-start')) startFuzzing();
+    if (e.target.closest('#btn-fz-stop')) {
+      if (fzJobId) api(`/api/fuzz/${fzJobId}/abort`).catch(() => {});
+      $('btn-fz-stop').hidden = true;
+    }
     const quickBtn = e.target.closest('[data-excmd]');
     if (quickBtn) runSessionCmd(quickBtn.dataset.excmd);
     if (e.target.closest('#btn-ex-cmd') || (e.target.id === 'ex-cmd' && e.key === 'Enter')) {
@@ -1612,10 +1678,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // autopilot page visit refreshes the live view
     if (e.target.closest('.nav-btn[data-phase="autopilot"]')) { if (!apPollTimer) pollAutopilot(); }
+    if (e.target.closest('.nav-btn[data-phase="fuzz"]')) { $('fz-live').textContent = 'Ready.'; }
     const rpt = e.target.closest('#btn-session-report');
     if (rpt) downloadSessionReport();
     const pp = e.target.closest('#btn-propagate-plan');
     if (pp) loadPropagationPlan();
+    if (e.target.closest('#btn-propagate-run')) executePropagation();
   });
 
   // Theme toggle
@@ -1729,10 +1797,31 @@ let graphSimulation = null;
 async function loadGraph() {
   try {
     const res = await api('/api/graph');
+    // merge the active engagement's graph (credential + pivot edges) in
+    try {
+      const s = await api('/api/session');
+      const engId = s.scope?.engagement_id;
+      if (engId) {
+        const eng = await api(`/api/engagement/${engId}/graph`);
+        const engNodeIds = new Set((eng.nodes || []).map(n => n.id));
+        (eng.nodes || []).forEach(n => {
+          if ((res.nodes || []).some(m => m.id === n.id)) return;
+          (res.nodes ||= []).push(n);
+        });
+        (eng.edges || []).forEach(e => {
+          (res.edges ||= []).push(e);
+          if (e.type === 'service') return;
+          // ensure credential endpoints exist as nodes even if not in eng.nodes
+          if (!engNodeIds.has(e.target) && !(res.nodes || []).some(m => m.id === e.target)) {
+            res.nodes.push({ id: e.target, label: e.target, type: 'cred', service_count: 0 });
+          }
+        });
+      }
+    } catch { /* engagement graph optional */ }
     state.graphData = res;
     renderGraph(res);
-    $('graph-host-count').textContent = (res.nodes || []).length + ' hosts';
-    $('graph-svc-count').textContent = (res.edges || []).length + ' services';
+    $('graph-host-count').textContent = (res.nodes || []).length + ' nodes';
+    $('graph-svc-count').textContent = (res.edges || []).length + ' edges';
   } catch (e) {
     log('Graph load failed: ' + e.message, 'error');
   }
@@ -1831,7 +1920,9 @@ function renderGraphFrame(svg, nodes, edges) {
   let html = `<g class="edges">`;
   edges.forEach(e => {
     if (!e.source || !e.target) return;
-    const cls = `edge edge-service edge-${e.proto || 'tcp'}`;
+    const cls = e.type === 'pivot' ? 'edge edge-pivot'
+      : e.type === 'credential' ? 'edge edge-cred'
+      : `edge edge-service edge-${e.proto || 'tcp'}`;
     html += `<line class="${cls}" x1="${e.source.x}" y1="${e.source.y}" x2="${e.target.x}" y2="${e.target.y}"/>`;
   });
   html += `</g>`;
@@ -1841,11 +1932,20 @@ function renderGraphFrame(svg, nodes, edges) {
   const svcByHost = {};
   edges.forEach(e => {
     if (!e.source || !e.target) return;
+    if (e.type !== 'service') return;
     const hostId = e.source.id;
     if (!svcByHost[hostId]) svcByHost[hostId] = [];
     svcByHost[hostId].push(e);
   });
   nodes.forEach(n => {
+    if (n.type === 'cred') {
+      const cls = `node-cred${isSelected ? ' selected' : ''}`;
+      html += `<g class="${cls}" data-node-id="${n.id}" data-node-type="cred" data-node-data="${escAttr(JSON.stringify(n))}">`;
+      html += `<rect x="${n.x - 26}" y="${n.y - 10}" width="52" height="20" rx="6"/>`;
+      html += `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle">${n.label.length > 14 ? n.label.slice(0, 12) + '…' : n.label}</text>`;
+      html += `</g>`;
+      return;
+    }
     const isHost = n.type === 'host';
     const isSelected = selected && selected.id === n.id;
     const svcList = svcByHost[n.id] || [];
@@ -1882,7 +1982,7 @@ function renderGraphFrame(svg, nodes, edges) {
   svg.innerHTML = html;
 
   // Attach click events
-  svg.querySelectorAll('.node-host, .node-service').forEach(el => {
+  svg.querySelectorAll('.node-host, .node-service, .node-cred').forEach(el => {
     el.addEventListener('click', () => {
       const type = el.dataset.nodeType;
       const data = JSON.parse(el.dataset.nodeData);
@@ -1963,4 +2063,93 @@ function hideGraphTooltip() {
 
 function escAttr(s) {
   return s.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ---- fuzzing ----
+
+let fzPollTimer = null;
+let fzJobId = null;
+
+async function startFuzzing() {
+  const host = $('fz-host').value.trim() || '127.0.0.1';
+  const port = parseInt($('fz-port').value, 10) || 8080;
+  const iters = parseInt($('fz-iters').value, 10) || 2000;
+  const timeout = parseInt($('fz-timeout').value, 10) || 60;
+  const btn = $('btn-fz-start');
+  btn.disabled = true;
+  $('btn-fz-stop').hidden = false;
+  $('fz-output').hidden = false;
+  $('fz-output').innerHTML = '';
+  appendFz(`> fuzzing ${host}:${port} (${iters} iterations, ${timeout}s timeout)...`);
+  $('fz-live').textContent = 'starting...';
+  try {
+    const res = await api('/api/fuzz', {
+      method: 'POST',
+      body: { target: `${host}:${port}`, host, port, scheme: 'http',
+              service: 'http', iterations: iters, timeout }
+    });
+    if (res.job_id) {
+      fzJobId = res.job_id;
+      if (fzPollTimer) clearInterval(fzPollTimer);
+      fzPollTimer = setInterval(pollFuzz, 2500);
+    } else {
+      $('fz-live').textContent = 'failed to start: ' + JSON.stringify(res);
+      btn.disabled = false;
+      $('btn-fz-stop').hidden = true;
+    }
+  } catch (e) {
+    $('fz-live').textContent = 'error: ' + e.message;
+    btn.disabled = false;
+    $('btn-fz-stop').hidden = true;
+  }
+}
+
+async function pollFuzz() {
+  if (!fzJobId) return;
+  try {
+    const job = await api(`/api/fuzz/${fzJobId}`);
+    $('fz-live').textContent = job.message || job.status;
+    $('fz-progress').style.width = (job.progress || 0) + '%';
+    $('fz-pct').textContent = Math.round(job.progress || 0) + '%';
+    const cands = job.candidates || [];
+    if (cands.length) {
+      $('fz-summary').hidden = false;
+      $('fz-chip-cves').textContent = `${cands.length} distinct crash(es)`;
+      const st = job.stats || {};
+      $('fz-chip-exec').textContent = `${st.execs ?? '?'} execs`;
+      const out = $('fz-output');
+      out.innerHTML = `
+        <p class="t-line">distinct crash candidates (deduped):</p>
+        ${cands.map(c => `
+          <p class="t-line">  [crash] ${escHtml(c.crash || c.bug_class || '?')} — ${escHtml((c.input || '').slice(0, 60))} ${c.reproduce ? '→ ' + escHtml(c.reproduce) : ''}</p>`).join('')}
+        <p class="t-line">minimize with “↻ Minimize” after the run finishes</p>`;
+    }
+    if (['done', 'error'].includes(job.status)) {
+      clearInterval(fzPollTimer);
+      fzPollTimer = null;
+      $('btn-fz-start').disabled = false;
+      $('btn-fz-stop').hidden = true;
+      if (job.status === 'error') {
+        $('fz-live').textContent = 'error: ' + (job.error || '?');
+        playSound('error');
+      } else {
+        log(`Fuzz done — ${cands.length} crash candidate(s)`, cands.length ? 'warn' : 'success');
+        unlockAchievement('port_scanner');
+      }
+    }
+  } catch (e) {
+    clearInterval(fzPollTimer);
+    fzPollTimer = null;
+    $('btn-fz-start').disabled = false;
+    $('fz-live').textContent = 'poll error: ' + e.message;
+  }
+}
+
+function appendFz(text) {
+  const el = $('fz-output');
+  if (!el) return;
+  const p = document.createElement('p');
+  p.className = 't-line';
+  p.textContent = text;
+  el.appendChild(p);
 }

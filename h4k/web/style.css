@@ -525,6 +525,18 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 }
 #graph-svg .node-host.pwned circle { fill: var(--danger); stroke: var(--danger); }
 
+/* credential + pivot graph elements (engagement overlays) */
+#graph-svg .node-cred rect {
+  fill: var(--warning-light);
+  stroke: var(--warning);
+  stroke-width: 1.5;
+  cursor: pointer;
+}
+#graph-svg .node-cred text { fill: var(--text); font-family: var(--font-mono); font-size: 8px; text-anchor: middle; pointer-events: none; }
+#graph-svg .node-cred.selected rect { stroke: var(--danger); stroke-width: 2.5; }
+#graph-svg .edge-cred { stroke: var(--warning); stroke-dasharray: 5 4; }
+#graph-svg .edge-pivot { stroke: var(--danger); stroke-dasharray: 2 4; stroke-width: 2; }
+
 .graph-detail-row { display: flex; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .graph-detail-row:last-child { border-bottom: none; }
 .graph-detail-label { font-weight: 500; color: var(--text-muted); min-width: 80px; }

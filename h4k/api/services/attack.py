@@ -192,12 +192,35 @@ class AttackService:
         if "LPORT" in valid:
             opts["LPORT"] = 4444
 
+        # Inject the verified credential under whatever option spelling this
+        # module uses — without this a confirmed cred would still fail at the
+        # MSF level ("Please supply USERNAME..."), breaking the whole
+        # creds-found -> module-fires chain.
+        cred_user = cred.get("user") if cred else None
+        cred_pass = cred.get("password") if cred else None
+        if cred_user:
+            if "USERNAME" in valid:
+                opts["USERNAME"] = cred_user
+            if "HttpUsername" in valid:
+                opts["HttpUsername"] = cred_user
+            if "SMBUser" in valid:
+                opts["SMBUser"] = cred_user
+            if "user" in valid and "USERNAME" not in valid:
+                opts["user"] = cred_user
+        if cred_pass:
+            if "PASSWORD" in valid:
+                opts["PASSWORD"] = cred_pass
+            if "HttpPassword" in valid:
+                opts["HttpPassword"] = cred_pass
+            if "SMBPass" in valid:
+                opts["SMBPass"] = cred_pass
+            if "password" in valid and "PASSWORD" not in valid:
+                opts["password"] = cred_pass
+
         # Credential-implicit modules (ssh/tomcat/ftp-family) only run when a
         # verified cred exists — for heuristic/auto attacks. An operator-pinned
         # module from a triage card is an explicit choice and runs as asked
         # (e.g. vsftpd_234_backdoor needs no credential).
-        cred_user = cred.get("user") if cred else None
-        cred_pass = cred.get("password") if cred else None
         needs_cred = any(m in module for m in ("ssh", "tomcat", "vsftpd"))
         if needs_cred and not (cred_user and cred_pass) and not pinned:
             return {

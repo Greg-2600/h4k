@@ -36,7 +36,8 @@
       <nav class="nav">
         <button class="nav-btn active" data-phase="recon" data-shortcut="1">Recon</button>
         <button class="nav-btn" data-phase="autopilot" data-shortcut="2">Autopilot</button>
-        <button class="nav-btn" data-phase="graph" data-shortcut="3">Graph</button>
+        <button class="nav-btn" data-phase="fuzz" data-shortcut="3">Fuzz</button>
+        <button class="nav-btn" data-phase="graph" data-shortcut="4">Graph</button>
       </nav>
 
       <div class="header-right">
@@ -443,6 +444,55 @@
           </div>
         </div>
 
+        <!-- FUZZ PHASE -->
+        <div class="phase" id="phase-fuzz" data-phase="fuzz" hidden>
+          <div class="card">
+            <div class="card-header">
+              <h2>🧪 Fuzz a Target You Own</h2>
+              <span class="pa-status" id="fz-status">idle</span>
+            </div>
+            <div class="card-body">
+              <div class="pa-hint">
+                LAB-ONLY: black-box signal-guided fuzzing of a service YOU control
+                (vulnlab at 127.0.0.1:3138 demo target). Connection teardown /
+                server errors / hangs become crash candidates with reproduce commands.
+              </div>
+              <div class="input-row">
+                <div class="input-group grow">
+                  <label>Target host</label>
+                  <input type="text" id="fz-host" placeholder="127.0.0.1" value="127.0.0.1" />
+                </div>
+                <div class="input-group">
+                  <label>Port</label>
+                  <input type="text" id="fz-port" placeholder="8080" value="3138" />
+                </div>
+                <div class="input-group">
+                  <label>Iterations</label>
+                  <input type="text" id="fz-iters" placeholder="2000" value="2000" />
+                </div>
+                <div class="input-group">
+                  <label>Timeout (s)</label>
+                  <input type="text" id="fz-timeout" placeholder="60" value="60" />
+                </div>
+              </div>
+              <div class="ex-actions">
+                <button class="btn btn-primary" id="btn-fz-start">🧪 Start Fuzzing</button>
+                <button class="btn btn-secondary" id="btn-fz-stop" hidden>■ Stop</button>
+                <span class="ex-status" id="fz-live">Ready.</span>
+              </div>
+              <div class="neighbors-progress-wrap">
+                <div class="progress-bar"><div class="progress-fill" id="fz-progress"></div></div>
+                <span class="fp-pct" id="fz-pct">0%</span>
+              </div>
+              <div class="fp-summary" id="fz-summary" hidden>
+                <span class="fp-chip" id="fz-chip-cves">0 distinct crashes</span>
+                <span class="fp-chip" id="fz-chip-exec">0 execs</span>
+              </div>
+              <div class="ex-output" id="fz-output" hidden></div>
+            </div>
+          </div>
+        </div>
+
         <!-- GRAPH PHASE -->
         <div class="phase" id="phase-graph" data-phase="graph" hidden>
           <div class="card">
@@ -478,11 +528,15 @@
 
           <div class="card" id="propagation-card" hidden>
             <div class="card-header">
-              <h2>🧬 Credential Propagation Plan</h2>
-              <span class="fp-chip" id="prop-legend">dry run — nothing is logged in</span>
+              <h2>🧬 Credential Propagation</h2>
+              <div class="vuln-header-right">
+                <span class="fp-chip" id="prop-legend">dry run — nothing is logged in</span>
+                <button class="btn btn-danger" id="btn-propagate-run" hidden title="Replay verified creds across in-scope services">▶ Execute</button>
+              </div>
             </div>
             <div class="card-body">
               <div id="prop-body" style="font-size: 12px;"></div>
+              <div class="ex-output" id="prop-results" hidden></div>
             </div>
           </div>
         </div>
