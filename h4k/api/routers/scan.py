@@ -465,9 +465,7 @@ def set_session_scope(req: dict[str, Any]) -> dict[str, Any]:
     # clear the persisted choice too, or a restart would silently re-arm it
     with suppress(Exception):
         conn = _neighbor_db()
-        conn.execute(
-            "DELETE FROM session_meta WHERE key = 'active_engagement_id'"
-        )
+        conn.execute("DELETE FROM session_meta WHERE key = 'active_engagement_id'")
         conn.commit()
         conn.close()
     logger.warning("[scope] cleared - actions unrestricted")
