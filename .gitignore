@@ -26,3 +26,12 @@ vulnlab/crash-*
 vulnlab/findings/
 vulnlab/corpus/
 h4k/data/engagements.db
+
+# runtime stores (any location — container volume or host checkout)
+*.db
+h4k/api/data/
+h4k/data/*.run
+
+# editor / OS noise
+*.swp
+.DS_Store

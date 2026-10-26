@@ -8,7 +8,7 @@ Recon your own lab, fuzz the software you run, and ship a responsible-disclosure
 report — all from one container.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![tests: 147](https://img.shields.io/badge/tests-147_passing-brightgreen)
+![tests: 1101](https://img.shields.io/badge/tests-1101_passing-90%25_coverage-brightgreen)
 ![lint: green](https://img.shields.io/badge/lint-black%20%7C%20ruff%20%7C%20mypy%20%7C%20bandit-brightgreen)
 
 </div>
@@ -36,7 +36,7 @@ Metasploitable box. Every aggressive action is **off by default and opt-in**.
 | **Supply-chain (SCA)** | SBOM (CycloneDX) + osv-scanner → known CVEs + secrets/license scan |
 | **Fuzzing** | signal-guided HTTP mutation fuzzer with **crash dedup** (distinct bugs, not raw crash counts) *and* a bundled coverage-guided lab (libFuzzer/AFL++ + ASan) |
 | **Triage & exploits** | crash → bug-class/CWE → minimized repro → PoC/disclosure skeleton |
-| **AI assistance** | local **Ollama** (qwen2.5) → root-cause + patch-candidate |
+| **AI assistance** | keyless local **opencode relay** (free models) or any OpenAI-compatible server → root-cause + patch-candidate |
 
 ---
 
@@ -48,11 +48,20 @@ Metasploitable box. Every aggressive action is **off by default and opt-in**.
 cd h4k
 docker build -t h4k .
 
-docker run --rm --network host -p 3137:3137 \
+# AI triage (optional, keyless): start the opencode relay on the host first —
+#   OPENCODE_MODEL=opencode/beam-free python3 h4k/scripts/opencode_relay.py
+
+docker run -d --name h4k --network host -p 3137:3137 \
+  -v h4k_data:/opt/h4k/data \
   -e API_PORT=3137 -e MSF_PASSWORD=h4k_msf_rocks \
-  -e H4K_AI_PROVIDER=ollama -e OLLAMA_BASE_URL=http://127.0.0.1:11434 -e H4K_AI_MODEL=qwen2.5:latest \
+  -e H4K_AI_PROVIDER=openai_compatible -e H4K_AI_KEYLESS=1 \
+  -e H4K_AI_URL=http://127.0.0.1:3777/v1/chat/completions \
+  -e H4K_AI_MODEL=opencode/beam-free \
   h4k
 ```
+
+> The h4k_data volume keeps your session (discovered hosts, services, findings,
+> credentials) across container rebuilds. Scope choice persists too.
 
 > **Note:** `docker build` alone does **not** leave the container running.
 > You must `docker run` (or `docker compose up`) to start the service.
@@ -67,27 +76,40 @@ docker build -t vulnlab .
 docker run --rm --name vulnlab -p 127.0.0.1:8080:8080 vulnlab
 ```
 
-Or start everything together:
+Or start everything together (platform + vulnlab):
 
 ```sh
-docker compose up --build            # platform + vulnlab
-docker compose --profile llm up      # + Ollama sidecar on 127.0.0.1:11435
+docker compose up --build
 ```
 
 ---
 
 ## First steps (for someone brand new)
 
-1. **Open the web UI** — `http://localhost:3137`.
-2. **Scan a lab target** — enter an IP/host you own (e.g. a Pi or VM), pick
-   **Overt**, hit **run scan**. Watch the console stream and the report build.
-3. **Find neighbors** — hit **find neighbors (arp)** to map your local segment.
-4. **Analyze source** — click **SAST source analysis**, paste a git URL or
-   upload a `.zip`, and see findings (Semgrep + heuristics).
-5. **Check supply chain** — paste a git URL with a committed lockfile (see
-   `demos/sca-demo/`) into **SBOM / SCA** to see instant known-CVE hits.
-6. **See the AI path** — hit **AI root-cause + patch** (needs local Ollama, or set
-   `H4K_AI_KEY` for an OpenAI-compatible endpoint).
+The UI is a 3-pane **Asset console** (network inventory · actions · activity).
+The overview card at the top always shows the next step.
+
+1. **Set the scope** — pick your engagement in the header 🔒 selector
+   (authorizes the aggressive actions; persists across restarts).
+2. **Discover** — **Assets** page → `＋ Discover` → **🌐 Discover my network**.
+   Discovery and service fingerprinting chain automatically; the inventory,
+   Service Map, and Network Graph fill themselves.
+3. **Judge it** — the **⚠ Likely Vulnerable** tab flags known CVEs (severity
+   badges); **🔑 Default-Cred Targets** lists services worth a password attack.
+4. **Act deliberately** — click a host/vuln: ⚔ fires a named Metasploit module,
+   🔑 runs a hydra password attack, 🔍 probes an HTTP surface. Every action is
+   logged verbatim in the Activity pane and in `docker logs`.
+5. **Pwned?** — sessions are captured automatically (💀 on the graph, quick
+   actions + free-form shell console attached to the finding).
+6. **Report** — **Report** page → `⇩ Session Report` downloads the markdown
+   writeup: scope, hosts, findings, verified creds, sessions, and every
+   attempted action.
+
+Prefer one button? **Walk** page = 🤖 Autopilot: the whole walk (discover →
+fingerprint → CVEs → password attacks → exploits) with a live named-action
+log. Requires the scope. **Fuzz** page points at your own lab target (vulnlab
+container included) for the crash → minimize → triage loop.
+
 7. **Fuzz a lab target you own** — start the `vulnlab` container and point the
    **lab fuzz** at `127.0.0.1:8080`.
 
@@ -103,7 +125,7 @@ docker compose --profile llm up      # + Ollama sidecar on 127.0.0.1:11435
 1. Fuzz a service you own        → anomaly/teardown detected
 2. Minimize the repro            → smallest triggering input
 3. Triage (bug-class + CWE)      → e.g. stack-buffer-overflow / CWE-120
-4. AI root-cause + patch         → local Ollama suggests a fix direction
+4. AI root-cause + patch         → keyless opencode relay / any OpenAI-compatible gateway
 5. Generate PoC skeleton        → for responsible disclosure (never a weapon)
 6. Re-fuzz to verify             → confirm the fix removed the crash
 ```
@@ -117,8 +139,8 @@ the project.
 
 ```mermaid
 flowchart TB
-    subgraph browser["Browser (terminal UI)"]
-        UI["web/ · index.html + app.js + style.css<br/>zsh-style console · 3-stage pipeline (recon → source/supply → fix)"]
+    subgraph browser["Browser"]
+        UI["web/ · index.html + app.js + style.css<br/>3-pane asset console (inventory · actions · activity)<br/>+ Walk / Fuzz / Report pages"]
     end
 
     subgraph api["FastAPI (api/)"]
@@ -135,8 +157,8 @@ flowchart TB
         TOOLS["nmap · hydra · nikto · sqlmap · semgrep<br/>trivy · osv-scanner · gobuster · masscan"]
     end
 
-    subgraph llm["Local LLM (optional)"]
-        OLLAMA["Ollama · qwen2.5"]
+    subgraph llm["AI triage (optional, keyless)"]
+        OLLAMA["opencode relay (host) · or any OpenAI-compatible gateway"]
     end
 
     subgraph lab["Fuzzing target (separate)"]

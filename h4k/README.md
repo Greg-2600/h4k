@@ -48,7 +48,8 @@ authorized lab target:
 
 It also analyzes the **software you actually run**: upload/clone source and get
 SAST (Semgrep + heuristics), SBOM/SCA (supply-chain CVEs), crash triage, PoC
-skeletons, and AI-assisted root-cause & patching (local Ollama) — on top of a
+skeletons, and AI-assisted root-cause & patching (keyless opencode relay, or any
+OpenAI-compatible gateway) — on top of a
 coverage-guided fuzzing lab.
 
 > Full inventory & design decisions: **`RELEASE_NOTES.md`· `ROADMAP.md`**.
