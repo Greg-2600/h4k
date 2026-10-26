@@ -1262,11 +1262,31 @@ async function onFingerprintDone(job) {
   }).catch(() => {});
 }
 
+async function resolveScanTarget() {
+  // stale UI state first, then derive from the session store (graph nodes)
+  if (state.discoveredTarget) return state.discoveredTarget;
+  try {
+    const g = await api('/api/graph');
+    const ips = (g.nodes || [])
+      .filter(n => n.type === 'host' && /^\d+\.\d+\.\d+\.\d+$/.test(n.id))
+      .map(n => n.id);
+    if (ips.length) {
+      const cidrs = [...new Set(ips.map(ip => ip.split('.').slice(0, 3).join('.') + '.0/24'))];
+      return cidrs.join(',');
+    }
+  } catch { /* fall through */ }
+  return null;
+}
+
 async function startFullScan() {
-  if (!state.discoveredTarget) {
-    log('No target — run neighbor discovery first', 'warn');
+  const target = await resolveScanTarget();
+  if (!target) {
+    log('No target yet — starting neighbor discovery for you...', 'info');
+    state.scanType = 'neighbors';
+    await startNeighborDiscovery();
     return;
   }
+  state.discoveredTarget = target;
   log('Starting full port scan...', 'info');
   logXp(5, '(recon started)');
 
@@ -1293,6 +1313,7 @@ async function startFullScan() {
       }
     });
 
+    log(`Scanning ${target}`, 'info');
     if (res.job_id) {
       scanJobId = res.job_id;
       log(`Job ${scanJobId} created`, 'info');
