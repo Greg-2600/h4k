@@ -1570,6 +1570,28 @@ function credPanelHtml(c) {
   <div class="pa-hint" style="margin-top:8px;">Switch to the <b>Report</b> page for the 🧬 propagation plan + execute across every in-scope service.</div>`;
 }
 
+
+function selectGraphNodeFromInventory(el) {
+  const kind = el.dataset.kind || 'host';
+  if (kind === 'service') {
+    selectGraphNode('service', {
+      id: el.dataset.id, port: parseInt(el.dataset.port, 10),
+      proto: el.dataset.proto, service: el.dataset.service,
+      state: el.dataset.state, source: el.dataset.ip,
+    });
+  } else if (kind === 'cred') {
+    selectGraphNode('cred', {
+      id: el.dataset.id, label: el.dataset.label,
+      service: el.dataset.service,
+    });
+  } else {
+    selectGraphNode('host', { id: el.dataset.id, label: el.dataset.id });
+  }
+  // highlight without a full re-render
+  document.querySelectorAll('.tile.chip-selected, .tile-chip.chip-selected').forEach(x => x.classList.remove('chip-selected'));
+  (el.closest('.tile') || el).classList.add('chip-selected');
+}
+
 // deep-attack button helper (used by panels)
 async function deepAttackHost(ip) {
   log(`Deep toolkit sweep ${ip}...`, 'warn');
@@ -1776,6 +1798,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('#btn-cred-targets-refresh')) { loadCredTargets(); loadCveStatus(); }
     if (e.target.closest('#btn-ap-start')) startAutopilot();
     if (e.target.closest('#btn-ap-stop')) stopAutopilot();
+    const invTile = e.target.closest('.tile, .tile-chip');
+    if (invTile) {
+      e.stopPropagation?.();
+      selectGraphNodeFromInventory(invTile);
+      return;
+    }
     const deepBtn = e.target.closest('.deep-btn');
     if (deepBtn) deepAttackHost(deepBtn.dataset.ip);
     if (e.target.closest('#btn-host-console')) hostOpenConsole(($('ph-ip') || {}).textContent || '');
@@ -1902,7 +1930,81 @@ async function checkMsfStatus() {
 // ═══════════════════════════════════════════
 // GRAPH
 // ═══════════════════════════════════════════
-let graphSimulation = null;
+
+
+function renderInventory(data) {
+  const grid = $('inventory-grid');
+  const empty = $('inventory-empty');
+  if (!grid) return;
+  const nodes = data.nodes || [];
+  const edges = data.edges || [];
+
+  empty.style.display = nodes.length ? 'none' : 'block';
+
+  // group service edges by host
+  const svcsByHost = {};
+  edges.forEach(e => {
+    if (e.type !== 'service') return;
+    (svcsByHost[e.source] ||= []).push(e);
+  });
+
+  const hosts = nodes
+    .filter(n => n.type === 'host')
+    .sort(_byIp);
+
+  const sel = state.selectedGraphNode;
+
+  grid.innerHTML = hosts.map(n => {
+    const svcs = svcsByHost[n.id] || [];
+    const chipCls = sel && sel.id === n.id ? 'tile chip-selected' : 'tile';
+    return `
+    <div class="tile ${sel && sel.id === n.id ? 'chip-selected' : ''}" data-kind="host" data-id="${escAttr(n.id)}">
+      <div class="tile-head">
+        <span class="tile-ip">${escHtml(n.id)}</span>
+        ${n.has_session ? '<span title="session open">💀</span>' : ''}
+        ${n.vuln_count ? `<span class="tile-vuln">⚠ ${n.vuln_count}</span>` : ''}
+        ${n.out_of_scope ? '<span class="tile-oos" title="outside engagement scope">⊘</span>' : ''}
+      </div>
+      <div class="tile-meta">${escHtml(n.vendor || n.hostname || '')}<span class="tile-os"> ${escHtml(n.os || '')}</span></div>
+      <div class="tile-chips">
+        ${svcs.map(e => `
+          <span class="tile-chip chip-svc ${e.state === 'open' ? 'chip-open' : 'chip-closed'}" data-kind="service" data-id="${escAttr(e.target)}"
+             data-ip="${escAttr(e.source)}" data-port="${escAttr(String(e.port))}" data-proto="${escAttr(e.proto || 'tcp')}"
+             data-service="${escAttr(e.service || '')}" data-product="${escAttr(e.product || '')}"
+             data-version="${escAttr(e.version || '')}" data-state="${escAttr(e.state || '')}" title="${escAttr((e.service || '?') + ' on port ' + e.port)}">
+            ${escHtml(String(e.port))}
+          </span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  // credentials strip (engagement overlay only)
+  const credNodes = nodes.filter(n => n.type === 'cred');
+  const credHtml = credNodes.map(cn => {
+    const acc = edges.filter(e => e.type === 'credential' && e.target === cn.id);
+    const pivot = edges.find(e => e.type === 'pivot' && e.target === cn.id);
+    const reaches = (pivot && pivot.reaches) || [];
+    return `
+      <div class="tile tile-cred ${sel && sel.id === cn.id ? 'chip-selected' : ''}" data-kind="cred" data-id="${escAttr(cn.id)}"
+           data-label="${escAttr(cn.label || cn.id)}" data-service="${escAttr((pivot && pivot.service) || (acc[0] && acc[0].service) || '')}"
+           data-hosts="${escAttr(acc.map(a => a.source).join(','))}" data-reaches="${escAttr(reaches.join(','))}">
+        🔑 ${escHtml(cn.label || cn.id)}
+        <span class="tile-cred-reach" title="verified at">${escHtml(acc.map(a => a.source).join(', '))}</span>
+        ${reaches.length ? `<span class="tile-cred-pivot" title="pivots to">${escHtml(reaches.join(', '))}</span>` : ''}
+      </div>`;
+  }).join('');
+  if (credHtml) grid.innerHTML += `<h3 class="inv-cred-head">Credentials</h3>${credHtml}`;
+}
+
+function _byIp(a, b) {
+  const qa = _q(a), qb = _q(b);
+  for (let i = 0; i < 4; i++) {
+    const d = (qa[i] || 0) - (qb[i] || 0);
+    if (d) return d;
+  }
+  return String(a.id).localeCompare(String(b.id));
+}
+function _q(x) { return String(x.id || '').split('.').map(Number); }
 
 async function loadGraph() {
   try {
@@ -1929,180 +2031,17 @@ async function loadGraph() {
       }
     } catch { /* engagement graph optional */ }
     state.graphData = res;
-    renderGraph(res);
-    $('graph-host-count').textContent = (res.nodes || []).length + ' nodes';
-    $('graph-svc-count').textContent = (res.edges || []).length + ' edges';
+    renderInventory(res);
   } catch (e) {
     log('Graph load failed: ' + e.message, 'error');
   }
 }
 
-function renderGraph(data) {
-  const svg = $('graph-svg');
-  const empty = $('graph-empty');
-  const nodes = data.nodes || [];
-  const edges = data.edges || [];
 
-  svg.innerHTML = '';
-  empty.hidden = nodes.length > 0;
-  if (nodes.length === 0) return;
 
-  const W = svg.clientWidth || 800;
-  const H = 600;
 
-  // Build node map
-  const nodeMap = {};
-  nodes.forEach((n, i) => {
-    nodeMap[n.id] = {
-      ...n,
-      x: W / 2 + (Math.random() - 0.5) * 400,
-      y: H / 2 + (Math.random() - 0.5) * 300,
-      vx: 0, vy: 0,
-    };
-  });
 
-  // Force-directed simulation (simple link + charge + center)
-  const nodes_list = Object.values(nodeMap);
-  const edges_list = edges.map(e => ({
-    ...e,
-    source: nodeMap[e.source],
-    target: nodeMap[e.target],
-  })).filter(e => e.source && e.target);
 
-  if (graphSimulation) graphSimulation.stop();
-
-  // Run simulation ticks
-  let tick = 0;
-  const run = () => {
-    for (let i = 0; i < 60; i++) tickSimulation(nodes_list, edges_list);
-    renderGraphFrame(svg, nodes_list, edges_list);
-    tick++;
-    if (tick < 200) graphSimulation = setTimeout(run, 10);
-    else renderGraphFrame(svg, nodes_list, edges_list);
-  };
-  graphSimulation = setTimeout(run, 10);
-}
-
-function tickSimulation(nodes, edges) {
-  const W = 800, H = 600;
-  const alpha = 0.3;
-  // Center gravity
-  nodes.forEach(n => {
-    n.vx += (W / 2 - n.x) * 0.01 * alpha;
-    n.vy += (H / 2 - n.y) * 0.01 * alpha;
-  });
-  // Charge (repulsion)
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      const dx = nodes[j].x - nodes[i].x;
-      const dy = nodes[j].y - nodes[i].y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const force = 2000 / (dist * dist);
-      const fx = dx / dist * force * alpha;
-      const fy = dy / dist * force * alpha;
-      nodes[i].vx -= fx; nodes[i].vy -= fy;
-      nodes[j].vx += fx; nodes[j].vy += fy;
-    }
-  }
-  // Link (spring)
-  edges.forEach(e => {
-    if (!e.source || !e.target) return;
-    const dx = e.target.x - e.source.x;
-    const dy = e.target.y - e.source.y;
-    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    const force = (dist - 80) * 0.05 * alpha;
-    const fx = dx / dist * force;
-    const fy = dy / dist * force;
-    e.source.vx += fx; e.source.vy += fy;
-    e.target.vx -= fx; e.target.vy -= fy;
-  });
-  // Apply velocity
-  nodes.forEach(n => {
-    n.x += n.vx; n.y += n.vy;
-    n.x = Math.max(30, Math.min(W - 30, n.x));
-    n.y = Math.max(30, Math.min(H - 30, n.y));
-    n.vx *= 0.8; n.vy *= 0.8;
-  });
-}
-
-function renderGraphFrame(svg, nodes, edges) {
-  const selected = state.selectedGraphNode;
-  let html = `<g class="edges">`;
-  edges.forEach(e => {
-    if (!e.source || !e.target) return;
-    const cls = e.type === 'pivot' ? 'edge edge-pivot'
-      : e.type === 'credential' ? 'edge edge-cred'
-      : `edge edge-service edge-${e.proto || 'tcp'}`;
-    html += `<line class="${cls}" x1="${e.source.x}" y1="${e.source.y}" x2="${e.target.x}" y2="${e.target.y}"/>`;
-  });
-  html += `</g>`;
-
-  html += `<g class="nodes">`;
-  // Service nodes
-  const svcByHost = {};
-  edges.forEach(e => {
-    if (!e.source || !e.target) return;
-    if (e.type !== 'service') return;
-    const hostId = e.source.id;
-    if (!svcByHost[hostId]) svcByHost[hostId] = [];
-    svcByHost[hostId].push(e);
-  });
-  nodes.forEach(n => {
-    if (n.type === 'cred') {
-      const cls = `node-cred${isSelected ? ' selected' : ''}`;
-      html += `<g class="${cls}" data-node-id="${n.id}" data-node-type="cred" data-node-data="${escAttr(JSON.stringify(n))}">`;
-      html += `<rect x="${n.x - 26}" y="${n.y - 10}" width="52" height="20" rx="6"/>`;
-      html += `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle">${n.label.length > 14 ? n.label.slice(0, 12) + '…' : n.label}</text>`;
-      html += `</g>`;
-      return;
-    }
-    const isHost = n.type === 'host';
-    const isSelected = selected && selected.id === n.id;
-    const svcList = svcByHost[n.id] || [];
-    // Service nodes cluster near host
-    svcList.forEach((e, i) => {
-      const angle = (i / svcList.length) * 2 * Math.PI;
-      const r = 40 + svcList.length * 6;
-      const sx = n.x + Math.cos(angle) * r;
-      const sy = n.y + Math.sin(angle) * r;
-      e.source.x = sx; e.source.y = sy;
-      e.source.label = e.service || e.port;
-      const scls = `node-service${isSelected ? ' selected' : ''}`;
-      html += `<g class="${scls}" data-node-id="${e.target.id}" data-node-type="service" data-node-data="${escAttr(JSON.stringify(e))}">`;
-      html += `<circle cx="${sx}" cy="${sy}" r="5"/>`;
-      html += `<text x="${sx + 8}" y="${sy + 4}">${e.port}/${e.proto || 'tcp'}</text>`;
-      html += `</g>`;
-    });
-    // Host node
-    const hcls = `node-host${isSelected ? ' selected' : ''}${n.vuln_count > 0 ? ' has-vulns' : ''}${n.has_session ? ' pwned' : ''}`;
-    html += `<g class="${hcls}" data-node-id="${n.id}" data-node-type="host" data-node-data="${escAttr(JSON.stringify(n))}">`;
-    if (n.vuln_count > 0) {
-      html += `<circle cx="${n.x}" cy="${n.y}" r="24" class="vuln-ring"/>`;
-      html += `<text x="${n.x}" y="${n.y - 22}" text-anchor="middle" class="vuln-badge">⚠${n.vuln_count}</text>`;
-    }
-    if (n.has_session) {
-      html += `<text x="${n.x}" y="${n.y - 26}" text-anchor="middle" class="pwned-badge">💀</text>`;
-    }
-    html += `<circle cx="${n.x}" cy="${n.y}" r="18"/>`;
-    const lbl = n.label || n.id || '?';
-    const shortLabel = lbl.length > 12 ? lbl.slice(0, 10) + '…' : lbl;
-    html += `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle">${shortLabel}</text>`;
-    html += `</g>`;
-  });
-  html += `</g>`;
-  svg.innerHTML = html;
-
-  // Attach click events
-  svg.querySelectorAll('.node-host, .node-service, .node-cred').forEach(el => {
-    el.addEventListener('click', () => {
-      const type = el.dataset.nodeType;
-      const data = JSON.parse(el.dataset.nodeData);
-      selectGraphNode(type, data);
-    });
-    el.addEventListener('mouseenter', (ev) => showGraphTooltip(ev, el));
-    el.addEventListener('mouseleave', hideGraphTooltip);
-  });
-}
 
 function selectGraphNode(type, data) {
   state.selectedGraphNode = data;
@@ -2154,33 +2093,9 @@ function servicesOfHost(ip) {
 
 
 
-function showGraphTooltip(ev, el) {
-  const type = el.dataset.nodeType;
-  const data = JSON.parse(el.dataset.nodeData);
-  const tip = $('graph-tooltip');
-  if (type === 'host') {
-    tip.innerHTML = `<div class="gt-host">${data.id}</div>
-      <div class="gt-row"><span class="gt-label">OS</span><span class="gt-value">${data.os || '—'}</span></div>
-      <div class="gt-row"><span class="gt-label">Vendor</span><span class="gt-value">${data.vendor || '—'}</span></div>
-      ${data.vuln_count ? `<div class="gt-row"><span class="gt-label">Vulns</span><span class="gt-value">⚠ ${data.vuln_count}</span></div>` : ''}
-      ${data.has_session ? `<div class="gt-row"><span class="gt-label">Status</span><span class="gt-value">💀 pwned</span></div>` : ''}`;
-  } else {
-    const edges = (state.graphData?.edges || []).filter(e => e.target === data.id);
-    const host = edges[0]?.source || '?';
-    tip.innerHTML = `<div class="gt-host">${data.service || data.port}</div>
-      <div class="gt-row"><span class="gt-label">Host</span><span class="gt-value">${host}</span></div>
-      <div class="gt-row"><span class="gt-label">Port</span><span class="gt-value">${data.port}/${data.proto}</span></div>
-      <div class="gt-row"><span class="gt-label">State</span><span class="gt-value">${data.state || '—'}</span></div>`;
-  }
-  const rect = el.getBoundingClientRect();
-  tip.style.left = (rect.right + 10) + 'px';
-  tip.style.top = rect.top + 'px';
-  tip.hidden = false;
-}
 
-function hideGraphTooltip() {
-  $('graph-tooltip').hidden = true;
-}
+
+
 
 function escAttr(s) {
   return s.replace(/"/g, '&quot;').replace(/'/g, '&#39;');

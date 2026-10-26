@@ -470,17 +470,7 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
   font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);
 }
 
-.graph-tooltip {
-  position: absolute; pointer-events: none;
-  padding: 10px 14px; background: var(--bg-raised);
-  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-lg); font-size: 12px; z-index: 100;
-  max-width: 260px;
-}
-.graph-tooltip .gt-host { font-family: var(--font-mono); font-weight: 700; color: var(--accent); font-size: 14px; }
-.graph-tooltip .gt-row { display: flex; gap: 8px; margin-top: 4px; }
-.graph-tooltip .gt-label { color: var(--text-muted); min-width: 50px; }
-.graph-tooltip .gt-value { color: var(--text); }
+
 
 .graph-empty {
   position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -488,54 +478,6 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
   font-size: 14px; gap: 8px;
 }
 .graph-empty[hidden] { display: none; }
-
-/* SVG graph styles */
-#graph-svg { display: block; background: var(--bg); }
-#graph-svg .edge { stroke: var(--border-strong); stroke-width: 1.5; fill: none; }
-#graph-svg .edge-tcp { stroke: var(--success); }
-#graph-svg .edge-udp { stroke: var(--warning); }
-#graph-svg .edge-service { stroke-dasharray: none; }
-#graph-svg .node-host circle { fill: var(--accent); stroke: var(--accent-hover); stroke-width: 2; cursor: pointer; }
-#graph-svg .node-host text { fill: white; font-family: var(--font-mono); font-size: 10px; pointer-events: none; }
-#graph-svg .node-service circle { fill: var(--success); stroke: var(--success); stroke-width: 1; cursor: pointer; }
-#graph-svg .node-service text { fill: var(--text-secondary); font-family: var(--font-mono); font-size: 8px; pointer-events: none; }
-#graph-svg .node-host.selected circle { fill: var(--danger); stroke: var(--danger); stroke-width: 3; }
-#graph-svg .node-service.selected circle { fill: var(--warning); stroke: var(--warning); stroke-width: 2; }
-
-/* vuln-flagged + pwned host styling */
-#graph-svg .vuln-ring {
-  fill: none;
-  stroke: var(--danger);
-  stroke-width: 2;
-  stroke-dasharray: 4 3;
-  animation: vulnSpin 8s linear infinite;
-  transform-origin: center;
-}
-@keyframes vulnSpin { to { transform: rotate(360deg); } }
-#graph-svg .vuln-badge {
-  fill: var(--danger);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  pointer-events: none;
-}
-#graph-svg .pwned-badge {
-  pointer-events: none;
-  font-size: 13px;
-}
-#graph-svg .node-host.pwned circle { fill: var(--danger); stroke: var(--danger); }
-
-/* credential + pivot graph elements (engagement overlays) */
-#graph-svg .node-cred rect {
-  fill: var(--warning-light);
-  stroke: var(--warning);
-  stroke-width: 1.5;
-  cursor: pointer;
-}
-#graph-svg .node-cred text { fill: var(--text); font-family: var(--font-mono); font-size: 8px; text-anchor: middle; pointer-events: none; }
-#graph-svg .node-cred.selected rect { stroke: var(--danger); stroke-width: 2.5; }
-#graph-svg .edge-cred { stroke: var(--warning); stroke-dasharray: 5 4; }
-#graph-svg .edge-pivot { stroke: var(--danger); stroke-dasharray: 2 4; stroke-width: 2; }
 
 .graph-detail-row { display: flex; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .graph-detail-row:last-child { border-bottom: none; }
@@ -921,3 +863,38 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
   .console { grid-template-columns: 1fr; height: auto; }
   .pane-left { height: 50vh; }
 }
+
+/* ═══════════════════════════════════════════
+   NETWORK INVENTORY GRID (left pane)
+═══════════════════════════════════════════ */
+#inventory-grid { display: flex; flex-direction: column; gap: 8px; }
+.tile {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.tile:hover { border-color: var(--accent); }
+.tile.chip-selected { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
+.tile-head { display: flex; align-items: center; gap: 8px; }
+.tile-ip { font-family: var(--font-mono); font-weight: 700; color: var(--accent); font-size: 12px; }
+.tile-vuln { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: white; background: var(--danger); border-radius: 10px; padding: 1px 7px; }
+.tile-oos { color: var(--text-muted); font-size: 11px; cursor: help; }
+.tile-meta { font-size: 11px; color: var(--text-secondary); margin: 3px 0 5px; }
+.tile-os { color: var(--text-muted); }
+.tile-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.tile-chip {
+  font-family: var(--font-mono); font-size: 10px;
+  padding: 1px 7px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--border);
+}
+.tile-chip.chip-open { border-color: var(--success); color: var(--success); }
+.tile-chip.chip-closed { color: var(--text-muted); }
+.tile-chip.chip-selected { background: var(--danger); color: white; border-color: var(--danger); }
+.tile-cred-head { margin: 12px 0 6px; }
+.inv-cred-head { font-size: 12px; color: var(--text-muted); margin: 10px 0 6px; }
+.tile-cred { display: flex; flex-direction: column; gap: 2px; }
+.tile-cred-reach { font-size: 10px; color: var(--success); font-family: var(--font-mono); }
+.tile-cred-pivot { font-size: 10px; color: var(--danger); font-family: var(--font-mono); }
