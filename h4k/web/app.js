@@ -348,9 +348,10 @@ async function pollNeighborDiscovery() {
 
 function updateNeighborProgress(job) {
   const pct = job.progress || 0;
-  $('neighbors-progress').style.width = pct + '%';
-  $('neighbors-status').textContent = job.message || job.status;
-  $('neighbors-progress-pct').textContent = Math.round(pct) + '%';
+  const fill = $('sp-fill');
+  const status = $('sp-status');
+  if (fill) fill.style.width = pct + '%';
+  if (status) status.textContent = job.message || job.status;
 
   const hosts = job.hosts || [];
   const list = $('neighbors-list');
@@ -1911,7 +1912,7 @@ async function refreshSessionBadge() {
   if (!el) return;
   try {
     const s = await api('/api/session');
-    el.textContent = `${s.id} · ${s.hosts}h ${s.services}s ${s.vulns}v`;
+    el.textContent = `${s.session_id} · ${s.hosts}h ${s.services}s ${s.vulns}v`;
   } catch { el.textContent = 'session: unavailable'; }
 }
 
