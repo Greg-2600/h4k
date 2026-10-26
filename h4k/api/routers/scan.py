@@ -381,6 +381,19 @@ def _active_scope() -> tuple[str | None, Any | None]:
         return None, None
     eng_id = getattr(app_state, "active_engagement_id", None)
     if not eng_id:
+        # persisted choice from a previous run (survives container restarts)
+        with suppress(Exception):
+            conn = _neighbor_db()
+            saved = dict(
+                conn.execute(
+                    "SELECT key, value FROM session_meta WHERE key = 'active_engagement_id'"
+                ).fetchall()
+            ).get("active_engagement_id")
+            conn.close()
+            if saved:
+                eng_id = str(saved)
+                app_state.active_engagement_id = eng_id
+    if not eng_id:
         return None, None
     try:
         from services.engagement import EngagementStore
@@ -425,6 +438,15 @@ def set_session_scope(req: dict[str, Any]) -> dict[str, Any]:
         if not any(e["id"] == eng_id for e in engs):
             raise HTTPException(status_code=404, detail="engagement not found")
         app_state.active_engagement_id = eng_id
+        with suppress(Exception):
+            conn = _neighbor_db()
+            conn.execute(
+                "INSERT OR REPLACE INTO session_meta (key, value) "
+                "VALUES ('active_engagement_id', ?)",
+                (eng_id,),
+            )
+            conn.commit()
+            conn.close()
         logger.warning(
             "[scope] engaged: %s (%s) -> %s",
             next(e["name"] for e in engs if e["id"] == eng_id),
@@ -440,6 +462,14 @@ def set_session_scope(req: dict[str, Any]) -> dict[str, Any]:
             "scope": scope,
         }
     app_state.active_engagement_id = None
+    # clear the persisted choice too, or a restart would silently re-arm it
+    with suppress(Exception):
+        conn = _neighbor_db()
+        conn.execute(
+            "DELETE FROM session_meta WHERE key = 'active_engagement_id'"
+        )
+        conn.commit()
+        conn.close()
     logger.warning("[scope] cleared - actions unrestricted")
     return {"status": "unscoped"}
 
@@ -703,6 +733,14 @@ def reset_session(wipe_engagements: bool = False) -> dict[str, Any]:
         "('started_at', ?)",
         (new_id, datetime.now(UTC).isoformat()),
     )
+    # a new session starts unscoped: authorization is per-engagement
+    conn.execute("DELETE FROM session_meta WHERE key = 'active_engagement_id'")
+    try:
+        import app_state
+
+        app_state.active_engagement_id = None
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 

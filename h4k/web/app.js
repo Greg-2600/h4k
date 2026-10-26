@@ -442,6 +442,9 @@ function startFingerprintPolling() {
   if (state.panelMode !== 'default') restoreDefaultPanel();
   state.panelTab = 'map';
   bindPanelTabs();
+  // overlapping jobs create overlapping pollers; clear the old handle or one
+  // orphaned interval will burn onFingerprintDone forever
+  if (fingerprintPollInterval) clearInterval(fingerprintPollInterval);
   fingerprintPollInterval = setInterval(pollFingerprintProgress, 2000);
 }
 
@@ -1240,6 +1243,11 @@ function renderFingerprintTable(results) {
 }
 
 async function onFingerprintDone(job) {
+  // same class of fix: a job id must only complete once even if a stale
+  // poller still holds its handle
+  state.fingerprintDone = state.fingerprintDone || new Set();
+  if (state.fingerprintDone.has(job.id)) return;
+  state.fingerprintDone.add(job.id);
   const btn = $('btn-fingerprint');
   if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
 
