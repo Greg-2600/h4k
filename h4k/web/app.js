@@ -57,11 +57,18 @@ const LEVEL_NAMES = ['Script Kiddie', 'Hacker', 'Elite', 'Master', 'Wizard', 'Sa
 // ═══════════════════════════════════════════
 const $ = (id) => document.getElementById(id);
 
-const api = (url, opts = {}) => fetch(url, {
-  headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
-  ...opts,
-  body: opts.body ? JSON.stringify(opts.body) : undefined,
-}).then(r => r.json());
+const api = async (url, opts = {}) => {
+  const r = await fetch(url, {
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  // non-JSON error bodies (e.g. middleware 429s) read as {detail: '...'}
+  // instead of blowing up every poller with a JSON parse error
+  const text = await r.text();
+  try { return JSON.parse(text); }
+  catch { return { status: r.status, detail: `${r.status} ${r.statusText}` }; }
+};
 
 function log(msg, level = 'info') {
   const ts = new Date().toLocaleTimeString('en-US', { hour12: false });

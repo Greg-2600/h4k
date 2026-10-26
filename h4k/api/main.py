@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from collections.abc import AsyncIterator, Awaitable, Callable
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from routers import (
@@ -45,7 +45,10 @@ log = logging.getLogger("h4k")
 # ---------------------------------------------------------------------------
 # Rate limiting middleware (in-memory, per-IP sliding window)
 # ---------------------------------------------------------------------------
-_RATE_LIMIT = int(os.environ.get("H4K_RATE_LIMIT", "100"))  # req/min per IP
+# Single-operator lab console: the UI polls several endpoints concurrently
+# (discovery status, fingerprint progress, cred targets, session badge), so the
+# default budget must absorb a whole scanning burst — not just idle browsing.
+_RATE_LIMIT = int(os.environ.get("H4K_RATE_LIMIT", "600"))  # req/min per IP
 _WINDOW = 60.0  # seconds
 
 
@@ -91,9 +94,16 @@ async def _rate_limit_middleware(
     ip_key = hashlib.sha256(ip.encode()).hexdigest()[:16]
 
     if not _rate_store.is_allowed(ip_key):
-        raise HTTPException(
+        # raise HTTPException from raw-ASGI context is NOT rendered by FastAPI's
+        # exception handlers — clients would get a bare 500 — so return the
+        # 429 response directly
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
             status_code=429,
-            detail=f"Rate limit exceeded: {_RATE_LIMIT} req/min. Retry after 60s.",
+            content={
+                "detail": f"Rate limit exceeded: {_RATE_LIMIT} req/min. Retry after 60s."
+            },
             headers={"Retry-After": "60", "X-RateLimit-Limit": str(_RATE_LIMIT)},
         )
 
