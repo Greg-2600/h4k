@@ -898,3 +898,16 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 .tile-cred { display: flex; flex-direction: column; gap: 2px; }
 .tile-cred-reach { font-size: 10px; color: var(--success); font-family: var(--font-mono); }
 .tile-cred-pivot { font-size: 10px; color: var(--danger); font-family: var(--font-mono); }
+
+/* state-driven checklist (overview) */
+.ov-card {
+  background: linear-gradient(135deg, var(--accent-light), var(--bg-raised) 65%);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+[data-theme="dark"] .ov-card { background: linear-gradient(135deg, #1d2f4d, var(--bg-raised) 65%); }
+.ov-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.ov-now { font-size: 10px; color: var(--danger); font-weight: 700; background: var(--bg); padding: 1px 7px; border-radius: 10px; }
+.ov-hint { font-size: 11px; color: var(--text-secondary); margin: 4px 0 8px; }

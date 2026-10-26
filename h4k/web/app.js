@@ -33,6 +33,7 @@ const state = {
   propEngagementId: null,
   propPairs: [],
   propPlan: null,
+  overview: undefined,
 };
 
 // XP table: level -> XP required to reach it
@@ -81,6 +82,7 @@ function logXp(amount, reason = '') {
   saveDefaultPanel();
   state.currentPhase = 'assets';
   updateXpDisplay();
+  renderOverview();
   showXpPopup(`+${amount} XP${reason ? ' ' + reason : ''}`);
 }
 
@@ -387,6 +389,7 @@ async function onNeighborDiscoveryDone(job) {
     return;
   }
   log(`Found ${hosts.length} neighbor(s) on local network`, 'success');
+  renderOverview();
   unlockAchievement('first_host');
   logXp(10, '(neighbors found)');
   const cidrs = [];
@@ -462,6 +465,7 @@ function updateFingerprintProgress(job) {
 }
 
 async function loadCveStatus() {
+  if (typeof refreshOverview === 'function') refreshOverview();
   const el = $('cve-status');
   if (!el) return;
   try {
@@ -1255,6 +1259,7 @@ async function onFingerprintDone(job) {
   unlockAchievement('port_scanner');
   unlockAchievement('vuln_finder');
   loadCredTargets();
+  renderOverview();
   // authoritative refresh: persisted vulns (covers earlier runs)
   api('/api/neighbors/vulns').then(res => {
     const rows = (res.vulns || []).map(v => ({ services: [{ port: v.port, proto: v.proto, vulns: [v] }], ip: v.ip }));
@@ -1479,16 +1484,16 @@ function renderActionPanel(kind, data) {
   if (kind === 'default') { restoreDefaultPanel(); return; }
 
   if (kind === 'host') {
-    $('ap-title').textContent = '🖥 Host — ' + data.ip;
+    $('ap-title').innerHTML = `🖥 Host — ${escHtml(data.ip)} ${BACK_BTN}`;
     body.innerHTML = hostPanelHtml(data);
   } else if (kind === 'service') {
-    $('ap-title').textContent = `🧩 ${data.ip}:${data.port} (${data.service || '?'})`;
+    $('ap-title').innerHTML = `🧩 ${escHtml(data.ip)}:${escHtml(String(data.port))} (${escHtml(data.service || '?')}) ${BACK_BTN}`;
     body.innerHTML = servicePanelHtml(data);
   } else if (kind === 'vuln') {
-    $('ap-title').textContent = `⚠ ${data.vid} — ${data.ip}:${data.port}`;
+    $('ap-title').innerHTML = `⚠ ${escHtml(data.vid)} — ${escHtml(data.ip)}:${escHtml(String(data.port))} ${BACK_BTN}`;
     body.innerHTML = vulnPanelHtml(data);
   } else if (kind === 'cred') {
-    $('ap-title').textContent = '🔑 ' + (data.label || data.id);
+    $('ap-title').innerHTML = `🔑 ${escHtml(data.label || data.id)} ${BACK_BTN}`;
     body.innerHTML = credPanelHtml(data);
   }
   bindPanelTabs();
@@ -1819,6 +1824,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('#btn-cred-targets-refresh')) { loadCredTargets(); loadCveStatus(); }
     if (e.target.closest('#btn-ap-start')) startAutopilot();
     if (e.target.closest('#btn-ap-stop')) stopAutopilot();
+    const backBtn = e.target.closest('.back-to-assets');
+    if (backBtn) { restoreDefaultPanel(); return; }
+    if (e.target.closest('#ov-discover')) {
+      e.stopPropagation?.();
+      state.scanType = 'neighbors';
+      launchScan();
+      return;
+    }
+    if (e.target.closest('#ov-specific')) { restoreDefaultPanel(); $('ap-acquire').hidden = false; return; }
+    if (e.target.closest('#ov-fingerprint')) { startFingerprintScan(); return; }
+    if (e.target.closest('#ov-discover')) {
+      e.stopPropagation?.();
+      state.scanType = 'neighbors';
+      launchScan();
+      return;
+    }
+    if (e.target.closest('#overview-area') && e.target.closest('button')?.id === 'btn-fingerprint') return; // static handler covers
     const invTile = e.target.closest('.tile, .tile-chip');
     if (invTile) {
       e.stopPropagation?.();
@@ -1854,6 +1876,7 @@ document.addEventListener('DOMContentLoaded', () => {
   saveDefaultPanel();
   state.currentPhase = 'assets';
   updateXpDisplay();
+  renderOverview();
   log('h4k operations center ready', 'system');
   setPhase('assets');
 
@@ -1869,10 +1892,11 @@ document.addEventListener('DOMContentLoaded', () => {
       state.vulnRows = [];
       state.selectedVulnRow = null;
       state.graphData = null;
-      if (state.panelMode !== 'default') restoreDefaultPanel();
+      restoreDefaultPanel();
       $('sp-strip').hidden = true;
       state.panelTab = 'map';
       bindPanelTabs();
+      renderOverview();
       const tb = $('vuln-tbody'); if (tb) tb.innerHTML = '';
       const fpt = $('fp-tbody'); if (fpt) fpt.innerHTML = '';
       const nl = $('neighbors-list'); if (nl) nl.innerHTML = '';
@@ -1951,6 +1975,45 @@ async function checkMsfStatus() {
 // ═══════════════════════════════════════════
 // GRAPH
 // ═══════════════════════════════════════════
+
+
+const BACK_BTN = '<button class="btn btn-secondary btn-sm back-to-assets" title="Back to all assets">← All assets</button>';
+
+
+async function renderOverview() {
+  let c = { hosts: 0, services: 0, vulns: 0, creds: 0 };
+  try { c = { ...c, ...(await api('/api/session')) }; } catch { /* offline */ }
+  // re-query AFTER the await: init's synchronous restore may have replaced
+  // the ap-body subtree while we were in flight — a pre-await node is stale
+  const area = $('overview-area');
+  if (!area) return;
+
+  let html = '<div class="ov-card">';
+  if (!c.hosts) {
+    html += `
+      <div class="ov-title">1 · Discover what's on the network<span class="ov-now">← start here</span></div>
+      <div class="ov-hint">Sweeps the local subnet for live hosts and fingerprints their open services.</div>
+      <div class="ex-actions">
+        <button class="btn btn-primary" id="ov-discover">🌐 Discover my network</button>
+        <button class="btn btn-secondary btn-sm" id="ov-specific">Or enter a specific IP/CIDR…</button>
+      </div>`;
+  } else if (!c.services) {
+    html += `
+      <div class="ov-title">2 · Found ${c.hosts} host(s) — scan their services<span class="ov-now">← do this next</span></div>
+      <div class="ov-hint">Probes common ports on every discovered host and flags known vulnerabilities.</div>
+      <div class="ex-actions">
+        <button class="btn btn-primary" id="ov-fingerprint">🔍 Scan services now</button>
+      </div>`;
+  } else {
+    html += `
+      <div class="ov-title">3 · ${c.hosts} hosts · ${c.services} services · ${c.vulns} findings · ${c.creds} creds</div>
+      <div class="ov-hint">Pick a host on the left — <b>⚠</b> marks findings, <b>💀</b> marks owned. Tables below for the full detail.</div>`;
+  }
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+function refreshOverview() { renderOverview(); }
 
 
 function renderInventory(data) {

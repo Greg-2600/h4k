@@ -83,7 +83,10 @@
             </div>
           </div>
           <div class="pane-body" id="ap-body">
-            <!-- in-flight strip (any running job) -->
+            <!-- 1. state-driven "what next" checklist (always on top) -->
+            <div id="overview-area"></div>
+
+            <!-- 2. in-flight strip (any running job) -->
             <div id="sp-strip" class="sp-strip" hidden>
               <div class="neighbors-progress-wrap">
                 <div class="progress-bar"><div class="progress-fill" id="sp-fill"></div></div>
