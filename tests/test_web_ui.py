@@ -84,10 +84,12 @@ def test_the_nav_phases_are_present():
     view. Keep this pinned so nav and sections never drift apart.
     """
     html = _html()
-    for name in ("recon", "autopilot", "graph"):
+    for name in ("assets", "walk", "fuzz", "report"):
         assert f'data-phase="{name}"' in html, f"nav entry for {name} missing"
     nav = set(re.findall(r'class="nav-btn[^"]*"[^>]*data-phase="([^"]+)"', html))
-    secs = set(re.findall(r'class="phase"[^>]*data-phase="([^"]+)"', html))
+    secs = set(
+        re.findall(r'class="(?:phase|console)[^"]*"[^>]*data-phase="([^"]+)"', html)
+    )
     assert nav == secs, f"nav/phase mismatch: {nav ^ secs}"
 
 
@@ -95,15 +97,17 @@ def test_only_one_phase_starts_visible():
     """Only the recon phase should be visible at load; the others are hidden."""
     html = _html()
     open_phases = re.findall(
-        r'<div class="phase"[^>]*id="phase-(\w+)"(?![^>]*hidden)', html
+        r'<div class="(?:phase|console)[^"]*"[^>]*id="phase-(\w+)"(?![^>]*hidden)', html
     )
-    assert open_phases == ["recon"], f"expected only recon visible, got {open_phases}"
+    assert open_phases == ["assets"], f"expected only recon visible, got {open_phases}"
 
 
 def test_phase_order_matches_the_nav_order():
     """app.js's state.currentPhase must agree with the markup order: the nav
     order is the workflow order (recon -> analyze -> prepare -> execute -> pwned)."""
-    dom_order = re.findall(r'<div class="phase"[^>]*id="phase-(\w+)"', _html())
+    dom_order = re.findall(
+        r'<div class="(?:phase|console)[^"]*"[^>]*id="phase-(\w+)"', _html()
+    )
     nav_order = re.findall(r'class="nav-btn[^"]*"[^>]*data-phase="(\w+)"', _html())
     assert dom_order == nav_order, f"nav {nav_order} != markup {dom_order}"
 
@@ -119,21 +123,20 @@ def test_stat_tiles_keep_their_class_list():
 
 
 def test_findings_panels_exist():
-    """The recon flow's operational cards: vulns, exploit setup, password
-    attack, default-cred targets — plus the live-status elements they poll."""
-    html = _html()
+    """Static center tabs + panel-template ids (which live in app.js)."""
     for cid in (
         "vuln-tbody",
-        "vulns-panel",
-        "exploit-panel",
-        "ex-module",
-        "ex-rhost",
-        "passattack-panel",
-        "pa-service",
+        "pane-vulns",
         "cred-targets-tbody",
-        "cred-targets-panel",
+        "pane-creds",
+        "fp-tbody",
+        "pane-map",
+        "ap-acquire",
+        "sp-strip",
     ):
-        assert f'id="{cid}"' in html, f"{cid} missing"
+        assert f'id="{cid}"' in _html(), f"{cid} missing"
+    for cid in ("ex-module", "ex-rhost", "ex-console", "pa-host", "pa-service"):
+        assert cid in _js(), f"{cid} template missing"
 
 
 def test_msf_status_footer_present():

@@ -55,6 +55,7 @@ const LEVEL_NAMES = ['Script Kiddie', 'Hacker', 'Elite', 'Master', 'Wizard', 'Sa
 // UTILS
 // ═══════════════════════════════════════════
 const $ = (id) => document.getElementById(id);
+
 const api = (url, opts = {}) => fetch(url, {
   headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
   ...opts,
@@ -77,6 +78,8 @@ function logXp(amount, reason = '') {
   if (state.level > oldLevel) {
     showAchievement(`LEVEL UP! ${LEVEL_NAMES[state.level - 1] || 'Level ' + state.level}`, '⬆️', 0);
   }
+  saveDefaultPanel();
+  state.currentPhase = 'assets';
   updateXpDisplay();
   showXpPopup(`+${amount} XP${reason ? ' ' + reason : ''}`);
 }
@@ -159,34 +162,34 @@ function updateXpDisplay() {
 // ═══════════════════════════════════════════
 function setPhase(phase) {
   state.currentPhase = phase;
-  document.querySelectorAll('.phase').forEach(el => {
+  document.querySelectorAll('.phase, .console').forEach(el => {
     el.hidden = el.dataset.phase !== phase;
   });
   document.querySelectorAll('.nav-btn').forEach(el => {
     el.classList.toggle('active', el.dataset.phase === phase);
   });
   updateHint();
+  if (phase === 'assets') {
+    loadGraph();
+    loadCredTargets();
+    loadCveStatus();
+    refreshSessionBadge();
+    restoreDefaultPanel();
+  }
+  if (phase === 'report') renderReportPreview();
 }
 
 function updateHint() {
   const hints = {
-    recon: 'Enter target IP, configure options, and hit Launch Recon',
-    autopilot: 'Requires an active scope — Start walks the entire local network',
-    graph: 'Explore the discovered host graph — click nodes for details',
+    assets: 'Click a host/service/cred on the canvas — actions appear for that asset',
+    walk: 'Requires an active scope — Start walks the entire local network',
+    fuzz: 'Point at a service you own and start fuzzing',
+    report: '⇩ Report downloads the full writeup; 🧬 plans credential propagation',
   };
   $('footer-hint').textContent = hints[state.currentPhase] || '';
 }
 
-function updateMissionObjective(obj, done = true) {
-  const el = document.querySelector(`[data-obj="${obj}"]`);
-  if (!el) return;
-  el.classList.toggle('done', done);
-  el.classList.remove('active');
-  if (done) {
-    el.querySelector('.obj-check').textContent = '✓';
-    playSound('success');
-  }
-}
+
 
 // ═══════════════════════════════════════════
 // ACTIVITY LOG
@@ -275,10 +278,10 @@ async function launchScan() {
   btn.classList.add('loading');
   btn.disabled = true;
 
-  $('brief-target').textContent = target;
+
   document.querySelector('[data-obj="host"]').classList.add('active');
 
-  setPhase('recon');
+
   log(`Starting recon on ${target}...`, 'info');
   logXp(5, '(recon started)');
 
@@ -314,18 +317,16 @@ async function launchScan() {
 }
 
 function startScanPolling() {
-  $('scan-progress-card').hidden = false;
+  if (state.panelMode !== 'default') restoreDefaultPanel();
+  $('sp-strip').hidden = false;
   updateScanProgress({ stage: 'recon', pct: 0, status: 'Initializing...' });
   pollInterval = setInterval(pollScanProgress, 2000);
 }
 
 function startNeighborDiscovery() {
-  $('neighbors-panel') || buildNeighborsPanel();
-  $('neighbors-panel').hidden = false;
-  $('neighbors-status').textContent = 'Discovering local network...';
+  if (state.panelMode !== 'default') restoreDefaultPanel();
+  $('sp-strip').hidden = false;
   $('neighbors-list').innerHTML = '';
-  $('neighbors-progress').style.width = '0%';
-  $('neighbors-progress-wrap').hidden = false;
   $('btn-launch-recon').disabled = true;
   log('Local network discovery started', 'info');
   neighborPollInterval = setInterval(pollNeighborDiscovery, 1500);
@@ -372,76 +373,36 @@ function updateNeighborProgress(job) {
 }
 
 async function onNeighborDiscoveryDone(job) {
-  const hosts = job.hosts || [];
   clearInterval(neighborPollInterval);
-
-  $('neighbors-progress').style.width = '100%';
-  $('btn-launch-recon').disabled = false;
+  const hosts = job.hosts || [];
 
   if (job.status === 'error') {
     log('Neighbor discovery failed: ' + (job.error || 'unknown error'), 'error');
-    $('neighbors-status').textContent = 'Discovery failed';
+    $('sp-strip').hidden = true;
     return;
   }
-
   if (hosts.length === 0) {
     log('No neighbors found. Is arp-scan available?', 'warn');
-    $('neighbors-status').textContent = 'No hosts found';
+    $('sp-strip').hidden = true;
     return;
   }
-
   log(`Found ${hosts.length} neighbor(s) on local network`, 'success');
-  $('neighbors-status').textContent = `${hosts.length} host(s) found — ready to scan`;
-
   unlockAchievement('first_host');
   logXp(10, '(neighbors found)');
-
   const cidrs = [];
   for (const h of hosts) {
     const parts = h.ip.split('.');
     cidrs.push(`${parts[0]}.${parts[1]}.${parts[2]}.0/24`);
   }
-  const unique = [...new Set(cidrs)];
-  const target = unique.join(',');
-  $('brief-target').textContent = target;
-  document.querySelector('[data-obj="host"]').classList.add('active');
-
-  const btnArea = $('neighbors-btn-area');
-  if (btnArea) btnArea.hidden = false;
-
-  state.discoveredTarget = target;
+  state.discoveredTarget = [...new Set(cidrs)].join(',');
+  state.panelTab = 'map';
+  // discovery done -> fingerprint all (with MSF union) for the coherent flow
+  startFingerprintScan();
 }
 
-function buildNeighborsPanel() {
-  const card = document.createElement('div');
-  card.className = 'card';
-  card.id = 'neighbors-panel';
-  card.hidden = true;
-  card.innerHTML = `
-    <div class="card-header">
-      <h2>🌐 Local Network Discovery</h2>
-      <span class="neighbors-status" id="neighbors-status">Initializing...</span>
-    </div>
-    <div class="card-body">
-      <div class="neighbors-progress-wrap" id="neighbors-progress-wrap">
-        <div class="progress-bar"><div class="progress-fill" id="neighbors-progress"></div></div>
-        <span class="neighbors-progress-pct" id="neighbors-progress-pct">0%</span>
-      </div>
-      <div class="neighbors-list" id="neighbors-list"></div>
-      <div class="neighbors-btn-area" id="neighbors-btn-area" hidden>
-        <div class="btn-row neighbors-actions">
-          <button class="btn btn-primary" id="btn-fingerprint">
-            🔍 Scan Services &amp; Fingerprint
-          </button>
-          <button class="btn btn-outline" id="btn-full-scan">
-            ⚡ Full Port Scan
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  $('phase-recon').insertBefore(card, $('scan-progress-card'));
-}
+
+
+
 
 let fingerprintPollInterval = null;
 
@@ -467,8 +428,9 @@ async function startFingerprintScan() {
 }
 
 function startFingerprintPolling() {
-  const panel = $('fingerprint-panel');
-  if (panel) panel.hidden = false;
+  if (state.panelMode !== 'default') restoreDefaultPanel();
+  state.panelTab = 'map';
+  bindPanelTabs();
   fingerprintPollInterval = setInterval(pollFingerprintProgress, 2000);
 }
 
@@ -485,8 +447,8 @@ async function pollFingerprintProgress() {
 }
 
 function updateFingerprintProgress(job) {
-  const panel = $('fingerprint-panel');
-  if (!panel) return;
+  const panel = $('pane-map');
+  if (!panel) restoreDefaultPanel();
   const pct = job.progress || 0;
   const statusEl = $('fp-status');
   const fillEl = $('fp-fill');
@@ -555,7 +517,6 @@ async function refreshCveDb() {
 function renderVulnPanel(results) {
   const tbody = $('vuln-tbody');
   const empty = $('vuln-empty');
-  const panel = $('vulns-panel');
   if (!tbody) return;
 
   const rows = [];
@@ -567,7 +528,8 @@ function renderVulnPanel(results) {
     });
   });
 
-  panel.hidden = rows.length === 0 ? panel.hidden : false;
+  const pane = $('pane-vulns');
+  const vulnsVisible = !$('pane-vulns')?.hidden;
   if (rows.length === 0) { if (empty) empty.hidden = false; return; }
   empty.hidden = true;
   const chip = $('vuln-chip-count');
@@ -605,20 +567,9 @@ function openExploitPanel(idx) {
   const row = (state.vulnRows || [])[idx];
   if (!row) return;
   state.selectedVulnRow = row;
-
-  const msfHint = (row.detail || '').match(/msf:\s*([^\s|]+)/);
-  const module = msfHint ? msfHint[1] : '';
-  $('ex-module').value = module;
-  $('ex-rhost').value = row.ip;
-  $('ex-rport').value = row.port;
-  $('ex-find').textContent = row.vid || 'manual';
-  $('ex-status').textContent = module
-    ? 'Module suggested from CVE db — confirm then launch.'
-    : 'No msf module hint — enter one or pick a heuristic.';
+  renderActionPanel('vuln', row);
   $('ex-output').hidden = true;
   $('ex-output').innerHTML = '';
-  $('exploit-panel').hidden = false;
-  $('exploit-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   hintVerifiedCreds(row);
 }
 
@@ -753,6 +704,7 @@ async function startLadderCreds() {
 }
 
 function openPassAttackCard(host, port, service) {
+  renderActionPanel('passattack', { host, port, service });
   $('pa-host').value = host || '';
   $('pa-port').value = port || '';
   const sel = $('pa-service');
@@ -760,8 +712,6 @@ function openPassAttackCard(host, port, service) {
     const known = ['ssh', 'ftp', 'telnet', 'mysql', 'http-basic'].find(s => s === service);
     if (known) sel.value = known;
   }
-  $('passattack-panel').hidden = false;
-  $('passattack-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 let paPollTimer = null;
@@ -1110,13 +1060,11 @@ async function loadCredTargets() {
 }
 
 function renderCredTargets(targets) {
-  const panel = $('cred-targets-panel');
   const tbody = $('cred-targets-tbody');
   const empty = $('cred-targets-empty');
   const chip = $('cred-targets-count');
   if (!tbody) return;
 
-  panel.hidden = targets.length === 0 ? panel.hidden : false;
   empty.hidden = targets.length > 0;
   if (chip) chip.textContent = `${targets.length} targets`;
   if (targets.length === 0) return;
@@ -1328,7 +1276,7 @@ async function startFullScan() {
   $('btn-launch-recon').classList.add('loading');
   $('btn-launch-recon').disabled = true;
 
-  setPhase('recon');
+
 
   try {
     const res = await api('/api/scan', {
@@ -1422,65 +1370,16 @@ async function onScanComplete(job) {
   try {
     const report = await api(`/api/report/${scanJobId}`);
     if (report && report.hosts && report.hosts.length > 0) {
-      displayScanResults(report.hosts[0]);
+      log('scan report ready — refreshing assets');
+      loadCredTargets();
+      loadGraph();
     }
   } catch (e) { log('Failed to fetch report: ' + e.message, 'error'); }
 }
 
-function displayScanResults(host) {
-  state.scanResults = host;
-  state.stats.hosts = 1;
 
-  $('result-ip').textContent = host.address || 'Unknown';
-  $('result-hostname').textContent = host.name || '';
-  $('result-os').textContent = host.os_name || '';
 
-  unlockAchievement('port_scanner');
-  logXp(15, '(port scan)');
 
-  if (host.services) {
-    state.stats.services = host.services.length;
-    const list = $('service-list');
-    list.innerHTML = '';
-    host.services.forEach((svc, i) => {
-      const el = document.createElement('div');
-      el.className = 'service-item';
-      el.dataset.index = i;
-      el.innerHTML = `
-        <span class="svc-port">${svc.port}/${svc.proto}</span>
-        <span class="svc-name">${svc.name} ${svc.product || ''}</span>
-        <span class="svc-state ${svc.state}">${svc.state}</span>
-      `;
-      el.addEventListener('click', () => selectService(i));
-      list.appendChild(el);
-      // Pulse animation delay
-      setTimeout(() => el.classList.add('pulse'), i * 100);
-    });
-  }
-
-  updateMissionObjective('host');
-  updateMissionObjective('services');
-  document.querySelector('[data-obj="vuln"]').classList.add('active');
-
-  $('target-results-card').hidden = false;
-  log('Host discovered: ' + host.address, 'success');
-  playSound('success');
-
-  // vuln leads from the scan feed the Likely Vulnerable card (no phase jump)
-  if (host.vulnerabilities && host.vulnerabilities.length > 0) {
-    state.stats.vulns = host.vulnerabilities.length;
-    unlockAchievement('vuln_finder');
-    logXp(20, '(vuln found)');
-  }
-}
-
-function selectService(idx) {
-  document.querySelectorAll('.service-item').forEach((el, i) => {
-    el.classList.toggle('selected', i === idx);
-  });
-  state.selectedService = state.scanResults.services[idx];
-  log(`Selected: ${state.selectedService.port}/${state.selectedService.proto} (${state.selectedService.name})`, 'info');
-}
 
 // ═══════════════════════════════════════════
 // TOOL ACTIONS
@@ -1496,23 +1395,13 @@ async function findNeighbors() {
   } catch (e) { log('Neighbors scan failed: ' + e.message, 'error'); }
 }
 
-async function deepAttack() {
-  if (!state.scanResults) { alert('Run a scan first'); return; }
-  log('Starting deep attack...', 'warn');
-  try {
-    const res = await api('/api/deepattack', {
-      method: 'POST',
-      body: { target: state.scanResults.address }
-    });
-    log('Deep attack job: ' + (res.job_id || res.attack_id || 'started'), 'info');
-  } catch (e) { log('Deep attack failed: ' + e.message, 'error'); }
-}
+
 
 // ═══════════════════════════════════════════
 // VIM NAVIGATION
 // ═══════════════════════════════════════════
 function vimNavigate(dir) {
-  const phases = ['recon', 'autopilot', 'fuzz', 'graph'];
+  const phases = ['assets', 'walk', 'fuzz', 'report'];
   const idx = phases.indexOf(state.currentPhase);
   if (dir === 'j' && idx < phases.length - 1) setPhase(phases[idx + 1]);
   if (dir === 'k' && idx > 0) setPhase(phases[idx - 1]);
@@ -1523,6 +1412,215 @@ function vimNavigate(dir) {
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
+
+// ═══════════════════════════════════════════
+// ACTION PANEL (asset-centric console)
+// ═══════════════════════════════════════════
+
+function restoreDefaultPanel() {
+  if (!state.defaultPanelHtml) saveDefaultPanel();
+  const body = $('ap-body');
+  // unconditional: the caller may have already set panelMode='default'
+  if (body) body.innerHTML = state.defaultPanelHtml;
+  state.panelMode = 'default';
+  state.selectedAsset = null;
+  state.selectedVulnRow = null;
+  bindPanelTabs();
+}
+
+function saveDefaultPanel() {
+  state.defaultPanelHtml = ($('ap-body') || {}).innerHTML || '';
+}
+
+function bindPanelTabs() {
+  document.querySelectorAll('.ap-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.aptab === (state.panelTab || 'map'));
+  });
+  ['pane-map', 'pane-vulns', 'pane-creds'].forEach(id => {
+    const el = $(id);
+    if (el) el.hidden = id !== 'pane-' + (state.panelTab || 'map');
+  });
+}
+
+function switchPanelTab(tab) {
+  if (state.panelMode !== 'default') { restoreDefaultPanel(); }
+  state.panelTab = tab;
+  bindPanelTabs();
+  if (tab === 'vulns') { loadCveStatus(); }
+  if (tab === 'creds') { loadCredTargets(); }
+}
+
+function renderActionPanel(kind, data) {
+  state.panelMode = kind;
+  state.selectedAsset = { kind, ...data };
+  const body = $('ap-body');
+  if (!body) return;
+  if (kind === 'default') { restoreDefaultPanel(); return; }
+
+  if (kind === 'host') {
+    $('ap-title').textContent = '🖥 Host — ' + data.ip;
+    body.innerHTML = hostPanelHtml(data);
+  } else if (kind === 'service') {
+    $('ap-title').textContent = `🧩 ${data.ip}:${data.port} (${data.service || '?'})`;
+    body.innerHTML = servicePanelHtml(data);
+  } else if (kind === 'vuln') {
+    $('ap-title').textContent = `⚠ ${data.vid} — ${data.ip}:${data.port}`;
+    body.innerHTML = vulnPanelHtml(data);
+  } else if (kind === 'cred') {
+    $('ap-title').textContent = '🔑 ' + (data.label || data.id);
+    body.innerHTML = credPanelHtml(data);
+  }
+  bindPanelTabs();
+}
+
+function hostPanelHtml(h) {
+  const vulns = h.vulns || [];
+  const svcs = h.services || [];
+  return `
+  <div class="graph-detail-row"><span class="graph-detail-label">Address</span><span class="graph-detail-value graph-id" id="ph-ip">${escHtml(h.ip)}</span></div>
+  <div class="graph-detail-row"><span class="graph-detail-label">OS</span><span class="graph-detail-value">${escHtml(h.os || 'unknown')}</span></div>
+  <div class="graph-detail-row"><span class="graph-detail-label">Vendor</span><span class="graph-detail-value">${escHtml(h.vendor || h.hostname || '—')}</span></div>
+  <div class="graph-detail-row"><span class="graph-detail-label">Status</span><span class="graph-detail-value">${h.has_session ? '💀 session open' : h.vuln_count ? '⚠ ' + h.vuln_count + ' findings' : '—'}</span></div>
+  ${h.has_session ? `<div class="ex-actions"><button class="btn btn-secondary" id="btn-host-console">🖥 Open Session Console</button></div>` : ''}
+  <h3 style="font-size:13px;margin:12px 0 4px;">Services</h3>
+  <div class="host-services">
+    ${svcs.map(s => `
+      <div class="host-svc-row" data-hsvc="${escHtml(s.port + '/' + (s.proto || 'tcp'))}">
+        <span class="fp-port">${escHtml(s.port + '/' + (s.proto || 'tcp'))}</span>
+        <span>${escHtml(s.service || '?')} ${escHtml(s.product || '')} ${escHtml(s.version || '')}</span>
+        <button class="btn btn-secondary btn-sm webprobe-btn" data-ip="${escHtml(h.ip)}" data-port="${escHtml(String(s.port))}" title="HTTP probe">🔍</button>
+        <button class="btn btn-danger btn-sm cred-target-btn" data-ip="${escHtml(h.ip)}" data-port="${escHtml(String(s.port))}" data-svc="${escHtml(s.attack_service || (s.service || '').startsWith('http') ? 'http-basic' : (s.service || 'ssh'))}" title="Password attack">🔑</button>
+      </div>`).join('') || '<p class="placeholder">no open services</p>'}
+  </div>
+  ${vulns.length ? `<h3 style="font-size:13px;margin:12px 0 4px;">Findings</h3>
+    <div>${vulns.map(v => `<span class="v-sev ${sevClass(v.detail)}">${escHtml(v.vid || v)}</span>`).join(' ')}</div>
+    <div class="ex-actions">
+      <button class="btn btn-danger" id="btn-host-exploit">⚔ Exploit Setup — first finding</button>
+    </div>` : ''}
+  <div class="ex-actions">
+    <button class="btn btn-secondary btn-sm recheck-btn" data-ip="${escHtml(h.ip)}" title="Re-fingerprint this host">↻ Re-fingerprint host</button>
+    <button class="btn btn-secondary btn-sm deep-btn" data-ip="${escHtml(h.ip)}">⚔️ Deep attack (toolkit)</button>
+  </div>`;
+}
+
+function servicePanelHtml(s) {
+  return `
+  <div class="graph-detail-row"><span class="graph-detail-label">Endpoint</span><span class="graph-detail-value graph-id" id="ph-ip">${escHtml(s.ip)}, port ${escHtml(String(s.port))}/${escHtml(s.proto || 'tcp')}</span></div>
+  <div class="graph-detail-row"><span class="graph-detail-label">Service</span><span class="graph-detail-value">${escHtml(s.service || '?')} ${escHtml(s.product || '')} ${escHtml(s.version || '')}</span></div>
+  <div class="graph-detail-row"><span class="graph-detail-label">State</span><span class="graph-detail-value">${escHtml(s.state || 'open')}</span></div>
+  <div class="ex-actions">
+    ${s.attack_service ? `<button class="btn btn-danger cred-target-btn" data-ip="${escHtml(s.ip)}" data-port="${escHtml(String(s.port))}" data-svc="${escHtml(s.attack_service)}" title="Password attack">🔑 Password attack</button>` : ''}
+    ${(s.service || '').includes('http') ? `<button class="btn btn-secondary webprobe-btn" data-ip="${escHtml(s.ip)}" data-port="${escHtml(String(s.port))}">🔍 HTTP probe</button>` : ''}
+    <button class="btn btn-secondary recheck-btn" data-ip="${escHtml(s.ip)}">↻ Re-fingerprint host</button>
+  </div>`;
+}
+
+let vulnSevClass = (d) => '';
+function sevClass(d) { const k = ((d || '') + '').split(':')[0]; return ['critical','high','medium','low'].includes(k.toLowerCase()) ? k.toLowerCase() : ''; }
+
+function vulnPanelHtml(v) {
+  const msfHint = (v.detail || '').match(/msf:\s*([^\s|]+)/);
+  const module = msfHint ? msfHint[1] : '';
+  return `
+  <div class="graph-detail-row"><span class="graph-detail-label">Finding</span><span class="graph-detail-value">${escHtml(v.vid)}</span></div>
+  <div class="graph-detail-row"><span class="graph-detail-label">Target</span><span class="graph-detail-value graph-id" id="ph-ip">${escHtml(v.ip)}:${escHtml(String(v.port))}</span></div>
+  <div class="graph-detail-row"><span class="graph-detail-label">Severity</span><span class="graph-detail-value"><span class="v-sev ${sevClass(v.detail)}">${escHtml((v.detail || 'INFO').split(':')[0])}</span></span></div>
+  <div class="graph-detail-row"><span class="graph-detail-label">Detail</span><span class="v-detail">${escHtml((v.detail || '').split(': ').slice(1).join(': '))}</span></div>
+  <div class="input-row">
+    <div class="input-group grow"><label>Module</label><input type="text" id="ex-module" placeholder="exploit/…" value="${escAttr(module)}" /></div>
+    <div class="input-group"><label>RHOST</label><input type="text" id="ex-rhost" value="${escAttr(v.ip)}" /></div>
+    <div class="input-group"><label>RPORT</label><input type="text" id="ex-rport" value="${escAttr(String(v.port))}" /></div>
+  </div>
+  <div class="ex-actions">
+    <button class="btn btn-danger" id="btn-launch-exploit">⚔ Launch Exploit</button>
+    <button class="btn btn-secondary btn-sm deep-btn" data-ip="${escHtml(v.ip)}">⚔️ Deep attack</button>
+    <span class="ex-status" id="ex-status">${module ? 'Module suggested from CVE db — confirm then launch.' : 'No msf hint — enter one or pick a heuristic.'}</span>
+  </div>
+  <div class="ex-output" id="ex-output" hidden></div>
+  <div class="ex-console" id="ex-console" hidden>
+    <div class="ex-console-head">
+      <span>🖥 Session Console</span>
+      <span class="fp-chip" id="ex-console-target">—</span>
+    </div>
+    <div class="ex-quick">
+      <button class="btn btn-secondary btn-sm" data-excmd="sysinfo">sysinfo</button>
+      <button class="btn btn-secondary btn-sm" data-excmd="getuid">getuid</button>
+      <button class="btn btn-secondary btn-sm" data-excmd="ifconfig">ifconfig</button>
+      <button class="btn btn-secondary btn-sm" data-excmd="hashdump">hashdump</button>
+    </div>
+    <div class="input-row">
+      <div class="input-group grow">
+        <label>Command</label>
+        <input type="text" id="ex-cmd" placeholder="meterpreter/shell command…" />
+      </div>
+      <button class="btn btn-primary" id="btn-ex-cmd">Run</button>
+    </div>
+    <div class="ex-output visible" id="ex-console-output"></div>
+  </div>`;
+}
+
+function credPanelHtml(c) {
+  return `
+  <div class="graph-detail-row"><span class="graph-detail-label">Credential</span><span class="graph-detail-value">${escHtml(c.label || c.id)}</span></div>
+  <div class="graph-detail-row"><span class="graph-detail-label">Verified at</span><span class="graph-detail-value">${escHtml((c.hosts || []).map(x => x.host || x).join(', '))}</span></div>
+  ${c.reaches ? `<div class="graph-detail-row"><span class="graph-detail-label">Also reaches</span><span class="graph-detail-value">${escHtml((c.reaches || []).join(', '))}</span></div>` : ''}
+  <div class="ex-actions">
+    <button class="btn btn-danger cred-target-btn" data-ip="${escHtml((c.hosts || [])[0] || '')}" data-port="${escHtml(String(c.port ?? '22'))}" data-svc="${escHtml(c.service || 'ssh')}" title="Password attack">🔑 Password attack (same family)</button>
+  </div>
+  <div class="pa-hint" style="margin-top:8px;">Switch to the <b>Report</b> page for the 🧬 propagation plan + execute across every in-scope service.</div>`;
+}
+
+// deep-attack button helper (used by panels)
+async function deepAttackHost(ip) {
+  log(`Deep toolkit sweep ${ip}...`, 'warn');
+  try {
+    const res = await api('/api/deepattack', { method: 'POST', body: { target: ip, host: ip, services: [] } });
+    if (res.job_id) {
+      appendTermLine($('ex-output') || $('ap-body'), `  toolkit job ${res.job_id} started — see Activity/GET /api/deepattack/${res.job_id}`);
+      log(`Toolkit job ${res.job_id} launched for ${ip}`, 'info');
+    }
+  } catch (e) { log('Deep attack failed: ' + e.message, 'error'); }
+}
+
+// host console shortcut
+async function hostOpenConsole(ip) {
+  try {
+    const res = await api('/api/sessions');
+    const s = (res.sessions || []).find(x => x.host === ip);
+    if (s) {
+      setPhase('assets');
+      openSessionConsole(s.msf_session_id, ip);
+    } else { log(`No live session for ${ip}`, 'warn'); }
+  } catch (e) { log('Sessions fetch failed: ' + e.message, 'error'); }
+}
+
+// web probe that reads panel-local buttons
+launchWebProbe = async function (idx) {
+  const t = (state.credTargets || [])[idx] || this._t || null;
+  if (!t) return;
+  try {
+    const res = await api('/api/webprobe', {
+      method: 'POST',
+      body: { host: t.ip, port: t.port, tls: t.port === 443 || t.port === 8443 }
+    });
+    log(`Probe ${t.ip}:${t.port} — server: ${res.server || '?'} | title: ${res.title || '?'} | hit endpoints: ${res.paths.map(p => p.path).join(', ') || 'none'}`, 'info');
+    const out = $('ex-output') || $('pa-output');
+    if (out) {
+      out.hidden = false;
+      appendTermLine(out, `probe ${t.ip}:${t.port}: ${res.server || '?'} | "${res.title || 'no title'}"`);
+      (res.paths || []).forEach(p => appendTermLine(out, `  ${p.status} ${p.path}`));
+    }
+  } catch (e) { log(`Probe failed for ${t.ip}:${t.port}: ` + e.message, 'error'); }
+};
+
+function acquireToggle() {
+  const a = $('ap-acquire');
+  if (a) {
+    a.hidden = !a.hidden;
+    if (!a.hidden) { (a.querySelector('#target') || {}).focus?.(); }
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // Load saved theme
   const savedTheme = localStorage.getItem('h4k-theme') || 'light';
@@ -1622,19 +1720,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Vim keys
     if (['j', 'k', 'h', 'l'].includes(e.key)) vimNavigate(e.key);
     // Number phases
-    if (e.key >= '1' && e.key <= '4') setPhase(['recon','autopilot','fuzz','graph'][parseInt(e.key) - 1]);
+    if (e.key >= '1' && e.key <= '4') setPhase(['assets','walk','fuzz','report'][parseInt(e.key) - 1]);
     // T = theme
     if (e.key === 't') toggleTheme();
     // ? = help
     if (e.key === '?') log('Shortcuts: j/k/h/l=navigate, 1-5=phases, t=theme, Ctrl+K=palette, Esc=close', 'info');
     // Ctrl+Enter = scan
-    if (e.ctrlKey && e.key === 'Enter' && state.currentPhase === 'recon') launchScan();
+    if (e.ctrlKey && e.key === 'Enter' && state.currentPhase === 'assets') acquireToggle();
   });
 
   // Tool buttons
-  $('tool-neighbors').addEventListener('click', findNeighbors);
-  $('tool-deep').addEventListener('click', deepAttack);
-  $('btn-graph-refresh').addEventListener('click', loadGraph);
+  // panel: acquire toggle + tabs
+  $('btn-acquire')?.addEventListener('click', acquireToggle);
+  document.querySelectorAll('.ap-tab').forEach(t => {
+    t.addEventListener('click', () => switchPanelTab(t.dataset.aptab));
+  });
 
   // Neighbor panel action buttons (delegated since panel is built dynamically)
   document.addEventListener('click', (e) => {
@@ -1646,12 +1746,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('#btn-cve-refresh')) refreshCveDb();
     if (e.target.closest('#btn-launch-passattack')) launchPassAttack();
     const ctBtn = e.target.closest('.cred-target-btn');
-    if (ctBtn) {
-      const t = (state.credTargets || [])[parseInt(ctBtn.dataset.index, 10)];
-      if (t) openPassAttackCard(t.ip, t.port, t.attack_service);
-    }
+    if (ctBtn) openPassAttackCard(
+      ctBtn.dataset.ip || ((state.credTargets || [])[parseInt(ctBtn.dataset.index, 10)] || {}).ip,
+      ctBtn.dataset.port || ((state.credTargets || [])[parseInt(ctBtn.dataset.index, 10)] || {}).port,
+      ctBtn.dataset.svc || ((state.credTargets || [])[parseInt(ctBtn.dataset.index, 10)] || {}).attack_service
+    );
     const probeBtn = e.target.closest('.webprobe-btn');
-    if (probeBtn) launchWebProbe(parseInt(probeBtn.dataset.index, 10));
+    if (probeBtn) {
+      const t = (state.credTargets || [])[parseInt(probeBtn.dataset.index, 10)] ||
+        { ip: probeBtn.dataset.ip, port: parseInt(probeBtn.dataset.port, 10) };
+      launchWebProbe(t);
+    }
     const recheckBtn = e.target.closest('.recheck-btn');
     if (recheckBtn) recheckHost(recheckBtn.dataset.ip);
     if (e.target.closest('#btn-fz-start')) startFuzzing();
@@ -1671,9 +1776,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.closest('#btn-cred-targets-refresh')) { loadCredTargets(); loadCveStatus(); }
     if (e.target.closest('#btn-ap-start')) startAutopilot();
     if (e.target.closest('#btn-ap-stop')) stopAutopilot();
+    const deepBtn = e.target.closest('.deep-btn');
+    if (deepBtn) deepAttackHost(deepBtn.dataset.ip);
+    if (e.target.closest('#btn-host-console')) hostOpenConsole(($('ph-ip') || {}).textContent || '');
     const apCon = e.target.closest('.ap-console-btn');
     if (apCon) {
-      setPhase('recon');
+    
       openSessionConsole(apCon.dataset.ssid, apCon.dataset.shost);
     }
     // autopilot page visit refreshes the live view
@@ -1694,9 +1802,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === $('cmd-palette')) toggleCmdPalette(false);
   });
 
+  saveDefaultPanel();
+  state.currentPhase = 'assets';
   updateXpDisplay();
   log('h4k operations center ready', 'system');
-  log('Press Ctrl+K for command palette, ? for shortcuts', 'info');
+  setPhase('assets');
 
   refreshSessionBadge();
 
@@ -1710,10 +1820,10 @@ document.addEventListener('DOMContentLoaded', () => {
       state.vulnRows = [];
       state.selectedVulnRow = null;
       state.graphData = null;
-      ['neighbors-panel', 'fingerprint-panel', 'vulns-panel', 'scan-progress-card', 'target-results-card', 'exploit-panel'].forEach(id => {
-        const el = $(id);
-        if (el) el.hidden = true;
-      });
+      if (state.panelMode !== 'default') restoreDefaultPanel();
+      $('sp-strip').hidden = true;
+      state.panelTab = 'map';
+      bindPanelTabs();
       const tb = $('vuln-tbody'); if (tb) tb.innerHTML = '';
       const fpt = $('fp-tbody'); if (fpt) fpt.innerHTML = '';
       const nl = $('neighbors-list'); if (nl) nl.innerHTML = '';
@@ -1724,7 +1834,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function refreshSessionBadge() {
-  const el = $('session-badge');
+  const el = $('session-badge');  // right pane badge
   if (!el) return;
   try {
     const s = await api('/api/session');
@@ -1974,7 +2084,8 @@ function renderGraphFrame(svg, nodes, edges) {
       html += `<text x="${n.x}" y="${n.y - 26}" text-anchor="middle" class="pwned-badge">💀</text>`;
     }
     html += `<circle cx="${n.x}" cy="${n.y}" r="18"/>`;
-    const shortLabel = n.label.length > 12 ? n.label.slice(0, 10) + '…' : n.label;
+    const lbl = n.label || n.id || '?';
+    const shortLabel = lbl.length > 12 ? lbl.slice(0, 10) + '…' : lbl;
     html += `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle">${shortLabel}</text>`;
     html += `</g>`;
   });
@@ -1995,43 +2106,53 @@ function renderGraphFrame(svg, nodes, edges) {
 
 function selectGraphNode(type, data) {
   state.selectedGraphNode = data;
-  const edges = (state.graphData?.edges || []).filter(e => {
-    if (type === 'host') return e.source === data.id;
-    return e.target === data.id;
-  });
-  const detailTitle = $('graph-detail-title');
-  const detailBody = $('graph-detail-body');
-  const detailCard = $('graph-detail-card');
-  detailCard.hidden = false;
   if (type === 'host') {
-    detailTitle.textContent = data.label || data.id;
-    const svcList = edges.map(e => ({
-      port: e.port, proto: e.proto, service: e.service, state: e.state, info: e.info
-    }));
-    detailBody.innerHTML = `
-      <div class="graph-detail-row"><span class="graph-detail-label">Address</span><span class="graph-detail-value">${data.id}</span></div>
-      <div class="graph-detail-row"><span class="graph-detail-label">OS</span><span class="graph-detail-value">${data.os || 'unknown'}</span></div>
-      <div class="graph-detail-row"><span class="graph-detail-label">Vendor</span><span class="graph-detail-value">${data.vendor || '—'}</span></div>
-      <div class="graph-detail-row"><span class="graph-detail-label">Status</span><span class="graph-detail-value">${data.has_session ? '💀 session' : '—'}</span></div>
-      <div class="graph-detail-row"><span class="graph-detail-label">Services</span><span class="graph-detail-value">${svcList.length}</span></div>
-      ${data.vuln_count ? `<div class="graph-detail-row"><span class="graph-detail-label">Vulns</span><span class="graph-detail-value">⚠ ${data.vuln_count} — see Likely Vulnerable card</span></div>` : ''}
-      <div class="graph-detail-services">
-        ${svcList.map(s => `<span class="graph-svc-chip ${s.state === 'open' ? 'open' : 'closed'}">${s.port}/${s.proto} ${s.service || ''}</span>`).join('')}
-      </div>
-    `;
+    renderActionPanel('host', {
+      ip: data.id, os: data.os, vendor: data.vendor, hostname: data.label,
+      vuln_count: data.vuln_count || 0, has_session: data.has_session,
+      services: servicesOfHost(data.id),
+    });
+  } else if (type === 'cred') {
+    const edges = (state.graphData?.edges || []).filter(e => e.target === data.id);
+    renderActionPanel('cred', {
+      label: data.label || data.id,
+      hosts: edges.map(e => ({ host: e.source })),
+      reaches: (edges.find(e => e.type === 'pivot') || {}).reaches || [],
+      service: (edges[0] || {}).service || '',
+      port: 22,
+    });
   } else {
-    const hostEdge = (state.graphData?.edges || []).find(e => e.target === data.id);
-    detailTitle.textContent = `Port ${data.port}/${data.proto}`;
-    detailBody.innerHTML = `
-      <div class="graph-detail-row"><span class="graph-detail-label">Host</span><span class="graph-detail-value">${hostEdge?.source || '?'}</span></div>
-      <div class="graph-detail-row"><span class="graph-detail-label">Port</span><span class="graph-detail-value">${data.port}</span></div>
-      <div class="graph-detail-row"><span class="graph-detail-label">Proto</span><span class="graph-detail-value">${data.proto || 'tcp'}</span></div>
-      <div class="graph-detail-row"><span class="graph-detail-label">Service</span><span class="graph-detail-value">${data.service || 'unknown'}</span></div>
-      <div class="graph-detail-row"><span class="graph-detail-label">State</span><span class="graph-detail-value">${data.state || 'unknown'}</span></div>
-      <div class="graph-detail-row"><span class="graph-detail-label">Info</span><span class="graph-detail-value">${data.info || '—'}</span></div>
-    `;
+    const edge = (state.graphData?.edges || []).find(e => e.target === data.id)
+      || {};
+    renderActionPanel('service', {
+      ip: edge.source || '?', port: data.port, proto: data.proto,
+      service: edge.service || data.service, product: edge.product,
+      version: edge.version, state: edge.state,
+      attack_service: serviceFamily(edge.service || ''),
+    });
   }
 }
+
+function serviceFamily(name) {
+  const s = (name || '').toLowerCase();
+  return (['ssh', 'ftp', 'telnet', 'mysql', 'http'].find(f => s.includes(f)) || '');
+}
+
+function servicesOfHost(ip) {
+  const seen = new Map();
+  (state.graphData?.edges || []).forEach(e => {
+    if (e.type === 'service' && e.source === ip && !seen.has(e.port)) {
+      seen.set(e.port, {
+        port: e.port, proto: e.proto, service: e.service, state: e.state,
+        product: e.product, version: e.version, info: e.info,
+        attack_service: serviceFamily(e.service),
+      });
+    }
+  });
+  return [...seen.values()];
+}
+
+
 
 function showGraphTooltip(ev, el) {
   const type = el.dataset.nodeType;

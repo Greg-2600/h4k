@@ -34,14 +34,13 @@
       </div>
 
       <nav class="nav">
-        <button class="nav-btn active" data-phase="recon" data-shortcut="1">Recon</button>
-        <button class="nav-btn" data-phase="autopilot" data-shortcut="2">Autopilot</button>
+        <button class="nav-btn active" data-phase="assets" data-shortcut="1">Assets</button>
+        <button class="nav-btn" data-phase="walk" data-shortcut="2">Walk</button>
         <button class="nav-btn" data-phase="fuzz" data-shortcut="3">Fuzz</button>
-        <button class="nav-btn" data-phase="graph" data-shortcut="4">Graph</button>
+        <button class="nav-btn" data-phase="report" data-shortcut="4">Report</button>
       </nav>
 
       <div class="header-right">
-        <span class="session-badge" id="session-badge" title="Current recon session">—</span>
         <select id="scope-select" class="scope-select" title="Active engagement scope — aggressive actions are restricted to these CIDRs"></select>
         <button class="icon-btn" id="btn-session-reset" title="Reset session (clears discovered hosts/services/vulns)">⟳</button>
         <button class="icon-btn" id="sound-toggle" title="Sound effects">🔊</button>
@@ -51,217 +50,122 @@
     </header>
 
     <!-- MAIN CONTENT -->
-    <main class="main">
+    <main class="console-main">
 
-      <!-- LEFT SIDEBAR -->
-      <aside class="sidebar">
+      <!-- 3-PANE OPERATIONS CONSOLE -->
+      <div class="console" id="phase-assets" data-phase="assets">
 
-        <!-- MISSION BRIEFING -->
-        <div class="card briefing-card" id="briefing-card">
-          <div class="card-header">
-            <h3>📋 Mission Briefing</h3>
+        <!-- LEFT: network canvas -->
+        <div class="pane pane-left card">
+          <div class="pane-header">
+            <h2>🌐 Network</h2>
+            <div class="pane-actions">
+              <span class="fp-chip" id="con-counts">…</span>
+              <button class="btn btn-primary btn-sm" id="btn-acquire">＋ Discover</button>
+            </div>
           </div>
-          <div class="card-body">
-            <div class="briefing-content" id="briefing-content">
-              <p class="briefing-target">Target: <strong id="brief-target">—</strong></p>
-              <div class="briefing-objectives" id="brief-objectives">
-                <div class="obj" data-obj="host">
-                  <span class="obj-check">○</span>
-                  <span>Discover host</span>
-                </div>
-                <div class="obj" data-obj="services">
-                  <span class="obj-check">○</span>
-                  <span>Enumerate services</span>
-                </div>
-                <div class="obj" data-obj="vuln">
-                  <span class="obj-check">○</span>
-                  <span>Find vulnerability</span>
-                </div>
-                <div class="obj" data-obj="exploit">
-                  <span class="obj-check">○</span>
-                  <span>Exploit target</span>
-                </div>
-                <div class="obj" data-obj="pwned">
-                  <span class="obj-check">○</span>
-                  <span>Gain shell</span>
-                </div>
+          <div class="pane-body" style="padding:0; position:relative;">
+            <div id="graph-tooltip" class="graph-tooltip" hidden></div>
+            <svg id="graph-svg" width="100%" height="100%"></svg>
+            <div id="graph-empty" class="graph-empty">
+              <p>No hosts yet.</p>
+              <p>Hit ＋ Discover, or run Autopilot.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- CENTER: action panel -->
+        <div class="pane pane-center card">
+          <div class="pane-header">
+            <h2 id="ap-title">🎯 Action Panel</h2>
+            <div class="pane-actions" id="ap-tabs" hidden>
+              <button class="st-tab ap-tab active" data-aptab="map">Service Map</button>
+              <button class="st-tab ap-tab" data-aptab="vulns">Likely Vulnerable</button>
+              <button class="st-tab ap-tab" data-aptab="creds">Cred Targets</button>
+            </div>
+          </div>
+          <div class="pane-body" id="ap-body">
+            <!-- in-flight strip (any running job) -->
+            <div id="sp-strip" class="sp-strip" hidden>
+              <div class="neighbors-progress-wrap">
+                <div class="progress-bar"><div class="progress-fill" id="sp-fill"></div></div>
+                <span class="fp-pct" id="sp-pct">0%</span>
               </div>
+              <p class="scan-status" id="sp-status">Initializing...</p>
+              <div class="neighbors-list" id="neighbors-list"></div>
             </div>
-          </div>
-        </div>
 
-        <!-- XP STATS -->
-        <div class="card">
-          <div class="card-header">
-            <h3>🏆 Achievements</h3>
-          </div>
-          <div class="stats-grid">
-            <div class="stat-card">
-              <span class="stat-num" id="stat-hosts">0</span>
-              <span class="stat-label">Hosts</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-num" id="stat-services">0</span>
-              <span class="stat-label">Services</span>
-            </div>
-            <div class="stat-card danger">
-              <span class="stat-num" id="stat-vulns">0</span>
-              <span class="stat-label">Vulns</span>
-            </div>
-            <div class="stat-card success">
-              <span class="stat-num" id="stat-pwned">0</span>
-              <span class="stat-label">Pwned</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- QUICK TOOLS -->
-        <div class="card">
-          <div class="card-header">
-            <h3>⚡ Quick Tools</h3>
-          </div>
-          <div class="tool-grid">
-            <button class="tool-btn" id="tool-neighbors">🌐 Neighbors</button>
-            <button class="tool-btn" id="tool-deep">⚔️ Deep Attack</button>
-            <button class="tool-btn" id="tool-nse">🔍 NSE Vuln</button>
-            <button class="tool-btn" id="tool-john">🔓 Crack</button>
-          </div>
-        </div>
-      </aside>
-
-      <!-- CENTER CONTENT -->
-      <section class="content">
-
-        <!-- RECON PHASE -->
-        <div class="phase" id="phase-recon" data-phase="recon">
-          <div class="card">
-            <div class="card-header">
-              <h2>🎯 Target Acquisition</h2>
-            </div>
-            <div class="card-body">
-              <div class="target-form">
+            <!-- acquisition (toggle w/ ＋ Discover) -->
+            <div id="ap-acquire" class="inner-card" hidden>
+              <div class="input-group">
+                <div class="scan-type-tabs" id="scan-type-tabs">
+                  <button class="st-tab active" data-type="ip" id="tab-ip">IP / CIDR</button>
+                  <button class="st-tab" data-type="neighbors" id="tab-neighbors">Local Network</button>
+                </div>
+                <input type="text" id="target" placeholder="192.168.1.13 or 192.168.1.0/24" />
+                <div class="input-hint" id="target-hint">Enter a single IP or CIDR range (e.g. 192.168.1.0/24)</div>
+              </div>
+              <div class="input-row">
                 <div class="input-group">
-                  <label>Target</label>
-                  <div class="scan-type-tabs" id="scan-type-tabs">
-                    <button class="st-tab active" data-type="ip" id="tab-ip">IP / CIDR</button>
-                    <button class="st-tab" data-type="neighbors" id="tab-neighbors">Local Network</button>
-                  </div>
-                  <input type="text" id="target" placeholder="192.168.1.13 or 192.168.1.0/24" />
-                  <div class="input-hint" id="target-hint">Enter a single IP or CIDR range (e.g. 192.168.1.0/24)</div>
+                  <label>Mode</label>
+                  <select id="mode-select">
+                    <option value="stealth">Stealth</option>
+                    <option value="tor">Tor</option>
+                    <option value="overt" selected>Overt</option>
+                  </select>
                 </div>
-                <div class="input-row">
-                  <div class="input-group">
-                    <label>Mode</label>
-                    <select id="mode-select">
-                      <option value="stealth">Stealth</option>
-                      <option value="tor">Tor</option>
-                      <option value="overt" selected>Overt</option>
-                    </select>
-                  </div>
-                  <div class="input-group">
-                    <label>Depth</label>
-                    <select id="depth-select">
-                      <option value="quick">Quick</option>
-                      <option value="standard" selected>Standard</option>
-                      <option value="full">Full</option>
-                    </select>
-                  </div>
+                <div class="input-group">
+                  <label>Depth</label>
+                  <select id="depth-select">
+                    <option value="quick">Quick</option>
+                    <option value="standard" selected>Standard</option>
+                    <option value="full">Full</option>
+                  </select>
                 </div>
-                <button class="btn btn-primary btn-large" id="btn-launch-recon">
-                  <span class="btn-text">Launch Recon</span>
+                <button class="btn btn-primary" id="btn-launch-recon">
+                  <span class="btn-text">🔍 Discover & Scan</span>
                   <span class="btn-loading" hidden>◌ Scanning...</span>
                 </button>
               </div>
             </div>
-          </div>
 
-          <!-- Scan Progress -->
-          <div class="card" id="scan-progress-card" hidden>
-            <div class="card-header">
-              <h2>📡 Scanning...</h2>
-              <span class="progress-pct" id="sp-pct">0%</span>
-            </div>
-            <div class="card-body">
-              <div class="progress-bar"><div class="progress-fill" id="sp-fill"></div></div>
-              <div class="scan-stages" id="sp-stages"></div>
-              <p class="scan-status" id="sp-status">Initializing...</p>
-            </div>
-          </div>
-
-          <!-- Target Results -->
-          <div class="card target-results" id="target-results-card" hidden>
-            <div class="card-header success">
-              <h2>🎯 Target Discovered</h2>
-            </div>
-            <div class="card-body">
-              <div class="target-header">
-                <div class="target-main">
-                  <span class="target-ip" id="result-ip">—</span>
-                  <span class="target-hostname" id="result-hostname"></span>
-                  <span class="target-os" id="result-os"></span>
-                </div>
-                <span class="target-status">● Online</span>
+            <!-- TAB: service map -->
+            <div class="ap-tabpane" id="pane-map">
+              <div class="fp-summary">
+                <span class="fp-chip" id="fp-chip-hosts">0 hosts</span>
+                <span class="fp-chip" id="fp-chip-ports">0 open ports</span>
+                <button class="btn btn-primary btn-sm" id="btn-fingerprint">🔍 Scan Services</button>
+                <button class="btn btn-outline btn-sm" id="btn-full-scan">⚡ Full Port Scan</button>
               </div>
-              <h3>Services Discovered</h3>
-              <div class="service-list" id="service-list"></div>
-            </div>
-          </div>
-
-          <!-- Service Map (fingerprint results) -->
-          <div class="card" id="fingerprint-panel" hidden>
-            <div class="card-header">
-              <h2>🔍 Service Map</h2>
-              <span class="fp-status" id="fp-status">Idle</span>
-            </div>
-            <div class="card-body">
               <div class="neighbors-progress-wrap">
                 <div class="progress-bar"><div class="progress-fill fp-fill" id="fp-fill"></div></div>
                 <span class="fp-pct" id="fp-pct">0%</span>
-              </div>
-              <div class="fp-summary" id="fp-summary">
-                <span class="fp-chip" id="fp-chip-hosts">0 hosts</span>
-                <span class="fp-chip" id="fp-chip-ports">0 open ports</span>
               </div>
               <div class="fp-table-wrap">
                 <table class="fp-map">
                   <thead>
                     <tr>
-                      <th>Host</th>
-                      <th>Port</th>
-                      <th>Service</th>
-                      <th>Product</th>
-                      <th>Version</th>
-                      <th>Vendor</th>
+                      <th>Host</th><th>Port</th><th>Service</th><th>Product</th><th>Version</th><th>Vendor</th>
                     </tr>
                   </thead>
                   <tbody id="fp-tbody"></tbody>
                 </table>
-                <div class="fp-empty" id="fp-empty">No fingerprint data yet — run “Scan Services &amp; Fingerprint”.</div>
+                <div class="fp-empty" id="fp-empty">No fingerprint data yet — run ＋ Discover, then “Scan Services”.</div>
               </div>
             </div>
-          </div>
 
-          <!-- Likely Vulnerable Services -->
-          <div class="card" id="vulns-panel" hidden>
-            <div class="card-header warning">
-              <h2>⚠️ Likely Vulnerable</h2>
-              <div class="vuln-header-right">
+            <!-- TAB: likely vulnerable -->
+            <div class="ap-tabpane" id="pane-vulns" hidden>
+              <div class="fp-summary">
                 <span class="cve-status" id="cve-status">CVE db: loading…</span>
                 <button class="btn btn-secondary btn-sm" id="btn-cve-refresh" hidden title="CVE db is 7+ days old">🔄 Update CVEs</button>
                 <span class="fp-chip" id="vuln-chip-count">0 findings</span>
               </div>
-            </div>
-            <div class="card-body">
               <div class="fp-table-wrap">
                 <table class="fp-map vuln-map">
                   <thead>
                     <tr>
-                      <th>Host</th>
-                      <th>Port</th>
-                      <th>Finding</th>
-                      <th>Severity</th>
-                      <th>Detail</th>
-                      <th></th>
+                      <th>Host</th><th>Port</th><th>Finding</th><th>Severity</th><th>Detail</th><th></th>
                     </tr>
                   </thead>
                   <tbody id="vuln-tbody"></tbody>
@@ -271,279 +175,174 @@
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Exploit Setup -->
-          <div class="card" id="exploit-panel" hidden>
-            <div class="card-header danger">
-              <h2>⚔ Exploit Setup</h2>
-              <span class="fp-status" id="ex-find">—</span>
-            </div>
-            <div class="card-body">
-              <div class="ex-summary" id="ex-summary"></div>
-              <div class="input-row">
-                <div class="input-group grow">
-                  <label>Module</label>
-                  <input type="text" id="ex-module" placeholder="exploit/…" />
-                </div>
-              </div>
-              <div class="input-row">
-                <div class="input-group">
-                  <label>RHOST</label>
-                  <input type="text" id="ex-rhost" />
-                </div>
-                <div class="input-group">
-                  <label>RPORT</label>
-                  <input type="text" id="ex-rport" />
-                </div>
-              </div>
-              <div class="ex-actions">
-                <button class="btn btn-danger" id="btn-launch-exploit">⚔ Launch Exploit</button>
-                <span class="ex-status" id="ex-status">Ready — verify the target is yours to test.</span>
-              </div>
-              <div class="ex-output" id="ex-output" hidden></div>
-              <div class="ex-console" id="ex-console" hidden>
-                <div class="ex-console-head">
-                  <span>🖥 Session Console</span>
-                  <span class="fp-chip" id="ex-console-target">—</span>
-                </div>
-                <div class="ex-quick">
-                  <button class="btn btn-secondary btn-sm" data-excmd="sysinfo">sysinfo</button>
-                  <button class="btn btn-secondary btn-sm" data-excmd="getuid">getuid</button>
-                  <button class="btn btn-secondary btn-sm" data-excmd="ifconfig">ifconfig</button>
-                  <button class="btn btn-secondary btn-sm" data-excmd="hashdump">hashdump</button>
-                </div>
-                <div class="input-row">
-                  <div class="input-group grow">
-                    <label>Command</label>
-                    <input type="text" id="ex-cmd" placeholder="meterpreter/shell command…" />
-                  </div>
-                  <button class="btn btn-primary" id="btn-ex-cmd">Run</button>
-                </div>
-                <div class="ex-output visible" id="ex-console-output"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Common Password Attack -->
-          <div class="card" id="passattack-panel" hidden>
-            <div class="card-header">
-              <h2>🔑 Common Password Attack</h2>
-              <span class="pa-status" id="pa-status">Idle</span>
-            </div>
-            <div class="card-body">
-              <div class="pa-hint">Bundled lists (users.txt / passwords.txt) — opt-in, targeted at one service on one host. Custom paste lists coming later.</div>
-              <div class="input-row">
-                <div class="input-group">
-                  <label>Host</label>
-                  <input type="text" id="pa-host" />
-                </div>
-                <div class="input-group">
-                  <label>Port</label>
-                  <input type="text" id="pa-port" />
-                </div>
-                <div class="input-group">
-                  <label>Service</label>
-                  <select id="pa-service">
-                    <option value="ssh">ssh (22)</option>
-                    <option value="ftp">ftp (21)</option>
-                    <option value="telnet">telnet (23)</option>
-                    <option value="mysql">mysql (3306)</option>
-                    <option value="http-basic">http basic-auth (80)</option>
-                  </select>
-                </div>
-              </div>
-              <div class="ex-actions">
-                <button class="btn btn-danger" id="btn-launch-passattack">🔑 Launch Password Attack</button>
-                <span class="ex-status" id="pa-live-status">Ready.</span>
-              </div>
-              <div class="neighbors-progress-wrap" id="pa-progress-wrap">
-                <div class="progress-bar"><div class="progress-fill" id="pa-progress"></div></div>
-              </div>
-              <div class="ex-output" id="pa-output" hidden></div>
-              <div class="pa-found" id="pa-found" hidden>
-                <h3>Credentials Found</h3>
-                <div id="pa-found-list"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Default-Cred Targets -->
-          <div class="card" id="cred-targets-panel" hidden>
-            <div class="card-header">
-              <h2>🔑 Default-Cred Targets</h2>
-              <div class="vuln-header-right">
+            <!-- TAB: cred targets -->
+            <div class="ap-tabpane" id="pane-creds" hidden>
+              <div class="fp-summary">
                 <span class="fp-chip" id="cred-targets-count">0 targets</span>
                 <button class="btn btn-secondary btn-sm" id="btn-cred-targets-refresh">↻</button>
               </div>
-            </div>
-            <div class="card-body">
               <div class="fp-table-wrap">
                 <table class="fp-map">
                   <thead>
                     <tr>
-                      <th>Host</th>
-                      <th>Port</th>
-                      <th>Service</th>
-                      <th>Product</th>
-                      <th>Attack</th>
-                      <th></th>
-                      <th></th>
+                      <th>Host</th><th>Port</th><th>Service</th><th>Product</th><th>Attack</th><th></th><th></th>
                     </tr>
                   </thead>
                   <tbody id="cred-targets-tbody"></tbody>
                 </table>
                 <div class="fp-empty" id="cred-targets-empty">
-                  No password-attackable services yet — run “Scan Services &amp; Fingerprint”.
+                  No password-attackable services yet — run “Scan Services”.
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- AUTOPILOT PHASE -->
-        <div class="phase" id="phase-autopilot" data-phase="autopilot" hidden>
-          <div class="card">
-            <div class="card-header danger">
-              <h2>🤖 Autopilot — Full Network Walk</h2>
-              <div class="vuln-header-right">
-                <span class="fp-chip" id="ap-status-chip">idle</span>
-                <button class="btn btn-danger" id="btn-ap-start">▶ Start Full Attack</button>
-                <button class="btn btn-secondary" id="btn-ap-stop" hidden>■ Stop</button>
+        <!-- RIGHT: activity -->
+        <div class="pane pane-right card">
+          <div class="pane-header">
+            <h2>📟 Activity</h2>
+            <span class="session-badge" id="session-badge">—</span>
+          </div>
+          <div class="pane-body" id="activity-log"></div>
+        </div>
+
+      </div>
+
+      <!-- WALK (autopilot) PAGE -->
+      <div class="phase single-page" id="phase-walk" data-phase="walk" hidden>
+        <div class="card">
+          <div class="card-header danger">
+            <h2>🤖 Autopilot — Full Network Walk</h2>
+            <div class="vuln-header-right">
+              <span class="fp-chip" id="ap-status-chip">idle</span>
+              <button class="btn btn-danger" id="btn-ap-start">▶ Start Full Attack</button>
+              <button class="btn btn-secondary" id="btn-ap-stop" hidden>■ Stop</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="pa-hint">
+              One run does the whole thing: discovery → fingerprint → CVE correlation →
+              password attacks → exploit attempts. <strong>Requires an active engagement
+              scope</strong> (header). Only hosts inside the scope are touched. Live log shows
+              every named action — watch it. Results land in the Assets console.
+            </div>
+            <div class="neighbors-progress-wrap" id="ap-progress-wrap">
+              <div class="progress-bar"><div class="progress-fill" id="ap-progress"></div></div>
+              <span class="fp-pct" id="ap-pct">0%</span>
+            </div>
+            <div class="ap-summary" id="ap-summary" hidden>
+              <span class="fp-chip" id="ap-chip-hosts">0 hosts</span>
+              <span class="fp-chip" id="ap-chip-vulns">0 with vulns</span>
+              <span class="fp-chip" id="ap-chip-creds">0 creds</span>
+              <span class="fp-chip" id="ap-chip-sessions">0 sessions</span>
+            </div>
+            <h3 style="font-size:13px; margin: 10px 0 6px;">Hosts</h3>
+            <div class="ap-table-wrap">
+              <table class="fp-map">
+                <thead>
+                  <tr><th>Host</th><th>Stage</th><th>Services</th><th>Vulns</th><th>Creds</th></tr>
+                </thead>
+                <tbody id="ap-tbody"></tbody>
+              </table>
+            </div>
+            <h3 style="font-size:13px; margin: 12px 0 6px;">Live log</h3>
+            <div class="ex-output ap-log" id="ap-log"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FUZZ PAGE -->
+      <div class="phase single-page" id="phase-fuzz" data-phase="fuzz" hidden>
+        <div class="card">
+          <div class="card-header">
+            <h2>🧪 Fuzz a Target You Own</h2>
+            <span class="pa-status" id="fz-status">idle</span>
+          </div>
+          <div class="card-body">
+            <div class="pa-hint">
+              LAB-ONLY: black-box signal-guided fuzzing of a service YOU control
+              (vulnlab at 127.0.0.1:3138 demo target). Connection teardown /
+              server errors / hangs become crash candidates with reproduce commands.
+            </div>
+            <div class="input-row">
+              <div class="input-group grow">
+                <label>Target host</label>
+                <input type="text" id="fz-host" placeholder="127.0.0.1" value="127.0.0.1" />
+              </div>
+              <div class="input-group">
+                <label>Port</label>
+                <input type="text" id="fz-port" placeholder="8080" value="3138" />
+              </div>
+              <div class="input-group">
+                <label>Iterations</label>
+                <input type="text" id="fz-iters" placeholder="2000" value="2000" />
+              </div>
+              <div class="input-group">
+                <label>Timeout (s)</label>
+                <input type="text" id="fz-timeout" placeholder="60" value="60" />
               </div>
             </div>
-            <div class="card-body">
-              <div class="pa-hint">
-                One run does the whole thing: discovery → fingerprint → CVE correlation →
-                password attacks → exploit attempts. <strong>Requires an active engagement
-                scope</strong> (header). Only hosts inside the scope are touched. Live log shows
-                every action against every host — watch it.
+            <div class="ex-actions">
+              <button class="btn btn-primary" id="btn-fz-start">🧪 Start Fuzzing</button>
+              <button class="btn btn-secondary" id="btn-fz-stop" hidden>■ Stop</button>
+              <span class="ex-status" id="fz-live">Ready.</span>
+            </div>
+            <div class="neighbors-progress-wrap">
+              <div class="progress-bar"><div class="progress-fill" id="fz-progress"></div></div>
+              <span class="fp-pct" id="fz-pct">0%</span>
+            </div>
+            <div class="fp-summary" id="fz-summary" hidden>
+              <span class="fp-chip" id="fz-chip-cves">0 distinct crashes</span>
+              <span class="fp-chip" id="fz-chip-exec">0 execs</span>
+            </div>
+            <div class="ex-output" id="fz-output" hidden></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORT PAGE -->
+      <div class="phase single-page" id="phase-report" data-phase="report" hidden>
+        <div class="card">
+          <div class="card-header">
+            <h2>📜 Engagement Report</h2>
+            <div class="vuln-header-right">
+              <button class="btn btn-secondary" id="btn-session-report" title="Download the full session writeup">⇩ Session Report</button>
+              <button class="btn btn-secondary" id="btn-propagate-plan" title="Plan replay of verified credentials">🧬 Propagation plan</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="pa-hint">
+              The machine-generated writeup: every host, service, finding, verified
+              credential, session and named action from the session's autopilot runs —
+              as markdown, ready for the disclosure appendix.
+            </div>
+
+            <div class="card inner-card" id="propagation-card" hidden>
+              <div class="card-header">
+                <h2>🧬 Credential Propagation</h2>
+                <div class="vuln-header-right">
+                  <span class="fp-chip" id="prop-legend">dry run — nothing is logged in</span>
+                  <button class="btn btn-danger" id="btn-propagate-run" hidden title="Replay verified creds across in-scope services">▶ Execute</button>
+                </div>
               </div>
-              <div class="neighbors-progress-wrap" id="ap-progress-wrap">
-                <div class="progress-bar"><div class="progress-fill" id="ap-progress"></div></div>
-                <span class="fp-pct" id="ap-pct">0%</span>
+              <div class="card-body">
+                <div id="prop-body" style="font-size: 12px;"></div>
+                <div class="ex-output" id="prop-results" hidden></div>
               </div>
-              <div class="ap-summary" id="ap-summary" hidden>
-                <span class="fp-chip" id="ap-chip-hosts">0 hosts</span>
-                <span class="fp-chip" id="ap-chip-vulns">0 with vulns</span>
-                <span class="fp-chip" id="ap-chip-creds">0 creds</span>
-                <span class="fp-chip" id="ap-chip-sessions">0 sessions</span>
-              </div>
-              <h3 style="font-size:13px; margin: 10px 0 6px;">Hosts</h3>
-              <div class="ap-table-wrap">
-                <table class="fp-map">
-                  <thead>
-                    <tr><th>Host</th><th>Stage</th><th>Services</th><th>Vulns</th><th>Creds</th></tr>
-                  </thead>
-                  <tbody id="ap-tbody"></tbody>
-                </table>
-              </div>
-              <h3 style="font-size:13px; margin: 12px 0 6px;">Live log</h3>
-              <div class="ex-output ap-log" id="ap-log"></div>
+            </div>
+
+            <div style="margin-top: 14px;">
+              <h3 style="font-size:13px; margin: 0 0 6px;">Live preview</h3>
+              <div class="ex-output report-preview" id="report-preview">press ⇩ Session Report to fill</div>
             </div>
           </div>
         </div>
-
-        <!-- FUZZ PHASE -->
-        <div class="phase" id="phase-fuzz" data-phase="fuzz" hidden>
-          <div class="card">
-            <div class="card-header">
-              <h2>🧪 Fuzz a Target You Own</h2>
-              <span class="pa-status" id="fz-status">idle</span>
-            </div>
-            <div class="card-body">
-              <div class="pa-hint">
-                LAB-ONLY: black-box signal-guided fuzzing of a service YOU control
-                (vulnlab at 127.0.0.1:3138 demo target). Connection teardown /
-                server errors / hangs become crash candidates with reproduce commands.
-              </div>
-              <div class="input-row">
-                <div class="input-group grow">
-                  <label>Target host</label>
-                  <input type="text" id="fz-host" placeholder="127.0.0.1" value="127.0.0.1" />
-                </div>
-                <div class="input-group">
-                  <label>Port</label>
-                  <input type="text" id="fz-port" placeholder="8080" value="3138" />
-                </div>
-                <div class="input-group">
-                  <label>Iterations</label>
-                  <input type="text" id="fz-iters" placeholder="2000" value="2000" />
-                </div>
-                <div class="input-group">
-                  <label>Timeout (s)</label>
-                  <input type="text" id="fz-timeout" placeholder="60" value="60" />
-                </div>
-              </div>
-              <div class="ex-actions">
-                <button class="btn btn-primary" id="btn-fz-start">🧪 Start Fuzzing</button>
-                <button class="btn btn-secondary" id="btn-fz-stop" hidden>■ Stop</button>
-                <span class="ex-status" id="fz-live">Ready.</span>
-              </div>
-              <div class="neighbors-progress-wrap">
-                <div class="progress-bar"><div class="progress-fill" id="fz-progress"></div></div>
-                <span class="fp-pct" id="fz-pct">0%</span>
-              </div>
-              <div class="fp-summary" id="fz-summary" hidden>
-                <span class="fp-chip" id="fz-chip-cves">0 distinct crashes</span>
-                <span class="fp-chip" id="fz-chip-exec">0 execs</span>
-              </div>
-              <div class="ex-output" id="fz-output" hidden></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- GRAPH PHASE -->
-        <div class="phase" id="phase-graph" data-phase="graph" hidden>
-          <div class="card">
-            <div class="card-header">
-              <h2>🕸️ Network Graph</h2>
-              <div class="graph-controls">
-                <button class="btn btn-secondary" id="btn-graph-refresh">↻ Refresh</button>
-                <button class="btn btn-secondary" id="btn-session-report" title="Download the full session writeup">⇩ Report</button>
-                <button class="btn btn-secondary" id="btn-propagate-plan" title="Plan replay of verified credentials across in-scope services (dry run)">🧬 Propagation plan</button>
-                <span class="graph-stat" id="graph-host-count">0 hosts</span>
-                <span class="graph-stat" id="graph-svc-count">0 services</span>
-              </div>
-            </div>
-            <div class="card-body" style="padding:0; position:relative;">
-              <div id="graph-tooltip" class="graph-tooltip" hidden></div>
-              <svg id="graph-svg" width="100%" height="600"></svg>
-              <div id="graph-empty" class="graph-empty">
-                <p>No hosts discovered yet.</p>
-                <p>Run a scan or find neighbors to populate the graph.</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Selected node detail -->
-          <div class="card" id="graph-detail-card" hidden>
-            <div class="card-header">
-              <h2 id="graph-detail-title">Host Details</h2>
-            </div>
-            <div class="card-body">
-              <div id="graph-detail-body"></div>
-            </div>
-          </div>
-
-          <div class="card" id="propagation-card" hidden>
-            <div class="card-header">
-              <h2>🧬 Credential Propagation</h2>
-              <div class="vuln-header-right">
-                <span class="fp-chip" id="prop-legend">dry run — nothing is logged in</span>
-                <button class="btn btn-danger" id="btn-propagate-run" hidden title="Replay verified creds across in-scope services">▶ Execute</button>
-              </div>
-            </div>
-            <div class="card-body">
-              <div id="prop-body" style="font-size: 12px;"></div>
-              <div class="ex-output" id="prop-results" hidden></div>
-            </div>
-          </div>
-        </div>
-
-      </section>
+      </div>
 
     </main>
+
 
     <!-- FOOTER -->
     <footer class="footer">

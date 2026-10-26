@@ -857,3 +857,67 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
   color: var(--success);
   border-color: var(--success);
 }
+
+/* ═══════════════════════════════════════════
+   3-PANE ASSET-CENTRIC CONSOLE
+═══════════════════════════════════════════ */
+.console-main { display: block; padding: 0; flex: 1; overflow: hidden; }
+.console {
+  display: grid;
+  grid-template-columns: 400px 1fr 300px;
+  gap: 0;
+  height: calc(100vh - 60px - 32px - 16px);
+  padding: 8px;
+}
+.console[hidden] { display: none; }
+.pane { display: flex; flex-direction: column; min-width: 0; }
+.pane-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; gap: 8px;
+}
+.pane-header h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.pane-actions { display: flex; align-items: center; gap: 8px; }
+.pane-body { overflow-y: auto; padding: 12px 14px; flex: 1; min-height: 0; }
+.pane-left .pane-body { padding: 0; }
+.pane-right .pane-body { font-size: 12px; padding: 8px; }
+.console .graph-empty[hidden] { display: none; }
+.pane-center .inner-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.sp-strip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.sp-strip[hidden] { display: none; }
+.ap-tabpane[hidden] { display: none; }
+.ap-tab { padding: 6px 12px; font-size: 12px; }
+.inner-card .input-group { margin-bottom: 8px; }
+.inner-card input, .inner-card select {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text);
+  font-size: 13px;
+}
+.host-svc-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.host-svc-row:last-child { border-bottom: none; }
+.single-page { padding: 8px; }
+.report-preview { max-height: 50vh; }
+
+@media (max-width: 1100px) {
+  .console { grid-template-columns: 300px 1fr; }
+  .pane-right { display: none; }
+}
+@media (max-width: 800px) {
+  .console { grid-template-columns: 1fr; height: auto; }
+  .pane-left { height: 50vh; }
+}
