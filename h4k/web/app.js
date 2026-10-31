@@ -1000,9 +1000,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saved) document.documentElement.dataset.theme = saved;
   } catch { /* ignore */ }
 
-  const tick = () => { $('clock').textContent = new Date().toLocaleTimeString('en-US', { hour12: false }); };
-  tick(); setInterval(tick, 1000);
-
   document.querySelectorAll('.ws-btn').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
 
   $('scope-select').addEventListener('change', async (e) => {
@@ -1042,6 +1039,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // recon
   $('btn-fingerprint').addEventListener('click', startFingerprint);
+  $('btn-empty-fp').addEventListener('click', startFingerprint);
+  $('btn-empty-fpv').addEventListener('click', startFingerprint);
+  $('btn-empty-scope').addEventListener('click', () => setTab('discover'));
+  $('btn-empty-exploit').addEventListener('click', () => setTab('exploit'));
   $('btn-full-scan').addEventListener('click', async () => {
     try {
       const res = await api('/api/neighbors/fingerprint', { method: 'POST', body: {} });

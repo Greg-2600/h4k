@@ -24,7 +24,6 @@
       <button class="icon-btn" id="cmd-palette-btn" data-testid="cmd-palette-btn" title="Command palette (Ctrl+K)">⌘</button>
       <button class="icon-btn" id="theme-toggle" title="Toggle theme">◐</button>
       <button class="icon-btn" id="btn-session-reset" title="Reset session">⟳</button>
-      <span class="clock" id="clock">--:--:--</span>
     </header>
 
     <!-- NEXT ACTION: single ranked recommendation -->
@@ -50,24 +49,15 @@
       <!-- ═══ 1. DISCOVER: scope, find targets ═══ -->
       <section class="ws-panel active" id="tab-discover" data-tab="discover">
         <div class="card">
-          <div class="card-head"><h2>Workflow</h2><span class="spacer"></span><span class="muted">click a step to go there</span></div>
-          <div class="card-body">
+          <div class="card-head"><h2>Discover</h2><span class="spacer"></span>
             <div class="row" id="workflow-steps" data-testid="workflow-steps">
               <button class="btn small" id="step-scope" data-testid="step-scope" title="Pick an engagement scope">1 · Scope</button>
               <button class="btn small" id="step-scan" data-testid="step-scan" title="Scan the scope for hosts">2 · Scan</button>
               <button class="btn small" id="step-fingerprint" data-testid="step-fingerprint" title="Fingerprint services and match CVEs">3 · Fingerprint</button>
               <button class="btn small" id="step-win" data-testid="step-win" title="Work the attack queue">4 · Win</button>
             </div>
+            <span class="muted" id="scope-summary">no scope</span>
           </div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h2>Scope</h2><span class="spacer"></span><span class="muted" id="scope-summary">no scope</span></div>
-          <div class="card-body">
-            <p class="muted">Everything aggressive is restricted to the scope selected above. No scope = recon only, nothing recorded.</p>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h2>Find targets</h2><span class="spacer"></span><span class="muted" id="scan-status">idle</span></div>
           <div class="card-body">
             <div class="row">
               <input type="text" id="target" class="grow" placeholder="192.168.1.0/24 or single IP" />
@@ -83,6 +73,7 @@
               </select>
               <button class="btn primary" id="btn-scan">Scan</button>
               <button class="btn" id="btn-neighbors" title="ARP discovery on local networks">Neighbors</button>
+              <span class="muted" id="scan-status">idle</span>
             </div>
             <div class="row">
               <span class="pill" data-testid="live-map-status"><span data-testid="live-map-state">auto-scan: idle</span> · <span data-testid="live-map-counts">0 hosts · 0 services · 0 vulns</span></span>
@@ -107,7 +98,7 @@
               <thead><tr><th>Host</th><th>Port</th><th>Service</th><th>Product</th><th>Version</th><th></th></tr></thead>
               <tbody id="hosts-tbody"></tbody>
             </table></div>
-            <div class="empty" id="hosts-empty">No services yet — fingerprint first.</div>
+            <div class="empty" id="hosts-empty">No services yet. <button class="btn small" id="btn-empty-fp">Fingerprint now</button></div>
           </div>
         </div>
         <div class="card">
@@ -117,7 +108,7 @@
               <thead><tr><th>Host</th><th>Port</th><th>Finding</th><th>Severity</th><th></th></tr></thead>
               <tbody id="vulns-tbody"></tbody>
             </table></div>
-            <div class="empty" id="vulns-empty">No findings yet — fingerprint first.</div>
+            <div class="empty" id="vulns-empty">No findings yet. <button class="btn small" id="btn-empty-fpv">Fingerprint now</button></div>
           </div>
         </div>
         <div class="card">
@@ -140,7 +131,7 @@
           <div class="card-head"><h2>Attack queue</h2><span class="spacer"></span><span class="muted" id="attack-queue-count" data-testid="attack-queue-count">0 moves</span></div>
           <div class="card-body">
             <div id="attack-queue" data-testid="attack-queue"></div>
-            <div class="empty" id="attack-empty" data-testid="attack-empty">No moves yet. Map + recon first.</div>
+            <div class="empty" id="attack-empty" data-testid="attack-empty">No moves yet. <button class="btn small" id="btn-empty-scope">Map + recon first</button></div>
           </div>
         </div>
         <div class="card">
@@ -214,7 +205,7 @@
           <div class="card-head"><h2>Shells</h2><span class="spacer"></span><span class="muted" id="shells-count">0 shells</span></div>
           <div class="card-body">
             <div id="shells-list" data-testid="shells-list"></div>
-            <div class="empty" id="shells-empty" data-testid="shells-empty">No shells yet. Exploit something.</div>
+            <div class="empty" id="shells-empty" data-testid="shells-empty">No shells yet. <button class="btn small" id="btn-empty-exploit">Exploit something</button></div>
             <div class="console" id="ex-console" data-testid="shell-console" hidden>
               <div class="console-head"><span>Session</span><span class="chip" id="ex-console-target">—</span><span class="spacer"></span><button class="icon-btn" id="shell-close">✕</button></div>
               <div class="row">
