@@ -32,8 +32,9 @@ Then:
 * `POST /api/engagement/{id}/ingest -d '{"job_id":"<id>"}'` → fold the result
   into the engagement graph so attack paths can use it
 
-**In the UI:** Assets → `＋ Discover` → *Discover my network* chains discovery
-and fingerprinting automatically.
+**In the UI:** the **Discover** tab's Workflow strip (Scope → Scan →
+Fingerprint → Win) chains discovery and fingerprinting; results land in
+**Recon** for judgement.
 
 ---
 

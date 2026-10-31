@@ -163,7 +163,7 @@ item is a self-contained, live-demonstrable increment on the current release.
   (done: `scripts/release.sh <ver>` builds/tags/pushes and prints the one-liner)
 - [x] **Selenium end-to-end suite** — a real browser drives the real console
       against a real API, so UI regressions cannot ship silently.
-  (done: `tests/e2e/` + `make e2e` + a CI job. 20 tests: boot, navigation,
+  (done: `tests/e2e/` + `make e2e` + a CI job. 27 tests: boot, navigation,
   scope picker, report preview, crown jewels, attack paths, ATT&CK panel and a
   full autopilot walk. The `page` fixture fails a test on any uncaught
   JavaScript error — that is how the missing `renderReportPreview()` was found.)

@@ -179,3 +179,4 @@ input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accen
   .move .kind { min-width: 0; }
   .tbl { min-width: 480px; font-size: 12px; }
 }
+.btn.done { border-color: var(--good, #3fb950); color: var(--good, #3fb950); }

@@ -183,6 +183,29 @@ async function refreshStatus() {
   badge('ws-count-pivot', shells + creds);
   badge('ws-count-persist', shells);
   badge('ws-count-score', flags);
+  renderSteps({
+    scoped: !!engId,
+    scanned: hosts > 0,
+    fingerprinted: services > 0,
+    won: flags > 0 || shells > 0,
+  });
+}
+
+function renderSteps(st) {
+  // Discover-tab stepper: where am I in scope → scan → fingerprint → win.
+  const steps = [
+    ['step-scope', st.scoped],
+    ['step-scan', st.scanned],
+    ['step-fingerprint', st.fingerprinted],
+    ['step-win', st.won],
+  ];
+  steps.forEach(([id, done], i) => {
+    const el = $(id);
+    if (!el) return;
+    el.classList.toggle('done', !!done);
+    const label = ['Scope', 'Scan', 'Fingerprint', 'Win'][i];
+    el.textContent = `${done ? '✓' : `${i + 1} ·`} ${label}`;
+  });
 }
 
 /* ---------- 1. discover ---------- */
@@ -956,6 +979,7 @@ function runCmd(cmd) {
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
   else if (cmd === 'firetv') setTab('pivot');
+  else if (cmd === 'cfuzz') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'score') setTab('score');
   else if (cmd === 'theme') toggleTheme();
@@ -992,6 +1016,17 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) { log(`scope change failed: ${err.message}`, 'error'); }
   });
 
+  // discover stepper
+  $('step-scope').addEventListener('click', () => { const s = $('scope-select'); if (s) s.focus(); });
+  $('step-scan').addEventListener('click', () => { const t = $('target'); if (t) t.focus(); });
+  $('step-fingerprint').addEventListener('click', () => setTab('recon'));
+  $('step-win').addEventListener('click', () => setTab('exploit'));
+  // next strip: run the top recommendation
+  $('btn-next-go').addEventListener('click', () => {
+    const top = state.moves && state.moves[0];
+    if (!top) { log('queue clear — nothing to run', 'info'); return; }
+    fireMove(top);
+  });
   // discover
   $('btn-scan').addEventListener('click', launchScan);
   $('target').addEventListener('keydown', (e) => { if (e.key === 'Enter') launchScan(); });

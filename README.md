@@ -90,19 +90,19 @@ docker compose up --build
 
 ## First steps (for someone brand new)
 
-The UI is a 3-pane **Asset console** (network inventory · actions · activity).
+The UI is a kill-chain console: **Discover → Recon → Exploit → Pivot →
+Persist → Score**. The Workflow strip on Discover tracks scope → scan →
+fingerprint → win; the next-action strip floats the single best move. (network inventory · actions · activity).
 The overview card at the top always shows the next step.
 
-1. **Set the scope** — pick your engagement in the header 🔒 selector
+1. **Set the scope** — pick your engagement in the header scope selector
    (authorizes the aggressive actions; persists across restarts).
-2. **Discover** — **Assets** page → `＋ Discover` → **🌐 Discover my network**.
-   Discovery and service fingerprinting chain automatically; the inventory,
-   Service Map, and Network Graph fill themselves.
-3. **Judge it** — the **⚠ Likely Vulnerable** tab flags known CVEs (severity
-   badges); **🔑 Default-Cred Targets** lists services worth a password attack.
-4. **Act deliberately** — click a host/vuln: ⚔ fires a named Metasploit module,
-   🔑 runs a hydra password attack, 🔍 probes an HTTP surface. Every action is
-   logged verbatim in the Activity pane and in `docker logs`.
+2. **Discover** — **Discover** tab → target + **Scan**. Results flow into
+   **Recon**: **Fingerprint services**, then review **Likely vulnerable**.
+3. **Judge it** — the **⚠ Likely Vulnerable** card flags known CVEs;
+   password-attack targets list under **Exploit**.
+4. **Act deliberately** — **Attack queue** entries each carry a fire button;
+   every action is logged verbatim in the Activity pane and in `docker logs`.
 5. **Pwned?** — sessions are captured automatically (💀 on the graph, quick
    actions + free-form shell console attached to the finding).
 6. **Report** — **Report** page → `⇩ Session Report` downloads the markdown

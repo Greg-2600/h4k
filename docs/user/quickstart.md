@@ -108,7 +108,10 @@ curl -X POST http://127.0.0.1:3137/api/session/scope \
 
 ## 4. First recon
 
-**In the UI:** Assets → `＋ Discover` → **🌐 Discover my network**.
+**In the UI:** the **Discover** tab walks you through Scope → Scan →
+Fingerprint → Win (click any step to jump there). Enter a target, pick a
+mode, hit **Scan**; results flow into the **Recon** tab — **Fingerprint
+services**, then review **Likely vulnerable**.
 
 **From the API:**
 
@@ -125,9 +128,10 @@ Poll `GET /api/jobs/{id}` until `status` is `done`, then read
 
 ## 5. The one-button walk
 
-**Walk** page → 🤖 **Autopilot** does the whole flow: discovery →
-fingerprinting → CVE correlation → password attacks → exploit attempts.
-It requires an active scope and logs every named action as it goes.
+**Exploit** tab → **Autopilot** card → **Start full attack** does the whole
+flow: discovery → fingerprinting → CVE correlation → password attacks →
+exploit attempts. It requires an active scope and logs every named action
+as it goes.
 
 ```sh
 curl -X POST http://127.0.0.1:3137/api/autopilot/start -d '{}' \
@@ -139,9 +143,8 @@ curl -s http://127.0.0.1:3137/api/autopilot/status | jq
 
 ## 6. Read the report
 
-**Report** page → `⇩ Session Report` downloads a markdown writeup: scope,
-hosts, services, findings, verified credentials, sessions and every action
-that was attempted.
+**Score** tab → **Report** card → **Download MD**: scope, hosts, services,
+findings, verified credentials, sessions and every action attempted.
 
 ---
 
@@ -155,7 +158,8 @@ docker build -t vulnlab .
 docker run --rm --name vulnlab -p 127.0.0.1:8080:8080 vulnlab
 ```
 
-Point the **Fuzz** page at `127.0.0.1:8080`.
+Point the **Exploit** tab's **Fuzz lab** card at `127.0.0.1:8080` (or try
+the **Container surfaces** card for Docker/kubelet/gRPC targets).
 
 ---
 

@@ -32,11 +32,11 @@ docker compose up --build          # platform on http://localhost:3137
 
 Then, in the browser:
 
-1. **Set the scope** — header 🔒 picker → pick an engagement.
-2. **Discover** — Assets → `＋ Discover` → *Discover my network*.
-3. **Judge** — the *Likely Vulnerable* and *Default-Cred Targets* tabs.
+1. **Set the scope** — header scope picker → pick an engagement.
+2. **Discover** — Workflow strip (Scope → Scan → Fingerprint → Win), target + **Scan**.
+3. **Judge** — **Recon** tab: *Services* and *Likely Vulnerable* findings.
 4. **Act** — every aggressive action is opt-in and named in the log.
-5. **Report** — Report → `⇩ Session Report` for the markdown writeup.
+5. **Report** — **Score** tab → **Report** → Download MD.
 
 ## Two modes of operation
 

@@ -86,6 +86,11 @@ def api_server(tmp_path_factory):
             "H4K_CVE_WEEKLY": "0",
             "H4K_LOG_LEVEL": "WARNING",
             "PYTHONUNBUFFERED": "1",
+            # The whole suite hammers one sandbox server from one IP; the
+            # production 600 req/min budget is a real limit the browser
+            # suite must not trip over (throttling itself is covered by
+            # tests/test_coverage_wave.py::test_rate_limit_429).
+            "H4K_RATE_LIMIT": "100000",
         }
     )
     env["PYTHONPATH"] = os.pathsep.join(
