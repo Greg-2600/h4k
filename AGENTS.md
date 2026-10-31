@@ -179,6 +179,7 @@ Health/diagnostic:
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |
 | `attack_paths.py` | crown jewels -> scored, evidence-backed attack paths |
+| `flag_paths.py` | foothold -> captured-flag chains (one objective per flag host) |
 | `attck.py` | MITRE ATT&CK technique mapping + defender detection guidance |
 | `sandbox.py` | deterministic offline stand-ins for nmap/hydra/Metasploit (demo + CI) |
 | `zap.py` | OWASP ZAP headless web-app scanner via REST |

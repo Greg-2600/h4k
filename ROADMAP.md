@@ -139,9 +139,12 @@ item is a self-contained, live-demonstrable increment on the current release.
       image + capabilities inventory)
 - [ ] **Advanced fuzzing for container surfaces** — fuzz Docker API, containerd
       gRPC, kubelet, CAD worker endpoints for RCE/DoS.
-- [ ] **Attack path graph to flag** — compute minimal path from foothold to flag
+- [x] **Attack path graph to flag** — compute minimal path from foothold to flag
       (container escape → host → other containers → DB → flag). Show ATT&CK
       chain.
+  (done: `flag_paths.py` + `GET /api/engagement/{id}/flag-paths` (fmt=json|md);
+  one synthetic objective per flag host, flags attached to the final hop,
+  ATT&CK techniques on every path; Score-tab "Flag paths" button)
 
 ## Infra / shipping
 

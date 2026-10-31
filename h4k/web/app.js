@@ -818,14 +818,30 @@ async function loadAttackPaths() {
   await loadCrowns();
   try {
     const res = await api(`/api/engagement/${engId}/attack-paths`);
-    const paths = res.paths || [];
-    $('attack-paths-body').innerHTML = paths.length
-      ? paths.map((p) => `<div class="move hot" data-testid="path-item"><span class="kind">score <span data-testid="path-score">${esc(String(p.score ?? ''))}</span></span><span><span class="title" data-testid="path-nodes">${esc((p.nodes || []).join(' → '))}</span><br /><span class="why">${esc((p.vulns || []).join(', '))}</span></span></div>`).join('')
-      : 'no paths yet';
-    const sum = $('attack-paths-summary');
-    sum.hidden = false;
-    sum.textContent = `${paths.length} path(s)`;
+    renderPathList(res.paths || [], `${(res.paths || []).length} path(s)`);
   } catch (e) { log(`attack paths failed: ${e.message}`, 'error'); }
+}
+
+function renderPathList(paths, summary) {
+  $('attack-paths-body').innerHTML = paths.length
+    ? paths.map((p) => {
+      const flags = (p.flags || []).map((f) => esc(f.value || '')).join(', ');
+      return `<div class="move hot" data-testid="path-item"><span class="kind">score <span data-testid="path-score">${esc(String(p.score ?? ''))}</span></span><span><span class="title" data-testid="path-nodes">${esc((p.nodes || []).join(' → '))}</span><br /><span class="why">${esc((p.vulns || []).join(', '))}${flags ? `<br />🏁 ${flags}` : ''}</span></span></div>`;
+    }).join('')
+    : 'no paths yet';
+  const sum = $('attack-paths-summary');
+  sum.hidden = false;
+  sum.textContent = summary;
+}
+
+async function loadFlagPaths() {
+  const engId = await currentEngagementId();
+  if (!engId) return;
+  await loadCrowns();
+  try {
+    const res = await api(`/api/engagement/${engId}/flag-paths`);
+    renderPathList(res.paths || [], `${(res.paths || []).length} flag path(s) · ${(res.summary || {}).flags || 0} flag(s)`);
+  } catch (e) { log(`flag paths failed: ${e.message}`, 'error'); }
 }
 
 async function loadAttck() {
@@ -982,6 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-flag-detect').addEventListener('click', detectFlags);
   $('btn-add-crown').addEventListener('click', addCrownJewel);
   $('btn-attack-paths').addEventListener('click', loadAttackPaths);
+  $('btn-flag-paths').addEventListener('click', loadFlagPaths);
   $('btn-attck').addEventListener('click', loadAttck);
   $('btn-session-report').addEventListener('click', downloadSessionReport);
 

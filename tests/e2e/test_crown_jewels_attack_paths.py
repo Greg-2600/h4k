@@ -66,3 +66,16 @@ def test_attack_paths_persist_across_reload(page, seeded, api_server):
     go_to(page, "score")
     click(page, "compute-paths")
     wait_visible(page, "path-item")
+
+
+def test_flag_paths_reach_captured_flag(page, seeded, api):
+    go_to(page, "score")
+    status, payload = api.post(
+        f"/api/engagement/{seeded['id']}/flags",
+        {"value": "CTF{e2e}", "host": "10.10.10.42"},
+    )
+    assert status == 200, payload
+    click(page, "compute-flag-paths")
+    wait_visible(page, "path-item")
+    wait_text(page, "paths-summary", "flag path(s)")
+    wait_text(page, "attack-paths", "CTF{e2e}")

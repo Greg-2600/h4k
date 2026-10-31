@@ -24,8 +24,8 @@ def compute_flag_paths(
     """Paths from plausible footholds to the hosts where flags were found."""
     from services.attack_paths import (
         _build_graph,
-        _paths_for_jewel,
         _footholds,
+        _paths_for_jewel,
     )
     from services.flags import FlagStore
 

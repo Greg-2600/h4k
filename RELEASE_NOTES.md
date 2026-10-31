@@ -33,6 +33,9 @@ root-cause & patching, and responsible-disclosure scaffolding.
 - `GET /api/engagement/{id}/attack-paths` returns scored, evidence-backed paths
   from any plausible foothold to each crown jewel. Only *verified* credential
   logins become edges, so a path is a chain of proof, not a guess.
+- `GET /api/engagement/{id}/flag-paths` does the same for captured flags: one
+  synthetic objective per flag host, flags attached to each path's final hop
+  (`services/flag_paths.py`, `?fmt=md` for a writeup).
 - Scoring: `crown_value + Σ(vuln severity) + 25·hops − 12·(hops−1) + foothold
   bonus` — a 2.0 leak that pivots into the DC outranks a 9.8 on an isolated box.
 - New Report-page card: **🎯 Attack Paths to Crown Jewels** (add / delete /

@@ -97,6 +97,7 @@ Conventions:
 | `GET` | `/api/engagement/{id}/crown-jewels` | List |
 | `DELETE` | `/api/engagement/{id}/crown-jewels/{cj_id}` | Remove |
 | `GET` | `/api/engagement/{id}/attack-paths` | `?crown_jewel_id=&max_depth=&limit=` — add `fmt=md` for a markdown writeup |
+| `GET` | `/api/engagement/{id}/flag-paths` | Foothold → flag-host chains (one objective per flag host); `fmt=md` for a writeup |
 | `GET` | `/api/engagement/{id}/export` | Portable snapshot (assets, services, credentials + access, vulns, attempts, crown jewels) |
 | `POST` | `/api/engagement/{id}/import` | Merge a snapshot in; every host is scope-checked and out-of-scope hosts are reported |
 
