@@ -507,6 +507,27 @@ class DBInterrogateRequest(BaseModel):
     target: str = "127.0.0.1"
 
 
+class FireTVRequest(BaseModel):
+    """Fire TV / Android TV assessment request (one target, one action)."""
+
+    target: str  # IP or hostname of the TV
+    port: int = 5555  # ADB port
+    command: str | None = None  # shell: command string
+    key: str | None = None  # keyevent: KEYCODE name or 0-255
+    remote: str | None = None  # pull: remote path on the TV
+    local: str | None = None  # pull: local name / install: local APK path
+    lines: int = 200  # logcat: recent line count
+
+
+class FireTVResult(BaseModel):
+    target: str = ""
+    action: str = ""
+    success: bool = False
+    output: str = ""
+    detail: dict[str, Any] = {}
+    error: str | None = None
+
+
 # ---- Nuclei ----
 class NucleiRequest(BaseModel):
     """Nuclei template-based vulnerability scan request."""

@@ -26,6 +26,8 @@ from schemas import (
     ContainerEscapeResult,
     DBInterrogateRequest,
     DeepAttackRequest,
+    FireTVRequest,
+    FireTVResult,
     FuzzRequest,
     Job,
     JohnRequest,
@@ -2886,6 +2888,152 @@ def db_interrogate(req: DBInterrogateRequest) -> dict[str, Any]:
     from services.db_interrogate import DBInterrogate
 
     return DBInterrogate().interrogate_all(req.target)
+
+
+# Fire TV / Android TV toolkit (opt-in; a scan never touches a TV).
+def _firetv_target(req: FireTVRequest) -> str:
+    if not (req.target or "").strip():
+        raise HTTPException(status_code=400, detail="target required")
+    return req.target.strip()
+
+
+@router.post("/firetv/recon", response_model=FireTVResult)
+def firetv_recon(req: FireTVRequest) -> FireTVResult:
+    """Read-only Fire TV fingerprint: ports + eureka + ADB auth state."""
+    from services.firetv import FireTVService
+
+    out = FireTVService().recon(_firetv_target(req))
+    return FireTVResult(target=req.target, action="recon", **_firetv_wrap(out))
+
+
+@router.post("/firetv/mdns", response_model=FireTVResult)
+def firetv_mdns() -> FireTVResult:
+    """Listen for Fire TV mDNS announcements (no target needed)."""
+    from services.firetv import mdns_discover
+
+    out = mdns_discover()
+    ok = bool(out.get("success"))
+    return FireTVResult(
+        target="multicast",
+        action="mdns",
+        success=ok,
+        output=f"{len(out.get('devices', []))} device(s)",
+        detail=out,
+        error=None if ok else out.get("error"),
+    )
+
+
+@router.post("/firetv/connect", response_model=FireTVResult)
+def firetv_connect(req: FireTVRequest) -> FireTVResult:
+    """`adb connect`: prompts the TV's on-screen pairing dialog (harmless)."""
+    from services.firetv import FireTVService
+
+    out = FireTVService().connect(_firetv_target(req), req.port)
+    return FireTVResult(target=req.target, action="connect", **_firetv_wrap(out))
+
+
+@router.post("/firetv/disconnect", response_model=FireTVResult)
+def firetv_disconnect(req: FireTVRequest) -> FireTVResult:
+    """Drop the adb connection to the target."""
+    from services.firetv import FireTVService
+
+    out = FireTVService().disconnect(_firetv_target(req), req.port)
+    return FireTVResult(target=req.target, action="disconnect", **_firetv_wrap(out))
+
+
+@router.post("/firetv/state", response_model=FireTVResult)
+def firetv_state(req: FireTVRequest) -> FireTVResult:
+    """ADB authorisation state: device | unauthorized | offline."""
+    from services.firetv import FireTVService
+
+    out = FireTVService().state(_firetv_target(req), req.port)
+    return FireTVResult(target=req.target, action="state", **_firetv_wrap(out))
+
+
+@router.post("/firetv/shell", response_model=FireTVResult)
+def firetv_shell(req: FireTVRequest) -> FireTVResult:
+    """Run a shell command as the adb `shell` user. Needs approval on TV."""
+    if not req.command:
+        raise HTTPException(status_code=400, detail="command required")
+    from services.firetv import FireTVService
+
+    out = FireTVService().shell(_firetv_target(req), req.command, req.port)
+    return FireTVResult(target=req.target, action="shell", **_firetv_wrap(out))
+
+
+@router.post("/firetv/keyevent", response_model=FireTVResult)
+def firetv_keyevent(req: FireTVRequest) -> FireTVResult:
+    """Press a remote key (DPAD_*/HOME/BACK/VOLUME_* or 0-255)."""
+    if not req.key:
+        raise HTTPException(status_code=400, detail="key required")
+    from services.firetv import FireTVService
+
+    out = FireTVService().keyevent(_firetv_target(req), req.key, req.port)
+    return FireTVResult(target=req.target, action="keyevent", **_firetv_wrap(out))
+
+
+@router.post("/firetv/apps", response_model=FireTVResult)
+def firetv_apps(req: FireTVRequest) -> FireTVResult:
+    """List installed packages + focused window (read-only)."""
+    from services.firetv import FireTVService
+
+    out = FireTVService().apps(_firetv_target(req), req.port)
+    return FireTVResult(target=req.target, action="apps", **_firetv_wrap(out))
+
+
+@router.post("/firetv/pull", response_model=FireTVResult)
+def firetv_pull(req: FireTVRequest) -> FireTVResult:
+    """`adb pull` a remote path into the h4k data dir (APK backup...)."""
+    if not req.remote:
+        raise HTTPException(status_code=400, detail="remote required")
+    from services.firetv import FireTVService
+
+    out = FireTVService().pull(_firetv_target(req), req.remote, req.local, req.port)
+    return FireTVResult(target=req.target, action="pull", **_firetv_wrap(out))
+
+
+@router.post("/firetv/screenshot", response_model=FireTVResult)
+def firetv_screenshot(req: FireTVRequest) -> FireTVResult:
+    """Grab the current framebuffer (read-only)."""
+    from services.firetv import FireTVService
+
+    out = FireTVService().screenshot(_firetv_target(req), req.port)
+    return FireTVResult(target=req.target, action="screenshot", **_firetv_wrap(out))
+
+
+@router.post("/firetv/logcat", response_model=FireTVResult)
+def firetv_logcat(req: FireTVRequest) -> FireTVResult:
+    """Recent logcat lines, bounded (read-only)."""
+    from services.firetv import FireTVService
+
+    out = FireTVService().logcat(_firetv_target(req), req.port, req.lines)
+    return FireTVResult(target=req.target, action="logcat", **_firetv_wrap(out))
+
+
+@router.post("/firetv/install", response_model=FireTVResult)
+def firetv_install(req: FireTVRequest) -> FireTVResult:
+    """`adb install` an operator-supplied local APK."""
+    if not req.local:
+        raise HTTPException(status_code=400, detail="local APK path required")
+    from services.firetv import FireTVService
+
+    out = FireTVService().install(_firetv_target(req), req.local, req.port)
+    return FireTVResult(target=req.target, action="install", **_firetv_wrap(out))
+
+
+def _firetv_wrap(out: dict[str, Any]) -> dict[str, Any]:
+    """Fold a service dict into FireTVResult fields."""
+    text = out.get("stdout") or out.get("output") or ""
+    lines = out.get("lines")
+    if isinstance(lines, list):
+        text = "\n".join(lines)
+    detail = {k: v for k, v in out.items() if k not in ("stdout", "stderr")}
+    return {
+        "success": bool(out.get("success")),
+        "output": str(text)[:20000],
+        "detail": detail,
+        "error": out.get("error") or out.get("stderr") or None,
+    }
 
 
 @router.post("/ollama/discover")

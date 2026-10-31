@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv python3-dev \
     dnsutils whois prips iputils-ping traceroute dnstracer \
     nmap whatweb arp-scan \
-    masscan tcpdump tshark netcat-openbsd socat iproute2 \
+    masscan tcpdump tshark netcat-openbsd socat iproute2 adb \
 hydra ncrack john sqlmap \
     dirb gobuster ffuf \
     smbclient smbmap dnsenum dnsrecon \

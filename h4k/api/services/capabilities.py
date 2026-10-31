@@ -31,6 +31,7 @@ TOOLS: dict[str, str] = {
     "semgrep": "static analysis (SAST)",
     "osv-scanner": "supply-chain CVE lookup",
     "trivy": "SBOM + secret + license scanning",
+    "adb": "Android/Fire TV debug bridge",
     "john": "hash cracking",
     "msfconsole": "Metasploit driver",
     "docker": "container runtime",

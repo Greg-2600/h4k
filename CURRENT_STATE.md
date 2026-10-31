@@ -13,7 +13,7 @@ the immediate horizon.
 | Item | Status |
 |---|---|
 | Git branch | `main` |
-| Tests | **1280 passing** (offline, mocked Metasploit) |
+| Tests | **1298 passing** (offline, mocked Metasploit) |
 | Coverage | **~90%** (CI gate 90%) |
 | Linters | black · ruff · isort · flake8 · mypy · bandit all green · pylint ~9.88 |
 | Container | **`h4k`** running, host-networking, UI on `http://127.0.0.1:3137` |
@@ -143,7 +143,7 @@ source .venv/bin/activate        # or .venv/bin/<tool>
 make fmt      # black + isort
 make fix      # ruff --fix
 make lint     # black ruff isort flake8 mypy pylint bandit
-make test     # pytest   (1280)
+make test     # pytest   (1298)
 make coverage # pytest --cov
 ```
 
@@ -162,7 +162,8 @@ live daemon needed. Tests that reach the network are monkeypatched (e.g.
 
 **CTF / lab toolkit (opt-in)** — `POST /zap`, `POST /john`, `POST /aircrack`,
 `POST /tshark/pcap`, `POST /tshark/live`, `POST /nmap/nse`,
-`POST /container_escape`, `POST /lateral`, `POST /db_interrogate`.
+`POST /container_escape`, `POST /lateral`, `POST /db_interrogate`,
+`POST /firetv/*` (Fire TV via adb).
 
 **Source (SAST/SCA/AI/triage)** — `POST /source/scan`,
 `POST /source/scan/upload`, `POST /source/exploit`,
