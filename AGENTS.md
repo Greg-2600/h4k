@@ -113,7 +113,7 @@ Host recon/scan:
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
-- `POST /nmap/nse`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /nmap/nse`, `POST /nikto`, `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
   apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
 - `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +

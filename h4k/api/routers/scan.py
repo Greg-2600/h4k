@@ -29,10 +29,14 @@ from schemas import (
     FireTVRequest,
     FireTVResult,
     FuzzRequest,
+    GobusterRequest,
+    GobusterResult,
     Job,
     JohnRequest,
     JohnResult,
     LateralRequest,
+    NiktoRequest,
+    NiktoResult,
     NmapNSERequest,
     NmapNSEResult,
     NucleiRequest,
@@ -2763,6 +2767,47 @@ def nmap_nse_scan(req: NmapNSERequest) -> NmapNSEResult:
     argv.append(req.target)
     out = ToolkitRunner().run_tool("nmap_nse", argv, timeout=600)
     return NmapNSEResult(target=req.target, tool=out)
+
+
+@router.post("/nikto", response_model=NiktoResult)
+def nikto_scan_api(req: NiktoRequest) -> NiktoResult:
+    """Standalone nikto web scan (also runs inside deepattack/autopilot)."""
+    from services.toolkit import ToolkitRunner
+
+    if not (req.target or "").strip():
+        raise HTTPException(status_code=400, detail="target required")
+    argv = ["nikto", "-host", req.target, "-maxtime", f"{max(1, req.maxtime)}s"]
+    if (req.tuning or "").strip():
+        argv += ["-Tuning", req.tuning.strip()]
+    out = ToolkitRunner().run_tool("nikto", argv, timeout=900)
+    return NiktoResult(target=req.target, tool=out)
+
+
+@router.post("/gobuster", response_model=GobusterResult)
+def gobuster_scan_api(req: GobusterRequest) -> GobusterResult:
+    """Standalone gobuster content discovery (also runs inside deepattack)."""
+    from services.toolkit import COMMON_WORDLIST, ToolkitRunner
+
+    if not (req.target or "").strip():
+        raise HTTPException(status_code=400, detail="target required")
+    mode = (req.mode or "dir").strip().lower()
+    if mode not in ("dir", "dns", "vhost", "fuzz"):
+        raise HTTPException(status_code=400, detail="mode must be dir|dns|vhost|fuzz")
+    argv = [
+        "gobuster",
+        mode,
+        "-u" if mode in ("dir", "vhost", "fuzz") else "-d",
+        req.target,
+        "-w",
+        (req.wordlist or "").strip() or COMMON_WORDLIST,
+        "-t",
+        str(max(1, req.threads)),
+        "-q",
+    ]
+    if (req.extensions or "").strip() and mode in ("dir", "fuzz"):
+        argv += ["-x", req.extensions.strip()]
+    out = ToolkitRunner().run_tool("gobuster", argv, timeout=900)
+    return GobusterResult(target=req.target, tool=out)
 
 
 @router.post("/container_escape", response_model=ContainerEscapeResult)

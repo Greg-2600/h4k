@@ -498,3 +498,44 @@ def test_fuzz_job_reports_dedup_counts_not_raw_crash_count(client, monkeypatch):
     assert job["stats"]["coverage_guided"] is False
     assert job["candidates"][0]["confirmed"] is True
     assert job["candidates"][0]["occurrences"] >= 10
+
+
+def test_nikto_endpoint(client, monkeypatch):
+    import services.toolkit as toolkit
+
+    seen = {}
+
+    def _fake_nikto(self, tool, argv, timeout=300):
+        seen["argv"] = argv
+        return {"tool": tool, "stdout": "+ /admin: 200"}
+
+    monkeypatch.setattr(toolkit.ToolkitRunner, "run_tool", _fake_nikto)
+    r = client.post("/api/nikto", json={"target": "http://192.168.1.13"})
+    assert r.status_code == 200
+    assert r.json()["tool"]["stdout"].startswith("+ /admin")
+    assert "-host" in seen["argv"] and "-maxtime" in seen["argv"]
+    r = client.post("/api/nikto", json={"target": "  "})
+    assert r.status_code == 400
+
+
+def test_gobuster_endpoint(client, monkeypatch):
+    import services.toolkit as toolkit
+
+    seen = {}
+
+    def _fake_gobuster(self, tool, argv, timeout=300):
+        seen["argv"] = argv
+        return {"tool": tool, "stdout": "/login (Status: 200)"}
+
+    monkeypatch.setattr(toolkit.ToolkitRunner, "run_tool", _fake_gobuster)
+    r = client.post(
+        "/api/gobuster",
+        json={"target": "http://192.168.1.13", "extensions": "php,html"},
+    )
+    assert r.status_code == 200
+    assert r.json()["tool"]["stdout"].startswith("/login")
+    assert "dir" in seen["argv"] and "-x" in seen["argv"]
+    r = client.post("/api/gobuster", json={"target": "http://x", "mode": "bogus"})
+    assert r.status_code == 400
+    r = client.post("/api/gobuster", json={"target": "  "})
+    assert r.status_code == 400

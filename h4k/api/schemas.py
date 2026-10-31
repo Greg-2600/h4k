@@ -489,6 +489,34 @@ class NmapNSEResult(BaseModel):
     tool: dict[str, Any] = {}
 
 
+class NiktoRequest(BaseModel):
+    """Standalone nikto web vulnerability scan."""
+
+    target: str  # URL or host to scan
+    maxtime: int = 120  # per-host budget in seconds
+    tuning: str | None = None  # nikto -Tuning value, e.g. "x"
+
+
+class NiktoResult(BaseModel):
+    target: str
+    tool: dict[str, Any] = {}
+
+
+class GobusterRequest(BaseModel):
+    """Standalone gobuster content discovery."""
+
+    target: str  # base URL
+    wordlist: str | None = None  # defaults to the bundled common list
+    mode: str = "dir"  # dir | dns | vhost | fuzz
+    threads: int = 10
+    extensions: str | None = None  # e.g. "php,html"
+
+
+class GobusterResult(BaseModel):
+    target: str
+    tool: dict[str, Any] = {}
+
+
 class ContainerEscapeResult(BaseModel):
     capabilities: list[str] = []
     dangerous_caps: list[str] = []

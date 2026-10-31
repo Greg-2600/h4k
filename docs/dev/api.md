@@ -1,7 +1,9 @@
 # API reference
 
 Base URL: `http://localhost:3137`. Interactive docs: `/docs` (Swagger),
-`/redoc`. Everything is JSON.
+`/redoc`, raw schema `/openapi.json`. Everything is JSON. `tests/test_openapi.py`
+asserts every registered route appears in the schema and every capability in
+`/api/capabilities` maps to at least one endpoint.
 
 Conventions:
 
@@ -53,6 +55,8 @@ Conventions:
 | `GET` | `/api/sessions` | Live msf sessions (`alive: true`) plus this session's recorded ones (`alive: false` when msfrpcd no longer holds them). Dead sessions are history, never presented as usable — re-enter via propagation or a fresh exploit |
 | `POST` | `/api/deepattack` | Toolkit orchestration (hydra/nikto/sqlmap/…) |
 | `POST` | `/api/nmap/nse` | NSE scripts |
+| `POST` | `/api/nikto` | Standalone nikto web scan |
+| `POST` | `/api/gobuster` | Standalone gobuster content discovery |
 | `POST` | `/api/container_escape` | Escape **detection** (read-only) + explicit helpers |
 | `POST` | `/api/lateral` | Routes, SSH/SOCKS tunnels, SMB sessions |
 | `POST` | `/api/db_interrogate` | Enumerate local APIs/DBs for flag-shaped secrets |
@@ -195,6 +199,7 @@ testing, no exploitation) on a cadence (`H4K_AUTO_SCAN_INTERVAL`, default
 | Method | Path |
 |---|---|
 | `POST` | `/api/zap` · `/api/john` · `/api/aircrack` · `/api/tshark/pcap` · `/api/tshark/live` |
+| `POST` | `/api/nikto` · `/api/gobuster` · `/api/sqlmap` · `/api/nmap/nse` |
 | `POST` | `/api/net/sniff` (quick capture) · `/api/net/sniff/deep` (capture + full analysis, folds into the engagement) · `/api/net/sniff/pcap` (analyse a pcap file) |
 | `GET` | `/api/net/interfaces` |
 
