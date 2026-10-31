@@ -137,8 +137,12 @@ item is a self-contained, live-demonstrable increment on the current release.
       sandbox.
       (done: `firetv.py` + `POST /api/firetv/*`; platform-tools `adb` in the
       image + capabilities inventory)
-- [ ] **Advanced fuzzing for container surfaces** — fuzz Docker API, containerd
-      gRPC, kubelet, CAD worker endpoints for RCE/DoS.
+- [x] **Advanced fuzzing for container surfaces** — fuzz Docker API, containerd
+      gRPC framing, kubelet, generic HTTP endpoints for RCE/DoS.
+  (done: `container_fuzz.py` + `POST /api/container_surfaces|container_fuzz`;
+  reuses the LabFuzzer engine/registry with TCP/TLS/unix/gRPC transports;
+  read-only GET shapes by default, POST shapes only with `allow_mutating`;
+  docker/grpc targets restricted to localhost; Exploit-tab card + e2e)
 - [x] **Attack path graph to flag** — compute minimal path from foothold to flag
       (container escape → host → other containers → DB → flag). Show ATT&CK
       chain.

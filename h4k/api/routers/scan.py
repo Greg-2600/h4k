@@ -24,6 +24,8 @@ from schemas import (
     BatchScanRequest,
     BatchScanResult,
     ContainerEscapeResult,
+    ContainerFuzzRequest,
+    ContainerFuzzResult,
     DBInterrogateRequest,
     DeepAttackRequest,
     FireTVRequest,
@@ -2649,6 +2651,101 @@ def fuzz_abort(job_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="fuzz job not found")
     job["status"] = "abort_requested"
     logger.info("[fuzz %s] abort requested", job_id)
+    return {"status": "abort_requested"}
+
+
+_cfuzz_jobs: dict[str, dict[str, Any]] = {}
+
+
+@router.post("/container_surfaces")
+def container_surfaces(req: dict[str, Any]) -> dict[str, Any]:
+    """Read-only inventory of fuzzable container runtimes (no packets mutated)."""
+    from services.container_fuzz import detect_surfaces
+
+    target = str((req or {}).get("target") or "127.0.0.1")
+    return detect_surfaces(target)
+
+
+@router.post("/container_fuzz", response_model=ContainerFuzzResult)
+def run_container_fuzz(
+    req: ContainerFuzzRequest, background: BackgroundTasks
+) -> ContainerFuzzResult:
+    """LAB-ONLY: fuzz a container surface you own (Docker API, kubelet,
+    containerd framing, or generic HTTP endpoints).
+
+    Read-only GET shapes by default; `allow_mutating` adds POST shapes.
+    Runs as a background job like /fuzz — poll `/api/container_fuzz/{id}`.
+    """
+    surface = (req.surface or "docker").strip().lower()
+    if surface not in ("docker", "kubelet", "grpc", "http"):
+        raise HTTPException(
+            status_code=400, detail="surface must be docker|kubelet|grpc|http"
+        )
+    if surface in ("docker", "grpc") and (req.target or "").strip() not in (
+        "127.0.0.1",
+        "localhost",
+        "::1",
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="docker/grpc fuzzing is local-only (unix socket)",
+        )
+    job_id = uuid.uuid4().hex[:12]
+    job = {
+        "id": job_id,
+        "surface": surface,
+        "target": req.target,
+        "status": "running",
+        "candidates": [],
+        "created": datetime.now(UTC).isoformat(),
+    }
+    _cfuzz_jobs[job_id] = job
+    background.add_task(_run_container_fuzz, job, req, surface)
+    return ContainerFuzzResult(job_id=job_id, status="running")
+
+
+def _run_container_fuzz(
+    job: dict[str, Any], req: ContainerFuzzRequest, surface: str
+) -> None:
+    from services.container_fuzz import fuzz_surface
+
+    try:
+        result = fuzz_surface(
+            surface,
+            target=req.target,
+            port=req.port,
+            endpoints=req.endpoints,
+            iterations=req.iterations,
+            timeout=req.timeout,
+            seed=req.seed,
+            allow_mutating=req.allow_mutating,
+            progress=lambda msg, pct: _update(job, message=msg, progress=pct),
+        )
+        job["candidates"] = result["candidates"]
+        job["count"] = result["count"]
+        job["stats"] = result["stats"]
+        job["transport"] = result["transport"]
+        _update(job, status="done", progress=100.0, message="container fuzz complete")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("container fuzz job failed")
+        _update(job, status="error", error=str(exc), message="container fuzz failed")
+
+
+@router.get("/container_fuzz/{job_id}")
+def container_fuzz_status(job_id: str) -> dict[str, Any]:
+    job = _cfuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="container fuzz job not found")
+    return job
+
+
+@router.post("/container_fuzz/{job_id}/abort")
+def container_fuzz_abort(job_id: str) -> dict[str, Any]:
+    job = _cfuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="container fuzz job not found")
+    job["status"] = "abort_requested"
+    logger.info("[container_fuzz %s] abort requested", job_id)
     return {"status": "abort_requested"}
 
 

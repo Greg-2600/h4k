@@ -110,6 +110,7 @@ Host recon/scan:
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
 - `POST /vulnleads`
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
+- `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
@@ -162,6 +163,7 @@ Health/diagnostic:
 | `discovery.py` | ARP neighbor discovery (arp-scan / cache / msf) |
 | `security.py` | traceroute + exposure -> posture heuristic |
 | `fuzzer.py` | signal-guided HTTP mutation engine + real libFuzzer crash minimizer |
+| `container_fuzz.py` | Docker API / kubelet / containerd-framing / HTTP surface fuzzing (job-based) + read-only surface inventory |
 | `crashes.py` | crash fingerprinting + dedup (N crashes -> M distinct bugs) |
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |

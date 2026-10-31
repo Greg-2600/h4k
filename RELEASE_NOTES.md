@@ -399,6 +399,8 @@ POST  /api/attack                      opt-in Metasploit exploit
 POST  /api/deepattack                  opt-in toolkit sweep (hydra/nikto/...)
 POST  /api/vulnleads                   EOL/beta/old version leads
 POST  /api/fuzz + /api/fuzz/{id}        lab fuzzer, dedup'd by bug fingerprint
+POST  /api/container_surfaces|container_fuzz
+                                        container-surface fuzzing (Docker/kubelet/gRPC/HTTP)
 POST  /api/source/scan                 clone+SAST (git URL)
 POST  /api/source/scan/upload          upload+SAST (zip/tar/tgz)
 POST  /api/source/exploit              PoC skeleton

@@ -17,6 +17,7 @@ const state = {
   apTimer: null,
   fzTimer: null,
   paTimer: null,
+  cfTimer: null,
   statusTimer: null,
 };
 
@@ -690,6 +691,65 @@ async function ftvRun(action, extra = {}) {
   }
 }
 
+/* ---------- exploit: container-surface recon + fuzz ---------- */
+
+async function detectContainerSurfaces() {
+  const target = $('cf-target').value.trim() || '127.0.0.1';
+  $('cf-output').hidden = false;
+  $('cf-output').textContent = 'inventorying runtimes…';
+  try {
+    const res = await api('/api/container_surfaces', { method: 'POST', body: { target } });
+    const rows = [];
+    const s = res.surfaces || {};
+    if (s.docker) rows.push(`docker sock: ${s.docker.socket_present ? 'present' : 'absent'}${s.docker.api_version ? ` (API ${s.docker.api_version})` : ''}`);
+    if (s.containerd) rows.push(`containerd sock: ${s.containerd.socket_present ? 'present' : 'absent'}`);
+    if (s.kubelet && s.kubelet.ports) {
+      const open = Object.entries(s.kubelet.ports).filter(([, p]) => p.open).map(([p]) => p);
+      rows.push(`kubelet: ${open.length ? `open on ${open.join(', ')}` : 'no API ports open'}`);
+    }
+    $('cf-output').textContent = rows.length ? rows.join('\n') : 'no container runtimes found';
+    log('surface inventory done', 'info');
+  } catch (e) {
+    $('cf-output').textContent = `inventory failed: ${e.message}`;
+    log(`surface inventory failed: ${e.message}`, 'error');
+  }
+}
+
+async function startContainerFuzz() {
+  const btn = $('btn-cf-start');
+  if (btn) btn.disabled = true;
+  $('cf-output').hidden = false;
+  $('cf-output').textContent = 'fuzzing container surface…';
+  try {
+    const res = await api('/api/container_fuzz', {
+      method: 'POST',
+      body: {
+        surface: $('cf-surface').value,
+        target: $('cf-target').value.trim() || '127.0.0.1',
+        iterations: parseInt($('cf-iters').value, 10) || 200,
+      },
+    });
+    if (!jobIdOf(res)) { log(`container fuzz refused: ${res.detail || 'error'}`, 'error'); if (btn) btn.disabled = false; return; }
+    const jobId = jobIdOf(res);
+    log(`container fuzz ${jobId}`, 'info');
+    if (state.cfTimer) clearInterval(state.cfTimer);
+    state.cfTimer = setInterval(async () => {
+      try {
+        const st = await api(`/api/container_fuzz/${jobId}`);
+        $('cf-live').textContent = `${st.status || 'running'}`;
+        const cands = st.candidates || [];
+        if (cands.length) $('cf-output').textContent = cands.map((c) => `${c.signal || '?'} via ${c.vector || '?'} (${c.port || ''})`).join('\n').slice(0, 4000);
+        if (isDone(st.status)) {
+          clearInterval(state.cfTimer); state.cfTimer = null;
+          if (btn) btn.disabled = false;
+          if (!cands.length) $('cf-output').textContent += '\nno candidates — surface stayed quiet';
+          log('container fuzz done', 'success');
+        }
+      } catch (e) { log(`container fuzz poll: ${e.message}`, 'error'); }
+    }, 2000);
+  } catch (e) { log(`container fuzz failed: ${e.message}`, 'error'); if (btn) btn.disabled = false; }
+}
+
 /* ---------- 5. persist: hold the win ---------- */
 
 async function renderPersist() {
@@ -955,6 +1015,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('btn-nikto').addEventListener('click', runNikto);
   $('btn-gobuster').addEventListener('click', runGobuster);
+  $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
+  $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }
     catch (e) { log(`cve refresh failed: ${e.message}`, 'error'); }

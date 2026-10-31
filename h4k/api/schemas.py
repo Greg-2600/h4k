@@ -696,3 +696,27 @@ class HealthDetail(BaseModel):
     cache_entries: int
     updater: str
     version: str
+
+
+class ContainerFuzzRequest(BaseModel):
+    """LAB-ONLY: mutate inputs to container surfaces you OWN.
+
+    surface docker = local Engine API over the unix socket; kubelet =
+    TLS API on target:10250; grpc = containerd framing over its socket;
+    http = generic endpoint list (CAD-worker style). Read-only GET
+    endpoints unless allow_mutating opts into POST shapes.
+    """
+
+    surface: str = "docker"  # docker | kubelet | grpc | http
+    target: str = "127.0.0.1"
+    port: int | None = None  # preset default when omitted
+    endpoints: list[str] | None = None  # override the preset endpoint list
+    iterations: int = Field(default=200, ge=1, le=20_000)
+    timeout: float = Field(default=3.0, gt=0, le=10.0)
+    seed: int | None = None
+    allow_mutating: bool = False  # include POST endpoint shapes
+
+
+class ContainerFuzzResult(BaseModel):
+    job_id: str = ""
+    status: str = ""

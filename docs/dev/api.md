@@ -167,6 +167,9 @@ Conventions:
 | `POST` | `/api/fuzz` | Start a fuzzing run against a target **you own** |
 | `GET` | `/api/fuzz/{id}` | Progress + crash candidates (deduped) |
 | `POST` | `/api/fuzz/minimize` | Minimize a crash artifact |
+| `POST` | `/api/container_surfaces` | Read-only inventory: docker/containerd/kubelet reachability |
+| `POST` | `/api/container_fuzz` | Fuzz a surface you own (`docker\|kubelet\|grpc\|http`); job-based |
+| `GET` | `/api/container_fuzz/{id}` | Job progress + candidates |
 
 ---
 

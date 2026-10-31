@@ -161,6 +161,25 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Container surfaces</h2><span class="spacer"></span><span class="muted" id="cf-live">ready</span></div>
+          <div class="card-body">
+            <p class="muted">Lab-only: inventory runtimes, then fuzz Docker API / kubelet / containerd framing / HTTP endpoints you own.</p>
+            <div class="row">
+              <select id="cf-surface" data-testid="cf-surface" title="Surface preset">
+                <option value="docker" selected>docker API (unix socket)</option>
+                <option value="kubelet">kubelet (TLS :10250)</option>
+                <option value="grpc">containerd framing (unix socket)</option>
+                <option value="http">generic HTTP endpoints</option>
+              </select>
+              <input type="text" id="cf-target" data-testid="cf-target" value="127.0.0.1" title="Target host (docker/grpc are local-only)" />
+              <input type="text" id="cf-iters" data-testid="cf-iters" value="200" title="Iterations" />
+              <button class="btn" id="btn-cf-detect" data-testid="btn-cf-detect">Detect</button>
+              <button class="btn primary" id="btn-cf-start" data-testid="btn-cf-start">Start fuzzing</button>
+            </div>
+            <div class="output" id="cf-output" data-testid="cf-output" hidden></div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Fuzz lab</h2><span class="spacer"></span><span class="muted" id="fz-live">ready</span></div>
           <div class="card-body">
             <p class="muted">Lab-only: fuzz a service you own. Crashes get reproduce commands.</p>
