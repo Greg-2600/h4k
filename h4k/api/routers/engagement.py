@@ -212,6 +212,35 @@ def attack_paths(
     return result
 
 
+@router.get("/{engagement_id}/flag-paths")
+def flag_paths(
+    engagement_id: str,
+    max_depth: int = 6,
+    limit: int = 25,
+    fmt: str = "json",
+) -> dict[str, Any]:
+    """Evidence-backed paths from footholds to the hosts where flags fell.
+
+    Same engine as attack-paths, but the objectives are the captured flags:
+    one synthetic objective per flag host, with the flags attached to each
+    path's final hop. Unplaced flags (no host recorded) are reported but
+    cannot be pathed to. `fmt=md` returns a markdown writeup.
+    """
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    from services.flag_paths import compute_flag_paths, flag_paths_to_markdown
+
+    result = compute_flag_paths(store, engagement_id, max_depth=max_depth, limit=limit)
+    if fmt.lower() in ("md", "markdown"):
+        return {
+            "fmt": "md",
+            "content": flag_paths_to_markdown(result),
+            "summary": result.get("summary", {}),
+        }
+    return result
+
+
 @router.get("/{engagement_id}/export")
 def export_engagement(engagement_id: str) -> dict[str, Any]:
     """Export the whole engagement as a portable snapshot.

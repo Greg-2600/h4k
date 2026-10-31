@@ -626,6 +626,70 @@ async function runEscapeCheck() {
   }
 }
 
+/* ---------- recon: web assessment (nikto + gobuster) ---------- */
+
+function renderToolResult(elId, res, label) {
+  const tool = res.tool || {};
+  const text = (tool.stdout || tool.stderr || JSON.stringify(res)).slice(0, 4000);
+  $(elId).innerHTML = `<div class="output">${esc(text)}</div>`;
+  log(`${label} done: ${tool.status || (res.success ? 'ok' : 'failed')}`, 'info');
+}
+
+async function runNikto() {
+  const target = $('web-target').value.trim();
+  if (!target) { log('nikto needs a target', 'warn'); return; }
+  $('web-body').textContent = 'nikto scanning…';
+  try {
+    const res = await api('/api/nikto', { method: 'POST', body: { target } });
+    renderToolResult('web-body', res, 'nikto');
+  } catch (e) {
+    $('web-body').textContent = `nikto failed: ${e.message}`;
+    log(`nikto failed: ${e.message}`, 'error');
+  }
+}
+
+async function runGobuster() {
+  const target = $('web-target').value.trim();
+  if (!target) { log('gobuster needs a target', 'warn'); return; }
+  const extensions = $('webgob-ext').value.trim();
+  $('web-body').textContent = 'gobuster enumerating…';
+  try {
+    const res = await api('/api/gobuster', { method: 'POST', body: { target, extensions: extensions || null } });
+    renderToolResult('web-body', res, 'gobuster');
+  } catch (e) {
+    $('web-body').textContent = `gobuster failed: ${e.message}`;
+    log(`gobuster failed: ${e.message}`, 'error');
+  }
+}
+
+/* ---------- pivot: Fire TV via adb ---------- */
+
+async function ftvRun(action, extra = {}) {
+  const target = $('ftv-target').value.trim() || '127.0.0.1';
+  $('ftv-body').textContent = `${action}…`;
+  try {
+    const res = await api(`/api/firetv/${action}`, { method: 'POST', body: { target, ...extra } });
+    const detail = res.detail || {};
+    const rows = [];
+    if (res.output) rows.push(res.output.slice(0, 1500));
+    if (detail.state) rows.push(`adb state: ${detail.state}`);
+    if (detail.adb_state) rows.push(`adb state: ${detail.adb_state}`);
+    if (detail.count !== undefined) rows.push(`packages: ${detail.count}`);
+    if (detail.file) rows.push(`saved: ${detail.file}`);
+    if (detail.ports) {
+      const open = Object.entries(detail.ports).filter(([, v]) => v).map(([p]) => p);
+      rows.push(`open tv ports: ${open.length ? open.join(', ') : 'none'}`);
+    }
+    if (detail.eureka && detail.eureka.model_name) rows.push(`model: ${detail.eureka.model_name}`);
+    const text = rows.length ? rows.join('\n') : JSON.stringify(detail).slice(0, 1500) || '(empty)';
+    $('ftv-body').innerHTML = `<div class="output">${esc(text)}</div>`;
+    log(`firetv ${action}: ${res.success ? 'ok' : (res.error || 'failed')}`, res.success ? 'success' : 'warn');
+  } catch (e) {
+    $('ftv-body').textContent = `firetv ${action} failed: ${e.message}`;
+    log(`firetv ${action} failed: ${e.message}`, 'error');
+  }
+}
+
 /* ---------- 5. persist: hold the win ---------- */
 
 async function renderPersist() {
@@ -813,6 +877,9 @@ function runCmd(cmd) {
   else if (cmd === 'neighbors') { setTab('discover'); launchNeighbors(); }
   else if (cmd === 'fingerprint') { setTab('recon'); startFingerprint(); }
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
+  else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
+  else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'score') setTab('score');
   else if (cmd === 'theme') toggleTheme();
@@ -870,6 +937,8 @@ document.addEventListener('DOMContentLoaded', () => {
       log(jobIdOf(res) ? `full scan ${jobIdOf(res)}` : `full scan refused: ${res.detail}`, jobIdOf(res) ? 'info' : 'error');
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
+  $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }
     catch (e) { log(`cve refresh failed: ${e.message}`, 'error'); }
@@ -894,6 +963,15 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-db-run').addEventListener('click', runDbInterrogate);
   $('btn-escape-run').addEventListener('click', runEscapeCheck);
   $('btn-trylocalroot-run').addEventListener('click', runTryLocalRoot);
+  $('btn-ftv-recon').addEventListener('click', () => ftvRun('recon'));
+  $('btn-ftv-pair').addEventListener('click', () => {
+    const code = $('ftv-code').value.trim();
+    if (!code) { log('pair needs the 6-digit on-screen code', 'warn'); return; }
+    ftvRun('pair', { code });
+  });
+  $('btn-ftv-state').addEventListener('click', () => ftvRun('state'));
+  $('btn-ftv-apps').addEventListener('click', () => ftvRun('apps'));
+  $('btn-ftv-shot').addEventListener('click', () => ftvRun('screenshot'));
 
   // persist
   $('btn-reenter').addEventListener('click', async () => { setTab('pivot'); await loadPropagationPlan(); await executePropagation(); await renderPersist(); });

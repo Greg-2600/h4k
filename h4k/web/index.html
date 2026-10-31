@@ -108,6 +108,18 @@
             <div class="empty" id="vulns-empty">No findings yet — fingerprint first.</div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>Web assessment</h2><span class="spacer"></span><span class="muted">nikto + gobuster · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="web-target" data-testid="web-target" class="grow" placeholder="http://192.168.1.13" />
+              <input type="text" id="webgob-ext" data-testid="webgob-ext" placeholder="exts: php,html" title="Gobuster extensions (comma-separated)" />
+              <button class="btn" id="btn-nikto" data-testid="btn-nikto">Nikto scan</button>
+              <button class="btn" id="btn-gobuster" data-testid="btn-gobuster">Gobuster</button>
+            </div>
+            <div id="web-body" data-testid="web-body" class="muted">Vulnerability scan and content discovery for one web surface you own.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ═══ 3. EXPLOIT: queue, autopilot, creds attacks, fuzz ═══ -->
@@ -228,6 +240,23 @@
             <div id="trylocalroot-body" class="muted">User-namespace uid 0, docker-group read, SUID/caps/gates/CVE posture — one shot, no password.</div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>Fire TV</h2><span class="spacer"></span><span class="muted">Android TV via adb · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="ftv-target" data-testid="ftv-target" class="grow" placeholder="192.168.1.100" />
+              <input type="text" id="ftv-code" data-testid="ftv-code" placeholder="pairing code" title="6-digit on-screen wireless-debugging code" />
+            </div>
+            <div class="row">
+              <button class="btn" id="btn-ftv-recon" data-testid="btn-ftv-recon">Recon</button>
+              <button class="btn" id="btn-ftv-pair" data-testid="btn-ftv-pair">Pair</button>
+              <button class="btn" id="btn-ftv-state" data-testid="btn-ftv-state">State</button>
+              <button class="btn" id="btn-ftv-apps" data-testid="btn-ftv-apps">Apps</button>
+              <button class="btn" id="btn-ftv-shot" data-testid="btn-ftv-shot">Screenshot</button>
+            </div>
+            <div id="ftv-body" data-testid="ftv-body" class="muted">Recon is read-only. Pair needs the on-TV code; shell-class actions need approval on the TV.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ═══ 5. PERSIST: hold the win ═══ -->
@@ -304,6 +333,9 @@
         <div class="cmd-item" data-cmd="neighbors"><span>Discover: find neighbors</span></div>
         <div class="cmd-item" data-cmd="fingerprint"><span>Recon: fingerprint services</span></div>
         <div class="cmd-item" data-cmd="autopilot"><span>Exploit: start autopilot</span></div>
+        <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
+        <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>
         <div class="cmd-item" data-cmd="theme"><span>Toggle theme</span></div>
@@ -314,6 +346,6 @@
     <div class="toast" id="flag-toast" data-testid="flag-toast" hidden></div>
 
   </div>
-  <script src="/static/app.js?v=13"></script>
+  <script src="/static/app.js?v=14"></script>
 </body>
 </html>
