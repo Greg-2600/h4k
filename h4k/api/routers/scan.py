@@ -2907,15 +2907,32 @@ def firetv_recon(req: FireTVRequest) -> FireTVResult:
 
 
 @router.post("/firetv/mdns", response_model=FireTVResult)
-def firetv_mdns() -> FireTVResult:
+def firetv_mdns(req: FireTVRequest) -> FireTVResult:
     """Listen for Fire TV mDNS announcements (no target needed)."""
     from services.firetv import mdns_discover
 
-    out = mdns_discover()
+    out = mdns_discover(queries=req.queries)
     ok = bool(out.get("success"))
     return FireTVResult(
         target="multicast",
         action="mdns",
+        success=ok,
+        output=f"{len(out.get('devices', []))} device(s)",
+        detail=out,
+        error=None if ok else out.get("error"),
+    )
+
+
+@router.post("/firetv/ssdp", response_model=FireTVResult)
+def firetv_ssdp() -> FireTVResult:
+    """UPnP/SSDP discovery sweep (no target needed)."""
+    from services.firetv import ssdp_discover
+
+    out = ssdp_discover()
+    ok = bool(out.get("success"))
+    return FireTVResult(
+        target="multicast",
+        action="ssdp",
         success=ok,
         output=f"{len(out.get('devices', []))} device(s)",
         detail=out,
@@ -2939,6 +2956,17 @@ def firetv_disconnect(req: FireTVRequest) -> FireTVResult:
 
     out = FireTVService().disconnect(_firetv_target(req), req.port)
     return FireTVResult(target=req.target, action="disconnect", **_firetv_wrap(out))
+
+
+@router.post("/firetv/pair", response_model=FireTVResult)
+def firetv_pair(req: FireTVRequest) -> FireTVResult:
+    """Pair with wireless debugging using the TV's on-screen 6-digit code."""
+    if not req.code:
+        raise HTTPException(status_code=400, detail="code required")
+    from services.firetv import FireTVService
+
+    out = FireTVService().pair(_firetv_target(req), req.code, req.port)
+    return FireTVResult(target=req.target, action="pair", **_firetv_wrap(out))
 
 
 @router.post("/firetv/state", response_model=FireTVResult)

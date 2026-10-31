@@ -131,11 +131,12 @@ item is a self-contained, live-demonstrable increment on the current release.
       with a UI button.
       (done: `zap.py` `john.py` `aircrack.py` `tshark.py` + `/api/zap|john|aircrack|
       tshark/*|nmap/nse`)
-- [x] **Fire TV toolkit** — ADB connect/state/shell/keyevent/apps/pull/
-      screenshot/logcat/install + recon (ports/eureka/auth-state) + mDNS
-      discovery, each an explicit endpoint; mutating calls gated in sandbox.
-      (done: `firetv.py` + `POST /api/firetv/*`; `adb` in the image +
-      capabilities inventory)
+- [x] **Fire TV toolkit** — ADB connect/pair/state/shell/keyevent/apps/pull/
+      screenshot/logcat/install + recon (ports/banners/certs/eureka/auth-state)
+      + mDNS/SSDP sweeps, each an explicit endpoint; mutating calls gated in
+      sandbox.
+      (done: `firetv.py` + `POST /api/firetv/*`; platform-tools `adb` in the
+      image + capabilities inventory)
 - [ ] **Advanced fuzzing for container surfaces** — fuzz Docker API, containerd
       gRPC, kubelet, CAD worker endpoints for RCE/DoS.
 - [ ] **Attack path graph to flag** — compute minimal path from foothold to flag

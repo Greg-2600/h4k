@@ -410,7 +410,7 @@ POST  /api/aircrack                     opt-in wireless assessment
 POST  /api/tshark/pcap · /tshark/live   pcap / live capture analysis
 POST  /api/nmap/nse                     nmap vuln NSE scripts
 POST  /api/container_escape             container escape vector check (read-only)
-POST  /api/firetv/recon|mdns|connect|state|shell|keyevent|apps|pull|screenshot|logcat|install|disconnect
+POST  /api/firetv/recon|mdns|ssdp|connect|pair|state|shell|keyevent|apps|pull|screenshot|logcat|install|disconnect
                                         Fire TV / Android TV via adb (opt-in)
 POST  /api/lateral                      route/interface map (read-only)
 POST  /api/db_interrogate               local API/DB/flag interrogation

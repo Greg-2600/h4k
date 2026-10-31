@@ -1,6 +1,6 @@
 # Fire TV / Android TV assessment: ADB + recon for the authorised-TV use case.
 # All actions are explicit opt-in endpoints; a scan never touches a TV.
-# Detection (recon/mdns_discover) is read-only. State-changing calls
+# Detection (recon/mdns_discover/ssdp_discover) is read-only. State-changing
 # (shell/install/push/keyevent) are disabled in sandbox mode.
 import json
 import logging
@@ -8,6 +8,7 @@ import re
 import shlex
 import shutil
 import socket
+import ssl
 import struct
 import subprocess  # nosec B404 - fixed-argv adb wrapper
 import time
@@ -188,6 +189,31 @@ class FireTVService:
             return {"success": False, "error": str(exc)}
         out = self._run([ADB, "disconnect", addr], timeout=15)
         return {"success": out["success"], "addr": addr}
+
+    def pair(self, target: str, code: str, port: int = DEFAULT_PORT) -> dict[str, Any]:
+        """Pair with the TV's wireless-debugging service (`adb pair`).
+
+        The 6-digit code comes from the TV screen (Settings -> ... ->
+        Wireless debugging) and is only valid while that dialog is up.
+        Needs the platform-tools adb; Debian's adb has no `pair` command.
+        """
+        ok, reason = self._mutating_ok()
+        if not ok:
+            return {"success": False, "error": reason}
+        try:
+            addr = _target_addr(target, port)
+        except ValueError as exc:
+            return {"success": False, "error": str(exc)}
+        if not re.fullmatch(r"\d{6}", (code or "").strip()):
+            return {"success": False, "error": "pairing code must be 6 digits"}
+        out = self._run([ADB, "pair", addr, code.strip()], timeout=60)
+        text = (out["stdout"] + out["stderr"]).strip()
+        paired = "successfully paired" in text.lower()
+        return {
+            "success": paired,
+            "addr": addr,
+            "output": text[:1000],
+        }
 
     def state(self, target: str, port: int = DEFAULT_PORT) -> dict[str, Any]:
         """device | unauthorized | offline — authorisation without a shell."""
@@ -384,7 +410,7 @@ class FireTVService:
 
     # -- recon ------------------------------------------------------------
     def recon(self, target: str) -> dict[str, Any]:
-        """Read-only Fire TV fingerprint: ports + eureka + adb state."""
+        """Read-only Fire TV fingerprint: ports + banners/certs + eureka + adb."""
         host = (target or "").strip().split(":")[0]
         if not host or host.startswith("-"):
             return {"success": False, "error": "invalid target"}
@@ -395,6 +421,17 @@ class FireTVService:
                     ports[p] = True
             except OSError:
                 ports[p] = False
+        banners: dict[int, dict[str, Any]] = {}
+        certs: dict[int, dict[str, Any]] = {}
+        for p, is_open in ports.items():
+            if not is_open:
+                continue
+            banner = _http_banner(host, p)
+            if banner:
+                banners[p] = banner
+            cert = _tls_cert(host, p)
+            if cert:
+                certs[p] = cert
         eureka: dict[str, Any] = {}
         if ports.get(8008):
             try:
@@ -408,11 +445,58 @@ class FireTVService:
             "success": True,
             "target": host,
             "ports": ports,
+            "banners": banners,
+            "certs": certs,
             "eureka": eureka,
             "adb_state": adb_state.get("state", "unknown"),
             "looks_like_fire_tv": bool(ports.get(5555) or ports.get(8009))
             or "amazon" in json.dumps(eureka).lower(),
         }
+
+
+def _http_banner(host: str, port: int, timeout: float = 4.0) -> dict[str, Any] | None:
+    """Best-effort HTTP banner: status + Server header (what curl -i showed)."""
+    try:
+        req = urllib.request.Request(f"http://{host}:{port}/", method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
+            return {
+                "status": getattr(resp, "status", None),
+                "server": resp.headers.get("Server", "")[:200],
+            }
+    except Exception:
+        return None
+
+
+def _tls_cert(host: str, port: int, timeout: float = 4.0) -> dict[str, Any] | None:
+    """Best-effort TLS cert grab (what `openssl s_client` showed)."""
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with (
+            socket.create_connection((host, port), timeout=timeout) as sock,
+            ctx.wrap_socket(sock, server_hostname=host) as tls,
+        ):
+            cert = tls.getpeercert() or {}
+        subj = _rdn(cert, "subject")
+        issuer = _rdn(cert, "issuer")
+        if not subj and not issuer:
+            return None
+        return {"subject": subj[:300], "issuer": issuer[:300]}
+    except Exception:
+        return None
+
+
+def _rdn(cert: dict[str, Any], field: str) -> str:
+    """Flatten a getpeercert() subject/issuer tuple-tree to one string."""
+    parts: list[str] = []
+    for rdn in cert.get(field, []) or []:
+        if not isinstance(rdn, (list, tuple)):
+            continue
+        for pair in rdn:
+            if isinstance(pair, (list, tuple)) and len(pair) == 2:
+                parts.append(f"{pair[0]}={pair[1]}")
+    return " ".join(parts)
 
 
 def mdns_discover(
@@ -481,6 +565,63 @@ def mdns_discover(
                 model = m.group(1)
                 if model not in entry["models"]:
                     entry["models"].append(model)
+    finally:
+        sock.close()
+    return {"success": True, "devices": sorted(found.values(), key=lambda d: d["ip"])}
+
+
+def ssdp_discover(timeout: float = 6.0) -> dict[str, Any]:
+    """UPnP/SSDP discovery (pure stdlib): M-SEARCH ssdp:all, parse replies.
+
+    Collects LOCATION / SERVER / ST / USN headers per source IP — the same
+    answers the manual `M-SEARCH` probe collected (here: none on this LAN,
+    which itself is a finding about the TV fleet).
+    """
+    msg = (
+        b"M-SEARCH * HTTP/1.1\r\n"
+        b"HOST: 239.255.255.250:1900\r\n"
+        b'MAN: "ns=01; ns=01"\r\n'
+        b"MX: 2\r\n"
+        b"ST: ssdp:all\r\n"
+        b"\r\n"
+    )
+    found: dict[str, dict[str, Any]] = {}
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        try:
+            sock.bind(("", 0))
+        except OSError as exc:
+            return {"success": False, "error": f"bind failed: {exc}", "devices": []}
+        sock.settimeout(2.0)
+        for _ in range(2):
+            with suppress(OSError):
+                sock.sendto(msg, ("239.255.255.250", 1900))
+            time.sleep(0.3)
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                data, addr = sock.recvfrom(65535)
+            except TimeoutError:
+                continue
+            except OSError:
+                break
+            ip = addr[0]
+            entry = found.setdefault(
+                ip, {"ip": ip, "location": None, "server": None, "st": [], "usn": None}
+            )
+            for line in data.decode("utf-8", "replace").splitlines():
+                if ":" not in line:
+                    continue
+                key, _, value = line.partition(":")
+                key, value = key.strip().upper(), value.strip()[:300]
+                if key == "LOCATION" and not entry["location"]:
+                    entry["location"] = value
+                elif key == "SERVER" and not entry["server"]:
+                    entry["server"] = value
+                elif key == "USN" and not entry["usn"]:
+                    entry["usn"] = value
+                elif key == "ST" and value not in entry["st"]:
+                    entry["st"].append(value)
     finally:
         sock.close()
     return {"success": True, "devices": sorted(found.values(), key=lambda d: d["ip"])}

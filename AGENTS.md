@@ -114,8 +114,8 @@ Host recon/scan:
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
 - `POST /nmap/nse`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
-- `POST /firetv/*` (recon, mdns, connect, state, shell, keyevent, apps, pull,
-  screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
+- `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
+  apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
 - `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +
   docker-group tries + host audit, read-only, no password)
 
@@ -186,7 +186,7 @@ Health/diagnostic:
 | `aircrack.py` | aircrack-ng wireless assessment (monitor/capture/crack) |
 | `tshark.py` | tshark pcap/live capture, flow/credential/anomaly extraction |
 | `container_escape.py` | detect container escape vectors (read-only); explicit exploit helpers |
-| `firetv.py` | Fire TV / Android TV assessment via adb (recon, shell, keyevent, apps, pull, screenshot, logcat, install) + mDNS discovery |
+| `firetv.py` | Fire TV / Android TV assessment via adb (recon, mDNS/SSDP sweeps, pair, shell, keyevent, apps, pull, screenshot, logcat, install) + mDNS discovery |
 | `privesc.py` | local-root awareness: docker-group/userns tries (read-only, no password) + host audit (SUID/caps/gates/CVEs) |
 | `lateral.py` | route/interface map + SSH/chisel tunnel + SMB session helpers |
 | `db_interrogate.py` | enumerate local APIs/DBs/configs for flag-shaped secrets |

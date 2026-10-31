@@ -510,13 +510,15 @@ class DBInterrogateRequest(BaseModel):
 class FireTVRequest(BaseModel):
     """Fire TV / Android TV assessment request (one target, one action)."""
 
-    target: str  # IP or hostname of the TV
+    target: str = ""  # IP or hostname of the TV (empty for mdns/ssdp sweeps)
     port: int = 5555  # ADB port
     command: str | None = None  # shell: command string
     key: str | None = None  # keyevent: KEYCODE name or 0-255
+    code: str | None = None  # pair: 6-digit on-screen pairing code
     remote: str | None = None  # pull: remote path on the TV
     local: str | None = None  # pull: local name / install: local APK path
     lines: int = 200  # logcat: recent line count
+    queries: list[str] | None = None  # mdns: service types to ask for
 
 
 class FireTVResult(BaseModel):

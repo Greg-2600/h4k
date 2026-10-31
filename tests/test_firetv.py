@@ -592,14 +592,14 @@ def test_firetv_endpoints(client, monkeypatch):
     monkeypatch.setattr(
         ft, "mdns_discover", lambda *a, **k: {"success": True, "devices": []}
     )
-    r = client.post("/api/firetv/mdns")
+    r = client.post("/api/firetv/mdns", json={})
     assert r.status_code == 200 and r.json()["action"] == "mdns"
     monkeypatch.setattr(
         ft,
         "mdns_discover",
         lambda *a, **k: {"success": False, "error": "nope", "devices": []},
     )
-    r = client.post("/api/firetv/mdns")
+    r = client.post("/api/firetv/mdns", json={})
     assert r.json()["error"] == "nope"
 
     canned = {"success": True, "stdout": "hi"}
@@ -693,3 +693,249 @@ def test_firetv_endpoints(client, monkeypatch):
         == 200
     )
     assert client.post("/api/firetv/install", json={"target": "h"}).status_code == 400
+
+
+def test_pair_gated_validated_and_runs(monkeypatch):
+    from services import firetv as ft
+
+    svc = ft.FireTVService()
+    monkeypatch.setenv("H4K_SANDBOX", "1")
+    assert svc.pair("h", "123456")["error"] == "disabled in sandbox mode"
+    monkeypatch.delenv("H4K_SANDBOX", raising=False)
+    assert svc.pair("", "123456")["success"] is False
+    for bad in ("", "12", "abcdef", "1234567", "-12345"):
+        assert svc.pair("h", bad)["success"] is False
+    monkeypatch.setattr(
+        ft.FireTVService,
+        "_run",
+        lambda self, argv, timeout=60: {
+            "stdout": "Successfully paired to 192.168.1.100:37123 [guid=abc]",
+            "stderr": "",
+            "success": True,
+            "rc": 0,
+        },
+    )
+    out = svc.pair("192.168.1.100:37123", "123456")
+    assert out["success"] is True
+    monkeypatch.setattr(
+        ft.FireTVService,
+        "_run",
+        lambda self, argv, timeout=60: {
+            "stdout": "",
+            "stderr": "failed",
+            "success": False,
+            "rc": 1,
+        },
+    )
+    assert svc.pair("h", "123456")["success"] is False
+
+
+def test_http_banner_and_tls_cert(monkeypatch):
+    from services import firetv as ft
+
+    class _Resp:
+        status = 403
+
+        def __init__(self):
+            self.headers = {"Server": "AirTunes/960.13.25"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(ft.urllib.request, "urlopen", lambda req, timeout=4.0: _Resp())
+    banner = ft._http_banner("h", 7000)
+    assert banner == {"status": 403, "server": "AirTunes/960.13.25"}
+
+    def _boom(req, timeout=4.0):
+        raise OSError("nope")
+
+    monkeypatch.setattr(ft.urllib.request, "urlopen", _boom)
+    assert ft._http_banner("h", 7000) is None
+
+    # TLS cert: success, empty, failure
+    class _TLS:
+        def getpeercert(self):
+            return {
+                "subject": ((("CN", "tv"),),),
+                "issuer": ((("CN", "ca"),),),
+            }
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    class _Ctx:
+        def __init__(self):
+            self.check_hostname = True
+            self.verify_mode = True
+
+        def wrap_socket(self, sock, server_hostname=None):
+            return _TLS()
+
+    class _Sock:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(ft.ssl, "create_default_context", lambda: _Ctx())
+    monkeypatch.setattr(ft.socket, "create_connection", lambda *a, **k: _Sock())
+    cert = ft._tls_cert("h", 8443)
+    assert cert == {"subject": "CN=tv", "issuer": "CN=ca"}
+
+    class _EmptyTLS(_TLS):
+        def getpeercert(self):
+            return {}
+
+    class _EmptyCtx(_Ctx):
+        def wrap_socket(self, sock, server_hostname=None):
+            return _EmptyTLS()
+
+    monkeypatch.setattr(ft.ssl, "create_default_context", lambda: _EmptyCtx())
+    assert ft._tls_cert("h", 8443) is None
+
+    def _conn_boom(*a, **k):
+        raise OSError("closed")
+
+    monkeypatch.setattr(ft.socket, "create_connection", _conn_boom)
+    assert ft._tls_cert("h", 8443) is None
+
+
+def test_recon_collects_banners_and_certs(monkeypatch):
+    from services import firetv as ft
+
+    svc = ft.FireTVService()
+
+    class _Conn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def _open(host_port, timeout=3):
+        if host_port[1] == 7000:
+            return _Conn()
+        raise OSError("closed")
+
+    monkeypatch.setattr(ft.socket, "create_connection", _open)
+    monkeypatch.setattr(
+        ft, "_http_banner", lambda host, port: {"status": 403, "server": "AirTunes/x"}
+    )
+    monkeypatch.setattr(
+        ft, "_tls_cert", lambda host, port: {"subject": "CN=x", "issuer": "CN=y"}
+    )
+    monkeypatch.setattr(
+        ft.FireTVService, "state", lambda self, host: {"state": "unknown"}
+    )
+    out = svc.recon("192.168.1.100")
+    assert out["ports"][7000] is True
+    assert out["banners"][7000]["server"] == "AirTunes/x"
+    assert out["certs"][7000]["subject"] == "CN=x"
+    assert out["looks_like_fire_tv"] is False
+
+
+def test_ssdp_discover_branches(monkeypatch):
+    from services import firetv as ft
+
+    class _BindFail:
+        def setsockopt(self, *a):
+            pass
+
+        def bind(self, *a):
+            raise OSError("in use")
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(ft.socket, "socket", lambda *a, **k: _BindFail())
+    out = ft.ssdp_discover(timeout=0.1)
+    assert out["success"] is False
+
+    reply = (
+        b"HTTP/1.1 200 OK\r\n"
+        b"CACHE-CONTROL: max-age=1800\r\n"
+        b"LOCATION: http://192.168.1.1:1900/desc.xml\r\n"
+        b"SERVER: Linux UPnP/1.0\r\n"
+        b"ST: upnp:rootdevice\r\n"
+        b"ST: upnp:rootdevice\r\n"
+        b"USN: uuid:abc::upnp:rootdevice\r\n"
+        b"X-No-Colon-Line\r\n"
+        b"\r\n"
+    )
+
+    class _Sock:
+        def __init__(self):
+            self.gave = False
+
+        def setsockopt(self, *a):
+            pass
+
+        def bind(self, *a):
+            pass
+
+        def settimeout(self, *a):
+            pass
+
+        def sendto(self, *a):
+            pass
+
+        def recvfrom(self, *a):
+            if not self.gave:
+                self.gave = True
+                return reply, ("192.168.1.1", 1900)
+            raise TimeoutError()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(ft.socket, "socket", lambda *a, **k: _Sock())
+    out = ft.ssdp_discover(timeout=0.3)
+    assert out["success"] is True
+    dev = out["devices"][0]
+    assert dev["location"] == "http://192.168.1.1:1900/desc.xml"
+    assert dev["server"] == "Linux UPnP/1.0"
+    assert dev["st"] == ["upnp:rootdevice"]
+    assert dev["usn"] == "uuid:abc::upnp:rootdevice"
+
+
+def test_pair_ssdp_mdns_query_endpoints(client, monkeypatch):
+    import services.firetv as ft
+
+    monkeypatch.setattr(
+        ft.FireTVService,
+        "pair",
+        lambda self, t, c, p=5555: {"success": True, "output": "Successfully paired"},
+    )
+    r = client.post("/api/firetv/pair", json={"target": "h", "code": "123456"})
+    assert r.json()["success"] is True
+    assert client.post("/api/firetv/pair", json={"target": "h"}).status_code == 400
+
+    monkeypatch.setattr(
+        ft, "ssdp_discover", lambda *a, **k: {"success": True, "devices": [{"ip": "x"}]}
+    )
+    r = client.post("/api/firetv/ssdp")
+    assert r.status_code == 200 and r.json()["action"] == "ssdp"
+    monkeypatch.setattr(
+        ft,
+        "ssdp_discover",
+        lambda *a, **k: {"success": False, "error": "nope", "devices": []},
+    )
+    assert client.post("/api/firetv/ssdp").json()["error"] == "nope"
+
+    seen = {}
+
+    def _fake_mdns(*a, **k):
+        seen["queries"] = k.get("queries")
+        return {"success": True, "devices": []}
+
+    monkeypatch.setattr(ft, "mdns_discover", _fake_mdns)
+    r = client.post("/api/firetv/mdns", json={"queries": ["_airplay._tcp.local"]})
+    assert r.status_code == 200
+    assert seen["queries"] == ["_airplay._tcp.local"]

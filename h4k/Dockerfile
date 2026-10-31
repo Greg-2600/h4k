@@ -70,6 +70,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf
     && unzip -o /tmp/nuclei.zip -d /usr/local/bin/ \
     && rm /tmp/nuclei.zip
 
+# Google platform-tools: an adb new enough for wireless `pair` (Debian's adb
+# predates the command). /usr/local/bin precedes /usr/bin on PATH, so this
+# adb shadows the distro one; fastboot comes along for free.
+RUN curl -sSfL -o /tmp/ptools.zip \
+      https://dl.google.com/android/repository/platform-tools-latest-linux.zip \
+    && unzip -q /tmp/ptools.zip -d /opt \
+    && ln -sf /opt/platform-tools/adb /usr/local/bin/adb \
+    && ln -sf /opt/platform-tools/fastboot /usr/local/bin/fastboot \
+    && rm /tmp/ptools.zip
+
 # OWASP ZAP (Zed Attack Proxy) — web app scanner with active/passive scan,
 # spider, AJAX spider, fuzzer, API. Headless mode for automation.
 RUN ZAP_VER="2.17.0" \
