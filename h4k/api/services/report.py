@@ -321,7 +321,7 @@ def _cve_notes(enriched: dict) -> list[str]:
     notes = []
     for addr, svc_map in enriched.get("services", {}).items():
         for key, cves in svc_map.items():
-            names = ", ".join(f"{c.get('id')}({c.get('cvss','?')})" for c in cves[:6])
+            names = ", ".join(f"{c.get('id')}({c.get('cvss', '?')})" for c in cves[:6])
             notes.append(f"[CVE] {addr} {key}: {names}")
     for idx, cves in enriched.get("vulns", {}).items():
         names = ", ".join(c.get("id", "") for c in cves)

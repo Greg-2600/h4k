@@ -17,6 +17,20 @@ sys.path.insert(0, str(API_PKG))
 os.environ.setdefault("H4K_REFRESH_CVE", "0")
 
 
+def pytest_collection_modifyitems(config, items):
+    """Selenium E2E is opt-in: it needs a browser and starts a real API.
+
+    `make test` stays fast and hermetic; `make e2e` (or H4K_E2E=1 pytest)
+    runs the browser suite.
+    """
+    if os.environ.get("H4K_E2E") == "1":
+        return
+    skip_e2e = pytest.mark.skip(reason="Selenium E2E disabled (set H4K_E2E=1)")
+    for item in items:
+        if "e2e" in item.path.parts:
+            item.add_marker(skip_e2e)
+
+
 # shared fixture: fake the pipeline's subprocess boundary (msfconsole, dig...)
 @pytest.fixture()
 def no_subprocess(monkeypatch):

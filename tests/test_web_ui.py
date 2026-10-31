@@ -1,10 +1,7 @@
 # The web UI has no framework and no build step, so the only thing standing
 # between a deleted element and a silently dead interface is this contract:
-# app.js binds every handler at load time, so one id it touches but index.html
-# does not define aborts the whole script. The console stops scrolling, the job
-# poller never starts, and nothing throws a visible error. That regression
-# shipped once (the consolidated-report panel was dropped from the HTML), so it
-# is pinned here instead of being rediscovered by hand.
+# app.js binds handlers at load time, so one id it touches but index.html
+# does not define aborts the whole script.
 import re
 from pathlib import Path
 
@@ -26,18 +23,31 @@ def _css() -> str:
     return CSS.read_text(encoding="utf-8")
 
 
+# `id="..."` must not match the tail of `data-testid="..."`, so the attribute
+# name is anchored with a negative lookbehind.
+_ID_RE = r'(?<![\w-])id="([^"]+)"'
+_TESTID_RE = r'data-testid="([^"]+)"'
+
+
 def test_every_js_id_lookup_exists_in_the_html():
-    html_ids = set(re.findall(r'id="([^"]+)"', _html()))
-    wanted = set(re.findall(r'\$\("([A-Za-z0-9_-]+)"\)', _js()))
-    wanted |= set(re.findall(r'getElementById\("([A-Za-z0-9_-]+)"\)', _js()))
+    html_ids = set(re.findall(_ID_RE, _html()))
+    wanted = set(re.findall(r"""\$\(['"]([A-Za-z0-9_-]+)['"]\)""", _js()))
+    wanted |= set(re.findall(r'getElementById\(["\']([A-Za-z0-9_-]+)["\']\)', _js()))
     missing = sorted(wanted - html_ids)
     assert not missing, f"app.js references undefined ids: {missing}"
 
 
 def test_no_duplicate_element_ids():
-    ids = re.findall(r'id="([^"]+)"', _html())
+    ids = re.findall(_ID_RE, _html())
     dupes = sorted({i for i in ids if ids.count(i) > 1})
     assert not dupes, f"duplicate ids in index.html: {dupes}"
+
+
+def test_no_duplicate_test_ids():
+    """The Selenium suite targets elements by data-testid — they must be unique."""
+    ids = re.findall(_TESTID_RE, _html())
+    dupes = sorted({i for i in ids if ids.count(i) > 1})
+    assert not dupes, f"duplicate data-testid in index.html: {dupes}"
 
 
 def test_html_tags_are_balanced():
@@ -75,75 +85,176 @@ def test_html_tags_are_balanced():
     assert not stack, f"unclosed tags: {[(name, ln) for name, ln in stack]}"
 
 
-def test_the_nav_phases_are_present():
-    """The nav buttons are the whole navigation; a missing phase is a dead end.
-
-    The old five-phase pipeline (analyze/prepare/execute/pwned) was collapsed:
-    the recon page hosts the whole flow (discovery -> service map -> vulns ->
-    exploit -> password attack -> cred targets), and the graph is the second
-    view. Keep this pinned so nav and sections never drift apart.
-    """
+def test_the_workspace_nav_is_present():
+    """Six kill-chain phases, operator order: Discover → Recon → Exploit → Pivot → Persist → Score."""
     html = _html()
-    for name in ("assets", "walk", "fuzz", "report"):
-        assert f'data-phase="{name}"' in html, f"nav entry for {name} missing"
-    nav = set(re.findall(r'class="nav-btn[^"]*"[^>]*data-phase="([^"]+)"', html))
-    secs = set(
-        re.findall(r'class="(?:phase|console)[^"]*"[^>]*data-phase="([^"]+)"', html)
-    )
-    assert nav == secs, f"nav/phase mismatch: {nav ^ secs}"
+    names = ("discover", "recon", "exploit", "pivot", "persist", "score")
+    for name in names:
+        assert f'data-tab="{name}"' in html, f"workspace {name} missing"
+    nav = set(re.findall(r'class="ws-btn[^"]*"[^>]*data-tab="([^"]+)"', html))
+    secs = set(re.findall(r'class="ws-panel[^"]*"[^>]*data-tab="([^"]+)"', html))
+    assert nav == secs == set(names), f"nav/panel mismatch: {nav ^ secs}"
+    dom_order = re.findall(r'<section class="ws-panel[^"]*"[^>]*id="tab-(\w+)"', html)
+    nav_order = re.findall(r'class="ws-btn[^"]*"[^>]*data-tab="(\w+)"', html)
+    assert dom_order == nav_order == list(names)
 
 
-def test_only_one_phase_starts_visible():
-    """Only the recon phase should be visible at load; the others are hidden."""
+def test_only_discover_starts_visible():
     html = _html()
-    open_phases = re.findall(
-        r'<div class="(?:phase|console)[^"]*"[^>]*id="phase-(\w+)"(?![^>]*hidden)', html
-    )
-    assert open_phases == ["assets"], f"expected only recon visible, got {open_phases}"
+    tabs = re.findall(r'<section class="ws-panel([^"]*)"[^>]*id="tab-(\w+)"', html)
+    visible = [tid for cls, tid in tabs if "active" in cls.split()]
+    assert visible == ["discover"], f"expected only discover visible, got {visible}"
 
 
-def test_phase_order_matches_the_nav_order():
-    """app.js's state.currentPhase must agree with the markup order: the nav
-    order is the workflow order (recon -> analyze -> prepare -> execute -> pwned)."""
-    dom_order = re.findall(
-        r'<div class="(?:phase|console)[^"]*"[^>]*id="phase-(\w+)"', _html()
-    )
-    nav_order = re.findall(r'class="nav-btn[^"]*"[^>]*data-phase="(\w+)"', _html())
-    assert dom_order == nav_order, f"nav {nav_order} != markup {dom_order}"
-
-
-def test_stat_tiles_keep_their_class_list():
-    """Assigning `.className` on a stat number silently drops `.stat-n`, so the
-    headline renders as body text and stops matching the stat selectors."""
-    js = _js()
-    for m in re.finditer(r'\$\("(fsum-[a-z]+)"\)\.className', js):
-        raise AssertionError(
-            f"{m.group(1)} is assigned className wholesale, dropping its base class"
-        )
-
-
-def test_findings_panels_exist():
-    """Static center tabs + panel-template ids (which live in app.js)."""
-    for cid in (
-        "vuln-tbody",
-        "pane-vulns",
-        "cred-targets-tbody",
-        "pane-creds",
-        "fp-tbody",
-        "pane-map",
-        "ap-acquire",
-        "sp-strip",
+def test_operator_chrome_exists():
+    """Status bar + next action + drawers: the persistent operator chrome."""
+    html = _html()
+    for needle in (
+        'id="scope-select"',
+        'id="msf-status"',
+        'id="cap-status"',
+        'id="autoscan-status"',
+        'id="flag-counter"',
+        'id="host-counter"',
+        'id="next-move-bar"',
+        'id="next-move-list"',
+        'id="btn-refresh-next"',
+        'id="activity-drawer"',
+        'id="activity-log"',
+        'id="cmd-palette"',
+        'id="cmd-input"',
+        'id="flag-toast"',
     ):
-        assert f'id="{cid}"' in _html(), f"{cid} missing"
-    for cid in ("ex-module", "ex-rhost", "ex-console", "pa-host", "pa-service"):
-        assert cid in _js(), f"{cid} template missing"
+        assert needle in html, f"{needle} missing"
+    for cls in ("statusbar", "nextmove", "workspaces", "ws-btn", "ws-panel"):
+        assert f".{cls}" in _css(), f"class .{cls} has no CSS rule"
 
 
-def test_msf_status_footer_present():
-    """msf-status shows MSF connection state in the footer via .status-dot class."""
+def test_workspace_panels_exist():
+    """Every workspace owns its controls; no hidden-compat leftovers."""
     html = _html()
-    assert 'id="msf-status"' in html, "msf-status element missing"
-    assert re.search(r'class="status-dot', html), "status-dot element missing"
+    for cid in (
+        # discover
+        "target",
+        "mode-select",
+        "depth-select",
+        "btn-scan",
+        "btn-neighbors",
+        "scan-status",
+        "scope-summary",
+        "btn-live-map-toggle",
+        # recon
+        "hosts-tbody",
+        "hosts-empty",
+        "hosts-count",
+        "vulns-tbody",
+        "vulns-empty",
+        "vulns-count",
+        "btn-fingerprint",
+        "btn-full-scan",
+        "cve-status",
+        "btn-cve-refresh",
+        # exploit
+        "attack-queue",
+        "attack-empty",
+        "attack-queue-count",
+        "btn-ap-start",
+        "btn-ap-stop",
+        "ap-status",
+        "ap-log",
+        "ap-tbody",
+        "ap-summary",
+        "cred-targets-tbody",
+        "cred-targets-empty",
+        "cred-targets-count",
+        "btn-cred-targets-refresh",
+        "btn-launch-passattack",
+        "fz-host",
+        "fz-port",
+        "fz-iters",
+        "fz-timeout",
+        "btn-fz-start",
+        "btn-fz-stop",
+        "fz-output",
+        "fz-live",
+        # pivot
+        "creds-ledger",
+        "creds-empty",
+        "creds-ledger-count",
+        "prop-body",
+        "prop-results",
+        "btn-propagate-plan",
+        "btn-propagate-run",
+        "shells-list",
+        "shells-empty",
+        "shells-count",
+        "ex-console",
+        "ex-console-target",
+        "ex-console-output",
+        "ex-cmd",
+        "btn-ex-cmd",
+        "shell-close",
+        "lateral-cidr",
+        "btn-lateral-map",
+        "lateral-body",
+        "db-target",
+        "btn-db-run",
+        "db-body",
+        "btn-escape-run",
+        "escape-body",
+        "btn-trylocalroot-run",
+        "trylocalroot-body",
+        # persist
+        "persist-checks",
+        "persist-sessions",
+        "btn-reenter",
+        "btn-go-score",
+        # score
+        "flags-grid",
+        "flags-empty",
+        "flags-count",
+        "flag-value",
+        "flag-host",
+        "flag-note",
+        "btn-flag-add",
+        "btn-flag-detect",
+        "crown-list",
+        "cj-host",
+        "cj-label",
+        "cj-value",
+        "btn-add-crown",
+        "btn-attack-paths",
+        "attack-paths-body",
+        "attack-paths-summary",
+        "attck-body",
+        "btn-attck",
+        "report-preview",
+        "btn-session-report",
+    ):
+        assert f'id="{cid}"' in html, f"{cid} missing"
+
+
+def test_no_gamification_leftovers():
+    """First-principles rule: operator console, not a game. No XP/glitch/sound."""
+    html, js = _html(), _js()
+    for needle in (
+        "xp-bar",
+        "player-level",
+        "player-xp",
+        "ach-popup",
+        "glitch-overlay",
+        "sound-toggle",
+        "xp-popup",
+    ):
+        assert needle not in html, f"gamification leftover in HTML: {needle}"
+        assert needle not in js, f"gamification leftover in JS: {needle}"
+    assert "logXp" not in js, "XP function still present"
+    assert "playSound" not in js, "sound function still present"
+
+
+def test_no_inline_styles():
+    """Layout lives in style.css; inline styles are unthemeable one-offs."""
+    assert 'style="' not in _html(), "inline styles in index.html"
 
 
 def test_new_ui_classes_are_styled():
@@ -159,7 +270,26 @@ def test_new_ui_classes_are_styled():
 
 def test_target_input_uses_canonical_id():
     """One #target only: two inputs means the operator can shoot the wrong box."""
+    assert _html().count('id="target"') == 1, "expected exactly one #target"
+
+
+def test_tables_scroll_inside_their_card():
+    """Half-screen rule: wide tables must scroll inside `.tbl-wrap`, never
+    push the whole page sideways. Every table needs the wrapper."""
     html = _html()
-    assert html.count('id="target"') == 1, "expected exactly one #target"
-    js = _js()
-    assert '$("target").value = ""' not in js, "scan clears the target field"
+    tables = re.findall(r'<table class="tbl">', html)
+    wraps = re.findall(r'class="tbl-wrap"', html)
+    assert tables, "no tables found"
+    assert len(wraps) == len(tables), f"{len(tables)} tables but {len(wraps)} wrappers"
+    assert ".tbl-wrap" in _css(), "class .tbl-wrap has no CSS rule"
+
+
+def test_responsive_breakpoints_exist():
+    """Half-screen rule: the status bar must shed chrome as width shrinks."""
+    css = _css()
+    for needle in (
+        "@media (max-width: 1100px)",
+        "@media (max-width: 900px)",
+        "@media (max-width: 640px)",
+    ):
+        assert needle in css, f"missing breakpoint {needle}"

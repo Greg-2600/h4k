@@ -120,8 +120,9 @@ def test_delete_cascades_to_child_rows(store, eng):
     assert store.attempted_pairs(eng["id"]) == set()
 
 
-def test_db_path_prefers_runtime_dir(monkeypatch, tmp_path):
-    monkeypatch.setattr("services.engagement._RUNTIME_DIR", tmp_path)
+def test_db_path_follows_the_env_override(monkeypatch, tmp_path):
+    """The runtime dir is resolved centrally (paths.py) from $H4K_DATA_DIR."""
+    monkeypatch.setenv("H4K_DATA_DIR", str(tmp_path))
     assert db_path().parent == tmp_path
 
 

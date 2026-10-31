@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 import time
+import uuid as _uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -41,6 +42,43 @@ logging.basicConfig(
 for _noisy in ("urllib3", "httpx"):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 log = logging.getLogger("h4k")
+
+# ---------------------------------------------------------------------------
+# API-key authentication (optional, env-gated)
+# ---------------------------------------------------------------------------
+# When H4K_API_KEY is set, every API request must carry X-API-Key: <key>.
+# When it is unset, authentication is off (solo-operator / test default).
+
+
+async def _auth_middleware(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    from services.auth import api_key as _api_key, is_exempt as _is_exempt
+
+    key = _api_key()
+    if key is None:
+        # auth disabled -- nothing to check
+        return await call_next(request)
+
+    path = request.url.path
+    if _is_exempt(path):
+        return await call_next(request)
+
+    supplied = request.headers.get("x-api-key")
+    if supplied != key:
+        # constant-time comparison to avoid timing leaks
+        from hmac import compare_digest
+
+        if not (supplied is not None and compare_digest(supplied, key)):
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "missing or invalid API key (X-API-Key header)"},
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
+    return await call_next(request)
+
 
 # ---------------------------------------------------------------------------
 # Rate limiting middleware (in-memory, per-IP sliding window)
@@ -125,9 +163,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     import app_state
     from services.cve_lookup import CveDb
     from services.msfrpc import MsfClient
+    from services.sandbox import FakeMsfClient, enabled as sandbox_enabled
 
-    app_state.msf_client = MsfClient(host, port, password)
-    log.info("msf client ready (lazy connect to %s:%s)", host, port)
+    if sandbox_enabled():
+        # Sandbox mode: deterministic stand-ins, zero network, zero daemon.
+        app_state.msf_client = FakeMsfClient(host, port, password)
+        log.warning("sandbox mode ON - Metasploit calls are stubbed (H4K_SANDBOX=1)")
+    else:
+        app_state.msf_client = MsfClient(host, port, password)
+        log.info("msf client ready (lazy connect to %s:%s)", host, port)
     # Load the local CVE database.
     app_state.cve_db = CveDb()
     log.info(
@@ -138,6 +182,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Optional refresh if network is available (keeps bundled snapshot otherwise).
     if os.environ.get("H4K_REFRESH_CVE", "1") == "1":
         app_state.cve_db.refresh()
+    # Start the passive auto-scan (best-effort): as soon as the API comes
+    # up it begins building a network/service map of the local subnet, with
+    # CVE correlation. No credentials, no exploitation -- recon only.
+    import services.auto_scan as auto_scan_module
+
+    auto_scan_module.start()
+
     # Start the periodic software-component updater (best-effort).
     _task = None
     if os.environ.get("H4K_AUTO_UPDATE", "1") == "1":
@@ -184,6 +235,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        auto_scan_module.stop()
         if _task is not None:
             _task.cancel()
         if _cve_task is not None:
@@ -242,8 +294,30 @@ All aggressive operations (`do_attack`, `try_default_creds`, toolkit endpoints) 
     ],
 )
 
-# Rate limiting — 100 req/min per IP by default, configurable via H4K_RATE_LIMIT
+# Authentication first, then rate limiting.
+app.middleware("http")(_auth_middleware)
 app.middleware("http")(_rate_limit_middleware)
+
+# ---------------------------------------------------------------------------
+# Structured error responses: never leak a traceback to the client.
+# ---------------------------------------------------------------------------
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception(request: Request, exc: Exception) -> Response:
+    error_id = _uuid.uuid4().hex[:12]
+    log.exception("unhandled error %s on %s: %s", error_id, request.url.path, exc)
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "internal server error",
+            "error_id": error_id,
+            "path": request.url.path,
+        },
+    )
+
 
 app.include_router(scan_router.router, tags=["scan"])
 app.include_router(source_router.router, tags=["source"])

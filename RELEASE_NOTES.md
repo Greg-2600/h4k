@@ -14,6 +14,126 @@ root-cause & patching, and responsible-disclosure scaffolding.
 
 ---
 
+## 1.1 · What's new since 1.0
+
+**tryLocalRoot_go_bro — one-shot local-root assessment** (`services/privesc.py`)
+- `POST /api/tryLocalRoot_go_bro` runs every passwordless local-root path in
+  one shot: the userns uid-0 try (`unshare -Urm id`, no sudo, no docker), the
+  docker-group read-only try, and the full host audit (SUID, file caps + live
+  DAC-bypass probe, credential gates, systemd ExecStart/PATH/polkit, CVE
+  posture vs the curated DB). Nothing supplies a password, writes a file, or
+  runs a payload — tries are `id`/`ls` only, sandbox-gated.
+- Console button in the pivot section renders userns/docker verdicts, audit
+  vectors and the overall verdict. Research notes live in
+  `labs/docker-group-to-root/` and `labs/userns-root-no-sudo-no-docker/`.
+
+**Attack paths to crown jewels** (`services/attack_paths.py`)
+- Declare objectives — `POST /api/engagement/{id}/crown-jewels` (`host`, `label`,
+  `value` 1–100). Scope-enforced like everything else.
+- `GET /api/engagement/{id}/attack-paths` returns scored, evidence-backed paths
+  from any plausible foothold to each crown jewel. Only *verified* credential
+  logins become edges, so a path is a chain of proof, not a guess.
+- Scoring: `crown_value + Σ(vuln severity) + 25·hops − 12·(hops−1) + foothold
+  bonus` — a 2.0 leak that pivots into the DC outranks a 9.8 on an isolated box.
+- New Report-page card: **🎯 Attack Paths to Crown Jewels** (add / delete /
+  compute, ranked list, ATT&CK techniques per path).
+
+**ATT&CK mapping + detection guidance** (`services/attck.py`)
+- `GET /api/engagement/{id}/attck` maps every finding and verified credential to
+  MITRE ATT&CK techniques; each technique carries log sources, event IDs and what
+  to look for — the defender's language, not just the attacker's.
+- `GET /api/engagement/attck/techniques` exposes the curated catalog.
+- New Report-page card: **🛡️ ATT&CK & Detection Guidance**.
+
+**Sandbox mode** (`services/sandbox.py`, `H4K_SANDBOX=1`)
+- Deterministic stand-ins for the three external dependencies (nmap, hydra,
+  Metasploit). Everything above the tool boundary — API, parsers, store, attack
+  paths, UI — stays real. No network, no daemon, no credentials.
+- `POST /api/engagement/sandbox-seed` seeds a demo lab (3 hosts, 2 pivot
+  credentials, 1 crown jewel) for demos and tests.
+
+**Selenium end-to-end suite** (`tests/e2e/`, `make e2e`)
+- Headless Chrome drives the real console against a real API in sandbox mode.
+- 20 tests: boot/navigation, scope picker, report preview, crown jewels,
+  attack paths, ATT&CK panel, and a full autopilot walk.
+- The `page` fixture **fails a test on any uncaught JavaScript error** — that is
+  how the Report page's missing `renderReportPreview()` was found.
+- New CI job runs the browser suite next to lint/tests.
+
+**Bug fixes found by the new suites**
+- Report page threw `ReferenceError: renderReportPreview is not defined` on every
+  navigation to it (the function was called but never implemented).
+- `GET /api/graph` returned **500** whenever an engagement scope was active:
+  `out_of_scope_probe(ip)` was called with one argument while `in_scope()` takes
+  `(engagement_id, host)`.
+- The header scope picker was only populated after a password attack, so it
+  showed "scope: none" on a fresh load.
+- UI API errors were swallowed: `api()` never rejects, so a 400 was treated as
+  success. Added `apiOrThrow()` and used it on the new endpoints.
+
+**Container boot reliability** (`h4k/entrypoint.sh`, `h4k/docker-compose.yml`)
+- The Metasploit database is now started, *waited for*, and **verified over
+  RPC** before the API comes up. Previously the RPC daemon could start before
+  the postgres cluster was reachable, answer "Database Not Loaded", and
+  db_nmap would silently find **zero hosts** — a scan of 127.0.0.1 returned an
+  empty inventory even though the API was up. The entrypoint now restarts the
+  daemon if its DB did not load, and says so in the logs.
+- The default compose file uses a **bridge network** so the container's
+  postgres/Metasploit ports cannot collide with services already running on
+  the host; `docker-compose.host.yml` is the host-network override for
+  LAN-wide ARP discovery.
+- The Metasploit module catalogue is read from the real pymetasploit3 API
+  (`modules.exploits`, `modules.auxiliary`, …). The old code looked for a
+  `module_types` dict that does not exist in current versions, so
+  `find_exploits()` always returned an empty list — the platform could not
+  suggest a single module. Module lookup is now also name-filtered, so it
+  costs a handful of RPC calls instead of thousands.
+
+**Capability report** (`services/capabilities.py`, `GET /api/capabilities`)
+- Answers the question an operator actually has before a run: *what will work
+  here, and what will fail silently?* Installed tools with versions,
+  Metasploit reachability **and database state**, the data directory, the
+  available wordlists, and plain-language warnings (no Metasploit DB → scans
+  come back empty; missing nmap → no inventory; sandbox mode → nothing
+  reaches the network).
+- The console shows it as a footer badge (green/amber), and
+  `scripts/sanity_check.py` asserts on it.
+
+**Banner-aware CVE matching** (fixes a critical false positive)
+- The matcher keyed the version ranges off the CVE's generic product (`ftp`)
+  instead of the product actually detected on the wire (`vsftpd`), and when a
+  version was known but no range existed it fell through to "vulnerable".
+  A **vsftpd 3.0.3** host was therefore flagged with the **2.3.4 backdoor**
+  CVE. Now: out-of-range versions exclude the CVE, and a match that cannot be
+  ruled out is marked `_version_verified: false` instead of being asserted.
+
+**Engagement snapshots + attack-path export**
+- `GET /api/engagement/{id}/export` → a portable snapshot; `POST .../import`
+  merges one back in, scope-checking every host and reporting the ones that
+  were skipped.
+- `GET /api/engagement/{id}/attack-paths?fmt=md` → a delivery-note writeup.
+
+**Passive auto-scan on boot** (`services/auto_scan.py`, `GET/POST /api/map*`)
+- As soon as the API comes up it detects the local subnet from the default
+  route, creates a default `auto-scan` engagement, and runs a recon-only
+  pass (ARP discovery, nmap fingerprint, CVE correlation — **no credentials,
+  no exploitation**). It re-scans on a cadence so the map stays current.
+- The map is live at `GET /api/map` and in the console footer
+  (`auto-scan: running · 12 hosts · 34 services · 3 vulns`), with a toggle.
+- Configurable via `H4K_AUTO_SCAN`, `H4K_AUTO_SCAN_CIDR`,
+  `H4K_AUTO_SCAN_INTERVAL`, `H4K_AUTO_SCAN_DEPTH`.
+- This is the feature the user asked for: "start the container, and have it
+  start building a network and service map looking for vulnerabilities right
+  off the bat, passively."
+
+**Documentation** (`docs/`)
+- New full documentation set: quickstart, concepts, workflows, UI guide,
+  safety, troubleshooting, architecture, API reference, service reference, data
+  model, testing guide, contributing, release process, threat model, scope
+  enforcement spec, secrets handling and runnable examples.
+
+---
+
 ## 1 · What it is
 
 A browser-based terminal (web UI → FastAPI → Metasploit MessagePack-RPC) plus a

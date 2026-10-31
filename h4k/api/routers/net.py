@@ -112,3 +112,45 @@ def tls_proxy(body: dict[str, Any]) -> dict[str, Any]:
         backend_host=str((body or {}).get("backend_host", "127.0.0.1")),
         backend_port=int((body or {}).get("backend_port", 8080)),
     )
+
+
+# ---- passive network sniffing (opt-in, lab-scoped) -------------------------
+@router.post("/sniff/deep")
+def net_sniff_deep(body: dict[str, Any]) -> dict[str, Any]:
+    """Capture live traffic on an interface, dissect it (hosts, flows, cleartext
+    credentials, TLS certificates, DNS, anomalies) and, when an engagement is
+    active, fold the findings into the engagement graph."""
+    from services.passive_sniff import PassiveSniffer
+
+    interface = (body or {}).get("interface") or "eth0"
+    duration = int((body or {}).get("duration", 30))
+    bpf_filter = (body or {}).get("filter")
+    eng_id, store = None, None
+    try:
+        from routers.scan import _active_scope as _as
+
+        eng_id, store = _as()
+    except Exception:
+        eng_id, store = None, None
+    result = PassiveSniffer().capture_live(
+        interface, duration, bpf_filter, eng_id, store
+    )
+    return result
+
+
+@router.post("/sniff/pcap")
+def net_sniff_pcap(body: dict[str, Any]) -> dict[str, Any]:
+    """Analyse a previously captured pcap file (no live capture)."""
+    from services.passive_sniff import PassiveSniffer
+
+    pcap_file = str((body or {}).get("pcap_file") or "").strip()
+    if not pcap_file:
+        raise HTTPException(status_code=400, detail="pcap_file required")
+    eng_id, store = None, None
+    try:
+        from routers.scan import _active_scope as _as
+
+        eng_id, store = _as()
+    except Exception:
+        eng_id, store = None, None
+    return PassiveSniffer().analyze_pcap(pcap_file, eng_id, store)

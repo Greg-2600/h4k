@@ -1,0 +1,20 @@
+# Host-network override.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.host.yml up -d
+#
+# Use this when you need the container to share the host's network stack:
+#   * ARP/L2 discovery (arp-scan) only sees the real LAN in host mode,
+#   * the container reaches services published on the host's localhost.
+#
+# Trade-off: the container's postgres and msfrpcd then share the host's
+# ports, so something already listening on 5432/5433/55553 will break the
+# Metasploit database. The default (bridge) compose file avoids that.
+services:
+  h4k:
+    networks: !reset null
+    network_mode: host
+    ports: !reset null
+  vulnlab:
+    networks: !reset null
+    network_mode: host
+    ports: !reset null

@@ -90,13 +90,21 @@ RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \
     && rm -rf /var/lib/apt/lists/*
 
 # Python automation stack (container images: break-system-packages is fine)
+#
+# Split into layers and pin the heavy wheels on purpose: an unpinned
+# `semgrep` makes pip backtrack through dozens of 70 MB releases (minutes of
+# wasted build time), and the AD tooling has its own dependency constraints.
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --break-system-packages --no-cache-dir --upgrade pip \
     && python3 -m pip install --break-system-packages --no-cache-dir \
-    pymetasploit3 fastapi uvicorn python-multipart semgrep \
-    python-owasp-zap-v2.4 \
-    mitm6 \
-    responder3 \
-    bloodhound
+         "semgrep==1.182.0" \
+    && python3 -m pip install --break-system-packages --no-cache-dir \
+         pymetasploit3 fastapi uvicorn python-multipart \
+         python-owasp-zap-v2.4 \
+         mitm6 \
+         responder3 \
+         bloodhound \
+    && python3 -m pip check || true
 
 # SCA / supply-chain tools: osv-scanner (Google) validates a repo/SBOM against
 # the OSV vulnerability DB; trivy (Aqua) can emit a CycloneDX SBOM.

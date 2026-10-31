@@ -23,3 +23,30 @@ jobs:
 
       - name: Test + coverage gate
         run: make coverage
+
+  e2e:
+    # Selenium browser suite. Runs the real API in sandbox mode against
+    # headless Chrome -- no network, no Metasploit daemon, no real targets.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Chrome + chromedriver
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Create venv + install toolchain
+        run: |
+          make setup
+          .venv/bin/pip install selenium
+
+      - name: Selenium end-to-end suite
+        env:
+          H4K_CHROME_BINARY: /usr/bin/google-chrome
+          H4K_CHROMEDRIVER: /usr/bin/chromedriver
+        run: make e2e

@@ -113,6 +113,23 @@ class NeighborFinder:
 
     def discover(self, target_cidr: str) -> list[Neighbor]:
         """Combine ARP sweep (arp-scan / arp cache / msf arp_sweep) + IPv6 + SNMP."""
+        from services.sandbox import (
+            enabled as sandbox_enabled,
+            neighbors as sandbox_neighbors,
+        )
+
+        if sandbox_enabled():
+            # Deterministic lab estate; no ARP packets leave the box.
+            return [
+                Neighbor(
+                    ip=n["ip"],
+                    mac=n.get("mac"),
+                    vendor=n.get("vendor"),
+                    hostname=n.get("hostname"),
+                )
+                for n in sandbox_neighbors()
+            ]
+
         found: dict[str, Neighbor] = {}
 
         try:

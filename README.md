@@ -30,8 +30,12 @@ Metasploitable box. Every aggressive action is **off by default and opt-in**.
 | Area | Capabilities |
 |------|--------------|
 | **Host recon & scan** | 3 OPSEC modes (stealth / Tor / overt), fingerprinting, PTR, DNS, ARP neighbors, posture heuristic |
+| **Passive auto-scan** | on boot, h4k starts building a network and service map of the local subnet automatically — recon only, no creds, no exploits; the map is live at `/api/map` and in the console |
+| **Passive auto-scan** | on boot, h4k starts building a network and service map of the local subnet automatically — recon only, no creds, no exploits; the map is live at `/api/map` and in the console |
 | **Vuln analysis** | curated CVE archive, EOL/version leads, default-cred archive, ranked recommendations |
 | **Engagements** | persistent scope-enforced asset graph; replays *verified* credentials across the in-scope estate to find where they also work (lateral movement), with a dry-run plan first |
+| **Attack paths** | declare **crown jewels** (the objectives that matter) and get scored, evidence-backed paths to them — a 2.0 leak that pivots into the DC outranks a 9.8 on an isolated box |
+| **ATT&CK & detection** | every finding mapped to a MITRE ATT&CK technique, each with defender telemetry (log sources, event IDs) |
 | **Source analysis (SAST)** | upload `.zip/.tar/.tar.gz` or clone a git URL → Semgrep + heuristics |
 | **Supply-chain (SCA)** | SBOM (CycloneDX) + osv-scanner → known CVEs + secrets/license scan |
 | **Fuzzing** | signal-guided HTTP mutation fuzzer with **crash dedup** (distinct bugs, not raw crash counts) *and* a bundled coverage-guided lab (libFuzzer/AFL++ + ASan) |
@@ -140,7 +144,7 @@ the project.
 ```mermaid
 flowchart TB
     subgraph browser["Browser"]
-        UI["web/ · index.html + app.js + style.css<br/>3-pane asset console (inventory · actions · activity)<br/>+ Walk / Fuzz / Report pages"]
+        UI["web/ · index.html + app.js + style.css<br/>mission-control CTF console (Recon / Attack / Creds / Shells / Flags / Report)<br/>+ next-move queue, flag ledger, activity drawer"]
     end
 
     subgraph api["FastAPI (api/)"]
@@ -183,6 +187,11 @@ Watch a live scan run end-to-end:
 
 ## Documentation
 
+- **[docs/](docs/index.md)** — the full documentation set: quickstart, concepts,
+  workflows, UI guide, safety, troubleshooting, architecture, API reference,
+  testing guide, threat model, scope spec, secrets handling, examples —
+  including a [real engagement write-up](docs/examples/finding-pi-hole-192-168-1-26.md)
+  (unauthenticated Transmission RPC → arbitrary file write).
 - **[README (this file)](README.md)** — you are here.
 - **[RELEASE_NOTES.md](RELEASE_NOTES.md)** — feature inventory + design decisions.
 - **[ROADMAP.md](ROADMAP.md)** — future work, prioritized.
@@ -201,15 +210,16 @@ HACKING/                git root
   AGENTS.md             AI-agent context
   RELEASE_NOTES.md      features + design decisions
   ROADMAP.md            future work
+  docs/                 full documentation set (user / dev / security / examples)
   Makefile · pyproject.toml   lint/test config
   h4k/                  the main platform image
-    api/                FastAPI app (routers + ~24 services)
+    api/                FastAPI app (routers + ~30 services)
     web/                terminal-style UI
     data/               CVE/creds archives + wordlists
     Dockerfile · docker-compose.yml · entrypoint.sh
   vulnlab/              intentionally-vulnerable fuzzing target + harnesses
   demos/sca-demo/       SCA fixture (pins vulnerable lodash)
-  tests/                pytest suites (1101 tests)
+  tests/                pytest suites (unit + API) and tests/e2e/ (Selenium)
 ```
 
 ## Development
@@ -219,15 +229,30 @@ Requirements: a recent Python 3.11+ and Docker.
 ```sh
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
+pip install selenium        # only needed for `make e2e`
 
 make fmt     # black + isort
 make lint    # black ruff isort flake8 mypy pylint bandit
-make test    # pytest (1101 tests)
+make test    # pytest (unit + API)
+make e2e     # Selenium browser suite (headless Chrome)
 make coverage # pytest --cov (90% gate)
 ```
 
 All linters pass and the suite is green. Tests run offline (a mocked Metasploit
 backend powers the API tests — no live daemon needed).
+
+The **Selenium suite** drives a real browser against a real API started in
+**sandbox mode** (`H4K_SANDBOX=1`): nmap, hydra and Metasploit are replaced by
+deterministic stand-ins, so it never touches the network and always sees the
+same lab estate. It also fails a test if the browser logs an uncaught
+JavaScript error — which is how the Report page's missing
+`renderReportPreview()` was found.
+
+```sh
+sudo pacman -S chromium chromedriver   # Arch
+sudo apt install chromium chromium-driver  # Debian/Ubuntu
+make e2e
+```
 
 ---
 

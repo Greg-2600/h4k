@@ -33,7 +33,7 @@ ERR     := $(RED)✗$(RESET)
 WARN    := $(YELLOW)⚠$(RESET)
 
 .PHONY: help setup fmt fix lint lint-py lint-c lint-shell lint-docker \
-        test coverage build build-no-cache up down ps logs clean \
+        test e2e sanity sanity-test coverage build build-no-cache up down ps logs clean \
         docker-validate
 
 ## ─────────────────────────────────────────────────────────────────────────────
@@ -56,6 +56,9 @@ help:
 	@printf "\n"
 	@printf "$(BOLD)Testing$(RESET)\n"
 	@printf "  make test               run full pytest suite\n"
+	@printf "  make e2e                run the Selenium browser suite (headless)\n"
+	@printf "  make sanity             check a RUNNING deployment end to end\n"
+	@printf "  make sanity-test        same checks, as pytest (needs the stack up)\n"
 	@printf "  make coverage           pytest + coverage report (90%% gate)\n"
 	@printf "\n"
 	@printf "$(BOLD)Containers$(RESET)\n"
@@ -184,6 +187,19 @@ logs:
 
 test:
 	$(PYTEST)
+
+# Selenium end-to-end suite (headless Chromium against a sandbox-mode API).
+# Needs: chromium + chromedriver on PATH, `selenium` in the venv.
+e2e:
+	H4K_E2E=1 $(PYTEST) tests/e2e -v
+
+# Live-stack sanity check against a RUNNING deployment (docker compose up).
+sanity:
+	python3 scripts/sanity_check.py
+
+# Same checks, as pytest (opt-in: needs the stack up).
+sanity-test:
+	H4K_LIVE=1 $(PYTEST) tests/test_live_stack.py -v
 
 coverage:
 	$(PYTEST) --cov --cov-report=term-missing

@@ -85,6 +85,14 @@ class AttackRequest(BaseModel):
     # instead of letting the service->module heuristic choose; both optional.
     module: str | None = None
     port: int | None = None
+    # Module-specific options (e.g. USER_FILE for ssh_brute, URI for an HTTP
+    # exploit). Only options the chosen module actually declares are passed
+    # through, so this cannot smuggle arbitrary settings into Metasploit.
+    options: dict[str, Any] = {}
+    # Check-only dry run: run the module's `check` (version/cred probing,
+    # no exploitation) and report vulnerable/safe/unknown. Used to confirm
+    # a finding before firing.
+    check_only: bool = False
 
 
 class FuzzRequest(BaseModel):

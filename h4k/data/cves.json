@@ -803,6 +803,72 @@
       "title": "Confluence SSTI in user-macro / wiki markup",
       "description": "Server-side template injection allows RCE in Confluence.",
       "msf_module": ""
+    },
+    {
+      "id": "CVE-2026-27470",
+      "aliases": [
+        "ZM second-order SQLi",
+        "getNearEvents SQLi"
+      ],
+      "product": "zoneminder",
+      "service": [
+        "http"
+      ],
+      "cvss": 8.8,
+      "severity": "HIGH",
+      "title": "ZoneMinder second-order SQL injection in getNearEvents (authenticated)",
+      "description": "web/ajax/status.php getNearEvents() concatenates the stored event Name/Cause into SQL. Entry via web/ajax/event.php rename/eventdetail (parameterized store, unsafe read). Affects 1.36.x before 1.36.38 and 1.38.x before 1.38.1. UNION exfiltration confirmed live on 1.36.35. No FILE primitives when secure_file_priv=NULL.",
+      "msf_module": ""
+    },
+    {
+      "id": "CVE-2025-32462",
+      "aliases": [
+        "Sudo host option EoP"
+      ],
+      "product": "sudo",
+      "service": [
+        "ssh",
+        "http",
+        "https"
+      ],
+      "cvss": 2.8,
+      "severity": "LOW",
+      "title": "Sudo host-option sudoers policy bypass",
+      "description": "Sudo stable 1.9.0-1.9.17 and legacy 1.8.8-1.8.32 evaluate the Host option against the invoking host, letting a sudoers entry for an unrelated host run commands locally. Fixed in 1.9.17p1.",
+      "msf_module": ""
+    },
+    {
+      "id": "CVE-2025-32463",
+      "aliases": [
+        "chwoot",
+        "Sudo chroot LPE"
+      ],
+      "product": "sudo",
+      "service": [
+        "ssh",
+        "http",
+        "https"
+      ],
+      "cvss": 9.3,
+      "severity": "CRITICAL",
+      "title": "Sudo chroot (-R) local privilege escalation to root",
+      "description": "Sudo 1.9.14-1.9.17 resolves paths via chroot() on the user-supplied root dir while still evaluating sudoers, letting any local user run arbitrary commands as root. Fixed in 1.9.17p1; chroot feature deprecated.",
+      "msf_module": ""
+    },
+    {
+      "id": "CVE-2026-31431",
+      "aliases": [
+        "Copy Fail"
+      ],
+      "product": "linux",
+      "service": [
+        "ssh"
+      ],
+      "cvss": 7.8,
+      "severity": "HIGH",
+      "title": "Kernel algif_aead LPE (Copy Fail)",
+      "description": "Linux kernel algif_aead in-place crypto flaw corrupts sensitive files for local root escalation. Affects 4.14-6.18.21 and 6.19-6.19.11; fixed in 6.18.22+/6.19.12+/7.0+. Actively exploited in the wild (CISA).",
+      "msf_module": ""
     }
   ]
 }

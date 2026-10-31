@@ -52,7 +52,16 @@ class CveDb:
         banner_words = set(banner.replace("(", " ").replace(")", " ").split())
 
         # Import here to avoid circular imports at module level
-        from services.version_detector import check_vulnerable_version
+        from services.version_detector import (
+            check_vulnerable_version,
+            has_version_data,
+        )
+
+        # The product we actually detected on the wire ("vsftpd") is what the
+        # version ranges are keyed by -- not the CVE's generic product
+        # ("ftp"). Using the wrong one produced false positives like
+        # "vsftpd 2.3.4 backdoor" on a vsftpd 3.0.3 host.
+        version_product = (product or "").lower()
 
         hits = []
         for cve in self.cves:
@@ -66,9 +75,11 @@ class CveDb:
             if not product_match:
                 continue
 
-            # Version-aware matching: if we have a version, check against ranges
-            if version:
-                vulnerable = check_vulnerable_version(product_key, version)
+            # Version-aware matching: if we know the version AND we know the
+            # vulnerable ranges for the detected product, the CVE only applies
+            # when the version is inside one of them.
+            if version and version_product:
+                vulnerable = check_vulnerable_version(version_product, version)
                 if vulnerable:
                     # Filter CVEs to only those affecting this version range
                     for vuln in vulnerable:
@@ -76,11 +87,22 @@ class CveDb:
                             cve_with_version = dict(cve)
                             cve_with_version["_matched_version"] = version
                             cve_with_version["_vulnerable_range"] = vuln.get("range")
+                            cve_with_version["_version_verified"] = True
                             hits.append(cve_with_version)
                             break
                     continue
+                if has_version_data(version_product):
+                    # We know the ranges and this version is outside all of
+                    # them: the CVE does not apply to this host.
+                    continue
 
-            hits.append(cve)
+            cve_with_version = dict(cve)
+            if version:
+                # No version data for this product: we cannot rule the CVE
+                # out, but we must not present it as confirmed either.
+                cve_with_version["_matched_version"] = version
+                cve_with_version["_version_verified"] = False
+            hits.append(cve_with_version)
 
         return sorted(hits, key=lambda c: -float(c.get("cvss", 0.0)))
 

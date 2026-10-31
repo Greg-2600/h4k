@@ -41,6 +41,40 @@ def test_no_false_positive_for_cherrypy(db):
     assert "CVE-2021-44228" not in ids
 
 
+def test_vsftpd_backdoor_only_matches_the_vulnerable_version(db):
+    """Regression: a vsftpd 3.0.3 banner must NOT be flagged as the 2.3.4
+    backdoor CVE. The matcher used to match on the service name only, which
+    produced a critical false positive on a patched host."""
+    patched = Service(port=21, service="ftp", info="vsftpd 3.0.3")
+    ids = [
+        c["id"] for c in db.match_service(patched, version="3.0.3", product="vsftpd")
+    ]
+    assert "CVE-2011-2523" not in ids
+
+    vulnerable = Service(port=21, service="ftp", info="vsftpd 2.3.4")
+    hits = db.match_service(vulnerable, version="2.3.4", product="vsftpd")
+    ids = [c["id"] for c in hits]
+    assert "CVE-2011-2523" in ids
+    # a version-checked hit says so
+    assert hits[0].get("_version_verified") is True
+
+
+def test_unverified_match_is_marked_not_asserted(db):
+    """No version data for the product -> the match stays, but it is not
+    presented as confirmed."""
+    svc = Service(port=8081, service="http", info="Something 1.2.3")
+    hits = db.match_service(svc, version="1.2.3", product="something-unknown")
+    for hit in hits:
+        assert hit.get("_version_verified") is False
+
+
+def test_openssh_version_excludes_newer_patched_versions(db):
+    svc = Service(port=22, service="ssh", info="OpenSSH 9.6p1")
+    ids = [c["id"] for c in db.match_service(svc, version="9.6p1", product="openssh")]
+    # CVE-2023-38408 affects up to 9.2
+    assert "CVE-2023-38408" not in ids
+
+
 def test_match_refs_by_id(db):
     v = Vuln(name="scan", refs=["CVE-2017-0144"])
     res = db.match_refs(v.refs)
@@ -77,3 +111,24 @@ def test_refresh_failed_keeps_db(db, monkeypatch):
     ok = db.refresh(url="https://invalid.example/x.json", timeout=1)
     assert ok is False
     assert len(db.cves) > 0
+
+
+def test_db_covers_modern_lpes(db):
+    """The 2025-2026 LPEs must be curated: chwoot (sudo) + Copy Fail (kernel).
+
+    h4k's offline DB previously ended at Baron Samedit/PwnKit-era entries,
+    so it would have missed the exact bugs on a vulnerable target."""
+    ids = {c["id"] for c in db.cves}
+    assert "CVE-2025-32462" in ids
+    assert "CVE-2025-32463" in ids
+    assert "CVE-2026-31431" in ids
+    # and they resolve by ref like every other entry
+    assert any(c["id"] == "CVE-2025-32463" for c in db.match_refs(["CVE-2025-32463"]))
+
+
+def test_db_covers_zoneminder_second_order_sqli(db):
+    """CVE-2026-27470 (ZM getNearEvents second-order SQLi), proven live on
+    1.36.35 via UNION exfiltration of the Users table."""
+    ids = {c["id"] for c in db.cves}
+    assert "CVE-2026-27470" in ids
+    assert any(c["id"] == "CVE-2026-27470" for c in db.match_refs(["CVE-2026-27470"]))

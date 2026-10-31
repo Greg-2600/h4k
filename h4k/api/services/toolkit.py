@@ -109,6 +109,26 @@ class ToolkitRunner:
         """
         self.progress(f"[toolkit:{tool}] {' '.join(argv[:6])}…", 0)
         started = time.time()
+        # Sandbox mode: canned output, no process is ever spawned.
+        from services.sandbox import (
+            enabled as sandbox_enabled,
+            tool_result as sandbox_tool_result,
+        )
+
+        if sandbox_enabled():
+            canned = sandbox_tool_result(tool, argv)
+            if canned is not None:
+                canned["elapsed"] = round(time.time() - started, 2)
+                return canned
+            return {
+                "tool": tool,
+                "stdout": "",
+                "stderr": "sandbox mode: tool execution is disabled",
+                "rc": -1,
+                "elapsed": round(time.time() - started, 2),
+                "timed_out": False,
+                "status": "sandbox",
+            }
         try:
             proc = subprocess.run(  # nosec B603 B607 - fixed argv, no shell
                 argv,
@@ -164,7 +184,10 @@ class ToolkitPlan:
     @staticmethod
     def for_target(req: Any) -> list[dict]:
         """Return a list of {tool, argv} runs based on a deep-attack request."""
-        host = req.host
+        # The router resolves host = req.host or req.target, but callers may
+        # leave host unset -- never build URLs/arguments against None, or
+        # every web tool runs against the literal string "http://None".
+        host = req.host or req.target
         runs: list[dict] = []
 
         # SSH brute force (only if user supplied cred lists exist)

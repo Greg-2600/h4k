@@ -667,3 +667,115 @@ def test_autopilot_stop_flag_aborts_midway(clean_db, monkeypatch):
     _run_autopilot(job, FakeMsf(), ["192.168.1.0/24"])
     _AUTOPILOT_STATE["job"] = None
     assert job["status"] == "aborted"
+
+
+def test_passattack_http_form_builds_post_form_spec(clean_db, monkeypatch):
+    from routers.scan import _ensure_session_row, _run_pass_attack
+
+    _ensure_session_row()
+    seen = {}
+
+    class FakeRunner:
+        def __init__(self, progress=None):
+            pass
+
+        def run_tool(self, tool, argv, timeout=300):
+            seen["argv"] = list(argv)
+            return {
+                "tool": "hydra",
+                "stdout": "[80][http-post-form] host: 192.168.1.84   login: admin   password: admin\n",
+                "stderr": "",
+                "rc": 0,
+                "elapsed": 2.0,
+                "timed_out": False,
+                "status": "ok",
+            }
+
+    import services.toolkit as toolkit_mod
+
+    monkeypatch.setattr(toolkit_mod, "ToolkitRunner", FakeRunner)
+
+    job = {"id": "pa-form", "status": "running", "log": []}
+    form = {
+        "path": "/index.php",
+        "user_field": "username",
+        "pass_field": "password",
+        "fail": 'name="username"',
+    }
+    _run_pass_attack(job, "192.168.1.84", "http-form", 80, form=form)
+    argv = seen["argv"]
+    assert "http-post-form" in argv
+    assert "-o" not in argv
+    spec = argv[argv.index("http-post-form") + 1]
+    assert spec == '/index.php:username=^USER^&password=^PASS^:name="username"'
+    assert job["found"] and job["found"][0]["user"] == "admin"
+
+
+def test_passattack_http_form_requires_fail_marker(client, clean_db):
+    r = client.post(
+        "/api/passattack",
+        json={"host": "192.168.1.84", "service": "http-form", "form": {"path": "/"}},
+    )
+    assert r.status_code == 422
+    r = client.post(
+        "/api/passattack",
+        json={
+            "host": "192.168.1.84",
+            "service": "http-form",
+            "form": {"path": "/index.php", "fail": 'name="username"'},
+        },
+    )
+    assert r.status_code == 200
+
+
+def test_payload_endpoint_validates_names(client, clean_db):
+    r = client.post("/api/payload", json={"payload": "php/bind_php; rm -rf /"})
+    assert r.status_code == 422
+    r = client.post("/api/payload", json={})
+    assert r.status_code == 422
+    r = client.post(
+        "/api/payload",
+        json={"payload": "php/bind_php", "options": {"LPORT": "bad port!"}},
+    )
+    assert r.status_code == 422
+
+
+def test_payload_endpoint_renders_via_msfvenom(client, clean_db, monkeypatch):
+    seen = {}
+
+    class FakeRunner:
+        def __init__(self, progress=None):
+            pass
+
+        def run_tool(self, tool, argv, timeout=300):
+            seen["tool"] = tool
+            seen["argv"] = list(argv)
+            return {
+                "tool": "msfvenom",
+                "stdout": "PAYLOAD-BYTES",
+                "stderr": "",
+                "rc": 0,
+                "elapsed": 1.0,
+                "timed_out": False,
+                "status": "ok",
+            }
+
+    import services.toolkit as toolkit_mod
+
+    real_runner = toolkit_mod.ToolkitRunner
+    monkeypatch.setattr("routers.scan.ToolkitRunner", FakeRunner, raising=False)
+    # the endpoint imports ToolkitRunner from services.toolkit at call time
+    monkeypatch.setattr(toolkit_mod, "ToolkitRunner", FakeRunner)
+    try:
+        r = client.post(
+            "/api/payload",
+            json={"payload": "php/bind_php", "options": {"LPORT": 4445}},
+        )
+    finally:
+        monkeypatch.setattr(toolkit_mod, "ToolkitRunner", real_runner, raising=False)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["stdout"] == "PAYLOAD-BYTES"
+    assert seen["argv"][:3] == ["msfvenom", "-p", "php/bind_php"]
+    assert "LPORT=4445" in seen["argv"]
+    assert "-f" in seen["argv"]

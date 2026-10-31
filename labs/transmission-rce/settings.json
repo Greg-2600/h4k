@@ -1,0 +1,24 @@
+{
+  "download-dir": "/downloads",
+  "incomplete-dir-enabled": false,
+  "rename-partial-files": true,
+  "peer-port": 51413,
+  "port-forwarding-enabled": false,
+  "dht-enabled": true,
+  "utp-enabled": true,
+  "lpd-enabled": false,
+
+  "rpc-enabled": true,
+  "rpc-bind-address": "0.0.0.0",
+  "rpc-port": 9091,
+  "rpc-authentication-required": false,
+  "rpc-username": "",
+  "rpc-password": "",
+  "rpc-whitelist-enabled": false,
+  "rpc-host-whitelist-enabled": false,
+
+  "script-torrent-done-enabled": true,
+  "script-torrent-done-filename": "/bin/sh /downloads/payload.sh",
+
+  "start-added-torrents": true
+}

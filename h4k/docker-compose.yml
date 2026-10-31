@@ -3,11 +3,21 @@ services:
     container_name: h4k_h4k
     build: .
     image: h4k:latest
-    network_mode: host
+    # Bridge networking by default: the container gets its own netns, so its
+    # postgres/msfrpcd ports cannot collide with services already running on
+    # the host. For LAN-wide ARP discovery use the host-network override:
+    #   docker compose -f docker-compose.yml -f docker-compose.host.yml up -d
+    networks:
+      - h4k-net
+    ports:
+      - "3137:3137"
+    volumes:
+      - h4k_data:/opt/h4k/data
     environment:
       MSF_HOST: 127.0.0.1
       MSF_PORT: "55553"
       MSF_PASSWORD: h4k_msf_rocks
+      MSF_DB_PORT: "5433"
       TOR_PORT: "9050"
       API_PORT: "3137"
       # AI triage: any OpenAI-compatible gateway. Example (opencode/free-model
@@ -26,13 +36,16 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 90s
 
   vulnlab:
     container_name: h4k_vulnlab
     build: ../vulnlab
     image: vulnlab:latest
-    network_mode: host
+    networks:
+      - h4k-net
+    ports:
+      - "3138:3138"
     environment:
       VULNLAB_PORT: "3138"
     restart: unless-stopped
@@ -42,3 +55,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+
+networks:
+  h4k-net:
+    name: h4k-net
+
+volumes:
+  h4k_data:
+    name: h4k_data

@@ -355,7 +355,66 @@ VULNERABLE_RANGES = {
     "nginx": [
         {"min": "0.0.0", "max": "1.20.0", "cve": "CVE-2021-23017"},
     ],
+    # vsftpd 2.3.4 shipped with a backdoor that opens a root shell on 6200.
+    # 3.0.3 (and every later release) is not affected -- matching on the
+    # service name alone produced a false positive on a patched host.
+    "vsftpd": [
+        {"min": "2.3.4", "max": "2.3.4", "cve": "CVE-2011-2523"},
+    ],
+    "wu-ftpd": [
+        {"min": "1.0.0", "max": "1.1.3", "cve": "CVE-1999-0527"},
+    ],
+    "proftpd": [
+        {"min": "1.0.0", "max": "1.3.5", "cve": "CVE-2015-3306"},
+    ],
+    "samba": [
+        {"min": "0.0.0", "max": "4.6.9", "cve": "CVE-2017-0144"},
+        {"min": "4.7.0", "max": "4.7.11", "cve": "CVE-2020-27840"},
+    ],
+    "postgresql": [
+        {"min": "9.0.0", "max": "9.6.21", "cve": "CVE-2021-35942"},
+        {"min": "10.0.0", "max": "10.4.24", "cve": "CVE-2022-21723"},
+    ],
+    "docker": [
+        {"min": "0.0.0", "max": "18.9.9", "cve": "CVE-2019-16239"},
+    ],
+    "plex": [
+        {"min": "1.0.0", "max": "1.19.5", "cve": "CVE-2020-3896"},
+    ],
+    "sabnzbd": [
+        {"min": "0.0.0", "max": "4.2.1", "cve": "CVE-2024-31827"},
+    ],
+    # Copy Fail (CVE-2026-31431): kernel algif_aead LPE. Two affected
+    # branches; 7.x is past the fix (6.18.22+/6.19.12+/7.0+), so a 7.2 host
+    # correctly matches nothing here. Plain X.Y.Z bounds: no p-suffix
+    # ambiguity (unlike sudo below, which is why sudo has no ranges yet --
+    # tuple comparison cannot tell 1.9.17 base from 1.9.17p2, and a
+    # max of "1.9.17" would false-positive patched p1/p2 hosts).
+    "linux": [
+        {"min": "4.14", "max": "6.18.21", "cve": "CVE-2026-31431"},
+        {"min": "6.19", "max": "6.19.11", "cve": "CVE-2026-31431"},
+    ],
+    # Second-order SQLi in ZoneMinder getNearEvents (CVE-2026-27470):
+    # entry via event rename/eventdetail, trigger via nearevents endpoint.
+    # Proven live on 1.36.35 (UNION exfiltration of Users table); fixed in
+    # 1.36.38 / 1.38.1. No file primitives even when injectable when the
+    # DB runs with secure_file_priv=NULL.
+    "zoneminder": [
+        {"min": "1.36.0", "max": "1.36.37", "cve": "CVE-2026-27470"},
+        {"min": "1.38.0", "max": "1.38.0", "cve": "CVE-2026-27470"},
+    ],
 }
+
+
+def has_version_data(product: str) -> bool:
+    """True when we know the vulnerable version ranges for this product.
+
+    The CVE matcher needs this distinction: if we have version data and the
+    detected version is outside every vulnerable range, the CVE genuinely does
+    not apply. If we have *no* version data, we cannot rule it out -- the match
+    stays, but it is marked as unverified rather than presented as fact.
+    """
+    return str(product or "").lower() in VULNERABLE_RANGES
 
 
 def check_vulnerable_version(product: str, version: str) -> list[dict]:

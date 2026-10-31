@@ -30,6 +30,17 @@ def test_toolkit_plan_picks_host():
     assert any("-L" in p["argv"] for p in plan if p["tool"] == "hydra")
 
 
+def test_toolkit_plan_falls_back_to_target_when_host_unset():
+    """Regression: the API allows omitting host (router resolves it), so a
+    bare DeepAttackRequest must never yield a literal "http://None" URL."""
+    req = DeepAttackRequest(target="192.168.1.84", services=["http"])
+    assert req.host is None
+    plan = ToolkitPlan.for_target(req)
+    assert plan, "expected nikto/gobuster/ffuf/zap steps"
+    for step in plan:
+        assert not any(a is None or "None" in str(a) for a in step["argv"]), step
+
+
 def test_has_matches_substring():
     assert _has("ssh", ["ssh", "http"]) is True
     assert _has("smb", ["microsoft-ds"]) is True

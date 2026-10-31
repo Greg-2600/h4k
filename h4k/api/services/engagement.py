@@ -25,8 +25,6 @@ from typing import Any
 
 logger = logging.getLogger("h4k.engagement")
 
-_RUNTIME_DIR = Path("/opt/h4k/data")
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 DB_NAME = "engagements.db"
 
 SCHEMA = """
@@ -115,6 +113,16 @@ CREATE INDEX IF NOT EXISTS idx_creds_eng ON credentials(engagement_id);
 CREATE INDEX IF NOT EXISTS idx_access_eng ON cred_access(engagement_id);
 CREATE INDEX IF NOT EXISTS idx_vulns_eng ON vulns(engagement_id);
 CREATE INDEX IF NOT EXISTS idx_attempts_eng ON attempts(engagement_id);
+CREATE TABLE IF NOT EXISTS crown_jewels (
+    id            TEXT PRIMARY KEY,
+    engagement_id TEXT NOT NULL,
+    host          TEXT NOT NULL,
+    label         TEXT NOT NULL,
+    value         INTEGER NOT NULL DEFAULT 50,
+    created_at    TEXT NOT NULL,
+    UNIQUE(engagement_id, host)
+);
+CREATE INDEX IF NOT EXISTS idx_crown_jewels_eng ON crown_jewels(engagement_id);
 """
 
 
@@ -124,11 +132,9 @@ def _now() -> str:
 
 def db_path() -> Path:
     """Runtime data dir in the container, repo data dir on the host."""
-    if _RUNTIME_DIR.is_dir():
-        _RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
-        return _RUNTIME_DIR / DB_NAME
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    return DATA_DIR / DB_NAME
+    from paths import data_dir
+
+    return data_dir() / DB_NAME
 
 
 class ScopeError(ValueError):
@@ -217,6 +223,7 @@ class EngagementStore:
             "DELETE FROM cred_access WHERE engagement_id=?",
             "DELETE FROM vulns WHERE engagement_id=?",
             "DELETE FROM attempts WHERE engagement_id=?",
+            "DELETE FROM crown_jewels WHERE engagement_id=?",
         ):
             self._write(sql, (engagement_id,))
         before = self._scalar(
@@ -709,6 +716,79 @@ class EngagementStore:
                 )
         return {"nodes": nodes, "edges": edges, "summary": self.summary(engagement_id)}
 
+    # ---- crown jewels / attack objectives ---------------------------------
+
+    def add_crown_jewel(
+        self,
+        engagement_id: str,
+        host: str,
+        label: str | None = None,
+        value: int = 50,
+    ) -> dict[str, Any]:
+        eng = self.get_engagement(engagement_id)
+        if not eng:
+            raise ValueError("engagement not found")
+        host = (host or "").strip()
+        if not host:
+            raise ValueError("host required")
+        try:
+            value = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("value must be an integer") from exc
+        value = max(1, min(100, value))
+        self._require_scope(engagement_id, host)
+        label = (label or host).strip() or host
+        cid = uuid.uuid4().hex[:12]
+        ts = _now()
+        try:
+            self._write(
+                "INSERT INTO crown_jewels (id, engagement_id, host, label, value, created_at)"
+                " VALUES (?,?,?,?,?,?)",
+                (cid, engagement_id, host, label, value, ts),
+            )
+        except Exception as exc:  # sqlite integrity error -> duplicate host
+            raise ValueError(f"crown jewel already declared for {host}: {exc}") from exc
+        rows = self._query("SELECT * FROM crown_jewels WHERE id=?", (cid,))
+        return (
+            dict(rows[0])
+            if rows
+            else {
+                "id": cid,
+                "engagement_id": engagement_id,
+                "host": host,
+                "label": label,
+                "value": value,
+                "created_at": ts,
+            }
+        )
+
+    def list_crown_jewels(self, engagement_id: str) -> list[dict[str, Any]]:
+        rows = self._query(
+            "SELECT * FROM crown_jewels WHERE engagement_id=? ORDER BY created_at",
+            (engagement_id,),
+        )
+        return [dict(r) for r in rows]
+
+    def get_crown_jewel(
+        self, engagement_id: str, crown_id: str
+    ) -> dict[str, Any] | None:
+        rows = self._query(
+            "SELECT * FROM crown_jewels WHERE engagement_id=? AND id=?",
+            (engagement_id, crown_id),
+        )
+        return dict(rows[0]) if rows else None
+
+    def delete_crown_jewel(self, engagement_id: str, crown_id: str) -> bool:
+        before = self._scalar(
+            "SELECT COUNT(*) FROM crown_jewels WHERE engagement_id=? AND id=?",
+            (engagement_id, crown_id),
+        )
+        self._write(
+            "DELETE FROM crown_jewels WHERE engagement_id=? AND id=?",
+            (engagement_id, crown_id),
+        )
+        return bool(before)
+
 
 def _normalize_scope(scope: list[str] | None) -> list[Any]:
     """Accept bare IPs and CIDRs; return networks. Deduped, order-stable."""
@@ -731,3 +811,170 @@ def _normalize_scope(scope: list[str] | None) -> list[Any]:
 def parse_scope(text: str) -> list[str]:
     """Parse a human-entered scope string ("10.0.0.0/24, 10.1.1.5")."""
     return [p for p in re.split(r"[,\s]+", text.strip()) if p]
+
+
+# ---- snapshot export / import ---------------------------------------------
+
+
+def export_snapshot(store: EngagementStore, engagement_id: str) -> dict[str, Any]:
+    """A portable snapshot of an engagement.
+
+    Everything an engagement knows, in one JSON document: the engagement
+    itself, the asset graph, credentials (and where they work), findings,
+    the attempt ledger and the crown jewels. It is deliberately plain data so
+    it can be diffed, archived, or handed to another operator.
+    """
+    engagement = store.get_engagement(engagement_id) or {}
+    return {
+        "format": "h4k-engagement",
+        "version": 1,
+        "exported_at": _now(),
+        "engagement": {
+            "name": engagement.get("name"),
+            "scope": engagement.get("scope") or [],
+            "notes": engagement.get("notes") or "",
+        },
+        "assets": store.assets(engagement_id),
+        "services": store.services(engagement_id),
+        "credentials": store.credentials(engagement_id),
+        "access": store.access(engagement_id),
+        "vulns": store.vulns(engagement_id),
+        "attempts": store.attempts(engagement_id),
+        "crown_jewels": store.list_crown_jewels(engagement_id),
+    }
+
+
+def import_snapshot(
+    store: EngagementStore, engagement_id: str, snapshot: dict[str, Any]
+) -> dict[str, Any]:
+    """Merge a snapshot into an engagement, scope-checking every host.
+
+    Hosts outside the engagement's authorized scope are skipped and reported
+    rather than silently dropped or silently imported.
+    """
+    if not isinstance(snapshot, dict):
+        raise ValueError("snapshot must be an object")
+    if snapshot.get("format") not in (None, "h4k-engagement"):
+        raise ValueError(f"unsupported snapshot format: {snapshot.get('format')}")
+
+    added: dict[str, int] = {"assets": 0, "services": 0, "credentials": 0, "vulns": 0}
+    skipped: list[str] = []
+
+    for asset in snapshot.get("assets") or []:
+        host = str(asset.get("host") or "")
+        if not host:
+            continue
+        if not store.in_scope(engagement_id, host):
+            skipped.append(host)
+            continue
+        try:
+            store.upsert_asset(
+                engagement_id,
+                host,
+                os=asset.get("os"),
+                vendor=asset.get("vendor"),
+                technology=asset.get("technology") or [],
+            )
+        except ScopeError:
+            skipped.append(host)
+            continue
+        added["assets"] += 1
+
+    for svc in snapshot.get("services") or []:
+        host = str(svc.get("host") or "")
+        port = svc.get("port")
+        if not host or port is None:
+            continue
+        if not store.in_scope(engagement_id, host):
+            skipped.append(host)
+            continue
+        store.upsert_service(
+            engagement_id,
+            host,
+            {
+                "port": int(port),
+                "proto": svc.get("proto") or "tcp",
+                "service": svc.get("service") or "",
+                "state": svc.get("state") or "open",
+                "info": svc.get("info") or "",
+            },
+        )
+        added["services"] += 1
+
+    for cred in snapshot.get("credentials") or []:
+        user = str(cred.get("user") or "")
+        password = str(cred.get("password") or "")
+        service = cred.get("service") or ""
+        if not user or not password:
+            continue
+        hosts = []
+        for access in snapshot.get("access") or []:
+            if (
+                str(access.get("user")) == user
+                and str(access.get("password")) == password
+                and str(access.get("service") or "") == service
+            ):
+                hosts.append((str(access.get("host")), int(access.get("port") or 0)))
+        if not hosts:
+            hosts = (
+                [(str(cred.get("host")), int(cred.get("port") or 0))]
+                if cred.get("host")
+                else []
+            )
+        for host, port in hosts:
+            if not host or not store.in_scope(engagement_id, host):
+                if host:
+                    skipped.append(host)
+                continue
+            store.record_credential(
+                engagement_id,
+                user,
+                password,
+                service,
+                origin_host=host,
+                origin_port=port,
+                verified=bool(cred.get("verified")),
+            )
+            added["credentials"] += 1
+
+    for vuln in snapshot.get("vulns") or []:
+        host = str(vuln.get("host") or "")
+        name = str(vuln.get("name") or "")
+        if not host or not name:
+            continue
+        if not store.in_scope(engagement_id, host):
+            skipped.append(host)
+            continue
+        store.record_vuln(
+            engagement_id,
+            host,
+            {
+                "name": name,
+                "severity": vuln.get("severity"),
+                "cwe": vuln.get("cwe"),
+                "module": vuln.get("module"),
+                "reference": vuln.get("reference"),
+            },
+        )
+        added["vulns"] += 1
+
+    for jewel in snapshot.get("crown_jewels") or []:
+        host = str(jewel.get("host") or "")
+        if not host:
+            continue
+        if not store.in_scope(engagement_id, host):
+            skipped.append(host)
+            continue
+        with suppress(ValueError):
+            # already declared -> keep the existing one
+            store.add_crown_jewel(
+                engagement_id,
+                host,
+                jewel.get("label"),
+                int(jewel.get("value") or 50),
+            )
+
+    return {
+        "imported": added,
+        "skipped_out_of_scope": sorted(set(skipped)),
+    }

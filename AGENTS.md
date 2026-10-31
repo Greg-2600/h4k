@@ -1,13 +1,13 @@
 # h4k — session context for AI agents
 
-This file gives an agent everything needed to work safely and correctly on this
-repo. Read it before touching code.
+This file gives an agent everything needed to work safely and correctly on
+this repo. Read it before touching code.
 
 ## What this is
 
 **h4k** is a self-contained, containerized **offensive-security analysis
 platform** for a school capstone. It drives **Metasploit** over its RPC interface
-and layers a modern analysis stack on top: coverage-guided fuzzing, static
+and layers a modern analysis stack on top — coverage-guided fuzzing, static
 analysis (Semgrep + heuristics), supply-chain/SBOM checking, an opt-in attack
 toolkit, keyless local-LLM (opencode relay) root-cause/patching assistance, and responsible-
 disclosure scaffolding.
@@ -23,33 +23,30 @@ disclosure scaffolding.
 HACKING/                 git root
   .venv/                 local dev venv (host tooling only; NOT in the container)
   pyproject.toml         linter/test config (black/ruff/isort/flake8/mypy/pylint/bandit)
-  Makefile               fmt / fix / lint / test / coverage
+  Makefile               fmt / fix / lint / test / e2e / coverage / docker
   requirements.txt       runtime deps
   requirements-dev.txt   lint+test toolchain
   RELEASE_NOTES.md       feature + design-decision inventory
-  ROADMAP.md             prioritized future work
-  AGENTS.md              (this file — read me first)
+  ROADMAP.md             prioritized work
+  docs/                  full documentation set (user / dev / security / examples)
+  AGENTS.md              this file — read me first
   h4k/                   the main platform image
-    Dockerfile           debian12 + postgres + tor + metasploit + offensive tools + semgrep/osv/trivy
-    docker-compose.yml   h4k + vulnlab (AI provider is env-configured, no sidecar)
+    Dockerfile           debian12 + postgres + tor + metasploit + offensive tools
+    docker-compose.yml   h4k + vulnlab (AI provider is env-configured)
     entrypoint.sh        boot: postgres -> msfdb -> tor -> msfrpcd -> uvicorn
     api/                 FastAPI app
       main.py            app + lifespan (starts periodic updater)
       schemas.py         all pydantic models
-      routers/           scan.py, source.py, update.py
-      services/          ~24 modules (see below)
+      routers/           scan.py, source.py, update.py, net.py, engagement.py
+      services/          ~30 modules (see below)
     data/                cves.json, creds.json, wordlists, custom_rules.json (runtime)
     web/                 light dashboard UI (index.html, app.js, style.css)
     scripts/             DNS recon bash tools
     README.md            main human doc (PHRACK-style)
   vulnlab/               intentionally-vulnerable fuzzing TARGET (separate container)
-    Dockerfile           alpine + clang + AFL++ + libFuzzer + supervisord
-    Makefile             server / libfuzzer / afl / parse-asan targets
-    vulnlab.c            buggy HTTP parser (B1 stack overflow, B2 format string)
-    fuzz/parse_fuzzer.c  libFuzzer harness; fuzz/parse_afl.c AFL harness
-    README.md
   demos/sca-demo/        SCA fixture: committed package-lock pinning lodash 4.17.20
-  tests/                 pytest suites (442 tests)
+  tests/                 pytest suites (unit + API) and tests/e2e/ (Selenium)
+  docs/                  documentation (see docs/index.md)
 ```
 
 ## How to run everything
@@ -75,6 +72,10 @@ docker compose up --build
 # fuzzing lab target (separate)
 cd vulnlab && docker build -t vulnlab . && \
   docker run --rm --name vulnlab -p 127.0.0.1:8080:8080 vulnlab
+
+# sandbox mode (no network, no Metasploit, deterministic) — used by CI + demos
+cd h4k/api && H4K_SANDBOX=1 H4K_DATA_DIR=/tmp/h4k-demo \
+  python3 -m uvicorn main:app --port 3137
 ```
 
 **Important:** after `docker build -t h4k .`, you must `docker run` (or `compose
@@ -88,13 +89,14 @@ source .venv/bin/activate        # or use .venv/bin/<tool>
 make fmt                         # black + isort
 make fix                         # ruff --fix
 make lint                        # black ruff isort flake8 mypy pylint bandit
-make test                        # pytest
-make coverage                    # pytest --cov (70% gate)
+make test                        # pytest (unit + API)
+make e2e                         # Selenium browser suite (headless Chrome)
+make coverage                    # pytest --cov (90% gate)
 ```
 
-All linters must pass before commit. Tests currently **1101 passing** at **90%**
-coverage (CI gate 90%), all linters (black/ruff/isort/flake8/mypy/pylint/bandit)
-green. Coverage gate is enforced in pyproject (fail_under = 90).
+All linters must pass before commit. Tests currently **~1150 passing**; the
+coverage gate is 90% (enforced in pyproject). CI runs `lint`, `test` and the
+Selenium suite.
 
 ## The API surface (FastAPI, all under /api)
 
@@ -112,6 +114,8 @@ Host recon/scan:
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
 - `POST /nmap/nse`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +
+  docker-group tries + host audit, read-only, no password)
 
 Engagement (persistent memory + cred propagation, engagement router):
 - `POST /api/engagement` (declare authorized scope), `GET /api/engagement`, `GET|DELETE /api/engagement/{id}`
@@ -119,6 +123,11 @@ Engagement (persistent memory + cred propagation, engagement router):
 - `POST /api/engagement/{id}/ingest` (raw report or `{job_id}`) → asset graph
 - `GET /api/engagement/{id}/assets|credentials|graph`
 - `GET /api/engagement/{id}/propagate/plan` (dry run), `POST /api/engagement/{id}/propagate` (opt-in)
+- `POST|GET /api/engagement/{id}/crown-jewels`, `DELETE .../crown-jewels/{id}`
+- `GET /api/engagement/{id}/attack-paths` (scored paths to crown jewels)
+- `GET /api/engagement/{id}/attck` (technique mapping + detection guidance)
+- `GET /api/engagement/attck/techniques` (catalog)
+- `POST /api/engagement/sandbox-seed` (sandbox mode only: seeded demo engagement)
 
 Source analysis (source router):
 - `POST /source/scan` (git URL SAST), `POST /source/scan/upload` (zip/tar/tgz)
@@ -155,9 +164,9 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
-| `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses | 
+| `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses |
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |
-| `sanitizer.py` | sanitizer-first: ASan/UBSan flags, trace env, bug-class table, per-finding verify/confirm plans |
+| `sanitizer.py` | sanitizer-first: ASan/UBSan flags, trace env, bug-class table |
 | `ai.py` | LLM provider (default local Ollama qwen2.5; OpenAI-compatible opt-in) |
 | `ai_loop.py` | AI exploit-first loop: root-cause + minimal trigger (confirm) + patch + verify |
 | `rules.py` | persistent custom-rule library |
@@ -165,13 +174,17 @@ Health/diagnostic:
 | `ossfuzz.py` | OSS-Fuzz-style build+asan+fuzz auto-runner |
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
-| `engagement.py` | persistent engagement store (scope-enforced asset graph: hosts/services/creds/vulns/attempts) |
+| `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |
-| `zap.py` | OWASP ZAP headless web-app scanner (spider/active) via REST |
+| `attack_paths.py` | crown jewels -> scored, evidence-backed attack paths |
+| `attck.py` | MITRE ATT&CK technique mapping + defender detection guidance |
+| `sandbox.py` | deterministic offline stand-ins for nmap/hydra/Metasploit (demo + CI) |
+| `zap.py` | OWASP ZAP headless web-app scanner via REST |
 | `john.py` | John the Ripper hash cracking (multi-format CTF flow) |
 | `aircrack.py` | aircrack-ng wireless assessment (monitor/capture/crack) |
 | `tshark.py` | tshark pcap/live capture, flow/credential/anomaly extraction |
 | `container_escape.py` | detect container escape vectors (read-only); explicit exploit helpers |
+| `privesc.py` | local-root awareness: docker-group/userns tries (read-only, no password) + host audit (SUID/caps/gates/CVEs) |
 | `lateral.py` | route/interface map + SSH/chisel tunnel + SMB session helpers |
 | `db_interrogate.py` | enumerate local APIs/DBs/configs for flag-shaped secrets |
 
@@ -193,17 +206,16 @@ Health/diagnostic:
    fabricate hits.
 9. **PoCs are disclosure skeletons, not weapons.**
 10. **AI defaults to local Ollama (qwen2.5)**, no key needed; OpenAI-compatible
-   as opt-in. `OLLAMA_BASE_URL` allows a sidecar later.
+    as opt-in. `OLLAMA_BASE_URL` allows a sidecar later.
 11. **Separate vulnlab container** — sandboxed fuzz target, crash-restart via
     supervisord.
 12. **Auto-update periodic task** refreshes semgrep/osv-scanner/trivy + CVE/creds
     (H4K_AUTO_UPDATE=1, interval env).
-13. **Engagement scope is enforced in the store, not the UI** — every write and
+13. **Engagement scope is enforced in the store, not in the UI** — every write and
     every replayed login re-checks the CIDR list. Out-of-scope hosts from a wide
     scan are skipped and reported, never recorded.
 14. **Propagation only replays already-verified credentials** — it never invents
     or sprays new candidates, and a ledger means a miss is never re-attempted.
-    A pivot edge appears only where a login actually succeeded.
 15. **Port breadth is a separate axis from OPSEC mode** — `ScanRequest.depth`
     (`quick`/`standard`/`full`) decides how many ports; every report carries a
     `Coverage` and a partial sweep emits a `[coverage] PARTIAL SCAN` note.
@@ -211,14 +223,26 @@ Health/diagnostic:
     container-escape/lateral/DB-interrogation each have their own button and
     endpoint; a scan never triggers one. Detection is read-only; exploit helpers
     are only ever called explicitly.
+17. **Attack paths are evidence-backed** — a path is built only from *verified*
+    credential logins plus the vulnerability inventory, then scored by business
+    value, vuln severity and hop count.
+18. **Sandbox mode replaces only the leaves** — nmap/hydra/Metasploit become
+    deterministic stand-ins; the pipeline, parsers, store and UI stay real.
+    This is what makes the Selenium suite and CI hermetic.
 
 Fuller prose in `RELEASE_NOTES.md` (features + D1–D24) and `ROADMAP.md`.
+Full documentation in `docs/` (see `docs/index.md`).
 
 ## Common pitfalls / gotchas
 
 - **`msfrpcd` connect**: client uses `ssl=False` (daemon started `-S true`).
 - **`-o -` semgrep**: writes a file literally named `-`; the wrapper writes to a
   temp file (`mkstemp`) and reads it back. Don't "fix" it to stdout.
+- **`-o -` hydra**: same trap, and worse -- it drops a file named `-` into the
+  working directory. The password attack parses hydra's stdout instead.
+- **never run `black` on `data/*.json`** — black rewrites them with
+  Python-style trailing commas, which is invalid JSON and breaks every
+  `CveDb` load. Edit JSON by hand or via `python -m json.tool`.
 - **`sys.executable` vs `sys.prefix`**: the .venv symlinks to system python; use
   `sys.prefix` to find `bin/semgrep` etc.
 - **osv-scanner needs a lockfile** to surface CVEs; fresh clones without one
@@ -232,6 +256,12 @@ Fuller prose in `RELEASE_NOTES.md` (features + D1–D24) and `ROADMAP.md`.
   backend powers the API tests.
 - **Auto-update in tests**: `test_updater` monkeypatches `_which`/state; it must
   not hit the network.
+- **UI inputs must not use `window.prompt`** — it blocks the browser and cannot
+  be driven by Selenium. Use a real form with a `data-testid`.
+- **`H4K_DATA_DIR`** overrides the runtime data directory (both
+  `neighbors.db` and `engagements.db`). Tests and E2E use a temp dir.
+- **nmap XML parsing splits on `"<host "`** — a canned XML must include
+  attributes on the `<host>` element or the parser sees no hosts.
 
 ## Git / workflow
 

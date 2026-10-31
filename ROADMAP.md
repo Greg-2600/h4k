@@ -103,13 +103,13 @@ item is a self-contained, live-demonstrable increment on the current release.
 
 ## Next up — the actual red-team gaps
 
-- [ ] **Attack paths to objectives** — let the operator declare crown jewels
+- [x] **Attack paths to objectives** — let the operator declare crown jewels
       (a DC, a file server, `db-prod-01`) and compute *paths* to them, so a
       2.0 info-leak that pivots to the DC outranks a 9.8 on an isolated box.
       Needs the engagement graph above; this is the missing deliverable.
-- [ ] **ATT&CK technique IDs** — map every action/finding to a technique so the
+- [x] **ATT&CK technique IDs** — map every action/finding to a technique so the
       output speaks the defender's language. Cheap once paths exist.
-- [ ] **Detection guidance** — per technique, what telemetry a defender would
+- [x] **Detection guidance** — per technique, what telemetry a defender would
       have seen (log source, event ID). Worth more to a client than the vuln list.
 
 ## CTF / Live-target enhancements (added during 192.168.1.13 engagement)
@@ -148,6 +148,41 @@ item is a self-contained, live-demonstrable increment on the current release.
   (done: `.github/workflows/ci.yml` runs `make lint` + `make coverage` on push/PR)
 - [x] **Release packaging** — tagged image + one-line `docker run` for classmates.
   (done: `scripts/release.sh <ver>` builds/tags/pushes and prints the one-liner)
+- [x] **Selenium end-to-end suite** — a real browser drives the real console
+      against a real API, so UI regressions cannot ship silently.
+  (done: `tests/e2e/` + `make e2e` + a CI job. 20 tests: boot, navigation,
+  scope picker, report preview, crown jewels, attack paths, ATT&CK panel and a
+  full autopilot walk. The `page` fixture fails a test on any uncaught
+  JavaScript error — that is how the missing `renderReportPreview()` was found.)
+- [x] **Sandbox mode** — deterministic, offline stand-ins for nmap/hydra/
+      Metasploit so demos, CI and the browser suite never touch a network.
+  (done: `services/sandbox.py` + `H4K_SANDBOX=1` + `POST /api/engagement/sandbox-seed`)
+- [x] **Capability report** — `GET /api/capabilities` reports installed tools,
+      Metasploit reachability *and database state*, storage and wordlists, and
+      warns about anything that would fail silently. The console shows it as a
+      footer badge; `scripts/sanity_check.py` asserts on it.
+  (done: `services/capabilities.py` + `/api/capabilities` + UI badge. It
+  catches the classic "Metasploit is up but its database is not" case, where
+  every scan comes back empty.)
+- [x] **Banner-aware CVE matching** — version ranges are keyed by the product
+      actually detected on the wire, so a patched vsftpd 3.0.3 is no longer
+      flagged with the 2.3.4 backdoor CVE.
+- [x] **Engagement snapshots + path export** — export/import an engagement as
+      a portable, scope-checked snapshot; export attack paths as markdown.
+- [x] **Passive auto-scan on boot** — as soon as the API comes up it begins
+      building a network and service map of the local subnet (recon only: no
+      credential testing, no exploitation), folds the result into a default
+      engagement, and re-scans on a cadence. The map is live at `/api/map`
+      and in the console (`auto-scan: running · N hosts · M services`).
+  (done: `services/auto_scan.py`, `GET/POST /api/map*`, UI status badge.
+  Configurable via `H4K_AUTO_SCAN`, `H4K_AUTO_SCAN_CIDR`,
+  `H4K_AUTO_SCAN_INTERVAL`, `H4K_AUTO_SCAN_DEPTH`.)
+- [x] **Documentation set** — user, developer and security documentation that
+      lives in the repo and is reviewed with the code.
+  (done: `docs/` — quickstart, concepts, workflows, UI guide, safety,
+  troubleshooting, architecture, API reference, service reference, data model,
+  testing guide, contributing, release process, threat model, scope spec,
+  secrets handling, examples.)
 
 ## Evaluated & rejected
 

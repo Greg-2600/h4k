@@ -4,13 +4,20 @@
 # scan explicitly enables it.
 import logging
 import socket
+import time
 from collections.abc import Callable
+from contextlib import suppress
 from typing import Any
 
 from schemas import AttackRequest
 from services.msfrpc import MsfClient
 
 logger = logging.getLogger("h4k.attack")
+
+# Framework datastore keys every exploit honours. They are not module options
+# (so option-discovery never lists them) but they must always pass through:
+# from a container the auto-detected LHOST is an unroutable bridge IP.
+_FRAMEWORK_OPTS = {"PAYLOAD", "LHOST", "LPORT"}
 
 
 def _local_ip() -> str | None:
@@ -64,6 +71,13 @@ class AttackService:
 
     def run(self, req: AttackRequest, known_creds: list[dict]) -> list[dict]:
         """Execute attacks for the services requested. Returns Attack dicts."""
+        # a named module from the triage drawer wins over the heuristic
+        if req.module and not req.module.startswith(
+            ("exploit/", "auxiliary/", "post/")
+        ):
+            raise ValueError(f"refusing to run {req.module!r}: not a module path")
+        if req.check_only:
+            return [self._check_only(req)]
         cred_idx: dict[tuple[str, str], dict[str, str]] = {}
         for c in known_creds or []:
             if not c.get("verified"):
@@ -72,11 +86,6 @@ class AttackService:
                 "user": c.get("user", ""),
                 "password": c.get("password", ""),
             }
-        # a named module from the triage drawer wins over the heuristic
-        if req.module and not req.module.startswith(
-            ("exploit/", "auxiliary/", "post/")
-        ):
-            raise ValueError(f"refusing to run {req.module!r}: not a module path")
         attacks: list[dict] = []
         hosts = self._resolve_hosts(req)
         for host in hosts:
@@ -95,6 +104,7 @@ class AttackService:
                     cred=cred,
                     port=req.port,
                     pinned=pinned,
+                    extra_opts=req.options or {},
                 )
                 attacks.append(
                     {
@@ -162,6 +172,90 @@ class AttackService:
             logger.debug("dynamic module search failed for %s: %s", service, exc)
         return self._module_for_service(service)
 
+    def _check_only(self, req: AttackRequest) -> dict[str, Any]:
+        """Dry run: ask the module whether the target is vulnerable without
+        exploiting. Used to confirm a finding before firing."""
+        module = req.module or ""
+        host = req.host or req.target
+        if not module:
+            return {
+                "host": host,
+                "service": "",
+                "module": "",
+                "result": "check_failed",
+                "detail": "check_only needs a pinned module",
+                "session_id": None,
+                "credential": None,
+            }
+        valid = self._module_options(module)
+        opts: dict[str, Any] = {"RHOSTS": host}
+        if "RPORT" in valid and req.port:
+            opts["RPORT"] = req.port
+        for key, val in (req.options or {}).items():
+            if key in valid or key in _FRAMEWORK_OPTS:
+                opts[key] = val
+        opts = {k: v for k, v in opts.items() if k in valid or k in _FRAMEWORK_OPTS}
+        self.progress(f"[check] {module} -> {host}", 0)
+        try:
+            res = self.msf.check(self._module_type(module), module, opts)
+        except Exception as exc:
+            return {
+                "host": host,
+                "service": "",
+                "module": module,
+                "result": "check_failed",
+                "detail": str(exc)[:200],
+                "session_id": None,
+                "credential": None,
+            }
+        # the verdict nests under result: {status, result: {code, message}}
+        inner = res.get("result") if isinstance(res, dict) else None
+        inner = inner if isinstance(inner, dict) else {}
+        code = str(
+            inner.get("code")
+            or (res.get("code") if isinstance(res, dict) else "")
+            or ""
+        ).strip()
+        message = str(
+            inner.get("message")
+            or (res.get("message") if isinstance(res, dict) else "")
+            or ""
+        ).strip()
+        if message and code and code.lower() not in message.lower():
+            text = f"{message} [{code}]"
+        else:
+            text = message or code or str(res)
+        lowered = text.lower()
+        err = res.get("error") if isinstance(res, dict) else None
+        if (
+            "vulnerable" in lowered
+            and "not vulnerable" not in lowered
+            and "appears" not in lowered
+        ):
+            result = "vulnerable"
+        elif "appears" in lowered:
+            # msf CheckCode::Appears ("appears to be vulnerable")
+            result = "likely_vulnerable"
+        elif (
+            "safe" in lowered
+            or "not vulnerable" in lowered
+            or "not exploitable" in lowered
+        ):
+            result = "safe"
+        elif err:
+            result = "check_failed"
+        else:
+            result = "unknown"
+        return {
+            "host": host,
+            "service": "",
+            "module": module,
+            "result": result,
+            "detail": text[:200],
+            "session_id": None,
+            "credential": None,
+        }
+
     def _try_exploit(
         self,
         module: str,
@@ -171,6 +265,8 @@ class AttackService:
         cred: dict[str, str] | None = None,
         port: int | None = None,
         pinned: bool = False,
+        extra_opts: dict[str, Any] | None = None,
+        session_timeout: float = 45.0,
     ) -> dict:
         """Set sensible per-module options (only valid ones) and execute.
 
@@ -229,26 +325,111 @@ class AttackService:
                 "session_id": None,
             }
 
+        # Operator-supplied module options (USER_FILE, TARGETURI, PAYLOAD,
+        # LHOST/LPORT for reverse/bind shells, ...) are merged last so a
+        # triage can tune a module. Module options pass; PAYLOAD/LHOST/LPORT
+        # are framework datastore keys every exploit honours, so they always
+        # pass too (from a container the auto-detected LHOST is an unroutable
+        # bridge IP — the operator must be able to set a routable one or a
+        # bind PAYLOAD instead).
+        for key, val in (extra_opts or {}).items():
+            if key in valid or key in _FRAMEWORK_OPTS:
+                opts[key] = val
+
         # Only pass options the module supports (drop StopOnSuccess etc.).
-        opts = {k: v for k, v in opts.items() if k in valid}
+        opts = {k: v for k, v in opts.items() if k in valid or k in _FRAMEWORK_OPTS}
 
         self.progress(f"[attack] {module} -> {host}", 0)
         try:
-            res = self.msf.execute("exploit", module, opts)
-            session_id = None
-            if isinstance(res, dict):
-                session_id = res.get("job_id")
-                ok = (res.get("status") == "success") or session_id is not None
+            known: set[str] = set()
+            with suppress(Exception):
+                known = {str(sid) for sid in (self.msf.sessions() or {})}
+        except Exception:  # pragma: no cover - defensive (mock without sessions)
+            known = set()
+        try:
+            runner = getattr(self.msf, "execute_module", None)
+            if runner is not None:
+                res = runner(self._module_type(module), module, opts)
             else:
-                ok = bool(res)
-            return {"ok": ok, "detail": str(res)[:200], "session_id": session_id}
+                res = self.msf.execute(self._module_type(module), module, opts)
+            session_id = None
+            job_id = res.get("job_id") if isinstance(res, dict) else None
+            if isinstance(res, dict) and isinstance(res.get("session_id"), (int, str)):
+                # some runners hand back a live session directly
+                session_id = str(res["session_id"])
+            if isinstance(res, dict) and res.get("error"):
+                return {
+                    "ok": False,
+                    "detail": str(res.get("error"))[:200],
+                    "session_id": None,
+                }
+            if module.startswith("auxiliary/"):
+                # scanners never open shells: launching is the success criterion
+                ok = job_id is not None
+                return {"ok": ok, "detail": str(res)[:200], "session_id": None}
+            if session_id is None and job_id is not None:
+                # {"job_id": N} means "module launched", NOT a shell. Wait for
+                # a genuinely new session instead of reporting the job id.
+                session_id = self._await_session(known, timeout=session_timeout)
+            if session_id is not None:
+                return {"ok": True, "detail": str(res)[:200], "session_id": session_id}
+            return {
+                "ok": False,
+                "detail": f"module ran as job {job_id}; no session opened",
+                "session_id": None,
+            }
         except Exception as exc:
             return {"ok": False, "detail": str(exc)[:200], "session_id": None}
 
+    def _await_session(self, known: set[str], timeout: float = 45.0) -> str | None:
+        """Wait for a genuinely NEW msf session id (a real shell).
+
+        `known` is the session-id set snapshotted before the module ran, so a
+        stale session from an earlier exploit can never be mistaken for this
+        one's. Returns None on timeout — the module ran, but nobody called
+        home (wrong LHOST, firewall, patched target, ...).
+        """
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            try:
+                current = self.msf.sessions() or {}
+            except Exception:
+                current = {}
+            fresh = [str(sid) for sid in current if str(sid) not in known]
+            if fresh:
+                return fresh[0]
+            time.sleep(2)
+        return None
+
+    @staticmethod
+    def _module_type(module: str) -> str:
+        """The Metasploit module type implied by a module path.
+
+        `exploit/...` -> exploit, `auxiliary/...` -> auxiliary, `post/...` ->
+        post. Running an auxiliary module as an exploit (the old behaviour)
+        makes the RPC fail to find it, so the type has to follow the path.
+        """
+        path = (module or "").strip()
+        for mtype in ("exploit", "auxiliary", "post"):
+            if path.startswith(f"{mtype}/"):
+                return mtype
+        return "exploit"
+
     def _module_options(self, module: str) -> set[str]:
         """Return the set of option names a module accepts (best-effort)."""
+        mtype = self._module_type(module)
+        # 1. the raw RPC (works for auxiliary/post modules too)
+        reader = getattr(self.msf, "module_options", None)
+        if reader is not None:
+            try:
+                valid = reader(mtype, module)
+                if valid:
+                    return valid
+            except Exception as exc:
+                logger.warning("could not read options for %s: %s", module, exc)
+        # 2. the pymetasploit3 module object (older clients)
         try:
-            mod = self.msf.client.modules.use("exploit", module)
+            mod = self.msf.client.modules.use(mtype, module)
             opts = getattr(mod, "options", None)
             if isinstance(opts, (list, tuple)):
                 return set(opts)

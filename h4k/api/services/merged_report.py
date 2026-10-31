@@ -79,7 +79,7 @@ def render_markdown(rep: dict[str, Any]) -> str:
     for h in rep.get("scan", []):
         svcs = (
             ", ".join(
-                f"{x.get('port','?')}/{x.get('service') or '?'}"
+                f"{x.get('port', '?')}/{x.get('service') or '?'}"
                 for x in h.get("services", [])
             )
             or "—"
@@ -120,7 +120,7 @@ def render_markdown(rep: dict[str, Any]) -> str:
         for c in rep["fuzz"]:
             L.append(
                 f"- {c.get('vector')}: **{c.get('signal')}** "
-                f"{c.get('evidence','')[:60]}"
+                f"{c.get('evidence', '')[:60]}"
             )
     else:
         L.append("- none")

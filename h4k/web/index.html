@@ -1,411 +1,319 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>h4k // operations</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=8" />
+  <title>h4k // kill chain</title>
+  <link rel="stylesheet" href="/static/style.css?v=12" />
 </head>
 <body>
   <div class="app" id="app">
 
-    <!-- GLITCH OVERLAY -->
-    <div class="glitch-overlay" id="glitch-overlay" hidden></div>
-
-    <!-- HEADER -->
-    <header class="header">
-      <div class="header-left">
-        <span class="logo">h4k</span>
-        <span class="logo-sub">operations</span>
-      </div>
-
-      <!-- XP BAR -->
-      <div class="xp-section">
-        <div class="xp-info">
-          <span class="xp-level">LVL <span id="player-level">1</span></span>
-          <span class="xp-bar-wrap">
-            <span class="xp-bar" id="xp-bar"></span>
-          </span>
-          <span class="xp-num"><span id="player-xp">0</span> / <span id="player-xp-next">100</span> XP</span>
-        </div>
-      </div>
-
-      <nav class="nav">
-        <button class="nav-btn active" data-phase="assets" data-shortcut="1">Assets</button>
-        <button class="nav-btn" data-phase="walk" data-shortcut="2">Walk</button>
-        <button class="nav-btn" data-phase="fuzz" data-shortcut="3">Fuzz</button>
-        <button class="nav-btn" data-phase="report" data-shortcut="4">Report</button>
-      </nav>
-
-      <div class="header-right">
-        <select id="scope-select" class="scope-select" title="Active engagement scope — aggressive actions are restricted to these CIDRs"></select>
-        <button class="icon-btn" id="btn-session-reset" title="Reset session (clears discovered hosts/services/vulns)">⟳</button>
-        <button class="icon-btn" id="sound-toggle" title="Sound effects">🔊</button>
-        <button class="icon-btn" id="cmd-palette-btn" title="Command palette (Ctrl+K)">⌘</button>
-        <button class="icon-btn" id="theme-toggle" title="Toggle theme">◐</button>
-      </div>
+    <!-- STATUS BAR: scope + health + score -->
+    <header class="statusbar">
+      <span class="brand">h4k</span>
+      <select id="scope-select" class="scope-select" data-testid="scope-select"
+              title="Active engagement scope — aggressive actions are restricted to these CIDRs"></select>
+      <span class="pill" id="msf-status" data-testid="msf-status"><span class="dot offline"></span><span>msf ?</span></span>
+      <span class="pill" id="cap-status" data-testid="cap-status" title="Tool / MSF / storage readiness"><span class="dot offline"></span><span>caps ?</span></span>
+      <span class="pill" id="autoscan-status" data-testid="autoscan-status"><span class="dot offline"></span><span>scan idle</span></span>
+      <span class="spacer"></span>
+      <span class="counter" id="flag-counter" data-testid="flag-counter">0 flags</span>
+      <span class="counter dim" id="host-counter" data-testid="host-counter">0 hosts</span>
+      <button class="icon-btn" id="activity-toggle" data-testid="activity-toggle" title="Activity log">log</button>
+      <button class="icon-btn" id="cmd-palette-btn" data-testid="cmd-palette-btn" title="Command palette (Ctrl+K)">⌘</button>
+      <button class="icon-btn" id="theme-toggle" title="Toggle theme">◐</button>
+      <button class="icon-btn" id="btn-session-reset" title="Reset session">⟳</button>
+      <span class="clock" id="clock">--:--:--</span>
     </header>
 
-    <!-- MAIN CONTENT -->
-    <main class="console-main">
+    <!-- NEXT ACTION: single ranked recommendation -->
+    <div class="nextmove" id="next-move-bar" data-testid="next-move-bar">
+      <span class="nextmove-label">next</span>
+      <div class="nextmove-list" id="next-move-list" data-testid="next-move-list"></div>
+      <button class="icon-btn" id="btn-refresh-next" data-testid="refresh-next" title="Refresh next moves">↻</button>
+    </div>
 
-      <!-- 3-PANE OPERATIONS CONSOLE -->
-      <div class="console" id="phase-assets" data-phase="assets">
+    <!-- KILL CHAIN: discover → recon → exploit → pivot → persist → score -->
+    <nav class="workspaces">
+      <button class="ws-btn active" data-tab="discover" data-testid="nav-discover">Discover <span class="ws-count" id="ws-count-discover"></span></button>
+      <button class="ws-btn" data-tab="recon" data-testid="nav-recon">Recon <span class="ws-count" id="ws-count-recon"></span></button>
+      <button class="ws-btn" data-tab="exploit" data-testid="nav-exploit">Exploit <span class="ws-count" id="ws-count-exploit"></span></button>
+      <button class="ws-btn" data-tab="pivot" data-testid="nav-pivot">Pivot <span class="ws-count" id="ws-count-pivot"></span></button>
+      <button class="ws-btn" data-tab="persist" data-testid="nav-persist">Persist <span class="ws-count" id="ws-count-persist"></span></button>
+      <button class="ws-btn" data-tab="score" data-testid="nav-score">Score <span class="ws-count" id="ws-count-score"></span></button>
+    </nav>
 
-        <!-- LEFT: network canvas -->
-        <div class="pane pane-left card">
-          <div class="pane-header">
-            <h2>🌐 Network</h2>
-            <div class="pane-actions">
-              <span class="fp-chip" id="con-counts">…</span>
-              <button class="btn btn-primary btn-sm" id="btn-acquire">＋ Discover</button>
-            </div>
-          </div>
-          <div class="pane-body" style="padding:8px;">
-            <div id="inventory-grid"></div>
-            <div id="inventory-empty" class="fp-empty" style="padding:24px 8px;">
-              No hosts yet.<br />Hit ＋ Discover, or run Autopilot.
-            </div>
-          </div>
-        </div>
+    <main class="main">
 
-        <!-- CENTER: action panel -->
-        <div class="pane pane-center card">
-          <div class="pane-header">
-            <h2 id="ap-title">🎯 Action Panel</h2>
-            <div class="pane-actions" id="ap-tabs" hidden>
-              <button class="st-tab ap-tab active" data-aptab="map">Service Map</button>
-              <button class="st-tab ap-tab" data-aptab="vulns">Likely Vulnerable</button>
-              <button class="st-tab ap-tab" data-aptab="creds">Cred Targets</button>
-            </div>
-          </div>
-          <div class="pane-body" id="ap-body">
-            <!-- 1. state-driven "what next" checklist (always on top) -->
-            <div id="overview-area"></div>
-
-            <!-- 2. in-flight strip (any running job) -->
-            <div id="sp-strip" class="sp-strip" hidden>
-              <div class="neighbors-progress-wrap">
-                <div class="progress-bar"><div class="progress-fill" id="sp-fill"></div></div>
-                <span class="fp-pct" id="sp-pct">0%</span>
-              </div>
-              <p class="scan-status" id="sp-status">Initializing...</p>
-              <div class="neighbors-list" id="neighbors-list"></div>
-            </div>
-
-            <!-- acquisition (toggle w/ ＋ Discover) -->
-            <div id="ap-acquire" class="inner-card" hidden>
-              <div class="input-group">
-                <div class="scan-type-tabs" id="scan-type-tabs">
-                  <button class="st-tab active" data-type="ip" id="tab-ip">IP / CIDR</button>
-                  <button class="st-tab" data-type="neighbors" id="tab-neighbors">Local Network</button>
-                </div>
-                <input type="text" id="target" placeholder="192.168.1.13 or 192.168.1.0/24" />
-                <div class="input-hint" id="target-hint">Enter a single IP or CIDR range (e.g. 192.168.1.0/24)</div>
-              </div>
-              <div class="input-row">
-                <div class="input-group">
-                  <label>Mode</label>
-                  <select id="mode-select">
-                    <option value="stealth">Stealth</option>
-                    <option value="tor">Tor</option>
-                    <option value="overt" selected>Overt</option>
-                  </select>
-                </div>
-                <div class="input-group">
-                  <label>Depth</label>
-                  <select id="depth-select">
-                    <option value="quick">Quick</option>
-                    <option value="standard" selected>Standard</option>
-                    <option value="full">Full</option>
-                  </select>
-                </div>
-                <button class="btn btn-primary" id="btn-launch-recon">
-                  <span class="btn-text">🔍 Discover & Scan</span>
-                  <span class="btn-loading" hidden>◌ Scanning...</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- TAB: service map -->
-            <div class="ap-tabpane" id="pane-map">
-              <div class="fp-summary">
-                <span class="fp-chip" id="fp-chip-hosts">0 hosts</span>
-                <span class="fp-chip" id="fp-chip-ports">0 open ports</span>
-                <button class="btn btn-primary btn-sm" id="btn-fingerprint">🔍 Scan Services</button>
-                <button class="btn btn-outline btn-sm" id="btn-full-scan">⚡ Full Port Scan</button>
-              </div>
-              <div class="neighbors-progress-wrap">
-                <div class="progress-bar"><div class="progress-fill fp-fill" id="fp-fill"></div></div>
-                <span class="fp-pct" id="fp-pct">0%</span>
-              </div>
-              <div class="fp-table-wrap">
-                <table class="fp-map">
-                  <thead>
-                    <tr>
-                      <th>Host</th><th>Port</th><th>Service</th><th>Product</th><th>Version</th><th>Vendor</th>
-                    </tr>
-                  </thead>
-                  <tbody id="fp-tbody"></tbody>
-                </table>
-                <div class="fp-empty" id="fp-empty">No fingerprint data yet — run ＋ Discover, then “Scan Services”.</div>
-              </div>
-            </div>
-
-            <!-- TAB: likely vulnerable -->
-            <div class="ap-tabpane" id="pane-vulns" hidden>
-              <div class="fp-summary">
-                <span class="cve-status" id="cve-status">CVE db: loading…</span>
-                <button class="btn btn-secondary btn-sm" id="btn-cve-refresh" hidden title="CVE db is 7+ days old">🔄 Update CVEs</button>
-                <span class="fp-chip" id="vuln-chip-count">0 findings</span>
-              </div>
-              <div class="fp-table-wrap">
-                <table class="fp-map vuln-map">
-                  <thead>
-                    <tr>
-                      <th>Host</th><th>Port</th><th>Finding</th><th>Severity</th><th>Detail</th><th></th>
-                    </tr>
-                  </thead>
-                  <tbody id="vuln-tbody"></tbody>
-                </table>
-                <div class="fp-empty" id="vuln-empty">
-                  No vulnerability candidates. Run a service fingerprint scan first.
-                </div>
-              </div>
-            </div>
-
-            <!-- TAB: cred targets -->
-            <div class="ap-tabpane" id="pane-creds" hidden>
-              <div class="fp-summary">
-                <span class="fp-chip" id="cred-targets-count">0 targets</span>
-                <button class="btn btn-secondary btn-sm" id="btn-cred-targets-refresh">↻</button>
-              </div>
-              <div class="fp-table-wrap">
-                <table class="fp-map">
-                  <thead>
-                    <tr>
-                      <th>Host</th><th>Port</th><th>Service</th><th>Product</th><th>Attack</th><th></th><th></th>
-                    </tr>
-                  </thead>
-                  <tbody id="cred-targets-tbody"></tbody>
-                </table>
-                <div class="fp-empty" id="cred-targets-empty">
-                  No password-attackable services yet — run “Scan Services”.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- RIGHT: activity -->
-        <div class="pane pane-right card">
-          <div class="pane-header">
-            <h2>📟 Activity</h2>
-            <span class="session-badge" id="session-badge">—</span>
-          </div>
-          <div class="pane-body" id="activity-log"></div>
-        </div>
-
-      </div>
-
-      <!-- WALK (autopilot) PAGE -->
-      <div class="phase single-page" id="phase-walk" data-phase="walk" hidden>
+      <!-- ═══ 1. DISCOVER: scope, find targets ═══ -->
+      <section class="ws-panel active" id="tab-discover" data-tab="discover">
         <div class="card">
-          <div class="card-header danger">
-            <h2>🤖 Autopilot — Full Network Walk</h2>
-            <div class="vuln-header-right">
-              <span class="fp-chip" id="ap-status-chip">idle</span>
-              <button class="btn btn-danger" id="btn-ap-start">▶ Start Full Attack</button>
-              <button class="btn btn-secondary" id="btn-ap-stop" hidden>■ Stop</button>
-            </div>
-          </div>
+          <div class="card-head"><h2>Scope</h2><span class="spacer"></span><span class="muted" id="scope-summary">no scope</span></div>
           <div class="card-body">
-            <div class="pa-hint">
-              One run does the whole thing: discovery → fingerprint → CVE correlation →
-              password attacks → exploit attempts. <strong>Requires an active engagement
-              scope</strong> (header). Only hosts inside the scope are touched. Live log shows
-              every named action — watch it. Results land in the Assets console.
-            </div>
-            <div class="neighbors-progress-wrap" id="ap-progress-wrap">
-              <div class="progress-bar"><div class="progress-fill" id="ap-progress"></div></div>
-              <span class="fp-pct" id="ap-pct">0%</span>
-            </div>
-            <div class="ap-summary" id="ap-summary" hidden>
-              <span class="fp-chip" id="ap-chip-hosts">0 hosts</span>
-              <span class="fp-chip" id="ap-chip-vulns">0 with vulns</span>
-              <span class="fp-chip" id="ap-chip-creds">0 creds</span>
-              <span class="fp-chip" id="ap-chip-sessions">0 sessions</span>
-            </div>
-            <h3 style="font-size:13px; margin: 10px 0 6px;">Hosts</h3>
-            <div class="ap-table-wrap">
-              <table class="fp-map">
-                <thead>
-                  <tr><th>Host</th><th>Stage</th><th>Services</th><th>Vulns</th><th>Creds</th></tr>
-                </thead>
-                <tbody id="ap-tbody"></tbody>
-              </table>
-            </div>
-            <h3 style="font-size:13px; margin: 12px 0 6px;">Live log</h3>
-            <div class="ex-output ap-log" id="ap-log"></div>
+            <p class="muted">Everything aggressive is restricted to the scope selected above. No scope = recon only, nothing recorded.</p>
           </div>
         </div>
-      </div>
-
-      <!-- FUZZ PAGE -->
-      <div class="phase single-page" id="phase-fuzz" data-phase="fuzz" hidden>
         <div class="card">
-          <div class="card-header">
-            <h2>🧪 Fuzz a Target You Own</h2>
-            <span class="pa-status" id="fz-status">idle</span>
-          </div>
+          <div class="card-head"><h2>Find targets</h2><span class="spacer"></span><span class="muted" id="scan-status">idle</span></div>
           <div class="card-body">
-            <div class="pa-hint">
-              LAB-ONLY: black-box signal-guided fuzzing of a service YOU control
-              (vulnlab at 127.0.0.1:3138 demo target). Connection teardown /
-              server errors / hangs become crash candidates with reproduce commands.
+            <div class="row">
+              <input type="text" id="target" class="grow" placeholder="192.168.1.0/24 or single IP" />
+              <select id="mode-select" title="OPSEC mode">
+                <option value="stealth">stealth</option>
+                <option value="tor">tor</option>
+                <option value="overt" selected>overt</option>
+              </select>
+              <select id="depth-select" title="Port breadth">
+                <option value="quick">quick</option>
+                <option value="standard" selected>standard</option>
+                <option value="full">full</option>
+              </select>
+              <button class="btn primary" id="btn-scan">Scan</button>
+              <button class="btn" id="btn-neighbors" title="ARP discovery on local networks">Neighbors</button>
             </div>
-            <div class="input-row">
-              <div class="input-group grow">
-                <label>Target host</label>
-                <input type="text" id="fz-host" placeholder="127.0.0.1" value="127.0.0.1" />
-              </div>
-              <div class="input-group">
-                <label>Port</label>
-                <input type="text" id="fz-port" placeholder="8080" value="3138" />
-              </div>
-              <div class="input-group">
-                <label>Iterations</label>
-                <input type="text" id="fz-iters" placeholder="2000" value="2000" />
-              </div>
-              <div class="input-group">
-                <label>Timeout (s)</label>
-                <input type="text" id="fz-timeout" placeholder="60" value="60" />
-              </div>
+            <div class="row">
+              <span class="pill" data-testid="live-map-status"><span data-testid="live-map-state">auto-scan: idle</span> · <span data-testid="live-map-counts">0 hosts · 0 services · 0 vulns</span></span>
+              <button class="btn small" id="btn-live-map-toggle" data-testid="live-map-toggle" title="Toggle passive auto-scan">toggle</button>
             </div>
-            <div class="ex-actions">
-              <button class="btn btn-primary" id="btn-fz-start">🧪 Start Fuzzing</button>
-              <button class="btn btn-secondary" id="btn-fz-stop" hidden>■ Stop</button>
-              <span class="ex-status" id="fz-live">Ready.</span>
-            </div>
-            <div class="neighbors-progress-wrap">
-              <div class="progress-bar"><div class="progress-fill" id="fz-progress"></div></div>
-              <span class="fp-pct" id="fz-pct">0%</span>
-            </div>
-            <div class="fp-summary" id="fz-summary" hidden>
-              <span class="fp-chip" id="fz-chip-cves">0 distinct crashes</span>
-              <span class="fp-chip" id="fz-chip-exec">0 execs</span>
-            </div>
-            <div class="ex-output" id="fz-output" hidden></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- REPORT PAGE -->
-      <div class="phase single-page" id="phase-report" data-phase="report" hidden>
+      <!-- ═══ 2. RECON: fingerprint, vulns ═══ -->
+      <section class="ws-panel" id="tab-recon" data-tab="recon">
         <div class="card">
-          <div class="card-header">
-            <h2>📜 Engagement Report</h2>
-            <div class="vuln-header-right">
-              <button class="btn btn-secondary" id="btn-session-report" title="Download the full session writeup">⇩ Session Report</button>
-              <button class="btn btn-secondary" id="btn-propagate-plan" title="Plan replay of verified credentials">🧬 Propagation plan</button>
-            </div>
-          </div>
+          <div class="card-head"><h2>Services</h2><span class="spacer"></span><span class="muted" id="hosts-count">0 hosts</span></div>
           <div class="card-body">
-            <div class="pa-hint">
-              The machine-generated writeup: every host, service, finding, verified
-              credential, session and named action from the session's autopilot runs —
-              as markdown, ready for the disclosure appendix.
+            <div class="row">
+              <button class="btn" id="btn-fingerprint">Fingerprint services</button>
+              <button class="btn" id="btn-full-scan">Full port scan</button>
+              <span class="muted" id="cve-status">cve db: ?</span>
+              <button class="btn small" id="btn-cve-refresh" hidden>Update CVEs</button>
             </div>
+            <div class="tbl-wrap"><table class="tbl">
+              <thead><tr><th>Host</th><th>Port</th><th>Service</th><th>Product</th><th>Version</th><th></th></tr></thead>
+              <tbody id="hosts-tbody"></tbody>
+            </table></div>
+            <div class="empty" id="hosts-empty">No services yet — fingerprint first.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Likely vulnerable</h2><span class="spacer"></span><span class="muted" id="vulns-count">0 findings</span></div>
+          <div class="card-body">
+            <div class="tbl-wrap"><table class="tbl">
+              <thead><tr><th>Host</th><th>Port</th><th>Finding</th><th>Severity</th><th></th></tr></thead>
+              <tbody id="vulns-tbody"></tbody>
+            </table></div>
+            <div class="empty" id="vulns-empty">No findings yet — fingerprint first.</div>
+          </div>
+        </div>
+      </section>
 
-            <div class="card inner-card" id="propagation-card" hidden>
-              <div class="card-header">
-                <h2>🧬 Credential Propagation</h2>
-                <div class="vuln-header-right">
-                  <span class="fp-chip" id="prop-legend">dry run — nothing is logged in</span>
-                  <button class="btn btn-danger" id="btn-propagate-run" hidden title="Replay verified creds across in-scope services">▶ Execute</button>
-                </div>
-              </div>
-              <div class="card-body">
-                <div id="prop-body" style="font-size: 12px;"></div>
-                <div class="ex-output" id="prop-results" hidden></div>
-              </div>
+      <!-- ═══ 3. EXPLOIT: queue, autopilot, creds attacks, fuzz ═══ -->
+      <section class="ws-panel" id="tab-exploit" data-tab="exploit">
+        <div class="card">
+          <div class="card-head"><h2>Attack queue</h2><span class="spacer"></span><span class="muted" id="attack-queue-count" data-testid="attack-queue-count">0 moves</span></div>
+          <div class="card-body">
+            <div id="attack-queue" data-testid="attack-queue"></div>
+            <div class="empty" id="attack-empty" data-testid="attack-empty">No moves yet. Map + recon first.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Autopilot</h2><span class="pill" id="ap-status" data-testid="ap-status">idle</span><span class="spacer"></span><button class="btn danger" id="btn-ap-start" data-testid="ap-start">Start full attack</button><button class="btn" id="btn-ap-stop" hidden>Stop</button></div>
+          <div class="card-body">
+            <p class="muted">Discovery → fingerprint → CVE → password attacks → exploits. Requires an active scope.</p>
+            <div class="progress"><div class="fill" id="ap-progress"></div></div>
+            <div class="chips" id="ap-summary" data-testid="ap-summary" hidden>
+              <span class="chip" id="ap-chip-hosts" data-testid="ap-chip-hosts">0 hosts</span>
+              <span class="chip" id="ap-chip-vulns" data-testid="ap-chip-vulns">0 vulns</span>
+              <span class="chip" id="ap-chip-creds" data-testid="ap-chip-creds">0 creds</span>
+              <span class="chip" id="ap-chip-sessions" data-testid="ap-chip-sessions">0 sessions</span>
             </div>
+            <div class="tbl-wrap"><table class="tbl">
+              <thead><tr><th>Host</th><th>Stage</th><th>Services</th><th>Vulns</th><th>Creds</th></tr></thead>
+              <tbody id="ap-tbody" data-testid="ap-tbody"></tbody>
+            </table></div>
+            <h3>Live log</h3>
+            <div class="output" id="ap-log" data-testid="ap-log"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Password attacks</h2><span class="spacer"></span><span class="muted" id="cred-targets-count">0 targets</span><button class="btn small" id="btn-cred-targets-refresh" title="Reload targets">↻</button><button class="btn danger small" id="btn-launch-passattack">Launch</button></div>
+          <div class="card-body">
+            <div class="tbl-wrap"><table class="tbl">
+              <thead><tr><th>Host</th><th>Port</th><th>Service</th><th>Product</th><th></th></tr></thead>
+              <tbody id="cred-targets-tbody"></tbody>
+            </table></div>
+            <div class="empty" id="cred-targets-empty">No targets yet — fingerprint first.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Fuzz lab</h2><span class="spacer"></span><span class="muted" id="fz-live">ready</span></div>
+          <div class="card-body">
+            <p class="muted">Lab-only: fuzz a service you own. Crashes get reproduce commands.</p>
+            <div class="row">
+              <input type="text" id="fz-host" value="127.0.0.1" title="Target host" />
+              <input type="text" id="fz-port" value="3138" title="Port" />
+              <input type="text" id="fz-iters" value="2000" title="Iterations" />
+              <input type="text" id="fz-timeout" value="60" title="Timeout (s)" />
+              <button class="btn primary" id="btn-fz-start">Start fuzzing</button>
+              <button class="btn" id="btn-fz-stop" hidden>Stop</button>
+            </div>
+            <div class="output" id="fz-output" hidden></div>
+          </div>
+        </div>
+      </section>
 
-            <div style="margin-top: 14px;">
-              <h3 style="font-size:13px; margin: 0 0 6px;">Live preview</h3>
-              <div class="ex-output report-preview" id="report-preview">press ⇩ Session Report to fill</div>
+      <!-- ═══ 4. PIVOT: shells, creds, routes, interrogation ═══ -->
+      <section class="ws-panel" id="tab-pivot" data-tab="pivot">
+        <div class="card">
+          <div class="card-head"><h2>Shells</h2><span class="spacer"></span><span class="muted" id="shells-count">0 shells</span></div>
+          <div class="card-body">
+            <div id="shells-list" data-testid="shells-list"></div>
+            <div class="empty" id="shells-empty" data-testid="shells-empty">No shells yet. Exploit something.</div>
+            <div class="console" id="ex-console" data-testid="shell-console" hidden>
+              <div class="console-head"><span>Session</span><span class="chip" id="ex-console-target">—</span><span class="spacer"></span><button class="icon-btn" id="shell-close">✕</button></div>
+              <div class="row">
+                <button class="btn small" data-excmd="sysinfo">sysinfo</button>
+                <button class="btn small" data-excmd="getuid">getuid</button>
+                <button class="btn small" data-excmd="hashdump">hashdump</button>
+              </div>
+              <div class="row"><input type="text" id="ex-cmd" class="grow" placeholder="session command…" /><button class="btn primary" id="btn-ex-cmd">Run</button></div>
+              <div class="output" id="ex-console-output"></div>
             </div>
           </div>
         </div>
-      </div>
+        <div class="card">
+          <div class="card-head"><h2>Credential ledger</h2><span class="spacer"></span><span class="muted" id="creds-ledger-count">0 creds</span></div>
+          <div class="card-body">
+            <div id="creds-ledger"></div>
+            <div class="empty" id="creds-empty">No verified credentials yet.</div>
+            <div class="row">
+              <button class="btn" id="btn-propagate-plan">Propagation plan</button>
+              <button class="btn danger" id="btn-propagate-run" hidden>Execute</button>
+            </div>
+            <div id="prop-body" class="muted"></div>
+            <div class="output" id="prop-results" hidden></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Route map</h2><span class="spacer"></span><span class="muted">read-only pivot planning</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="lateral-cidr" class="grow" value="192.168.1.0/24" placeholder="CIDR to map routes for" />
+              <button class="btn primary" id="btn-lateral-map">Map routes</button>
+            </div>
+            <div id="lateral-body" class="muted">Local interfaces, routes and pivot paths appear here.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Interrogate</h2><span class="spacer"></span><span class="muted">looted hosts give up flags</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="db-target" class="grow" value="127.0.0.1" placeholder="Compromised host to enumerate" />
+              <button class="btn primary" id="btn-db-run">Enumerate APIs &amp; secrets</button>
+              <button class="btn" id="btn-escape-run" title="Detect container escape vectors (read-only)">Escape check</button>
+            </div>
+            <div id="db-body" class="muted">Flag-shaped strings from DBs, configs and local APIs appear here.</div>
+            <div id="escape-body" class="muted"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Try local root</h2><span class="spacer"></span><span class="muted">passwordless paths only · read-only</span></div>
+          <div class="card-body">
+            <div class="row">
+              <button class="btn primary" id="btn-trylocalroot-run" title="Userns + docker-group tries plus full host audit (no password, nothing written)">tryLocalRoot_go_bro</button>
+            </div>
+            <div id="trylocalroot-body" class="muted">User-namespace uid 0, docker-group read, SUID/caps/gates/CVE posture — one shot, no password.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ 5. PERSIST: hold the win ═══ -->
+      <section class="ws-panel" id="tab-persist" data-tab="persist">
+        <div class="card">
+          <div class="card-head"><h2>Hold the win</h2><span class="spacer"></span><span class="muted">sessions alive, creds banked, flags captured</span></div>
+          <div class="card-body">
+            <div id="persist-checks"></div>
+            <div class="row">
+              <button class="btn primary" id="btn-reenter">Re-enter (replay creds)</button>
+              <button class="btn" id="btn-go-score">Review loot →</button>
+            </div>
+            <p class="muted">Re-entry replays verified credentials across in-scope services — the same mechanism as propagation. No implants, no fake persistence: if a shell dies, this is how you get back in.</p>
+            <div id="persist-sessions" class="muted"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ 6. SCORE: flags, objective, report ═══ -->
+      <section class="ws-panel" id="tab-score" data-tab="score">
+        <div class="card">
+          <div class="card-head"><h2>Flags</h2><span class="spacer"></span><span class="muted" id="flags-count">0 captured</span></div>
+          <div class="card-body">
+            <div id="flags-grid" data-testid="flags-grid"></div>
+            <div class="empty" id="flags-empty" data-testid="flags-empty">No flags yet. Capture one.</div>
+            <div class="row">
+              <input type="text" id="flag-value" data-testid="flag-value" class="grow" placeholder="CTF{...}" />
+              <input type="text" id="flag-host" data-testid="flag-host" placeholder="host (optional)" />
+              <input type="text" id="flag-note" data-testid="flag-note" placeholder="note" />
+              <button class="btn primary" id="btn-flag-add" data-testid="flag-add">Add flag</button>
+              <button class="btn" id="btn-flag-detect" data-testid="flag-detect">Scan output</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Crown jewels → attack paths</h2><span class="spacer"></span><button class="btn" id="btn-attack-paths" data-testid="compute-paths">Compute paths</button></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="cj-host" data-testid="crown-host" class="grow" placeholder="10.10.10.42" />
+              <input type="text" id="cj-label" data-testid="crown-label" class="grow" placeholder="Domain controller" />
+              <input type="number" id="cj-value" data-testid="crown-value" min="1" max="100" value="50" title="Value" />
+              <button class="btn primary" id="btn-add-crown" data-testid="add-crown">Add</button>
+            </div>
+            <div id="crown-list" data-testid="crown-list" class="muted">Press Compute paths to load.</div>
+            <div id="attack-paths-body" data-testid="attack-paths"></div>
+            <div id="attack-paths-summary" data-testid="paths-summary" class="muted" hidden></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>ATT&amp;CK &amp; detection</h2><span class="spacer"></span><button class="btn" id="btn-attck" data-testid="load-attck">Load</button></div>
+          <div class="card-body"><div id="attck-body" data-testid="attck-body" class="muted">Press Load to map findings to techniques.</div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Report</h2><span class="spacer"></span><button class="btn" id="btn-session-report">Download MD</button></div>
+          <div class="card-body"><div class="output" id="report-preview" data-testid="report-preview">Press Download MD to fill.</div></div>
+        </div>
+      </section>
 
     </main>
 
-
-    <!-- FOOTER -->
-    <footer class="footer">
-      <div class="footer-left">
-        <span class="msf-status" id="msf-status">
-          <span class="status-dot offline"></span>
-          <span>MSF: offline</span>
-        </span>
+    <!-- ACTIVITY -->
+    <aside class="drawer" id="activity-drawer" data-testid="activity-drawer" hidden>
+      <div class="drawer-head"><span>Activity</span><span class="spacer"></span><button class="icon-btn" id="activity-close">✕</button></div>
+      <div class="drawer-body" id="activity-body" data-testid="activity-body">
+        <div id="activity-log" data-testid="activity-log"></div>
       </div>
-      <div class="footer-center">
-        <span class="hint" id="footer-hint">Select a target to begin</span>
-      </div>
-      <div class="footer-right">
-        <span class="time" id="clock">--:--:--</span>
-      </div>
-    </footer>
+    </aside>
 
     <!-- COMMAND PALETTE -->
-    <div class="cmd-palette" id="cmd-palette" hidden>
-      <div class="cmd-input-wrap">
-        <input type="text" class="cmd-input" id="cmd-input" placeholder="Type a command..." />
-      </div>
-      <div class="cmd-results" id="cmd-results">
-        <div class="cmd-item" data-cmd="scan">
-          <span class="cmd-label">Launch Scan</span>
-          <span class="cmd-key">Ctrl+Enter</span>
-        </div>
-        <div class="cmd-item" data-cmd="neighbors">
-          <span class="cmd-label">Find Neighbors</span>
-          <span class="cmd-key"></span>
-        </div>
-        <div class="cmd-item" data-cmd="deep">
-          <span class="cmd-label">Deep Attack</span>
-          <span class="cmd-key"></span>
-        </div>
-        <div class="cmd-item" data-cmd="theme">
-          <span class="cmd-label">Toggle Theme</span>
-          <span class="cmd-key">T</span>
-        </div>
-        <div class="cmd-item" data-cmd="clear">
-          <span class="cmd-label">Clear Log</span>
-          <span class="cmd-key"></span>
-        </div>
+    <div class="palette" id="cmd-palette" data-testid="cmd-palette" hidden>
+      <input type="text" id="cmd-input" class="cmd-input" data-testid="cmd-input" placeholder="Type a command…" autocomplete="off" />
+      <div id="cmd-results">
+        <div class="cmd-item" data-cmd="scan"><span>Discover: launch scan</span></div>
+        <div class="cmd-item" data-cmd="neighbors"><span>Discover: find neighbors</span></div>
+        <div class="cmd-item" data-cmd="fingerprint"><span>Recon: fingerprint services</span></div>
+        <div class="cmd-item" data-cmd="autopilot"><span>Exploit: start autopilot</span></div>
+        <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
+        <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>
+        <div class="cmd-item" data-cmd="theme"><span>Toggle theme</span></div>
+        <div class="cmd-item" data-cmd="clear"><span>Clear log</span></div>
       </div>
     </div>
 
-    <!-- ACHIEVEMENT POPUP -->
-    <div class="achievement-popup" id="ach-popup" hidden>
-      <span class="ap-icon" id="ap-icon">🏆</span>
-      <div class="ap-text">
-        <span class="ap-title">Achievement Unlocked</span>
-        <span class="ap-name" id="ap-name">—</span>
-      </div>
-    </div>
-
-    <!-- XP POPUP -->
-    <div class="xp-popup" id="xp-popup" hidden>
-      <span class="xp-popup-text" id="xp-popup-text">+10 XP</span>
-    </div>
+    <div class="toast" id="flag-toast" data-testid="flag-toast" hidden></div>
 
   </div>
-
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/app.js?v=13"></script>
 </body>
 </html>
