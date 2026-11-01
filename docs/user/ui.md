@@ -21,7 +21,14 @@ dark-first with a light theme, keyboard-driven, every control has a
 | `cap-status` | Tool readiness (`caps: N tools`). |
 | `autoscan-status` | Passive auto-scan state (`scan running/idle`). |
 | `flag-counter` / `host-counter` | Captured flags / discovered hosts. |
-| log / ⌘ / ◐ / ⟳ / clock | Activity drawer, command palette, theme, session reset, clock. |
+| log / ⌘ / ◐ / ⟳ | Activity drawer, command palette, theme, session reset. |
+
+## Ops rail (right side, wide screens)
+
+A persistent sidebar next to the workspace: **Session** (active scope id,
+host/service/vuln/shell/cred/flag counts, refreshed on every poll) and
+**Activity** (a live mirror of the last 40 log lines — the full log lives
+in the drawer). It stacks below the workspace under 900 px.
 
 ## Next strip
 
@@ -108,6 +115,7 @@ container-fuzz (`cfuzz`) · persist · score · theme · clear.
 
 * Visible labels on every control; focus outlines preserved.
 * The page never scrolls sideways: cards stack, tables scroll inside their
-  card (`.tbl-wrap`), the workspace strip scrolls, and the status bar sheds
-  chrome as width shrinks (clock gone ≤1100px, scope goes full-width ≤900px,
-  pills collapse to dots ≤640px).
+  card (`.tbl-wrap`), the two-column workspace + rail collapses to one column
+  under 900 px, the workspace strip scrolls, and the status bar sheds chrome
+  as width shrinks (scope goes full-width ≤900px, pills collapse to dots
+  ≤640px).

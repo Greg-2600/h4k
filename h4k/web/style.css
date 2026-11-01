@@ -77,8 +77,10 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 .ws-btn:hover { color: var(--text); }
 .ws-btn.active { background: var(--panel); border-color: var(--border); color: var(--accent); }
 
-.main { flex: 1; padding: 8px 10px; max-width: 1500px; width: 100%; margin: 0 auto; }
-.ws-panel { display: none; flex-direction: column; gap: 8px; }
+.main { flex: 1; padding: 8px 10px; max-width: 1720px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 8px; align-items: start; }
+.ws-panel { display: none; flex-direction: column; gap: 8px; grid-column: 1; min-width: 0; }
+.rail { grid-column: 2; display: flex; flex-direction: column; gap: 8px; position: sticky; top: 118px; min-width: 0; }
+.rail-log { max-height: 42vh; font-size: 11px; }
 .ws-panel.active { display: flex; }
 
 /* cards */
@@ -160,12 +162,14 @@ input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accen
   .scope-select { max-width: 180px; }
 }
 
-/* tablet / half of a 1440p screen: two-row status bar, full-width scope */
+/* tablet / half of a 1440p screen: two-row status bar, full-width scope,
+   rail stacks under the workspace */
 @media (max-width: 900px) {
   .statusbar { row-gap: 6px; }
   .scope-select { order: 10; flex: 1 1 100%; max-width: none; }
   .spacer { display: none; }
-  .main { padding: 8px; }
+  .main { padding: 8px; grid-template-columns: minmax(0, 1fr); }
+  .rail { grid-column: 1; position: static; }
   .card-body { padding: 10px; }
 }
 

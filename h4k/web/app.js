@@ -62,6 +62,12 @@ function log(msg, level = 'info') {
   el.appendChild(div);
   while (el.children.length > 300) el.removeChild(el.firstChild);
   el.scrollTop = el.scrollHeight;
+  const rail = $('rail-log');
+  if (rail) {
+    rail.appendChild(div.cloneNode(true));
+    while (rail.children.length > 40) rail.removeChild(rail.firstChild);
+    rail.scrollTop = rail.scrollHeight;
+  }
 }
 
 /* ---------- tabs + chain badges ---------- */
@@ -189,6 +195,15 @@ async function refreshStatus() {
     fingerprinted: services > 0,
     won: flags > 0 || shells > 0,
   });
+  const rs = $('rail-session');
+  if (rs) {
+    rs.innerHTML =
+      `<div>scope <b>${esc(engId ? engId.slice(0, 8) : 'none')}</b></div>` +
+      `<div>hosts <b>${hosts}</b> · services <b>${services}</b> · vulns <b>${vulns}</b></div>` +
+      `<div>shells <b>${shells}</b> · creds <b>${creds}</b> · flags <b>${flags}</b></div>`;
+  }
+  const rsc = $('rail-scope');
+  if (rsc) rsc.textContent = engId ? engId.slice(0, 8) : 'no scope';
 }
 
 function renderSteps(st) {

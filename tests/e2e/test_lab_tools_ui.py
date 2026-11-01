@@ -62,3 +62,11 @@ def test_discover_stepper_and_next_go(page):
     assert "1" in find(page, "step-scope").text
     # the next strip exposes a run control for the top recommendation
     assert find(page, "next-go").is_displayed()
+
+
+def test_ops_rail_shows_session_and_activity(page):
+    go_to(page, "pivot")
+    assert find(page, "rail-session").is_displayed()
+    assert find(page, "rail-log").is_displayed()
+    # the boot log line is mirrored into the rail
+    wait_text(page, "rail-log", "kill-chain", timeout=30)
