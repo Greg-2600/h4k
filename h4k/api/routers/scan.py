@@ -838,6 +838,8 @@ def _pull_cached(req: ScanRequest) -> dict[str, Any] | None:
 
 
 def _run_scan(job: dict[str, Any], req: ScanRequest) -> None:
+    if job.get("status") == "queued":
+        _update(job, status="running", message="scan starting")
     msf = _get_msf()
     if msf is None:
         _update(
@@ -1060,6 +1062,10 @@ def _all_jobs(active_only: bool = False) -> list[dict[str, Any]]:
         ("attack", _attack_jobs),
         ("deepattack", _toolkit_jobs),
         ("fuzz", _fuzz_jobs),
+        ("neighbors", _neighbor_jobs),
+        ("fingerprint", _fingerprint_jobs),
+        ("passattack", _passattack_jobs),
+        ("container_fuzz", _cfuzz_jobs),
     )
     for kind, store in stores:
         for job in store.values():
@@ -1077,7 +1083,8 @@ def list_jobs(
     per_page: int = 20,
     limit: int = 100,
 ) -> PaginatedJobs:
-    """Enumerate every job family (scan / attack / deepattack / fuzz).
+    """Enumerate every job family (scan / attack / deepattack / fuzz /
+    neighbors / fingerprint / passattack).
 
     Supports cursor-free pagination via `page` + `per_page`. Also accepts the
     legacy `limit` param for backward compatibility (returns first `limit` items).
@@ -1119,6 +1126,11 @@ def list_jobs(
 @router.get("/jobs/{job_id}", response_model=Job)
 def get_job(job_id: str) -> Job:
     job = JOBS.get(job_id)
+    if job is None:
+        for store in (_neighbor_jobs, _fingerprint_jobs, _passattack_jobs):
+            if job_id in store:
+                job = store[job_id]
+                break
     if not job:
         raise HTTPException(status_code=404, detail="job not found")
     return Job(**job)
@@ -1231,13 +1243,24 @@ def neighbors(cidr: str | None = None) -> dict[str, Any]:
     if not cidr:
         cidr = "192.168.1.0/24"
     key = cidr
-    if key in _neighbors_cache:
-        return {"neighbors": _neighbors_cache[key], "cache": True}
-    finder = NeighborFinder(msf)
-    found = finder.discover(cidr)
-    data = NeighborFinder.neighbors_to_dicts(found)
-    _neighbors_cache[key] = data
-    return {"neighbors": data, "cache": False}
+    cache_hit = key in _neighbors_cache
+    if not cache_hit:
+        finder = NeighborFinder(msf)
+        found = finder.discover(cidr)
+        _neighbors_cache[key] = NeighborFinder.neighbors_to_dicts(found)
+    # Fingerprinted services live in neighbors.db, not in the ARP sweep:
+    # merge them onto every response so the Recon table reflects the last
+    # fingerprint. The discovery cache stays services-free on purpose.
+    try:
+        saved_services = _load_neighbor_services()
+    except Exception:
+        saved_services = {}
+    neighbors = []
+    for h in _neighbors_cache[key]:
+        host = dict(h)
+        host["services"] = saved_services.get(host.get("ip", ""), [])
+        neighbors.append(host)
+    return {"neighbors": neighbors, "cache": cache_hit}
 
 
 @router.post("/neighbors/scan")
@@ -1269,6 +1292,8 @@ def neighbors_scan(background: BackgroundTasks) -> dict[str, Any]:
 
 
 def _run_neighbor_discovery(job: dict[str, Any], msf: MsfClient) -> None:
+    if job.get("status") == "queued":
+        _update(job, status="running", message="discovering neighbors")
     try:
         from services.discovery import NeighborFinder
 
@@ -1406,6 +1431,8 @@ def neighbors_fingerprint(
 
 
 def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> None:
+    if job.get("status") == "queued":
+        _update(job, status="running", message="fingerprint starting")
     logger.info("_run_fingerprint starting with %d neighbors", len(neighbors))
     try:
         from services.toolkit import ToolkitRunner
@@ -1713,6 +1740,8 @@ def _run_pass_attack(
     passwords: list[str] | None = None,
     form: dict[str, Any] | None = None,
 ) -> None:
+    if job.get("status") == "queued":
+        _update(job, status="running", message="password attack starting")
     logger.info("[passattack %s] %s:%s/%s launched", job["id"], host, port, service)
     import re as _re
     import time as _time
@@ -2615,6 +2644,8 @@ def run_fuzz(req: FuzzRequest, background: BackgroundTasks) -> dict[str, Any]:
 
 
 def _run_fuzz(job: dict[str, Any], req: FuzzRequest, host: str, port: int) -> None:
+    if job.get("status") == "queued":
+        _update(job, status="running", message="fuzzing")
     from services.fuzzer import LabFuzzer
 
     fuzzer = LabFuzzer(
@@ -2707,6 +2738,8 @@ def run_container_fuzz(
 def _run_container_fuzz(
     job: dict[str, Any], req: ContainerFuzzRequest, surface: str
 ) -> None:
+    if job.get("status") == "queued":
+        _update(job, status="running", message="container fuzzing")
     from services.container_fuzz import fuzz_surface
 
     try:
@@ -3642,6 +3675,8 @@ def _ap_note_host(job: dict[str, Any], ip: str, **fields: Any) -> None:
 def _run_autopilot(
     job: dict[str, Any], msf: MsfClient, scope_cidrs: list[str], deep_web: bool = False
 ) -> None:
+    if job.get("status") == "queued":
+        _update(job, status="running", stage="starting", message="autopilot starting")
     from services.toolkit import ToolkitRunner
 
     def _stopped() -> bool:

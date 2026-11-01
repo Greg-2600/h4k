@@ -70,3 +70,14 @@ def test_ops_rail_shows_session_and_activity(page):
     assert find(page, "rail-log").is_displayed()
     # the boot log line is mirrored into the rail
     wait_text(page, "rail-log", "kill-chain", timeout=30)
+
+
+def test_recon_table_renders_fingerprinted_services(page, seeded):
+    """Regression: loadHosts read res.hosts while /api/neighbors returns
+    {neighbors} — the Services table stayed empty forever."""
+    go_to(page, "discover")
+    click(page, "btn-neighbors")
+    wait_text(page, "scan-status", "done", timeout=120)
+    go_to(page, "recon")
+    click(page, "btn-fingerprint")
+    wait_text(page, "hosts-tbody", "10.10.10", timeout=180)

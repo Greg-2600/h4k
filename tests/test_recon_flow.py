@@ -779,3 +779,101 @@ def test_payload_endpoint_renders_via_msfvenom(client, clean_db, monkeypatch):
     assert seen["argv"][:3] == ["msfvenom", "-p", "php/bind_php"]
     assert "LPORT=4445" in seen["argv"]
     assert "-f" in seen["argv"]
+
+
+def test_neighbors_endpoint_merges_fingerprinted_services(
+    client, clean_db, monkeypatch
+):
+    """Regression: fingerprint saves services to neighbors.db, but GET
+    /api/neighbors only returned the ARP sweep — the Recon table stayed
+    empty forever. Fingerprinted services must be merged into the response
+    (fresh and cached alike)."""
+    from routers import scan as scan_router
+    from schemas import Neighbor
+
+    clean_db._ensure_session_row()
+    scan_router._neighbors_cache.clear()
+    scan_router._save_neighbor_host(
+        "192.168.1.10", "aa:bb:cc:dd:ee:01", "Raspberry Pi", None
+    )
+    scan_router._save_neighbor_services(
+        "192.168.1.10",
+        [
+            {
+                "port": 22,
+                "proto": "tcp",
+                "service": "ssh",
+                "version": "9.0",
+                "product": "OpenSSH",
+                "state": "open",
+            }
+        ],
+    )
+
+    class FakeFinder:
+        def __init__(self, msf):
+            pass
+
+        @staticmethod
+        def neighbors_to_dicts(found):
+            return [n.model_dump(exclude_none=True) for n in found]
+
+        def discover(self, cidr):
+            return [
+                Neighbor(ip="192.168.1.10", mac="aa:bb:cc:dd:ee:01"),
+                Neighbor(ip="192.168.1.11", mac="aa:bb:cc:dd:ee:02"),
+            ]
+
+    monkeypatch.setattr(scan_router, "NeighborFinder", FakeFinder)
+
+    r = client.get("/api/neighbors")
+    assert r.status_code == 200
+    assert r.json()["cache"] is False
+    hosts = {h["ip"]: h for h in r.json()["neighbors"]}
+    assert hosts["192.168.1.10"]["services"][0]["port"] == 22
+    assert hosts["192.168.1.11"]["services"] == []
+
+    # discovery cache hits must still carry freshly-merged services
+    r2 = client.get("/api/neighbors")
+    assert r2.json()["cache"] is True
+    hosts2 = {h["ip"]: h for h in r2.json()["neighbors"]}
+    assert hosts2["192.168.1.10"]["services"][0]["service"] == "ssh"
+
+
+def test_job_monitor_covers_neighbor_and_fingerprint_jobs(
+    client, clean_db, monkeypatch
+):
+    """The job monitor merges every family: a discovery or fingerprint job
+    must be visible at /api/jobs and /api/jobs/{id}, not just its own
+    family endpoint. (The UI polls /api/jobs/{id}; before this, a Neighbors
+    scan read 'starting...' forever.)"""
+    from routers import scan as scan_router
+    from schemas import Neighbor
+
+    clean_db._ensure_session_row()
+    scan_router._neighbors_cache.clear()
+
+    class FakeFinder:
+        def __init__(self, msf, interface=None):
+            pass
+
+        @staticmethod
+        def neighbors_to_dicts(found):
+            return [n.model_dump(exclude_none=True) for n in found]
+
+        def discover(self, cidr):
+            return [Neighbor(ip="192.168.1.10", mac="aa:bb:cc:dd:ee:01")]
+
+    monkeypatch.setattr(scan_router, "NeighborFinder", FakeFinder)
+
+    r = client.post("/api/neighbors/scan")
+    assert r.status_code == 200
+    job_id = r.json()["job_id"]
+
+    r = client.get(f"/api/jobs/{job_id}")
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == job_id
+
+    r = client.get("/api/jobs", params={"active": False})
+    ids = [j["id"] for j in r.json()["jobs"]]
+    assert job_id in ids

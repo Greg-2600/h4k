@@ -287,7 +287,9 @@ async function loadHosts() {
   try {
     const res = await api('/api/neighbors');
     const rows = [];
-    (res.hosts || []).forEach((h) => {
+    // the endpoint returns {neighbors: [...]} (services merged from the
+    // fingerprint store); older shapes used `hosts`.
+    (res.neighbors || res.hosts || []).forEach((h) => {
       const ip = h.ip || h.address;
       (h.services || []).forEach((s) => {
         if (s.state && s.state !== 'open') return;

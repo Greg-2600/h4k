@@ -72,8 +72,8 @@
                 <option value="full">full</option>
               </select>
               <button class="btn primary" id="btn-scan">Scan</button>
-              <button class="btn" id="btn-neighbors" title="ARP discovery on local networks">Neighbors</button>
-              <span class="muted" id="scan-status">idle</span>
+              <button class="btn" id="btn-neighbors" data-testid="btn-neighbors" title="ARP discovery on local networks">Neighbors</button>
+              <span class="muted" id="scan-status" data-testid="scan-status">idle</span>
             </div>
             <div class="row">
               <span class="pill" data-testid="live-map-status"><span data-testid="live-map-state">auto-scan: idle</span> · <span data-testid="live-map-counts">0 hosts · 0 services · 0 vulns</span></span>
@@ -89,14 +89,14 @@
           <div class="card-head"><h2>Services</h2><span class="spacer"></span><span class="muted" id="hosts-count">0 hosts</span></div>
           <div class="card-body">
             <div class="row">
-              <button class="btn" id="btn-fingerprint">Fingerprint services</button>
+              <button class="btn" id="btn-fingerprint" data-testid="btn-fingerprint">Fingerprint services</button>
               <button class="btn" id="btn-full-scan">Full port scan</button>
               <span class="muted" id="cve-status">cve db: ?</span>
               <button class="btn small" id="btn-cve-refresh" hidden>Update CVEs</button>
             </div>
             <div class="tbl-wrap"><table class="tbl">
               <thead><tr><th>Host</th><th>Port</th><th>Service</th><th>Product</th><th>Version</th><th></th></tr></thead>
-              <tbody id="hosts-tbody"></tbody>
+              <tbody id="hosts-tbody" data-testid="hosts-tbody"></tbody>
             </table></div>
             <div class="empty" id="hosts-empty">No services yet. <button class="btn small" id="btn-empty-fp">Fingerprint now</button></div>
           </div>
@@ -106,7 +106,7 @@
           <div class="card-body">
             <div class="tbl-wrap"><table class="tbl">
               <thead><tr><th>Host</th><th>Port</th><th>Finding</th><th>Severity</th><th></th></tr></thead>
-              <tbody id="vulns-tbody"></tbody>
+              <tbody id="vulns-tbody" data-testid="vulns-tbody"></tbody>
             </table></div>
             <div class="empty" id="vulns-empty">No findings yet. <button class="btn small" id="btn-empty-fpv">Fingerprint now</button></div>
           </div>
@@ -158,7 +158,7 @@
           <div class="card-body">
             <div class="tbl-wrap"><table class="tbl">
               <thead><tr><th>Host</th><th>Port</th><th>Service</th><th>Product</th><th></th></tr></thead>
-              <tbody id="cred-targets-tbody"></tbody>
+              <tbody id="cred-targets-tbody" data-testid="cred-targets-tbody"></tbody>
             </table></div>
             <div class="empty" id="cred-targets-empty">No targets yet — fingerprint first.</div>
           </div>

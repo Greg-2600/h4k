@@ -101,7 +101,16 @@ def test_job_not_found(client):
 
 # ---------- job monitor: the UI must be able to enumerate running jobs ----------
 
-JOBS_ENV = ["JOBS", "_attack_jobs", "_toolkit_jobs", "_fuzz_jobs"]
+JOBS_ENV = [
+    "JOBS",
+    "_attack_jobs",
+    "_toolkit_jobs",
+    "_fuzz_jobs",
+    "_neighbor_jobs",
+    "_fingerprint_jobs",
+    "_passattack_jobs",
+    "_cfuzz_jobs",
+]
 
 
 @pytest.fixture()
@@ -139,16 +148,41 @@ def test_jobs_lists_every_family(client, job_stores):
         "status": "done",
         "target": "10.0.0.5",
     }
+    job_stores["_neighbor_jobs"]["n1"] = {
+        "id": "n1",
+        "status": "done",
+        "target": "10.0.0.0/24",
+    }
+    job_stores["_fingerprint_jobs"]["fp1"] = {
+        "id": "fp1",
+        "status": "done",
+    }
+    job_stores["_passattack_jobs"]["p1"] = {
+        "id": "p1",
+        "status": "running",
+        "host": "10.0.0.5",
+    }
+    job_stores["_cfuzz_jobs"]["c1"] = {
+        "id": "c1",
+        "status": "done",
+    }
     r = client.get("/api/jobs")
     assert r.status_code == 200
     payload = r.json()
     by_id = {j["id"]: j for j in payload["jobs"]}
-    assert set(by_id) == {"s1", "a1", "d1", "f1"}
+    assert set(by_id) == {"s1", "a1", "d1", "f1", "n1", "fp1", "p1", "c1"}
     assert by_id["d1"]["type"] == "deepattack"
     assert by_id["f1"]["type"] == "fuzz"
     assert by_id["a1"]["type"] == "attack"
-    assert payload["total"] == 4
-    assert payload["active"] == 3  # s1, a1, d1 are still in flight
+    assert by_id["n1"]["type"] == "neighbors"
+    assert by_id["fp1"]["type"] == "fingerprint"
+    assert by_id["p1"]["type"] == "passattack"
+    assert by_id["c1"]["type"] == "container_fuzz"
+    assert payload["total"] == 8
+    # single-job lookup falls through to the other families too
+    assert client.get("/api/jobs/n1").json()["id"] == "n1"
+    assert client.get("/api/jobs/nope").status_code == 404
+    assert payload["active"] == 4  # s1, a1, d1, p1 are still in flight
 
 
 def test_scan_job_carries_its_target_for_the_monitor(client, job_stores, monkeypatch):
