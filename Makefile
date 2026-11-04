@@ -202,6 +202,12 @@ test-container:
 e2e:
 	H4K_E2E=1 $(PYTEST) tests/e2e -v
 
+# Same suite, fully containerized: test-runner image (chromium + toolchain
+# baked in) with the repo mounted. No host execution.
+e2e-container:
+	docker build -f h4k/Dockerfile.test -t h4k-test .
+	docker run --rm -v "$(PWD):/work" -w /work h4k-test
+
 # Live-stack sanity check against a RUNNING deployment (docker compose up).
 sanity:
 	python3 scripts/sanity_check.py
