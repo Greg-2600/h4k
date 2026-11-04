@@ -48,7 +48,7 @@ RUN CHISEL_VER=$(\
     && chmod +x /usr/local/bin/chisel
 
 # impacket (secretsdump, wmiexec, GetNPUsers...) — powershell/AD RPC suite
-RUN python3 -m pip install --break-system-packages --no-cache-dir impacket \
+RUN python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed impacket \
   && for s in secretdump secretsdump wmiexec smbexec GetNPUsers getTGT GetADUsers \
              mssqlclient smbclient; do \
        if [ -f "/usr/lib/python3/dist-packages/impacket/examples/${s}.py" ]; then \
