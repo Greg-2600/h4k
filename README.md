@@ -143,13 +143,13 @@ the project.
 
 ```mermaid
 flowchart TB
-    subgraph browser["Browser"]
-        UI["web/ · index.html + app.js + style.css<br/>mission-control CTF console (Recon / Attack / Creds / Shells / Flags / Report)<br/>+ next-move queue, flag ledger, activity drawer"]
+    subgraph browser["Browser (kill-chain console)"]
+        UI["web/ · index.html + app.js + style.css<br/>Discover → Recon → Exploit → Pivot → Persist → Score<br/>+ ops rail (session + live activity)"]
     end
 
     subgraph api["FastAPI (api/)"]
-        R["routers/ scan.py · source.py · update.py"]
-        S["services · ~24 modules<br/>(scan_pipeline, sast, sca, fuzzer, triage, ai…)"]
+        R["routers/ scan · source · update · net · engagement"]
+        S["services ~65 modules<br/>(pipeline, recon, exploit, CTF tools,<br/>SAST/SCA, fuzzing, AI, Fire TV, container-fuzz)"]
     end
 
     subgraph msf["Metasploit"]
@@ -157,20 +157,20 @@ flowchart TB
         DB["PostgreSQL (hosts/services/vulns)"]
     end
 
-    subgraph tools["Offensive & analysis tools"]
-        TOOLS["nmap · hydra · nikto · sqlmap · semgrep<br/>trivy · osv-scanner · gobuster · masscan"]
+    subgraph tools["Offensive / analysis tools"]
+        TOOLS["nmap · whatweb · hydra · nikto · sqlmap<br/>semgrep · trivy · osv-scanner · gobuster<br/>libFuzzer/AFL++ · masscan"]
     end
 
-    subgraph llm["AI triage (optional, keyless)"]
-        OLLAMA["opencode relay (host) · or any OpenAI-compatible gateway"]
+    subgraph llm["Local LLM (optional)"]
+        OLLAMA["Ollama · qwen2.5 :11434/<sidecar>"]
     end
 
     subgraph lab["Fuzzing target (separate)"]
-        VULN["vulnlab · vulnerable HTTP server<br/>+ coverage-guided harness"]
+        VULN["vulnlab · intentionally-vulnerable<br/>HTTP server + coverage-guided harness"]
     end
 
     UI -->|HTTP/JSON :3137| R
-    R -->|RPC| RPC
+    R -->|RPC calls| RPC
     RPC --> DB
     R -->|subprocess| TOOLS
     R -->|local model| OLLAMA
