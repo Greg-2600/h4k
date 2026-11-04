@@ -56,11 +56,18 @@
               <button class="btn small" id="step-fingerprint" data-testid="step-fingerprint" title="Fingerprint services and match CVEs">3 · Fingerprint</button>
               <button class="btn small" id="step-win" data-testid="step-win" title="Work the attack queue">4 · Win</button>
             </div>
-            <span class="muted" id="scope-summary">no scope</span>
+            <span class="muted" id="scope-summary" data-testid="scope-summary">no scope</span>
           </div>
           <div class="card-body">
+            <div class="row scope-create" id="scope-create" data-testid="scope-create">
+              <span class="muted">Scope (required for scans + attacks):</span>
+              <input type="text" id="scope-name" class="grow" placeholder="Lab name, e.g. home-lab" data-testid="scope-name" />
+              <input type="text" id="scope-cidrs" class="grow" placeholder="Authorized targets, e.g. 192.168.1.0/24" data-testid="scope-cidrs" />
+              <button class="btn primary" id="btn-scope-create" data-testid="btn-scope-create" title="Create engagement and set it as the active scope">Create scope</button>
+              <span class="muted" id="scope-create-status" data-testid="scope-create-status"></span>
+            </div>
             <div class="row">
-              <input type="text" id="target" class="grow" placeholder="192.168.1.0/24 or single IP" />
+              <input type="text" id="target" class="grow" placeholder="192.168.1.0/24 or single IP" data-testid="target-input" />
               <select id="mode-select" title="OPSEC mode">
                 <option value="stealth">stealth</option>
                 <option value="tor">tor</option>
@@ -71,7 +78,7 @@
                 <option value="standard" selected>standard</option>
                 <option value="full">full</option>
               </select>
-              <button class="btn primary" id="btn-scan">Scan</button>
+              <button class="btn primary" id="btn-scan" data-testid="btn-scan">Scan</button>
               <button class="btn" id="btn-neighbors" data-testid="btn-neighbors" title="ARP discovery on local networks">Neighbors</button>
               <span class="muted" id="scan-status" data-testid="scan-status">idle</span>
             </div>

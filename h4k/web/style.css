@@ -92,6 +92,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 .muted { color: var(--muted); font-size: 12px; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 160px; }
+.scope-create { margin-bottom: 8px; }
 
 /* inputs + buttons */
 input[type="text"], input[type="number"], select {

@@ -55,7 +55,7 @@ help:
 	@printf "  make lint-docker        Dockerfile linting only\n"
 	@printf "\n"
 	@printf "$(BOLD)Testing$(RESET)\n"
-	@printf "  make test               run full pytest suite\n"
+	@printf "  make test               run full pytest suite (in container, no host exec)\n"
 	@printf "  make e2e                run the Selenium browser suite (headless)\n"
 	@printf "  make sanity             check a RUNNING deployment end to end\n"
 	@printf "  make sanity-test        same checks, as pytest (needs the stack up)\n"
@@ -185,8 +185,17 @@ logs:
 # Testing
 ## ─────────────────────────────────────────────────────────────────────────────
 
-test:
-	PATH="$(PWD)/.venv/bin:$$PATH" $(PYTEST) --ignore=tests/e2e
+# Containerized unit/API tests: pytest runs inside python:3.11-slim with the
+# repo mounted — no project code executes on the host. e2e stays host-side
+# (needs local Chromium + a sandbox API) and runs in CI.
+TEST_IMAGE := python:3.11-slim
+TEST_DOCKER := docker run --rm --user "$(shell id -u):$(shell id -g)" -v "$(PWD):/work" -w /work -e PYTHONDONTWRITEBYTECODE=1 -e PIP_TARGET=/tmp/pylibs -e PYTHONPATH=/tmp/pylibs -e HOME=/tmp $(TEST_IMAGE)
+TEST_SETUP := pip install -q --target=/tmp/pylibs -r requirements.txt -r requirements-dev.txt
+
+test: test-container
+
+test-container:
+	$(TEST_DOCKER) bash -c "$(TEST_SETUP) && python -m pytest --ignore=tests/e2e -q -p no:cacheprovider"
 
 # Selenium end-to-end suite (headless Chromium against a sandbox-mode API).
 # Needs: chromium + chromedriver on PATH, `selenium` in the venv.
@@ -202,7 +211,7 @@ sanity-test:
 	H4K_LIVE=1 $(PYTEST) tests/test_live_stack.py -v
 
 coverage:
-	PATH="$(PWD)/.venv/bin:$$PATH" $(PYTEST) --ignore=tests/e2e --cov --cov-report=term-missing
+	$(TEST_DOCKER) bash -c "$(TEST_SETUP) && python -m pytest --ignore=tests/e2e -q -p no:cacheprovider --cov --cov-report=term-missing"
 
 ## ─────────────────────────────────────────────────────────────────────────────
 # Clean
