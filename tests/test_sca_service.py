@@ -336,3 +336,67 @@ def test_sca_result_to_dict_shape():
     r2 = sca.ScaResult(tool="x")
     r2.cve_ids.append("CVE-1")
     assert sca.ScaResult(tool="y").cve_ids == []
+
+
+OSV_V2_FIXTURE = {
+    # osv-scanner v2 shape: no top-level "vulnerabilities" — hits live in
+    # packages[].groups[] (seen live against demos/sca-demo/lockfile).
+    "results": [
+        {
+            "source": {"path": "demos/sca-demo/package-lock.json", "type": "lockfile"},
+            "packages": [
+                {
+                    "package": {
+                        "name": "lodash",
+                        "version": "4.17.20",
+                        "ecosystem": "npm",
+                    },
+                    "groups": [
+                        {
+                            "ids": ["GHSA-35jh-r3h4-6jhm"],
+                            "aliases": ["CVE-2021-23337", "GHSA-35jh-r3h4-6jhm"],
+                            "max_severity": "7.2",
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+}
+
+
+def test_scan_osv_parses_v2_package_groups(tmp_path, monkeypatch):
+    """v2 moved hits to packages[].groups[] — the parser must follow."""
+    monkeypatch.setattr(sca, "_tool_cmd", lambda t: "/usr/bin/osv-scanner")
+    calls = []
+
+    def run(cmd, cwd=None, timeout=180):
+        calls.append(cmd)
+        if "--output" in cmd:
+            Path(cmd[cmd.index("--output") + 1]).write_text(
+                json.dumps(OSV_V2_FIXTURE), encoding="utf-8"
+            )
+        return 0, "", ""
+
+    monkeypatch.setattr(sca, "_run", run)
+    res = sca.scan_osv(tmp_path)
+    assert "-r" in calls[0], "osv must walk recursively or nested lockfiles are missed"
+    assert "CVE-2021-23337" in res.cve_ids
+    assert res.packages == ["lodash"]
+    assert "CVE-2021-23337" in res.pkg_cves["lodash"]
+
+
+def test_scan_osv_accepts_vulns_found_exit_code(tmp_path, monkeypatch):
+    """osv exits 1 when it FINDS vulns — that is success with a report."""
+    monkeypatch.setattr(sca, "_tool_cmd", lambda t: "/usr/bin/osv-scanner")
+
+    def run(cmd, cwd=None, timeout=180):
+        if "--output" in cmd:
+            Path(cmd[cmd.index("--output") + 1]).write_text(
+                json.dumps(OSV_V2_FIXTURE), encoding="utf-8"
+            )
+        return 1, "", ""  # 1 = vulnerabilities found, report written
+
+    monkeypatch.setattr(sca, "_run", run)
+    res = sca.scan_osv(tmp_path)
+    assert "CVE-2021-23337" in res.cve_ids

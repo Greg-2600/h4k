@@ -3,6 +3,7 @@
 # optional (opt-in) default-credential verification -> collect findings.
 import ipaddress
 import logging
+import socket
 import subprocess  # nosec B404 - required to drive msfconsole / bash recon tools
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1062,7 +1063,14 @@ def _target_matches(addr: str | None, target: str) -> bool:
         net = ipaddress.ip_network(target, strict=False)
         return ipaddress.ip_address(addr) in net
     except ValueError:
-        return addr == target
+        pass
+    if addr == target:
+        return True
+    # hostname targets (domains, compose names): nmap resolves them for the
+    # scan, so resolve here too or IP rows never match their own target
+    with suppress(Exception):
+        return socket.gethostbyname(target) == addr
+    return False
 
 
 def _match_hints(

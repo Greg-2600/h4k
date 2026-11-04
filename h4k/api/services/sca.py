@@ -160,15 +160,19 @@ def scan_osv(root: Path) -> ScaResult:
         return res
 
     # osv-scanner can scan a directory (lockfiles+manifest) directly.
+    # -r/--recursive is required: without it v2 only looks at the top level
+    # and never descends into fixture dirs like demos/sca-demo/.
     out_dir = _sbom_out_dir()
     out = out_dir / f"osv-{root.name}.json"
+    # osv-scanner exit codes: 0 = clean, 1 = vulnerabilities found,
+    # >1 = error. Both 0 and 1 can carry a usable report.
     rc, so, se = _run(
-        [osv, "--format", "json", "--output", str(out), str(root)], timeout=240
+        [osv, "--format", "json", "-r", "--output", str(out), str(root)], timeout=240
     )
-    if rc != 0 or not out.exists():
+    if rc not in (0, 1) or not out.exists():
         # try capturing stdout as JSON directly
-        rc, so, se = _run([osv, "--format", "json", str(root)], timeout=240)
-        if rc == 0 and so.strip():
+        rc, so, se = _run([osv, "--format", "json", "-r", str(root)], timeout=240)
+        if rc in (0, 1) and so.strip():
             out.write_text(so, encoding="utf-8")
         else:
             logger.warning("osv-scanner failed: %s", se[:200])
@@ -185,30 +189,49 @@ def scan_osv(root: Path) -> ScaResult:
     pkgs: list[str] = []
     pkg_cves: dict[str, list[str]] = {}  # package name -> [cve...]
 
-    # osv-scanner output: {"results": [{"source": {...}, "packages": [...]
+    # osv-scanner output v1: {"results": [{"source": {...}, "packages": [...]
     #   , "vulnerabilities": [{"id": "GHSA/PYSEC/OSV", "aliases":["CVE-..."], ...}]}]}
+    # v2 moved per-package hits to packages[].groups[]:
+    #   {"packages": [{"package": {"name": ...}, "groups":
+    #     [{"ids": [...], "aliases": ["CVE-...", ...], "max_severity": ...}]}]}
     for grp in data.get("results", []):
         # packages in this group (name@version or name)
         group_pkgs: list[str] = []
+        pkg_by_name: dict[str, dict] = {}
         for pkg in grp.get("packages", []):
             name = pkg.get("package", {}).get("name", "")
             if name:
                 group_pkgs.append(name)
+                pkg_by_name[name] = pkg
                 if name not in pkgs:
                     pkgs.append(name)
-        for vuln in grp.get("vulnerabilities", []):
-            vid = vuln.get("id", "")
-            aliases = vuln.get("aliases", []) or []
+
+        def _record(vid: str, aliases: list, intro: str, names: list[str]) -> None:
             cve = next((a for a in aliases if a.startswith("CVE-")), vid)
-            intro = vuln.get("details", "")[:200]
             vulns.append({"id": vid, "cve": cve, "summary": intro})
             if cve and cve not in cves:
                 cves.append(cve)
-            # attribute the CVE to any package in this group
-            for name in group_pkgs:
+            for name in names:
                 pkg_cves.setdefault(name, [])
                 if cve not in pkg_cves[name]:
                     pkg_cves[name].append(cve)
+
+        for vuln in grp.get("vulnerabilities", []):
+            _record(
+                vuln.get("id", ""),
+                vuln.get("aliases", []) or [],
+                vuln.get("details", "")[:200],
+                group_pkgs,
+            )
+        for name, pkg in pkg_by_name.items():
+            for group in pkg.get("groups", []) or []:
+                ids = group.get("ids", []) or []
+                _record(
+                    ids[0] if ids else "",
+                    group.get("aliases", []) or [],
+                    f"max_severity {group.get('max_severity', '?')}",
+                    [name],
+                )
 
     res.osv_vulns = vulns
     res.cve_ids = cves

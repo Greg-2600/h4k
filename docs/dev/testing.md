@@ -9,11 +9,28 @@ Three layers, each with a different job.
 | **E2E** | `tests/e2e/` | Chrome/Chromium + chromedriver | ~1 minute |
 
 ```sh
-make test     # unit + API
-make e2e      # Selenium
-make lint     # black ruff isort flake8 mypy pylint bandit
-make coverage # pytest + coverage (90% gate)
+make test          # unit + API (in a python:3.11-slim container)
+make e2e           # Selenium, host chromium
+make e2e-container # Selenium, fully containerized
+make lint          # black ruff isort flake8 mypy pylint bandit
+make coverage      # pytest + coverage (90% gate, in container)
+make qualify       # fresh images + live stack + full feature workout
 ```
+
+---
+
+## Release qualification
+
+Unit tests mock the daemon and e2e runs a sandbox API — neither proves a
+fresh build boots and works. `make qualify` closes that gap: no-cache build
+of both images, `compose up`, wait for healthy (API + reachable msfrpcd),
+then `scripts/qualify.py` works the product like an operator (scan vulnlab,
+fingerprint, vuln leads, CVE report, SAST upload, SCA on the fixture repo,
+short fuzz, engagement ingest, crown jewels, attack paths, markdown export),
+asserting each step. Tears the stack down afterwards; exit nonzero on any
+failure. Stdlib only, so it runs anywhere with a docker CLI. Also runs in CI
+(`qualify.yml`: on demand, weekly, and on PRs touching runtime code) as a
+non-required signal.
 
 ---
 
