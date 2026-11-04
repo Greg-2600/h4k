@@ -123,6 +123,19 @@ CREATE TABLE IF NOT EXISTS crown_jewels (
     UNIQUE(engagement_id, host)
 );
 CREATE INDEX IF NOT EXISTS idx_crown_jewels_eng ON crown_jewels(engagement_id);
+-- Lab Watch: versioned estate snapshots + per-pass diffs. Snapshots are
+-- scope-filtered at record time (out-of-scope hosts never enter the series),
+-- so a wide auto-scan cannot poison an engagement's change history.
+CREATE TABLE IF NOT EXISTS watch_snapshots (
+    id            TEXT PRIMARY KEY,
+    engagement_id TEXT NOT NULL,
+    source        TEXT NOT NULL DEFAULT 'auto',
+    created_at    TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL DEFAULT '{}',
+    diff_json     TEXT NOT NULL DEFAULT '{}',
+    change_count  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_watch_eng ON watch_snapshots(engagement_id);
 """
 
 
@@ -788,6 +801,139 @@ class EngagementStore:
             (engagement_id, crown_id),
         )
         return bool(before)
+
+    # ---- lab watch ------------------------------------------------------
+
+    def record_watch_snapshot(
+        self,
+        engagement_id: str,
+        report: dict[str, Any] | None,
+        source: str = "auto",
+        retain: int = 30,
+    ) -> dict[str, Any]:
+        """Snapshot the in-scope estate and diff it against the previous one.
+
+        Out-of-scope hosts are dropped before canonicalizing, mirroring
+        ingest_scan: a wide scan can never widen an engagement's history.
+        Returns {snapshot_id, diff, summary, notable}.
+        """
+        from services import watch as watch_mod
+
+        if not self.get_engagement(engagement_id):
+            raise ValueError("unknown engagement")
+        report = report or {}
+        in_scope_hosts = [
+            h
+            for h in (report.get("hosts") or [])
+            if h.get("address") and self.in_scope(engagement_id, h["address"])
+        ]
+        in_scope_vulns = [
+            v
+            for v in (report.get("vulns") or [])
+            if v.get("host") and self.in_scope(engagement_id, v["host"])
+        ]
+        snap = watch_mod.canonicalize(
+            {"hosts": in_scope_hosts, "vulns": in_scope_vulns}
+        )
+        prev_rows = self._query(
+            "SELECT snapshot_json FROM watch_snapshots WHERE engagement_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1",
+            (engagement_id,),
+        )
+        prev = (
+            watch_mod._restore_snapshot(json.loads(prev_rows[0]["snapshot_json"]))
+            if prev_rows
+            else None
+        )
+        diff = watch_mod.diff_snapshots(prev, snap)
+        snap_id = uuid.uuid4().hex[:12]
+        self._write(
+            "INSERT INTO watch_snapshots (id, engagement_id, source, created_at, snapshot_json, diff_json, change_count)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                snap_id,
+                engagement_id,
+                source,
+                _now(),
+                json.dumps(watch_mod._jsonable_snapshot(snap)),
+                json.dumps(diff),
+                int(diff.get("change_count", 0)),
+            ),
+        )
+        self._write(
+            "DELETE FROM watch_snapshots WHERE id IN (SELECT id FROM watch_snapshots"
+            " WHERE engagement_id=? ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?)",
+            (engagement_id, retain),
+        )
+        self._touch(engagement_id)
+        return {
+            "snapshot_id": snap_id,
+            "diff": diff,
+            "summary": watch_mod.summarize(diff),
+            "notable": bool(diff.get("notable")),
+        }
+
+    def watch_changes(
+        self, engagement_id: str, limit: int = 20
+    ) -> list[dict[str, Any]]:
+        rows = self._query(
+            "SELECT id, source, created_at, diff_json, change_count FROM watch_snapshots"
+            " WHERE engagement_id=? ORDER BY created_at DESC, rowid DESC LIMIT ?",
+            (engagement_id, limit),
+        )
+        out = []
+        for r in rows:
+            diff = json.loads(r["diff_json"] or "{}")
+            if diff.get("first_baseline"):
+                summary = "baseline recorded"
+            else:
+                summary = self._watch_summary(diff)
+            out.append(
+                {
+                    "snapshot_id": r["id"],
+                    "source": r["source"],
+                    "created_at": r["created_at"],
+                    "change_count": r["change_count"],
+                    "summary": summary,
+                    "diff": diff,
+                }
+            )
+        return out
+
+    @staticmethod
+    def _watch_summary(diff: dict[str, Any]) -> str:
+        from services import watch as watch_mod
+
+        return watch_mod.summarize(diff)
+
+    def watch_status(self, engagement_id: str) -> dict[str, Any]:
+        total = self._scalar(
+            "SELECT COUNT(*) FROM watch_snapshots WHERE engagement_id=?",
+            (engagement_id,),
+        )
+        last = self._query(
+            "SELECT created_at, source FROM watch_snapshots WHERE engagement_id=?"
+            " ORDER BY created_at DESC, rowid DESC LIMIT 1",
+            (engagement_id,),
+        )
+        changed = self._query(
+            "SELECT created_at, diff_json FROM watch_snapshots WHERE engagement_id=?"
+            " AND change_count > 0 ORDER BY created_at DESC, rowid DESC LIMIT 1",
+            (engagement_id,),
+        )
+        last_change = None
+        if changed:
+            last_change = {
+                "created_at": changed[0]["created_at"],
+                "summary": self._watch_summary(
+                    json.loads(changed[0]["diff_json"] or "{}")
+                ),
+            }
+        return {
+            "snapshots": total or 0,
+            "last_pass_at": last[0]["created_at"] if last else None,
+            "last_source": last[0]["source"] if last else None,
+            "last_change": last_change,
+        }
 
 
 def _normalize_scope(scope: list[str] | None) -> list[Any]:

@@ -57,9 +57,11 @@ help:
 	@printf "$(BOLD)Testing$(RESET)\n"
 	@printf "  make test               run full pytest suite (in container, no host exec)\n"
 	@printf "  make e2e                run the Selenium browser suite (headless)\n"
+	@printf "  make e2e-container      same suite, fully in a container\n"
+	@printf "  make qualify            fresh images + live stack + full feature workout\n"
 	@printf "  make sanity             check a RUNNING deployment end to end\n"
 	@printf "  make sanity-test        same checks, as pytest (needs the stack up)\n"
-	@printf "  make coverage           pytest + coverage report (90%% gate)\n"
+	@printf "  make coverage           pytest + coverage report (90%% gate, in container)\n"
 	@printf "\n"
 	@printf "$(BOLD)Containers$(RESET)\n"
 	@printf "  make build              build h4k + vulnlab images\n"
@@ -201,6 +203,16 @@ test-container:
 # Needs: chromium + chromedriver on PATH, `selenium` in the venv.
 e2e:
 	H4K_E2E=1 $(PYTEST) tests/e2e -v
+
+# Release qualification: fresh images, live stack, full feature workout.
+# Stdlib-only workout (scripts/qualify.py) — no host venv needed. Tears the
+# stack down afterwards either way; exit code reflects the workout.
+# The no-cache build pulls several install scripts (trivy etc.); retry it —
+# build-time DNS flakes have killed otherwise-green runs.
+qualify:
+	ok=0; for i in 1 2 3; do if docker compose -f $(COMPOSE_FILE) build --no-cache; then ok=1; break; fi; echo "build attempt $$i failed; retrying"; sleep 15; done; [ $$ok -eq 1 ]
+	docker compose -f $(COMPOSE_FILE) up -d
+	python3 scripts/qualify.py http://127.0.0.1:3137; rc=$$?; docker compose -f $(COMPOSE_FILE) down; exit $$rc
 
 # Same suite, fully containerized: test-runner image (chromium + toolchain
 # baked in) with the repo mounted. No host execution.

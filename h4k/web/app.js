@@ -81,7 +81,7 @@ function setTab(tab) {
   if (tab === 'exploit') { refreshNextMove(); loadCredTargets(); }
   if (tab === 'pivot') { loadShells(); loadCredLedger(); }
   if (tab === 'persist') renderPersist();
-  if (tab === 'score') { refreshFlags(); renderReportPreview(); }
+  if (tab === 'score') { refreshFlags(); renderReportPreview(); refreshWatch(); }
 }
 
 function badge(id, n) {
@@ -857,6 +857,39 @@ async function refreshFlags() {
   } catch (e) { log(`flags failed: ${e.message}`, 'error'); }
 }
 
+async function refreshWatch() {
+  const list = $('watch-list');
+  const empty = $('watch-empty');
+  const status = $('watch-status');
+  const engId = await currentEngagementId();
+  if (!engId) {
+    list.innerHTML = ''; empty.hidden = false; status.textContent = 'needs scope';
+    return;
+  }
+  try {
+    const [st, ch] = await Promise.all([
+      api(`/api/engagement/${engId}/watch/status`),
+      api(`/api/engagement/${engId}/watch/changes?limit=10`),
+    ]);
+    status.textContent = st.snapshots
+      ? `${st.snapshots} snapshot(s)${st.last_change ? ` · last change: ${st.last_change.summary}` : ' · no changes yet'}`
+      : 'no snapshots yet — auto-scan records them';
+    const items = (ch.changes) || [];
+    empty.hidden = items.length > 0;
+    list.innerHTML = items.map((c) => {
+      const d = c.diff || {};
+      const parts = [];
+      for (const h of (d.appeared_hosts || [])) parts.push(`<div class="watch-line">+ host <b>${esc(h)}</b></div>`);
+      for (const h of (d.vanished_hosts || [])) parts.push(`<div class="watch-line">− host <b>${esc(h)}</b></div>`);
+      for (const s of (d.new_services || [])) parts.push(`<div class="watch-line">+ <b>${esc(s.host)}:${esc(String(s.port))}</b> ${esc(s.service || '')} ${esc(s.version || '')}</div>`);
+      for (const s of (d.closed_services || [])) parts.push(`<div class="watch-line">− <b>${esc(s.host)}:${esc(String(s.port))}</b> ${esc(s.service || '')}</div>`);
+      for (const v of (d.new_vulns || [])) parts.push(`<div class="watch-line">! <b>${esc(v.name)}</b> on ${esc(v.host)}${v.severity ? ` (${esc(v.severity)})` : ''}</div>`);
+      for (const v of (d.cleared_vulns || [])) parts.push(`<div class="watch-line">✓ cleared <b>${esc(v.name)}</b> on ${esc(v.host)}</div>`);
+      return `<div class="watch-item"><div class="watch-head"><span class="muted">${esc(c.created_at || '')} [${esc(c.source || '')}]</span><span>${esc(c.summary || '')}</span></div>${parts.join('')}</div>`;
+    }).join('');
+  } catch { status.textContent = 'unavailable'; }
+}
+
 async function addFlag() {
   const engId = await currentEngagementId();
   if (!engId) { log('set an active scope first', 'warn'); return; }
@@ -1058,6 +1091,20 @@ document.addEventListener('DOMContentLoaded', () => {
       loadScopeSelect();
       refreshStatus(); refreshNextMove();
     } catch (e) { status.textContent = `failed: ${e.message}`; }
+  });
+  // lab watch: estate change history for the active engagement
+  $('btn-watch-refresh').addEventListener('click', refreshWatch);
+  $('btn-watch-baseline').addEventListener('click', async () => {
+    const engId = await currentEngagementId();
+    if (!engId) { log('engage a scope first', 'error'); return; }
+    try {
+      const jobs = await api('/api/jobs?active=false');
+      const scan = ((jobs.jobs) || []).find((j) => (j.status === 'done' || j.status === 'completed'));
+      if (!scan) { log('run a scan first — nothing to snapshot yet', 'error'); return; }
+      const res = await api(`/api/engagement/${engId}/watch/baseline`, { method: 'POST', body: { job_id: scan.id } });
+      log(`watch snapshot: ${res.summary || res.snapshot_id}`, 'info');
+      refreshWatch();
+    } catch (e) { log(`baseline failed: ${e.message}`, 'error'); }
   });
   // discover stepper
   $('step-scope').addEventListener('click', () => { const s = $('scope-select'); if (s) s.focus(); });

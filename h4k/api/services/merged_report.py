@@ -24,6 +24,7 @@ def build_merged_report(
     sca: dict | None = None,
     fuzz: list[dict] | None = None,
     triage: list[dict] | None = None,
+    watch: list[dict] | None = None,
 ) -> dict[str, Any]:
     """Merge all sections into one structured report dict."""
     scan = scan or []
@@ -31,6 +32,7 @@ def build_merged_report(
     fuzz = fuzz or []
     triage = triage or []
     sca = sca or {}
+    watch = watch or []
 
     cves = _dedupe(list(sca.get("cves", [])))
     if sca.get("vulnerabilities"):
@@ -47,6 +49,7 @@ def build_merged_report(
             "sca_cves": len(cves),
             "fuzz_candidates": len(fuzz),
             "triage_reports": len(triage),
+            "watch_events": len(watch),
         },
         "scan": scan,
         "sast": sast,
@@ -57,6 +60,7 @@ def build_merged_report(
         },
         "fuzz": fuzz,
         "triage": triage,
+        "watch": watch,
     }
 
 
@@ -71,6 +75,7 @@ def render_markdown(rep: dict[str, Any]) -> str:
     L.append(f"- SCA known CVEs: {s.get('sca_cves', 0)}")
     L.append(f"- fuzz candidates: {s.get('fuzz_candidates', 0)}")
     L.append(f"- triage reports: {s.get('triage_reports', 0)}")
+    L.append(f"- watch events: {s.get('watch_events', 0)}")
     L.append("")
 
     # Host scan
@@ -137,6 +142,18 @@ def render_markdown(rep: dict[str, Any]) -> str:
             )
     else:
         L.append("- none")
+    L.append("")
+
+    # Lab watch
+    L.append("## Lab watch (estate changes)")
+    L.append("")
+    if rep.get("watch"):
+        for ch in rep["watch"]:
+            L.append(
+                f"- {ch.get('created_at')} [{ch.get('source')}] {ch.get('summary')}"
+            )
+    else:
+        L.append("- no changes recorded")
     L.append("")
     L.append("> authorized-scope only.")
     L.append("")

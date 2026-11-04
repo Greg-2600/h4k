@@ -53,6 +53,9 @@ and layers modern analysis on top:
   (secretsdump/GetNPUsers/kerberoast), ldapsearch/rpcclient, chisel/sshuttle pivot.
 - **Network-layer (opt-in)** — tcpdump sniff, arp-scan, bettercap MITM,
   aircrack-ng WiFi scan/capture.
+- **Lab Watch** — every auto-scan pass snapshots the in-scope estate and
+  diffs it (new/vanished hosts, opened/closed services, changed banners,
+  new/cleared CVE matches); Score tab card + session/merged reports.
 - **Auto-update** — periodic refresh of semgrep/osv-scanner/trivy + CVE/creds.
 
 **Every aggressive action is off by default and opt-in.** This is a lab tool for

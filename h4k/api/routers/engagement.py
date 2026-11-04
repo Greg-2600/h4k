@@ -105,6 +105,48 @@ def ingest_scan(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.post("/{engagement_id}/watch/baseline")
+def watch_baseline(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Snapshot the in-scope estate now and diff it against the previous one.
+
+    Accepts a raw report dict, or `{"job_id": ...}` to snapshot a finished
+    scan job's report. Out-of-scope hosts are dropped before snapshotting.
+    """
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    report = body or {}
+    if "job_id" in report and "hosts" not in report:
+        from routers.scan import JOBS
+
+        job = JOBS.get(str(report["job_id"]))
+        if not job:
+            raise HTTPException(status_code=404, detail="job not found")
+        found = job.get("report")
+        if found is None:
+            raise HTTPException(status_code=404, detail="report not ready")
+        if hasattr(found, "model_dump"):
+            found = found.model_dump()
+        report = found
+    if not isinstance(report, dict) or "hosts" not in report:
+        raise HTTPException(status_code=400, detail="report with 'hosts' required")
+    return store.record_watch_snapshot(engagement_id, report, source="manual")
+
+
+@router.get("/{engagement_id}/watch/changes")
+def watch_changes(engagement_id: str, limit: int = 20) -> dict[str, Any]:
+    if not get_store().get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return {"changes": get_store().watch_changes(engagement_id, limit=limit)}
+
+
+@router.get("/{engagement_id}/watch/status")
+def watch_status(engagement_id: str) -> dict[str, Any]:
+    if not get_store().get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return get_store().watch_status(engagement_id)
+
+
 @router.get("/{engagement_id}/assets")
 def list_assets(engagement_id: str) -> dict[str, Any]:
     return {"assets": get_store().assets(engagement_id)}

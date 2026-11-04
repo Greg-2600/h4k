@@ -464,6 +464,7 @@ def build_merged_report(body: dict[str, Any] | None = None) -> dict[str, Any]:
         sca=body.get("sca"),
         fuzz=body.get("fuzz"),
         triage=body.get("triage"),
+        watch=body.get("watch"),
     )
     return rep
 
@@ -478,6 +479,7 @@ def report_markdown(body: dict[str, Any] | None = None) -> str:
         sca=body.get("sca"),
         fuzz=body.get("fuzz"),
         triage=body.get("triage"),
+        watch=body.get("watch"),
     )
     return merged_report.render_markdown(rep)
 

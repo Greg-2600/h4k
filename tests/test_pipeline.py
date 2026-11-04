@@ -49,3 +49,11 @@ def test_target_matches_cidr():
 
 def test_target_matches_none():
     assert _target_matches(None, "10.0.0.0/24") is False
+
+
+def test_target_matches_hostname_via_dns():
+    """Hostname targets must match their resolved IPs — nmap resolves for
+    the scan, so the DB-row filter has to resolve too (compose names like
+    h4k_vulnlab, domains). localhost is deterministic without network."""
+    assert _target_matches("127.0.0.1", "localhost") is True
+    assert _target_matches("10.0.0.1", "localhost") is False

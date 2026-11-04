@@ -584,3 +584,13 @@ pinning the path. Full local verification on this host: `make lint`
 green, pylint 9.80, `make test` 1340 passed / 3 skipped, `make e2e`
 29 passed / 3 skipped (chromium + chromedriver), crown-jewel waits at
 60s holding green.
+
+## Lab Watch — continuous change detection (2026-11-04)
+
+Every auto-scan pass now snapshots the in-scope estate and diffs it against
+the previous pass: new/vanished hosts, opened/closed services, changed
+banners, new/cleared CVE matches. Stored per engagement with retention
+(old snapshots pruned, out-of-scope hosts never recorded). Surfaced in a
+Score-tab card (snapshot-now + history), the session report, and the merged
+report; `scripts/qualify.py` gained a watch stage. Scope enforcement reused,
+not reinvented: snapshots filter through `in_scope` like ingest does.
