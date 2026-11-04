@@ -554,3 +554,23 @@ button ends stages at the next checkpoint.
   scripts/opencode_relay.py); compose no longer ships an LLM sidecar.
 - Autopilot runs persist and appear in the session report; opened sessions are
   automatically post-exploit recon'd (sysinfo/getuid/hashdump → session_recon).
+
+## Public-repo hardening (2026-11-04)
+
+CI was red underneath a broken `make setup` (`.venv/bin/python` before the
+venv exists — every fresh runner failed before lint). Fixed setup to
+`python3 -m venv` + install both requirements files (missing
+`python-multipart` was killing the API in e2e), gave `test`/`coverage`
+`.venv/bin` on `PATH` + `--ignore=tests/e2e`, added `pythonpath=[".",
+"h4k/api"]` so `from h4k.api...` imports resolve, `nosec`'d four bandit
+false positives, and skipped four live-host privesc assertions on
+`GITHUB_ACTIONS` (runners have passwordless sudo/docker by design).
+E2E crown-jewel waits raised 20s → 60s (slow-runner flakes).
+
+GitHub: ruleset `main protection` (PR + `lint-test` + `e2e` green),
+`delete_branch_on_merge`/`allow_update_branch`/`allow_auto_merge` on,
+Dependabot security updates on, CodeQL default setup on, topics +
+`lodash` fixture ignore. License back to pure MIT (detection flipped
+`Other` → `MIT`). Dependabot queue worked: actions bumps merged,
+lodash fixture declined (intentionally vulnerable), debian 13 deferred
+(`buster` metasploit repo vs new base — needs a tested build).
