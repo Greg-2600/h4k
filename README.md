@@ -32,7 +32,6 @@ Metasploitable box. Every aggressive action is **off by default and opt-in**.
 |------|--------------|
 | **Host recon & scan** | 3 OPSEC modes (stealth / Tor / overt), fingerprinting, PTR, DNS, ARP neighbors, posture heuristic |
 | **Passive auto-scan** | on boot, h4k starts building a network and service map of the local subnet automatically — recon only, no creds, no exploits; the map is live at `/api/map` and in the console |
-| **Passive auto-scan** | on boot, h4k starts building a network and service map of the local subnet automatically — recon only, no creds, no exploits; the map is live at `/api/map` and in the console |
 | **Vuln analysis** | curated CVE archive, EOL/version leads, default-cred archive, ranked recommendations |
 | **Engagements** | persistent scope-enforced asset graph; replays *verified* credentials across the in-scope estate to find where they also work (lateral movement), with a dry-run plan first |
 | **Attack paths** | declare **crown jewels** (the objectives that matter) and get scored, evidence-backed paths to them — a 2.0 leak that pivots into the DC outranks a 9.8 on an isolated box |
