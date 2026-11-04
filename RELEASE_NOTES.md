@@ -594,3 +594,14 @@ banners, new/cleared CVE matches. Stored per engagement with retention
 Score-tab card (snapshot-now + history), the session report, and the merged
 report; `scripts/qualify.py` gained a watch stage. Scope enforcement reused,
 not reinvented: snapshots filter through `in_scope` like ingest does.
+
+## Lint + test hygiene (2026-11-04)
+
+`make lint` now actually lints everything: shellcheck covers
+`h4k/scripts/` too (fixed real quoting bugs in the shipped DNS recon
+scripts), hadolint runs on all three Dockerfiles via a pinned config
+(`.hadolint.yaml` documents the accepted rolling-image exceptions), and
+`shellcheck-py` moved into requirements-dev so CI stops skipping shell
+lint. Lab Watch closed the loop (#16): change digest badge, per-engagement
+mode/retention prefs, verify-fix flow, trends view, qualify stage.
+Unit 1367 + e2e 32 green in containers.

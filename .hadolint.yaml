@@ -1,0 +1,10 @@
+# Hadolint: only fail on things that are real defects for this repo.
+# h4k's images are rolling tool images (debian slim + latest scanners) where
+# the updater + dependabot keep things fresh — pinning every apt/pip package
+# would freeze the toolchain without adding safety.
+ignored:
+  - DL3008  # apt pinning: rolling base, dependabot bumps debian
+  - DL3013  # pip pinning: unpinned except where coherence demands it (semgrep/otel)
+  - DL3018  # apk pinning: same rolling rationale as DL3008 (vulnlab)
+  - DL4006  # pipefail: RUN lines are single pipelines ending in explicit cleanup; curl -f fails loudly
+  - SC2015  # A && B || C: used only with `|| true`-style guards, no masked status

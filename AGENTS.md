@@ -94,7 +94,7 @@ make e2e                         # Selenium browser suite (headless Chrome)
 make coverage                    # pytest --cov (90% gate)
 ```
 
-All linters must pass before commit. Tests currently **~1340 passing** (+29 e2e); the
+All linters must pass before commit. Tests currently **~1367 passing** (+32 e2e); the
 coverage gate is 90% (enforced in pyproject). CI runs `lint`, `test` and the
 Selenium suite.
 

@@ -13,7 +13,7 @@ the immediate horizon.
 | Item | Status |
 |---|---|
 | Git branch | `main` |
-| Tests | **1340 passing** (offline, mocked Metasploit) + 29 e2e + live-target flow |
+| Tests | **1367 passing** (offline, mocked Metasploit) + 32 e2e + live-target flow |
 | Coverage | **~90%** (CI gate 90%) |
 | Linters | black · ruff · isort · flake8 · mypy · bandit all green · pylint ~9.88 |
 | Container | **`h4k`** running, host-networking, UI on `http://127.0.0.1:3137` |
@@ -126,7 +126,7 @@ source .venv/bin/activate        # or .venv/bin/<tool>
 make fmt      # black + isort
 make fix      # ruff --fix
 make lint     # black ruff isort flake8 mypy pylint bandit
-make test     # pytest in container, no host exec (1340)
+make test     # pytest in container, no host exec (1367)
 make coverage # pytest --cov
 ```
 
