@@ -1,0 +1,31 @@
+name: Qualify
+
+# Release qualification: fresh images, live stack, full feature workout.
+# Heavy (~30 min: no-cache build + boot + workout), so it runs on demand,
+# weekly, and on PRs that touch runtime code — never as a merge gate.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * 1" # weekly Monday
+  pull_request:
+    paths:
+      - "h4k/**"
+      - "vulnlab/**"
+      - "scripts/qualify.py"
+
+concurrency:
+  group: qualify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fresh build + boot + full feature workout
+        run: make qualify
