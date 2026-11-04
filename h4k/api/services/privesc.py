@@ -78,7 +78,11 @@ def _filecap_dac_probe(timeout: float = 10.0) -> tuple[bool, str]:
         return False, "gsr-kms-server not installed"
     try:
         proc = subprocess.run(  # nosec B603 B607 - fixed argv, no shell
-            [exe, "/tmp/h4k-probe-sock", "/etc/shadow"],  # nosec B108 - intentional fixed probe socket path
+            [
+                exe,
+                "/tmp/h4k-probe-sock",
+                "/etc/shadow",
+            ],  # nosec B108 - intentional fixed probe socket path
             capture_output=True,
             text=True,
             timeout=timeout,
