@@ -107,6 +107,9 @@ RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --break-system-packages --no-cache-dir --upgrade pip \
     && python3 -m pip install --break-system-packages --no-cache-dir \
+         "opentelemetry-api==1.37.0" \
+         "opentelemetry-sdk==1.37.0" \
+         "opentelemetry-exporter-otlp-proto-http==1.37.0" \
          "semgrep==1.182.0" \
     && python3 -m pip install --break-system-packages --no-cache-dir \
          pymetasploit3 fastapi uvicorn python-multipart \
@@ -114,7 +117,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
          mitm6 \
          responder3 \
          bloodhound \
+         "opentelemetry-api==1.37.0" \
+         "opentelemetry-sdk==1.37.0" \
+         "opentelemetry-exporter-otlp-proto-http==1.37.0" \
     && python3 -m pip check || true
+
+# Build-time gate: semgrep must actually start (otel version skew has
+# shipped a broken install before — the ImportError only shows at runtime).
+RUN semgrep --version
 
 # SCA / supply-chain tools: osv-scanner (Google) validates a repo/SBOM against
 # the OSV vulnerability DB; trivy (Aqua) can emit a CycloneDX SBOM.
