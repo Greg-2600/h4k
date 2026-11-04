@@ -574,3 +574,13 @@ Dependabot security updates on, CodeQL default setup on, topics +
 `Other` → `MIT`). Dependabot queue worked: actions bumps merged,
 lodash fixture declined (intentionally vulnerable), debian 13 deferred
 (`buster` metasploit repo vs new base — needs a tested build).
+
+## CVE refresh fix + container re-verify (2026-11-04)
+
+`REFRESH_URL` pointed at `.../main/data/cves.json` (404 — the dataset
+lives at `.../main/h4k/data/cves.json`), so every startup/weekly/updater
+refresh silently kept the bundled snapshot. Fixed + regression test
+pinning the path. Full local verification on this host: `make lint`
+green, pylint 9.80, `make test` 1340 passed / 3 skipped, `make e2e`
+29 passed / 3 skipped (chromium + chromedriver), crown-jewel waits at
+60s holding green.
