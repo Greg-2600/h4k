@@ -1,0 +1,29 @@
+name: Feature request
+description: An idea for h4k — endpoint, tool wrapper, UI, docs
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check ROADMAP.md first — your idea may already be queued (or
+        evaluated and rejected, with reasons).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What lab problem does this solve?
+      description: The workflow, target, or finding this helps with
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Endpoint shape, UI placement, or behaviour change
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Aggressive action?
+      description: Anything that touches a target stays opt-in and scope-enforced
+      options:
+        - "No — read-only, recon, report, or docs"
+        - "Yes — and I understand it must be opt-in + scope-checked"

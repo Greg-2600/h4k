@@ -1,0 +1,25 @@
+# Dependabot: keep the toolchain and the image fresh. Security updates only
+# land via PR — CI (lint + tests + coverage + e2e) must stay green to merge.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # requirements-dev.txt pins the lint/test toolchain; runtime deps ride
+    # in requirements.txt. Review lockfile bumps for behaviour changes in
+    # semgrep/pymetasploit3/fastapi before merging.
+  - package-ecosystem: docker
+    directory: "/h4k"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3

@@ -1,0 +1,39 @@
+name: Bug report
+description: Something broken, wrong, or misleading in h4k
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. h4k is a lab tool — include what you ran
+        against (own VM, vulnlab, sandbox) and never paste real credentials.
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Image tag or short SHA (e.g. `h4k:1.0.0`, `d44b890`)
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - container (docker compose)
+        - host install
+        - sandbox (H4K_SANDBOX=1)
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: "`docker compose logs h4k`, API response, browser console errors. Redact credentials and internal hostnames."
+      render: shell
