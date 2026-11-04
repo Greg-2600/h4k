@@ -153,16 +153,12 @@ def stage_report(job_id: str) -> str:
     return addr
 
 
-def stage_fingerprint() -> bool:
-    # fingerprint needs discovered neighbors — run discovery first (fresh
-    # stacks have none; the endpoint 400s with "run discovery first")
-    status, job = api("POST", "/api/neighbors/scan", {}, timeout=30)
-    disc_id = job.get("job_id", "") if isinstance(job, dict) else ""
-    if status != 200 or not disc_id:
-        return check("fingerprint: service/version sweep runs", False, f"discovery HTTP {status}")
-    if wait_job("/api/neighbors/status", disc_id, timeout=600).get("status") not in ("done", "completed"):
-        return check("fingerprint: service/version sweep runs", False, "discovery never finished")
-    status, payload = api("POST", "/api/neighbors/fingerprint", {}, timeout=30)
+def stage_fingerprint(host_ip: str = "") -> bool:
+    # Fingerprint a single host directly: neighbor discovery depends on ARP
+    # peers, which CI runners don't have — {"ip": ...} fingerprints the
+    # target host without needing a prior discovery sweep.
+    body = {"ip": host_ip} if host_ip else {}
+    status, payload = api("POST", "/api/neighbors/fingerprint", body, timeout=30)
     if status != 200 or not isinstance(payload, dict):
         return check("fingerprint: service/version sweep runs", False, f"HTTP {status}")
     job_id = payload.get("job_id") or payload.get("id")
@@ -301,7 +297,7 @@ def main() -> int:
     if not job_id:
         return summary(1)
     host_addr = stage_report(job_id)
-    stage_fingerprint()
+    stage_fingerprint(host_addr)
     stage_vulnleads()
     stage_sast()
     stage_sca()
