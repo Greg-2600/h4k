@@ -1,0 +1,28 @@
+# h4k e2e test runner — Selenium suite in a container.
+# Bakes python + Chromium + chromedriver + the dev toolchain; the repo is
+# mounted at run time so no rebuild is needed for test/UI changes.
+# The sandbox API under test starts inside this same container (see
+# tests/e2e/conftest.py), so no host execution and no dependency on the
+# runtime h4k container.
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    chromium-driver \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Toolchain + runtime deps (mirrors requirements files; baked for speed).
+COPY requirements.txt requirements-dev.txt /tmp/
+RUN pip install --no-cache-dir -r /tmp/requirements.txt -r /tmp/requirements-dev.txt \
+    && pip install --no-cache-dir selenium
+
+ENV H4K_CHROME_BINARY=/usr/bin/chromium \
+    H4K_CHROMEDRIVER=/usr/bin/chromedriver
+
+WORKDIR /work
+CMD ["bash", "-c", "H4K_E2E=1 python -m pytest tests/e2e -q -p no:cacheprovider"]

@@ -6,17 +6,19 @@ disabled in sandbox mode. The userns try uses no sudo and no docker.
 """
 
 import os
+from pathlib import Path
 
 import pytest
 from services import privesc as privesc_mod
 from services.capabilities import build_report
 from services.container_escape import ContainerEscape
 
-# GitHub runners have passwordless sudo + docker by design; these
+# GitHub runners have passwordless sudo + docker by design, and ad-hoc test
+# containers (/.dockerenv) are not hardened lab hosts either: these
 # live-host hardening assertions only hold on a hardened lab host.
 needs_hardened_host = pytest.mark.skipif(
-    os.environ.get("GITHUB_ACTIONS") == "true",
-    reason="needs hardened host (no passwordless sudo/docker); GH runners have both",
+    os.environ.get("GITHUB_ACTIONS") == "true" or Path("/.dockerenv").exists(),
+    reason="needs hardened host (no passwordless sudo/docker); CI runners and test containers have both",
 )
 
 

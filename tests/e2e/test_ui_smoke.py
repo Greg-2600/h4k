@@ -26,6 +26,19 @@ def test_health_endpoint_is_ok(api):
     assert payload["status"] == "ok"
 
 
+def test_msf_pill_matches_health_contract(page, api):
+    # regression: the pill read h.msf === 'up' but /api/health returns
+    # {msf: {reachable: bool}} — so it showed "down" while msf was fine
+    status, payload = api.get("/api/health")
+    assert status == 200
+    assert wait_text(
+        page,
+        "msf-status",
+        "msf up" if payload["msf"]["reachable"] else "msf down",
+        timeout=30,
+    )
+
+
 def test_scope_selector_lists_engagement(page, seeded):
     # the header scope picker is populated from /api/engagement
     sel = wait_visible(page, "scope-select")

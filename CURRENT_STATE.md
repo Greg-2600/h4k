@@ -123,7 +123,7 @@ source .venv/bin/activate        # or .venv/bin/<tool>
 make fmt      # black + isort
 make fix      # ruff --fix
 make lint     # black ruff isort flake8 mypy pylint bandit
-make test     # pytest   (1340)
+make test     # pytest in container, no host exec (1340)
 make coverage # pytest --cov
 ```
 

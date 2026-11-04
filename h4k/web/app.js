@@ -127,6 +127,8 @@ function updateScopeSummary(engs, cur) {
   if (!el) return;
   const e = (engs || []).find((x) => x.id === cur);
   el.textContent = e ? `${e.name}: ${(e.scope || []).join(', ')}` : 'no scope — recon only, nothing recorded';
+  const form = $('scope-create');
+  if (form) form.hidden = !!e;
 }
 
 function setPill(id, text, level) {
@@ -141,7 +143,8 @@ function setPill(id, text, level) {
 async function refreshStatus() {
   try {
     const h = await api('/api/health');
-    setPill('msf-status', h.msf === 'up' ? 'msf up' : 'msf down', h.msf === 'up' ? 'online' : 'offline');
+    const msfUp = !!(h.msf && h.msf.reachable);
+    setPill('msf-status', msfUp ? 'msf up' : 'msf down', msfUp ? 'online' : 'offline');
   } catch { setPill('msf-status', 'msf ?', 'offline'); }
   try {
     const c = await api('/api/capabilities');
@@ -240,6 +243,12 @@ async function pollJob(jobId, onDone) {
 async function launchScan() {
   const target = $('target').value.trim();
   if (!target) { log('enter a target IP or CIDR first', 'error'); $('target').focus(); return; }
+  const engId = await currentEngagementId();
+  if (!engId) {
+    log('no scope: create one above (name + authorized CIDRs) before scanning — scans stay read-only without it', 'error');
+    const c = $('scope-cidrs'); if (c && !$('scope-create').hidden) c.focus();
+    return;
+  }
   $('scan-status').textContent = 'starting…';
   try {
     const res = await api('/api/scan', {
@@ -1030,6 +1039,26 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) { log(`scope change failed: ${err.message}`, 'error'); }
   });
 
+  // scope creator (Discover): validate CIDRs, create engagement, engage it
+  $('btn-scope-create').addEventListener('click', async () => {
+    const status = $('scope-create-status');
+    const name = ($('scope-name').value || '').trim() || 'lab';
+    const text = ($('scope-cidrs').value || '').trim();
+    if (!text) { status.textContent = 'enter authorized CIDRs first'; $('scope-cidrs').focus(); return; }
+    status.textContent = 'checking…';
+    try {
+      const parsed = await api('/api/engagement/parse-scope', { method: 'POST', body: { text } });
+      if (!parsed.scope || !parsed.scope.length) { status.textContent = 'no valid IPs/CIDRs in that text'; return; }
+      const eng = await api('/api/engagement', { method: 'POST', body: { name, scope: parsed.scope } });
+      if (!eng.id) { status.textContent = `refused: ${eng.detail || 'error'}`; return; }
+      await api('/api/session/scope', { method: 'POST', body: { engagement_id: eng.id } });
+      state.engagementId = eng.id;
+      status.textContent = '';
+      log(`scope engaged: ${eng.name} (${parsed.scope.join(', ')})`, 'info');
+      loadScopeSelect();
+      refreshStatus(); refreshNextMove();
+    } catch (e) { status.textContent = `failed: ${e.message}`; }
+  });
   // discover stepper
   $('step-scope').addEventListener('click', () => { const s = $('scope-select'); if (s) s.focus(); });
   $('step-scan').addEventListener('click', () => { const t = $('target'); if (t) t.focus(); });
