@@ -207,8 +207,10 @@ e2e:
 # Release qualification: fresh images, live stack, full feature workout.
 # Stdlib-only workout (scripts/qualify.py) — no host venv needed. Tears the
 # stack down afterwards either way; exit code reflects the workout.
+# The no-cache build pulls several install scripts (trivy etc.); retry it —
+# build-time DNS flakes have killed otherwise-green runs.
 qualify:
-	docker compose -f $(COMPOSE_FILE) build --no-cache
+	ok=0; for i in 1 2 3; do if docker compose -f $(COMPOSE_FILE) build --no-cache; then ok=1; break; fi; echo "build attempt $$i failed; retrying"; sleep 15; done; [ $$ok -eq 1 ]
 	docker compose -f $(COMPOSE_FILE) up -d
 	python3 scripts/qualify.py http://127.0.0.1:3137; rc=$$?; docker compose -f $(COMPOSE_FILE) down; exit $$rc
 
