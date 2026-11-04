@@ -1,6 +1,6 @@
 # h4k — current project state (read this first in a new session)
 
-> Last updated: 2026-11-03 · branch `main` on `git`
+> Last updated: 2026-11-04 · branch `main` on `git` (public, CI green)
 
 This file is a **snapshot of the live project** so a fresh session can pick up
 immediately: what's running, what's committed, how to bring it up, and what's on
@@ -18,6 +18,9 @@ the immediate horizon.
 | Linters | black · ruff · isort · flake8 · mypy · bandit all green · pylint ~9.88 |
 | Container | **`h4k`** running, host-networking, UI on `http://127.0.0.1:3137` |
 | Local LLM | Ollama reachable at `127.0.0.1:11434` (30 models); default `qwen2.5:latest` |
+| Branch protection | ruleset `main protection`: PR required + `lint-test` + `e2e` green, no force-push |
+| Dependabot | queue clear (actions bumps merged; lodash fixture ignored; debian 13 deferred) |
+| License | pure MIT — GitHub detects `MIT` (ethical-use lives in README/SECURITY/docs) |
 
 **The most common gotcha:** `docker build` does **not** leave the container
 running — you must `docker run` (or `docker compose up`). If the UI is unreachable,

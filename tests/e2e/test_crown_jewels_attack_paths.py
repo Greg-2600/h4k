@@ -8,7 +8,8 @@ from .helpers import all_of, click, fill, go_to, wait_text, wait_visible
 def _open_paths(page):
     go_to(page, "score")
     click(page, "compute-paths")
-    wait_visible(page, "crown-list")
+    # path computation hits the backend + re-renders; runners are slow
+    wait_visible(page, "crown-list", timeout=60)
 
 
 def test_seeded_crown_jewel_is_listed(page, seeded):
@@ -53,19 +54,19 @@ def test_add_crown_jewel_rejects_out_of_scope_host(page, seeded):
 
 def test_delete_crown_jewel(page, seeded):
     _open_paths(page)
-    wait_text(page, "crown-list", "Domain controller")
+    wait_text(page, "crown-list", "Domain controller", timeout=60)
     click(page, "del-crown")
     # the seeded crown jewel is gone; the list falls back to the empty state
-    wait_text(page, "crown-list", "No crown jewels declared yet")
+    wait_text(page, "crown-list", "No crown jewels declared yet", timeout=60)
 
 
 def test_attack_paths_persist_across_reload(page, seeded, api_server):
     _open_paths(page)
-    wait_visible(page, "path-item")
+    wait_visible(page, "path-item", timeout=60)
     page.get(api_server)
     go_to(page, "score")
     click(page, "compute-paths")
-    wait_visible(page, "path-item")
+    wait_visible(page, "path-item", timeout=60)
 
 
 def test_flag_paths_reach_captured_flag(page, seeded, api):
@@ -76,6 +77,6 @@ def test_flag_paths_reach_captured_flag(page, seeded, api):
     )
     assert status == 200, payload
     click(page, "compute-flag-paths")
-    wait_visible(page, "path-item")
-    wait_text(page, "paths-summary", "flag path(s)")
-    wait_text(page, "attack-paths", "CTF{e2e}")
+    wait_visible(page, "path-item", timeout=60)
+    wait_text(page, "paths-summary", "flag path(s)", timeout=60)
+    wait_text(page, "attack-paths", "CTF{e2e}", timeout=60)
