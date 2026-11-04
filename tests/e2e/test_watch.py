@@ -23,11 +23,13 @@ def test_watch_card_lists_baseline_and_change(page, api, seeded):
     eng_id = seeded["id"]
     status, first = api.post(f"/api/engagement/{eng_id}/watch/baseline", _report())
     assert status == 200, first
+    assert first["diff"]["first_baseline"] is True
     second = _report(extra_service=True)
     status, res = api.post(f"/api/engagement/{eng_id}/watch/baseline", second)
     assert status == 200, res
     assert res["notable"] is True
     page.refresh()
+    wait_text(page, "scope-summary", "10.10.10.0/24", timeout=60)
     go_to(page, "score")
     wait_text(page, "watch-list", "baseline recorded", timeout=60)
     wait_text(page, "watch-list", "new service(s)", timeout=60)
