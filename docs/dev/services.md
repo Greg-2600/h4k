@@ -62,7 +62,8 @@ One line per service: what it does, what it touches, and how to test it.
 | `attack_paths.py` | crown jewels → scored paths | reads the store | `compute_attack_paths(store, id)` |
 | `flag_paths.py` | foothold → captured-flag chains | reads the store + flag store | `compute_flag_paths(store, id)` |
 | `attck.py` | ATT&CK mapping + detection guidance | reads the store | `enrich_engagement(store, id)` |
-| `merged_report.py` | merge scan+SAST+SCA+fuzz+triage | none | pure |
+| `merged_report.py` | merge scan+SAST+SCA+fuzz+triage+watch | none | pure |
+| `watch.py` | canonicalize + diff estate snapshots | none | pure (`canonicalize`, `diff_snapshots`) |
 
 ## CTF / lab
 

@@ -249,6 +249,58 @@ def stage_fuzz() -> bool:
     )
 
 
+def stage_watch(eng_id: str, job_id: str) -> bool:
+    # baseline from the finished scan job, then re-baseline a modified copy
+    # (first service dropped) — the diff must record a closed service.
+    status, first = api(
+        "POST",
+        f"/api/engagement/{eng_id}/watch/baseline",
+        {"job_id": job_id},
+        timeout=60,
+    )
+    if not check(
+        "watch: baseline from scan job",
+        status == 200 and isinstance(first, dict),
+        f"HTTP {status}",
+    ):
+        return False
+    if not first.get("diff", {}).get("first_baseline"):
+        return check("watch: baseline from scan job", False, "not first baseline")
+    status, rep = api("GET", f"/api/report/{job_id}", timeout=60)
+    hosts = (rep.get("hosts") or []) if isinstance(rep, dict) else []
+    if not hosts or not (hosts[0].get("services") or []):
+        return check(
+            "watch: modified re-baseline diffs", False, "no services to modify"
+        )
+    import copy as _copy
+
+    mod = _copy.deepcopy(rep)
+    mod["hosts"][0]["services"] = mod["hosts"][0]["services"][1:]
+    status, second = api(
+        "POST", f"/api/engagement/{eng_id}/watch/baseline", mod, timeout=60
+    )
+    closed = (
+        (second.get("diff", {}) or {}).get("closed_services", [])
+        if isinstance(second, dict)
+        else []
+    )
+    if not check(
+        "watch: modified re-baseline diffs",
+        status == 200 and len(closed) > 0,
+        f"{len(closed)} closed",
+    ):
+        return False
+    status, changes = api(
+        "GET", f"/api/engagement/{eng_id}/watch/changes?limit=5", timeout=30
+    )
+    items = (changes.get("changes") or []) if isinstance(changes, dict) else []
+    return check(
+        "watch: change history lists both passes",
+        status == 200 and len(items) >= 2,
+        f"{len(items)} events",
+    )
+
+
 def stage_engage_flow(eng_id: str, job_id: str, host_addr: str) -> bool:
     ok = True
     status, payload = api(
@@ -303,6 +355,7 @@ def main() -> int:
     stage_sca()
     stage_fuzz()
     stage_engage_flow(eng_id, job_id, host_addr)
+    stage_watch(eng_id, job_id)
     stage_export(job_id)
     api("POST", "/api/session/scope", {"engagement_id": None}, timeout=30)
     return summary(0)

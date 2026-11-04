@@ -628,9 +628,18 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
                 {"command": r[1], "output": str(r[2])[:600]}
             )
 
+    scope = _session_scope_info()
+    watch_changes: list[dict[str, Any]] = []
+    if scope.get("engagement_id"):
+        with suppress(Exception):
+            from services.engagement import EngagementStore
+
+            watch_changes = EngagementStore().watch_changes(
+                scope["engagement_id"], limit=10
+            )
     report = {
         **meta,
-        "scope": _session_scope_info(),
+        "scope": scope,
         "generated": datetime.now(UTC).isoformat(),
         "hosts": hosts,
         "services": [
@@ -653,6 +662,7 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
         ],
         "exploit_attempts": attempts,
         "autopilot_runs": runs,
+        "watch_changes": watch_changes,
     }
 
     scope_info: Any = report["scope"]
@@ -703,6 +713,13 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
         lines += [
             f"- `{a['host']}` {a['module']} → {a['result']}" for a in attempts
         ] or ["- none"]
+        lines.append("")
+        lines.append("## Lab watch (estate changes)")
+        if watch_changes:
+            for ch in watch_changes:
+                lines.append(f"- {ch['created_at']} [{ch['source']}] {ch['summary']}")
+        else:
+            lines.append("- no changes recorded yet — run a scan or wait for auto-scan")
         lines.append("")
         lines.append(
             "> Generated for authorized lab use — verify every target was owned before citing it."

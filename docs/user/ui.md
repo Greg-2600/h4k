@@ -89,6 +89,11 @@ are how you return.
 * **Crown jewels → attack paths** — declare objectives, Compute paths (or
   Flag paths for captured flags), read score/hops/vulns.
 * **ATT&CK & detection** — findings mapped to techniques with telemetry.
+* **Lab watch** — estate change history for the active engagement. Every
+  auto-scan pass snapshots the in-scope estate and diffs it: new/vanished
+  hosts, opened/closed services, changed banners, new/cleared CVE matches.
+  Snapshot now baselines the latest finished scan; rescan (or auto-scan) to
+  see what moved. Session and merged reports include a Lab watch section.
 * **Report** — machine-generated markdown writeup, Download MD.
 
 ---

@@ -264,6 +264,22 @@ def _run_one_pass(cidr: str, engagement_id: str | None) -> dict[str, Any]:
         except Exception as exc:
             logger.debug("auto-scan: ingest failed: %s", exc)
 
+    # 6. lab watch: snapshot the in-scope estate and diff it. Notable
+    # changes are logged; the full history lives on the engagement.
+    if engagement_id:
+        try:
+            from services.engagement import EngagementStore as _Store
+
+            _wstore = _Store()
+            if _wstore.get_engagement(engagement_id):
+                _wres = _wstore.record_watch_snapshot(
+                    engagement_id, report, source="auto"
+                )
+                if _wres.get("notable"):
+                    logger.info("[auto-scan] estate changed: %s", _wres.get("summary"))
+        except Exception as exc:
+            logger.debug("auto-scan: watch snapshot failed: %s", exc)
+
     return {
         "hosts": len(all_hosts),
         "services": sum(len(h.get("services") or []) for h in all_hosts),

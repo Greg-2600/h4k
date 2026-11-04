@@ -335,6 +335,13 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Lab watch</h2><span class="spacer"></span><span class="muted" id="watch-status" data-testid="watch-status">no snapshots yet</span><button class="btn" id="btn-watch-baseline" data-testid="watch-baseline" title="Snapshot the current estate from the latest finished scan">Snapshot now</button> <button class="btn" id="btn-watch-refresh" data-testid="watch-refresh" title="Reload changes">↻</button></div>
+          <div class="card-body">
+            <div id="watch-list" data-testid="watch-list"></div>
+            <div class="empty" id="watch-empty" data-testid="watch-empty">No estate changes recorded yet. Snapshot a baseline, then rescan.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>ATT&amp;CK &amp; detection</h2><span class="spacer"></span><button class="btn" id="btn-attck" data-testid="load-attck">Load</button></div>
           <div class="card-body"><div id="attck-body" data-testid="attck-body" class="muted">Press Load to map findings to techniques.</div></div>
         </div>
