@@ -13,7 +13,7 @@ logger = logging.getLogger("h4k.cve")
 DATA_FILE = Path(__file__).resolve().parent.parent.parent / "data" / "cves.json"
 
 # Remote source for optional online refresh (fallback if unreachable -> offline).
-REFRESH_URL = "https://raw.githubusercontent.com/Greg-2600/h4k/main/data/cves.json"
+REFRESH_URL = "https://raw.githubusercontent.com/Greg-2600/h4k/main/h4k/data/cves.json"
 
 
 class CveDb:

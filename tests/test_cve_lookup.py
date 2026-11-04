@@ -132,3 +132,14 @@ def test_db_covers_zoneminder_second_order_sqli(db):
     ids = {c["id"] for c in db.cves}
     assert "CVE-2026-27470" in ids
     assert any(c["id"] == "CVE-2026-27470" for c in db.match_refs(["CVE-2026-27470"]))
+
+
+def test_refresh_url_points_at_real_path():
+    """Regression: REFRESH_URL once pointed at /main/data/cves.json (404).
+
+    The dataset lives at h4k/data/cves.json in the repo, so the raw URL
+    must contain that path or every refresh silently fails."""
+    from services.cve_lookup import REFRESH_URL
+
+    assert REFRESH_URL.endswith("/h4k/data/cves.json"), REFRESH_URL
+    assert "/main/h4k/data/cves.json" in REFRESH_URL
