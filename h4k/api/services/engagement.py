@@ -174,6 +174,16 @@ class EngagementStore:
     def _init_db(self) -> None:
         with self._lock, self._connect() as conn:
             conn.executescript(SCHEMA)
+            # Lab Watch preferences (phase 2): added after the base schema.
+            # ALTER is idempotent-guarded so old databases migrate on open.
+            with suppress(Exception):
+                conn.execute(
+                    "ALTER TABLE engagements ADD COLUMN watch_mode TEXT NOT NULL DEFAULT 'notable'"
+                )
+            with suppress(Exception):
+                conn.execute(
+                    "ALTER TABLE engagements ADD COLUMN watch_retain INTEGER NOT NULL DEFAULT 30"
+                )
         with suppress(OSError):  # non-POSIX / read-only fs
             self.path.chmod(0o600)  # holds verified credentials
 
@@ -809,7 +819,7 @@ class EngagementStore:
         engagement_id: str,
         report: dict[str, Any] | None,
         source: str = "auto",
-        retain: int = 30,
+        retain: int | None = None,
     ) -> dict[str, Any]:
         """Snapshot the in-scope estate and diff it against the previous one.
 
@@ -859,6 +869,11 @@ class EngagementStore:
                 int(diff.get("change_count", 0)),
             ),
         )
+        if retain is None:
+            try:
+                retain = self.get_watch_config(engagement_id)["retain"]
+            except ValueError:
+                retain = 30
         self._write(
             "DELETE FROM watch_snapshots WHERE id IN (SELECT id FROM watch_snapshots"
             " WHERE engagement_id=? ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?)",
@@ -933,7 +948,108 @@ class EngagementStore:
             "last_pass_at": last[0]["created_at"] if last else None,
             "last_source": last[0]["source"] if last else None,
             "last_change": last_change,
+            "config": self.get_watch_config(engagement_id),
         }
+
+    WATCH_MODES = ("all", "notable", "off")
+    DEFAULT_WATCH_RETAIN = 30
+
+    def get_watch_config(self, engagement_id: str) -> dict[str, Any]:
+        rows = self._query(
+            "SELECT watch_mode, watch_retain FROM engagements WHERE id=?",
+            (engagement_id,),
+        )
+        if not rows:
+            raise ValueError("unknown engagement")
+        mode = rows[0]["watch_mode"] or "notable"
+        retain = rows[0]["watch_retain"] or self.DEFAULT_WATCH_RETAIN
+        if mode not in self.WATCH_MODES:
+            mode = "notable"
+        try:
+            retain = max(1, min(365, int(retain)))
+        except (TypeError, ValueError):
+            retain = self.DEFAULT_WATCH_RETAIN
+        return {"mode": mode, "retain": retain}
+
+    def set_watch_config(
+        self, engagement_id: str, mode: str | None = None, retain: int | None = None
+    ) -> dict[str, Any]:
+        if not self.get_engagement(engagement_id):
+            raise ValueError("unknown engagement")
+        cfg = self.get_watch_config(engagement_id)
+        if mode is not None:
+            if mode not in self.WATCH_MODES:
+                raise ValueError(f"mode must be one of {list(self.WATCH_MODES)}")
+            cfg["mode"] = mode
+        if retain is not None:
+            try:
+                cfg["retain"] = max(1, min(365, int(retain)))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "retain must be an integer number of snapshots"
+                ) from exc
+        self._write(
+            "UPDATE engagements SET watch_mode=?, watch_retain=? WHERE id=?",
+            (cfg["mode"], cfg["retain"], engagement_id),
+        )
+        self.prune_watch_snapshots(engagement_id, cfg["retain"])
+        return cfg
+
+    def prune_watch_snapshots(self, engagement_id: str, retain: int) -> int:
+        before = self._scalar(
+            "SELECT COUNT(*) FROM watch_snapshots WHERE engagement_id=?",
+            (engagement_id,),
+        )
+        self._write(
+            "DELETE FROM watch_snapshots WHERE id IN (SELECT id FROM watch_snapshots"
+            " WHERE engagement_id=? ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?)",
+            (engagement_id, retain),
+        )
+        after = self._scalar(
+            "SELECT COUNT(*) FROM watch_snapshots WHERE engagement_id=?",
+            (engagement_id,),
+        )
+        return int(before or 0) - int(after or 0)
+
+    def watch_trends(self, engagement_id: str, limit: int = 100) -> dict[str, Any]:
+        """First-seen / last-seen timelines per host and service.
+
+        Walks stored snapshots oldest-first; a host/service counts as present
+        from its first snapshot appearance to its latest. Current presence
+        comes from the newest snapshot.
+        """
+        from services import watch as watch_mod
+
+        rows = self._query(
+            "SELECT created_at, snapshot_json FROM watch_snapshots WHERE engagement_id=?"
+            " ORDER BY created_at ASC, rowid ASC LIMIT ?",
+            (engagement_id, limit),
+        )
+        hosts: dict[str, Any] = {}
+        latest: set = set()
+        for row in rows:
+            snap = watch_mod._restore_snapshot(json.loads(row["snapshot_json"] or "{}"))
+            at = row["created_at"]
+            latest = set(snap.get("hosts", {}))
+            for addr, host in snap.get("hosts", {}).items():
+                h = hosts.setdefault(
+                    addr, {"first_seen": at, "last_seen": at, "services": {}}
+                )
+                h["last_seen"] = at
+                for (port, proto), svc in (host.get("services") or {}).items():
+                    key = f"{port}/{proto}"
+                    s = h["services"].setdefault(
+                        key,
+                        {
+                            "first_seen": at,
+                            "last_seen": at,
+                            "service": svc.get("service"),
+                        },
+                    )
+                    s["last_seen"] = at
+        for addr, host in hosts.items():
+            host["present"] = addr in latest
+        return {"hosts": hosts, "snapshots_considered": len(rows)}
 
 
 def _normalize_scope(scope: list[str] | None) -> list[Any]:

@@ -301,6 +301,26 @@ def stage_watch(eng_id: str, job_id: str) -> bool:
     )
 
 
+def stage_watch_verify(eng_id: str) -> bool:
+    # verify-fix: snapshot the freshest finished scan and diff it; trends
+    # must show first-seen/last-seen timelines for the estate.
+    status, res = api("POST", f"/api/engagement/{eng_id}/watch/verify", {}, timeout=60)
+    if not check(
+        "watch: verify snapshots freshest scan", status == 200, f"HTTP {status}"
+    ):
+        return False
+    status, trends = api(
+        "GET", f"/api/engagement/{eng_id}/watch/trends?limit=100", timeout=60
+    )
+    hosts = (trends.get("hosts") or {}) if isinstance(trends, dict) else {}
+    ok = (
+        status == 200
+        and len(hosts) > 0
+        and all("first_seen" in h and "last_seen" in h for h in hosts.values())
+    )
+    return check("watch: trends show first/last seen", ok, f"{len(hosts)} hosts")
+
+
 def stage_engage_flow(eng_id: str, job_id: str, host_addr: str) -> bool:
     ok = True
     status, payload = api(
@@ -356,6 +376,7 @@ def main() -> int:
     stage_fuzz()
     stage_engage_flow(eng_id, job_id, host_addr)
     stage_watch(eng_id, job_id)
+    stage_watch_verify(eng_id)
     stage_export(job_id)
     api("POST", "/api/session/scope", {"engagement_id": None}, timeout=30)
     return summary(0)
