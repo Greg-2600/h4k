@@ -1,11 +1,11 @@
 <div align="center">
 
-# ⚡ h4k — Intrusion Suite
+# ⚡ h4k - Intrusion Suite
 
 **A containerized security analysis platform for authorized lab testing.**
 
 Recon your own lab, fuzz the software you run, and ship a responsible-disclosure
-report — all from one container.
+report - all from one container.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/Greg-2600/h4k/actions/workflows/ci.yml/badge.svg)](https://github.com/Greg-2600/h4k/actions)
@@ -20,10 +20,10 @@ report — all from one container.
 
 **h4k** is a self-contained, **Dockerized offensive-security analysis platform**
 built for a school capstone. It drives the **Metasploit Framework** over its RPC
-interface and layers a modern analysis stack on top — so you can go from *"what's
+interface and layers a modern analysis stack on top - so you can go from *"what's
 on this host?"* to *"here's a fuzzed crash, a root-cause, and a patch direction."*
 
-It's built for **authorized lab work only** — your own VMs, a test router, a
+It's built for **authorized lab work only** - your own VMs, a test router, a
 Metasploitable box. Every aggressive action is **off by default and opt-in**.
 
 ### What it can do
@@ -31,10 +31,10 @@ Metasploitable box. Every aggressive action is **off by default and opt-in**.
 | Area | Capabilities |
 |------|--------------|
 | **Host recon & scan** | 3 OPSEC modes (stealth / Tor / overt), fingerprinting, PTR, DNS, ARP neighbors, posture heuristic |
-| **Passive auto-scan** | on boot, h4k starts building a network and service map of the local subnet automatically — recon only, no creds, no exploits; the map is live at `/api/map` and in the console |
+| **Passive auto-scan** | on boot, h4k starts building a network and service map of the local subnet automatically - recon only, no creds, no exploits; the map is live at `/api/map` and in the console |
 | **Vuln analysis** | curated CVE archive, EOL/version leads, default-cred archive, ranked recommendations |
 | **Engagements** | persistent scope-enforced asset graph; replays *verified* credentials across the in-scope estate to find where they also work (lateral movement), with a dry-run plan first |
-| **Attack paths** | declare **crown jewels** (the objectives that matter) and get scored, evidence-backed paths to them — a 2.0 leak that pivots into the DC outranks a 9.8 on an isolated box |
+| **Attack paths** | declare **crown jewels** (the objectives that matter) and get scored, evidence-backed paths to them - a 2.0 leak that pivots into the DC outranks a 9.8 on an isolated box |
 | **ATT&CK & detection** | every finding mapped to a MITRE ATT&CK technique, each with defender telemetry (log sources, event IDs) |
 | **Source analysis (SAST)** | upload `.zip/.tar/.tar.gz` or clone a git URL → Semgrep + heuristics |
 | **Supply-chain (SCA)** | SBOM (CycloneDX) + osv-scanner → known CVEs + secrets/license scan |
@@ -52,7 +52,7 @@ Metasploitable box. Every aggressive action is **off by default and opt-in**.
 cd h4k
 docker build -t h4k .
 
-# AI triage (optional, keyless): start the opencode relay on the host first —
+# AI triage (optional, keyless): start the opencode relay on the host first -
 #   OPENCODE_MODEL=opencode/beam-free python3 h4k/scripts/opencode_relay.py
 
 docker run -d --name h4k --network host -p 3137:3137 \
@@ -94,17 +94,17 @@ The UI is a kill-chain console: **Discover → Recon → Exploit → Pivot →
 Persist → Score**. The Workflow strip on Discover tracks scope → scan →
 fingerprint → win; the next-action strip floats the single best move.
 
-1. **Set the scope** — pick your engagement in the header scope selector
+1. **Set the scope** - pick your engagement in the header scope selector
    (authorizes the aggressive actions; persists across restarts).
-2. **Discover** — **Discover** tab → target + **Scan**. Results flow into
+2. **Discover** - **Discover** tab → target + **Scan**. Results flow into
    **Recon**: **Fingerprint services**, then review **Likely vulnerable**.
-3. **Judge it** — the **⚠ Likely Vulnerable** card flags known CVEs;
+3. **Judge it** - the **⚠ Likely Vulnerable** card flags known CVEs;
    password-attack targets list under **Exploit**.
-4. **Act deliberately** — **Attack queue** entries each carry a fire button;
+4. **Act deliberately** - **Attack queue** entries each carry a fire button;
    every action is logged verbatim in the Activity pane and in `docker logs`.
-5. **Pwned?** — sessions are captured automatically (💀 on the graph, quick
+5. **Pwned?** - sessions are captured automatically (💀 on the graph, quick
    actions + free-form shell console attached to the finding).
-6. **Report** — **Score** tab → **Report** card → **Download MD**: scope,
+6. **Report** - **Score** tab → **Report** card → **Download MD**: scope,
    hosts, findings, verified creds, sessions, and every attempted action.
 
 Prefer one button? **Exploit** tab → **Autopilot** card → **Start full attack**:
@@ -113,7 +113,7 @@ with a live named-action log. Requires the scope. The **Fuzz lab** card points
 at your own lab target (vulnlab container included) for the crash → minimize
 → triage loop.
 
-7. **Fuzz a lab target you own** — start the `vulnlab` container and point the
+7. **Fuzz a lab target you own** - start the `vulnlab` container and point the
    **lab fuzz** at `127.0.0.1:8080`.
 
 > **Every aggressive toggle (creds, exploits, deep toolkit, fuzz) requires an
@@ -133,7 +133,7 @@ at your own lab target (vulnlab container included) for the crash → minimize
 6. Re-fuzz to verify             → confirm the fix removed the crash
 ```
 
-This mirrors the process real security teams use — and it's the whole point of
+This mirrors the process real security teams use - and it's the whole point of
 the project.
 
 ---
@@ -186,18 +186,18 @@ Watch a live scan run end-to-end:
 
 ## Documentation
 
-- **[docs/](docs/index.md)** — the full documentation set: quickstart, concepts,
+- **[docs/](docs/index.md)** - the full documentation set: quickstart, concepts,
   workflows, UI guide, safety, troubleshooting, architecture, API reference,
-  testing guide, threat model, scope spec, secrets handling, examples —
+  testing guide, threat model, scope spec, secrets handling, examples -
   including a [real engagement write-up](docs/examples/finding-pi-hole-192-168-1-26.md)
   (unauthenticated Transmission RPC → arbitrary file write).
-- **[README (this file)](README.md)** — you are here.
-- **[RELEASE_NOTES.md](RELEASE_NOTES.md)** — feature inventory + design decisions.
-- **[ROADMAP.md](ROADMAP.md)** — future work, prioritized.
-- **[AGENTS.md](AGENTS.md)** — technical context for AI agents working on the
+- **[README (this file)](README.md)** - you are here.
+- **[RELEASE_NOTES.md](RELEASE_NOTES.md)** - feature inventory + design decisions.
+- **[ROADMAP.md](ROADMAP.md)** - future work, prioritized.
+- **[AGENTS.md](AGENTS.md)** - technical context for AI agents working on the
   repo (services map, gotchas, dev loop).
-- **[h4k/README.md](h4k/README.md)** — the in-repo PHRACK-style ezine.
-- **[vulnlab/README.md](vulnlab/README.md)** — the fuzzing-lab target.
+- **[h4k/README.md](h4k/README.md)** - the in-repo PHRACK-style ezine.
+- **[vulnlab/README.md](vulnlab/README.md)** - the fuzzing-lab target.
 
 ---
 
@@ -238,13 +238,13 @@ make coverage # pytest --cov (90% gate)
 ```
 
 All linters pass and the suite is green. Tests run offline (a mocked Metasploit
-backend powers the API tests — no live daemon needed).
+backend powers the API tests - no live daemon needed).
 
 The **Selenium suite** drives a real browser against a real API started in
 **sandbox mode** (`H4K_SANDBOX=1`): nmap, hydra and Metasploit are replaced by
 deterministic stand-ins, so it never touches the network and always sees the
 same lab estate. It also fails a test if the browser logs an uncaught
-JavaScript error — which is how the Report page's missing
+JavaScript error - which is how the Report page's missing
 `renderReportPreview()` was found.
 
 ```sh
@@ -257,7 +257,7 @@ make e2e
 
 ## License
 
-[MIT](LICENSE) — with an **ethical-use notice**. Use it only for authorized
+[MIT](LICENSE) - with an **ethical-use notice**. Use it only for authorized
 security education and testing.
 
 ## Acknowledgements
