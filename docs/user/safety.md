@@ -41,7 +41,7 @@ most jurisdictions (e.g. CFAA in the US, Computer Misuse Act in the UK,
      -H 'Content-Type: application/json' \
      -d '{"name":"acme red","scope":["10.0.0.0/24"],"notes":"signed SOW-2026-14"}'
    ```
-3. **Set the active scope** (header 🔒 picker or
+3. **Set the active scope** (the header scope picker or
    `POST /api/session/scope`). With no scope, aggressive actions are refused.
 4. **Know the blast radius of the action you are about to click.** Password
    attacks lock accounts; exploit attempts crash services; propagation tries

@@ -1396,7 +1396,8 @@ def neighbors_fingerprint(
     """Run an nmap service/version/OS fingerprint scan across all discovered
     neighbor hosts.
 
-    Runs: nmap -sV -sC -O --top-ports 100 -vvv -Pn
+    Runs: nmap -sS -sV -O -T4 -Pn -p <common ports> --max-retries 1
+    --host-timeout 30s -oX - (service + OS detection).
     Results are stored in the neighbors.db and merged into the graph endpoint.
     Accepts {"ip": "x.x.x.x"} to fingerprint a single host.
     """
@@ -1457,6 +1458,7 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
                 "nmap",
                 "-sS",
                 "-sV",
+                "-O",
                 "-T4",
                 "-Pn",
                 "-p",
@@ -1545,7 +1547,7 @@ def _parse_nmap_xml(xml_output: str) -> list[dict[str, Any]]:
         mac_match = re.search(r'<address addr="([0-9a-f:]+)" addrtype="mac"', block)
         vendor_match = re.search(r'<vendor name="([^"]+)"', block)
         hostname_match = re.search(r'<hostname name="([^"]+)"', block)
-        os_match = re.search(r'<osclass type="([^"]+)" osfamily="([^"]+)"', block)
+        os_match = re.search(r'<osclass[^>]*osfamily="([^"]+)"', block)
 
         if not ip_match:
             continue
@@ -1575,7 +1577,7 @@ def _parse_nmap_xml(xml_output: str) -> list[dict[str, Any]]:
                 "mac": mac_match.group(1) if mac_match else None,
                 "vendor": vendor_match.group(1) if vendor_match else None,
                 "hostname": hostname_match.group(1) if hostname_match else None,
-                "os": (os_match.group(2) or "").strip() if os_match else None,
+                "os": (os_match.group(1) or "").strip() if os_match else None,
                 "services": services,
             }
         )
@@ -3744,6 +3746,8 @@ def _run_autopilot(
         argv = [
             "nmap",
             "-sS",
+            "-sV",
+            "-O",
             "-T4",
             "-Pn",
             "-p",

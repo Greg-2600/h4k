@@ -6,14 +6,15 @@ How h4k is put together, and why.
 ┌──────────────────────────────────────────────────────────────────────┐
 │ browser                                                               │
 │  web/index.html + app.js + style.css                                  │
-│  4 pages: Assets · Walk · Fuzz · Report                              │
+│  6 phases: Discover · Recon · Exploit · Pivot · Persist · Score      │
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ HTTP/JSON :3137
 ┌───────────────────────────────▼──────────────────────────────────────┐
 │ FastAPI (h4k/api)                                                    │
 │  main.py        app, lifespan, rate limiting, static mount            │
 │  routers/       scan · source · update · net · engagement            │
-│  services/      ~30 modules (pipeline, cve, creds, attack, fuzzer…)   │
+│  services/      ~65 modules: pipeline, recon, exploit,               │
+│                 SCA, fuzzing, AI, Fire TV, container-fuzz …          │
 └───────┬───────────────────────────────┬───────────────────────────────┘
         │ RPC                          │ subprocess
 ┌───────▼────────┐          ┌───────────▼────────────────────────────┐
@@ -36,7 +37,7 @@ logic lives here.
 | `source.py` | SAST, SCA, SBOM, fuzzing, triage, AI, rules, reports |
 | `engagement.py` | Engagements, scope, assets, credentials, crown jewels, attack paths, ATT&CK |
 | `update.py` | Tool/CVE/rule refresh status |
-| `net.py` | ARP neighbors, exposure posture, traceroute, TLS lab |
+| `net.py` | interfaces, sniff/ARP/MITM/WiFi, TLS lab, auto-scan map |
 
 ### Services (`h4k/api/services/`)
 
@@ -86,7 +87,7 @@ POST /api/scan
   → job registered (JOBS)
   → pipeline thread:
        discovery (ARP/MSF)  → neighbours
-       fingerprint (nmap -sV) → services, banners
+       fingerprint (nmap -sS -sV -O) → services, banners, OS guess
        CVE match (cve_lookup)  → findings
        [opt-in] default creds (creds.py + msf/tk)
        [opt-in] exploits (attack.py)
@@ -112,7 +113,10 @@ POST /api/scan
 
 * FastAPI endpoints are sync or async; long work runs in a **thread**
   (`threading.Thread(..., daemon=True)`) and is tracked in a job registry
-  (`JOBS`, `_attack_jobs`, `_toolkit_jobs`, `_fuzz_jobs`).
+  (`JOBS`, `_attack_jobs`, `_toolkit_jobs`, `_fuzz_jobs`, plus
+  `_neighbor_jobs`, `_fingerprint_jobs`, `_passattack_jobs`,
+  `_cfuzz_jobs`). `GET /api/jobs` merges every family; every runner flips
+  `queued` → `running` up front so the monitor never sticks on queued.
 * Job state is plain dicts mutated under the GIL; SQLite writes are
   serialized by a lock inside `EngagementStore`.
 * The rate limiter is an in-memory per-IP sliding window (600 req/min).

@@ -1,6 +1,6 @@
 # h4k — current project state (read this first in a new session)
 
-> Last updated: 2026-09-30 · branch `main` on `git`
+> Last updated: 2026-11-03 · branch `main` on `git`
 
 This file is a **snapshot of the live project** so a fresh session can pick up
 immediately: what's running, what's committed, how to bring it up, and what's on
@@ -13,7 +13,7 @@ the immediate horizon.
 | Item | Status |
 |---|---|
 | Git branch | `main` |
-| Tests | **1328 passing** (offline, mocked Metasploit) |
+| Tests | **1339 passing** (offline, mocked Metasploit) + 28 e2e + live-target flow |
 | Coverage | **~90%** (CI gate 90%) |
 | Linters | black · ruff · isort · flake8 · mypy · bandit all green · pylint ~9.88 |
 | Container | **`h4k`** running, host-networking, UI on `http://127.0.0.1:3137` |
@@ -97,42 +97,19 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3137/   # 200
 
 ---
 
-## 3b · Live CTF engagement — 192.168.1.13 (`lab-host`)
+## 3b · Live targets (kept out of the repo)
 
-Status: **root code-execution achieved on the target's CAD worker container**
-(`/render/cadquery` `exec()`s caller-supplied Python). The flag file
-(`/shared-work/user/flag.txt`, ext4 `/dev/sda2`) is **empty**, and no flag is
-present on either reachable image; the orchestrator DB/flag host is a separate
-container not exposed on the target's network. Findings so far:
-
-| # | Finding | Evidence |
-|---|---------|----------|
-| F1 | **Unauthenticated RCE** — `POST :18799/render/cadquery` `exec(compile(source))` runs as root in container `worker0abcd` | `id` → `uid=0(root)`; `output.txt` shows a prior session did the same |
-| F2 | **Unauthenticated arbitrary config write** — `PUT :4546/system/config/{key}` with no auth; flipped `ZHC3_MIN_DESIRABILITY_SCORE` source `registry`→`db`, `set_by=h4k` | value unchanged (0.6) to avoid side effects |
-| F3 | Full-depth sweep (`-p-`) found 1716, 4546, 11435, 18799; a top-200 sweep found only 22 | drives the new `depth` axis (D23) |
-| F4 | CAD worker is root with `CAP_DAC_OVERRIDE`+`CAP_MKNOD` but the device cgroup blocks reading `/dev/sda2` (`/tmp/sda2` → EPERM) | `dd` denied; no docker/containerd socket |
-
-Services on `.13`: 22 ssh · 1716 tcpwrapped · 4546 zhc3 orchestrator +
-dashboard · 11435 Ollama 0.31.1 (`mistral:latest`) · 18799 CAD worker.
-Exploit helper: `/tmp/opencode/cadrce.py` (base64-exfil wrapper around F1).
-
-> The flag lives on the orchestrator/DB host, which is not on the worker's
-> Docker network — that host is the next pivot target, not reachable from
-> `.13` alone. Do not record this as "unsolved" — the RCE objective is met.
-
----
+Live-engagement notes (target IPs, findings, exploit helpers) are session
+scratch and live outside version control — see `safety.md` and `secrets.md`
+for why scan data never belongs in git. Design lessons from live work land
+in `RELEASE_NOTES.md` (e.g. D23) and `ROADMAP.md`, never raw findings.
 
 ## 4 · Container hygiene (this host)
 
-Only **`h4k`** belongs to this project. The rest of the running containers
-(`2b-*`, `oobir_*`, `zhc3-*`, `svc-main`, `ollama`, etc.) are **other
-projects** — leave them alone unless you're explicitly asked.
-
-There are also several **stale, exited containers** with auto-generated names
-(`stale-container-a`, `stale-container-b`, `stale-container-c`, etc.). Most are
-intermediate images from earlier builds and are **not** this repo's. Do not bulk
-`docker system prune` here — it could remove another project's named containers.
-Clean up an h4k container only by exact name.
+Only containers belonging to this project (names starting with `h4k_`)
+may be touched. Other containers on the host are other projects — leave them
+alone. Do not bulk `docker system prune` on a shared host; clean up an h4k
+container only by exact name (`docker rm h4k_h4k`).
 
 ---
 
@@ -143,7 +120,7 @@ source .venv/bin/activate        # or .venv/bin/<tool>
 make fmt      # black + isort
 make fix      # ruff --fix
 make lint     # black ruff isort flake8 mypy pylint bandit
-make test     # pytest   (1328)
+make test     # pytest   (1339)
 make coverage # pytest --cov
 ```
 

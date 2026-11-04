@@ -16,10 +16,12 @@ and what to do with them.
 | `docker logs h4k` | Action log; may include banners and findings | Anyone with log access can read it |
 | AI requests | If AI triage is enabled, findings may be sent to a model endpoint | Depends on your provider |
 
-## What is *not* protected
+## What is *not* protected by default
 
-* **There is no authentication on the API.** Anyone who can reach the port
-  can read the credential store. Bind to `127.0.0.1` and do not expose it.
+* **Authentication is opt-in.** Set `H4K_API_KEY` and every request must
+  carry `X-API-Key: <key>` (health/docs stay open). Without it, anyone who
+  can reach the port can read the credential store — bind to `127.0.0.1`
+  and do not expose it.
 * **Exports are not redacted.** A markdown report contains the passwords you
   found. Redact before sharing.
 * **`attempts` records failed logins too** — usernames are secrets as well.

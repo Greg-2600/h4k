@@ -47,7 +47,13 @@ def test_firetv_card_recon_and_state(page):
 
 def test_container_surfaces_card_detects(page):
     go_to(page, "exploit")
-    for testid in ("cf-surface", "cf-target", "cf-iters", "btn-cf-detect", "btn-cf-start"):
+    for testid in (
+        "cf-surface",
+        "cf-target",
+        "cf-iters",
+        "btn-cf-detect",
+        "btn-cf-start",
+    ):
         assert find(page, testid).is_displayed(), testid
     fill(page, "cf-target", "127.0.0.1")
     click(page, "btn-cf-detect")
@@ -56,7 +62,13 @@ def test_container_surfaces_card_detects(page):
 
 def test_discover_stepper_and_next_go(page):
     go_to(page, "discover")
-    for testid in ("workflow-steps", "step-scope", "step-scan", "step-fingerprint", "step-win"):
+    for testid in (
+        "workflow-steps",
+        "step-scope",
+        "step-scan",
+        "step-fingerprint",
+        "step-win",
+    ):
         assert find(page, testid).is_displayed(), testid
     # no scope in a fresh session: step 1 shows its number, not a check
     assert "1" in find(page, "step-scope").text

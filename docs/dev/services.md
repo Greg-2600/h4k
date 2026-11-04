@@ -14,12 +14,14 @@ One line per service: what it does, what it touches, and how to test it.
 | `scan_pipeline.py` | orchestrates recon → fingerprint → scan → creds → attack | shells out, writes `neighbors.db` | monkeypatch `subprocess.run` (`no_subprocess` fixture) |
 | `modes.py` | stealth / tor / overt parameters | none | pure functions |
 | `discovery.py` | ARP / IPv6 / SNMP neighbours | shells out (`arp-scan`, `ping6`, `snmpwalk`) | `NeighborFinder.discover`; sandbox mode returns a fixed estate |
-| `fingerprint.py` | service/version detection | shells out (`nmap -sV`) | stub the runner |
+| fingerprint (`routers/scan.py` + `toolkit.py` nmap) | service/version/OS detection (`-sS -sV -O`) | shells out (`nmap`) | stub `ToolkitRunner.run_tool`; results merged into `neighbors.db` |
 | `cve_lookup.py` | banner-aware CVE matching | refreshes `cves.json` (network) | set `H4K_REFRESH_CVE=0`; `CveDb.refresh()` is monkeypatched in tests |
 | `creds.py` | default-credential matching | none | pure |
 | `vulnleads.py` | EOL / old-version heuristics | none | pure |
 | `security.py` | traceroute + exposure posture | shells out (`traceroute`) | stub the subprocess |
 | `version_detector.py` | version parsing/normalization | none | pure |
+| `next_move.py` | ranked next-action recommendation | reads the store | pure over store data |
+| `capabilities.py` | tool/MSF/storage readiness report | version probes | `tool_report()` with stubbed `shutil.which` |
 
 ## Attack surface
 
@@ -58,6 +60,7 @@ One line per service: what it does, what it touches, and how to test it.
 |---|---|---|---|
 | `report.py` | scoring + recommendations + report model | none | pure |
 | `attack_paths.py` | crown jewels → scored paths | reads the store | `compute_attack_paths(store, id)` |
+| `flag_paths.py` | foothold → captured-flag chains | reads the store + flag store | `compute_flag_paths(store, id)` |
 | `attck.py` | ATT&CK mapping + detection guidance | reads the store | `enrich_engagement(store, id)` |
 | `merged_report.py` | merge scan+SAST+SCA+fuzz+triage | none | pure |
 
@@ -73,6 +76,16 @@ One line per service: what it does, what it touches, and how to test it.
 | `lateral.py` | route map, SSH/SOCKS + chisel tunnels, SMB sessions |
 | `db_interrogate.py` | enumerate local APIs/DBs for flag-shaped secrets |
 | `tls_lab.py` | local CA + loopback HTTPS proxy for the fuzzer |
+| `firetv.py` | Fire TV / Android TV via adb (recon, pair, shell, apps, pull…) |
+| `container_fuzz.py` | Docker/kubelet/gRPC/HTTP surface fuzzing (job-based) |
+| `ad_tools.py` | BloodHound / mitm6 / Responder wrappers |
+| `nuclei.py` / `sqlmap.py` / `ollama.py` | template scans / SQLi testing / Ollama exploit checks |
+| `privesc.py` | local-root awareness (docker-group, userns, SUID/caps audit) |
+| `flags.py` | flag-shaped secret ledger + detection |
+| `auth.py` | opt-in API-key authentication |
+| `auto_scan.py` | passive boot-time subnet map |
+| `passive_sniff.py` / `sniffer.py` | packet capture + flow/credential analysis |
+| `sbom.py` / `source_fetcher.py` / `vuln_analyzer.py` | SBOM map / repo fetching / finding normalization |
 
 ## Infrastructure
 

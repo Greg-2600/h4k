@@ -35,3 +35,6 @@ h4k/data/*.run
 # editor / OS noise
 *.swp
 .DS_Store
+
+# live session scratch (never commit)
+ENGAGEMENT_LOG.md

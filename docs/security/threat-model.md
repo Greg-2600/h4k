@@ -49,7 +49,7 @@ data that h4k parses.
 | T1 | **Scope bypass** — a mistyped target widens the engagement | Scope is enforced in `EngagementStore`, on every write path; out-of-scope hosts are skipped *and reported* |
 | T2 | **Accidental attack on a third party** | Aggressive actions require an active scope; the UI shows the scope in the header; every action is logged |
 | T3 | **Credential exposure** | DB file mode `0600`; data dir outside the repo; excluded from git; reports redact nothing, so **treat exports as secrets** |
-| T4 | **Host compromise via h4k itself** | The API is a local tool; bind to `127.0.0.1`; do not expose it to a network. There is **no authentication** — that is the main caveat (see below) |
+| T4 | **Host compromise via h4k itself** | The API is a local tool; bind to `127.0.0.1`; do not expose it to a network. Authentication is **opt-in** (`H4K_API_KEY`) — without it, anyone who can reach the port can use it (see below) |
 | T5 | **Malicious scan data** (banner injection, crafted XML) | Parsers are regex-based and defensive; untrusted strings are escaped in the UI (`escHtml`); the API never `eval`s scan output |
 | T6 | **Subprocess injection** | Every external call uses an argv list, never `shell=True`; bandit enforces it |
 | T7 | **Zip-slip in uploads** | `ingest.py` validates extracted paths |
@@ -59,8 +59,9 @@ data that h4k parses.
 
 ## 5. Accepted risks (deliberate)
 
-* **No authentication on the API.** h4k binds to localhost and assumes a
-  single trusted operator. Do not expose it.
+* **Authentication is opt-in, not on by default.** h4k binds to localhost
+  and assumes a single trusted operator. Set `H4K_API_KEY` if the port is
+  reachable by anyone else. Do not expose it.
 * **Plaintext credentials in the store.** Required to replay what was found.
   The DB is `0600`; the volume is the sensitive part.
 * **Running as root.** Raw sockets and ARP need it. Use a dedicated lab host

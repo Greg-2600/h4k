@@ -129,6 +129,19 @@ root-cause & patching, and responsible-disclosure scaffolding.
   start building a network and service map looking for vulnerabilities right
   off the bat, passively."
 
+**Job monitor honesty + Recon that actually renders**
+- Every background runner flips `queued` → `running` up front (guarded so a
+  pre-start abort is never clobbered). Previously the monitor read "queued"
+  for entire multi-minute runs while progress advanced underneath.
+- `GET /api/neighbors` now merges fingerprinted services from `neighbors.db`,
+  so the Recon Services table fills after a fingerprint — previously it could
+  never render, because the UI read `res.hosts` while the API sends
+  `res.neighbors`. `GET /api/jobs` and `GET /api/jobs/{id}` now cover every
+  job family (scan, attack, deepattack, fuzz, container-fuzz, neighbors,
+  fingerprint, passattack).
+- Fingerprint nmap runs `-sV -O`; the `<osclass>` parser no longer requires
+  adjacency, so real-world OS guesses land in `os_guess`.
+
 **Documentation** (`docs/`)
 - New full documentation set: quickstart, concepts, workflows, UI guide,
   safety, troubleshooting, architecture, API reference, service reference, data

@@ -8,7 +8,8 @@ Recon your own lab, fuzz the software you run, and ship a responsible-disclosure
 report — all from one container.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![tests: 1101](https://img.shields.io/badge/tests-1101_passing-90%25_coverage-brightgreen)
+[![CI](https://github.com/Greg-2600/h4k/actions/workflows/ci.yml/badge.svg)](https://github.com/Greg-2600/h4k/actions)
+![tests: 1339](https://img.shields.io/badge/tests-1339_passing-90%25_coverage-brightgreen)
 ![lint: green](https://img.shields.io/badge/lint-black%20%7C%20ruff%20%7C%20mypy%20%7C%20bandit-brightgreen)
 
 </div>
@@ -92,8 +93,7 @@ docker compose up --build
 
 The UI is a kill-chain console: **Discover → Recon → Exploit → Pivot →
 Persist → Score**. The Workflow strip on Discover tracks scope → scan →
-fingerprint → win; the next-action strip floats the single best move. (network inventory · actions · activity).
-The overview card at the top always shows the next step.
+fingerprint → win; the next-action strip floats the single best move.
 
 1. **Set the scope** — pick your engagement in the header scope selector
    (authorizes the aggressive actions; persists across restarts).
@@ -105,14 +105,14 @@ The overview card at the top always shows the next step.
    every action is logged verbatim in the Activity pane and in `docker logs`.
 5. **Pwned?** — sessions are captured automatically (💀 on the graph, quick
    actions + free-form shell console attached to the finding).
-6. **Report** — **Report** page → `⇩ Session Report` downloads the markdown
-   writeup: scope, hosts, findings, verified creds, sessions, and every
-   attempted action.
+6. **Report** — **Score** tab → **Report** card → **Download MD**: scope,
+   hosts, findings, verified creds, sessions, and every attempted action.
 
-Prefer one button? **Walk** page = 🤖 Autopilot: the whole walk (discover →
-fingerprint → CVEs → password attacks → exploits) with a live named-action
-log. Requires the scope. **Fuzz** page points at your own lab target (vulnlab
-container included) for the crash → minimize → triage loop.
+Prefer one button? **Exploit** tab → **Autopilot** card → **Start full attack**:
+the whole walk (discover → fingerprint → CVEs → password attacks → exploits)
+with a live named-action log. Requires the scope. The **Fuzz lab** card points
+at your own lab target (vulnlab container included) for the crash → minimize
+→ triage loop.
 
 7. **Fuzz a lab target you own** — start the `vulnlab` container and point the
    **lab fuzz** at `127.0.0.1:8080`.
@@ -205,7 +205,7 @@ Watch a live scan run end-to-end:
 ## Project layout
 
 ```
-HACKING/                git root
+h4k/                   git root
   .venv/                local dev venv (host tooling, NOT in the container)
   AGENTS.md             AI-agent context
   RELEASE_NOTES.md      features + design decisions
@@ -213,8 +213,8 @@ HACKING/                git root
   docs/                 full documentation set (user / dev / security / examples)
   Makefile · pyproject.toml   lint/test config
   h4k/                  the main platform image
-    api/                FastAPI app (routers + ~30 services)
-    web/                terminal-style UI
+    api/                FastAPI app (routers + ~60 services)
+    web/                kill-chain console (Discover → Recon → Exploit → Pivot → Persist → Score)
     data/               CVE/creds archives + wordlists
     Dockerfile · docker-compose.yml · entrypoint.sh
   vulnlab/              intentionally-vulnerable fuzzing target + harnesses

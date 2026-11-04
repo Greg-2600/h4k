@@ -115,12 +115,12 @@ defender's.
 | Action | Default | How to enable |
 |---|---|---|
 | Recon / fingerprint / CVE correlation | **on** | — |
-| Default-credential testing | off | `try_default_creds: true` / the 🔑 button |
-| Exploit execution | off | `do_attack: true` / the ⚔ button |
-| Deep toolkit (hydra/nikto/sqlmap/NSE) | off | the 🛠 button / `/api/deepattack` |
-| Credential propagation | off | `POST /api/engagement/{id}/propagate` |
-| Fuzzing | off | the Fuzz tab |
-| Container escape helpers | off | `POST /api/container_escape` |
+| Default-credential testing | off | `try_default_creds: true` / Exploit-tab password attacks |
+| Exploit execution | off | `do_attack: true` / Attack-queue fire buttons |
+| Deep toolkit (hydra/nikto/sqlmap/NSE) | off | `/api/deepattack` (or the standalone nikto/gobuster/sqlmap endpoints) |
+| Credential propagation | off | `POST /api/engagement/{id}/propagate` (or the Pivot-tab Execute button) |
+| Fuzzing | off | the Exploit-tab Fuzz lab card |
+| Container escape helpers | off | the Pivot-tab Escape check / `POST /api/container_escape` |
 
 Everything aggressive is logged verbatim — in the UI activity pane, in the
 session report, and in `docker logs`.

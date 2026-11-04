@@ -52,7 +52,7 @@ Sandbox mode exists for demos, CI and the Selenium suite. See
 
 ```
 h4k/
-├── api/          FastAPI app (routers + ~30 services)
+├── api/          FastAPI app (routers + ~65 services)
 ├── web/          the console (index.html + app.js + style.css)
 ├── data/         CVE archive, credential archive, wordlists
 ├── scripts/      DNS recon helpers

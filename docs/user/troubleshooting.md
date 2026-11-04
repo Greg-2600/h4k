@@ -6,7 +6,7 @@
 
 1. Check the API: `curl http://127.0.0.1:3137/api/health`
    → `{"status":"ok", ...}` means the API is fine.
-2. Check the footer: **MSF: offline** means Metasploit is not running.
+2. Check the status bar: **msf down** means Metasploit is not running.
    Recon still works; module execution does not.
 
 ---

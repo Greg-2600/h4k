@@ -62,6 +62,18 @@ file is chmod'ed `0600` — it holds verified credentials in the clear.
 
 ---
 
+## `flags.db` — captured flags
+
+Owned by `services/flags.py`. One row per distinct flag value:
+
+| Column | Purpose |
+|---|---|
+| `engagement_id`, `value` | unique key — the same flag is never stored twice |
+| `host`, `path`, `method` | where it was found (host may be empty = unplaced) |
+| `note`, `auto`, `created_at` | analyst note, auto-detected or manual, timestamp |
+
+---
+
 ## JSON archives (`h4k/data/`)
 
 | File | Contents |

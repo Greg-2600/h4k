@@ -75,8 +75,8 @@ flip the switches, on your own lab range, on your own terms.
 ```
 +----------+    HTTP/JSON    +--------------+   MessagePack-RPC   +-----------------+
 |  browser | --------------> |   FastAPI    | -------------------> |   msfrpcd       |
-|  terminal|   (web UI on   |   (api/)     |    port 3137:55553   |   Metasploit     |
-|    TUI   |   0.0.0.0:3137)|              |                      |   Framework DB  |
+| console  |   (web UI on   |   (api/)     |    port 3137:55553   |   Metasploit     |
+| killchain|   0.0.0.0:3137)|              |                      |   Framework DB  |
 +----------+                +--------------+                      +-----------------+
                                      | subprocess (bash tools)
                                      v

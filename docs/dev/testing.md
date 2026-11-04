@@ -70,10 +70,12 @@ enforcement (400 for out-of-scope, 404 for unknown engagement, …).
 tests/e2e/
 ├── conftest.py                    API subprocess + driver + page fixtures
 ├── helpers.py                     wait_for / click / fill / go_to
-├── test_ui_smoke.py               boot, navigation, scope picker, report page
+├── test_ui_smoke.py               boot, navigation, scope picker, report preview
 ├── test_crown_jewels_attack_paths.py
 ├── test_attck_panel.py
-└── test_autopilot_walk.py
+├── test_autopilot_walk.py
+├── test_lab_tools_ui.py           web-assessment / Fire TV / container cards, ops rail
+└── test_live_flow.py              opt-in live-target flow (see below; skipped in CI)
 ```
 
 ### Sandbox mode
@@ -104,7 +106,7 @@ from .helpers import all_of, click, fill, go_to, wait_text, wait_visible
 
 
 def test_add_crown_jewel_through_the_form(page, seeded):
-    go_to(page, "report")
+    go_to(page, "score")
     click(page, "compute-paths")
     wait_visible(page, "crown-list")
     fill(page, "crown-host", "10.10.10.9")
@@ -119,7 +121,7 @@ Rules of thumb:
   do not.
 * Use `wait_text` / `wait_visible` instead of `time.sleep`.
 * `wait_text` reads `textContent`, so it also works for panes that are
-  currently hidden (e.g. the activity log while the Report tab is open).
+  currently hidden (e.g. the activity log while the drawer is shut).
 * The `page` fixture fails the test if the browser logged an uncaught
   JavaScript error or a 5xx. That is how the missing
   `renderReportPreview()` bug was caught.
@@ -158,6 +160,18 @@ H4K_LIVE=1 pytest tests/test_live_stack.py -v
 It proves the parts unit tests cannot: Metasploit's RPC daemon, the real
 database, the web console being served, a real scan producing an inventory,
 and the attack-path/ATT&CK engines working on live data.
+
+`tests/e2e/test_live_flow.py` is the same idea through a real browser, and is
+also opt-in because it drives a real target:
+
+```sh
+H4K_E2E=1 H4K_LIVE_E2E=1 H4K_LIVE_URL=http://127.0.0.1:3137 \
+  H4K_LIVE_TARGET=192.168.1.84 pytest tests/e2e/test_live_flow.py -v
+```
+
+Recon only (scan → single-host fingerprint → vuln correlation → UI
+drive-through). The module-scoped fixture creates a temporary scoped
+engagement and deletes it afterwards. It never runs in CI.
 
 ---
 

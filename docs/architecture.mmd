@@ -1,11 +1,11 @@
 flowchart TB
-    subgraph browser["Browser (terminal UI)"]
-        UI["web/ · index.html + app.js + style.css<br/>zsh-style console + report tabs"]
+    subgraph browser["Browser (kill-chain console)"]
+        UI["web/ · index.html + app.js + style.css<br/>Discover → Recon → Exploit → Pivot → Persist → Score<br/>+ ops rail (session + live activity)"]
     end
 
     subgraph api["FastAPI (api/)"]
-        R["routers/ scan.py · source.py · update.py"]
-        S["services ~24 modules<br/>(scan_pipeline, sast, sca, fuzzer, triage, ai, ...)"]
+        R["routers/ scan · source · update · net · engagement"]
+        S["services ~65 modules<br/>(pipeline, recon, exploit, CTF tools,<br/>SAST/SCA, fuzzing, AI, Fire TV, container-fuzz)"]
     end
 
     subgraph msf["Metasploit"]

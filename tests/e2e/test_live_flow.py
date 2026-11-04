@@ -85,7 +85,9 @@ def test_live_scan_status_transitions(scoped_engagement):
     assert final["status"] == "done", final
     stuck = [(s, p) for s, p in samples if s == "queued" and p > 0]
     assert not stuck, f"job read queued while progressing: {stuck[:5]}"
-    assert any(s == "running" for s, _ in samples), f"never flipped to running: {samples}"
+    assert any(
+        s == "running" for s, _ in samples
+    ), f"never flipped to running: {samples}"
 
 
 def test_live_fingerprint_single_host(scoped_engagement):
@@ -143,7 +145,10 @@ def _fingerprint_target():
         assert status == 200
         _wait_until(
             lambda: TARGET
-            in {h.get("ip") for h in _api("GET", "/api/neighbors")[1].get("neighbors", [])},
+            in {
+                h.get("ip")
+                for h in _api("GET", "/api/neighbors")[1].get("neighbors", [])
+            },
             timeout=300,
             label=f"{TARGET} in neighbor discovery",
         )

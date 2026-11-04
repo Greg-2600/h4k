@@ -877,3 +877,44 @@ def test_job_monitor_covers_neighbor_and_fingerprint_jobs(
     r = client.get("/api/jobs", params={"active": False})
     ids = [j["id"] for j in r.json()["jobs"]]
     assert job_id in ids
+
+
+def test_fingerprint_nmap_uses_service_and_os_detection(clean_db, monkeypatch):
+    """The fingerprint sweep must run service (-sV) and OS (-O) detection:
+    version strings feed CVE matching and osclass feeds os_guess."""
+    from routers.scan import _ensure_session_row, _run_fingerprint
+
+    _ensure_session_row()
+    seen = {}
+
+    class FakeRunner:
+        def __init__(self, progress=None):
+            pass
+
+        def run_tool(self, tool, argv, timeout=300):
+            seen["argv"] = argv
+            return {
+                "tool": "nmap",
+                "stdout": """
+                <host starttime="1" endtime="1"><status state="up"/>
+                <address addr="192.168.1.10" addrtype="ipv4"/>
+                <os><osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="5.X" accuracy="96"/></os>
+                <ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH" version="9.0"/></port></ports>
+                </host>
+                """,
+                "stderr": "",
+                "rc": 0,
+                "elapsed": 1.0,
+                "timed_out": False,
+                "status": "ok",
+            }
+
+    import services.toolkit as toolkit_mod
+
+    monkeypatch.setattr(toolkit_mod, "ToolkitRunner", FakeRunner)
+
+    job = {"id": "t", "status": "running", "log": []}
+    _run_fingerprint(job, [{"ip": "192.168.1.10"}])
+    assert "-sV" in seen["argv"]
+    assert "-O" in seen["argv"]
+    assert clean_db._load_neighbor_hosts()["192.168.1.10"]["os"] == "Linux"

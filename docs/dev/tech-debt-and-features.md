@@ -23,7 +23,7 @@ The list this session worked through, and what is still open. Items marked
 | TD-12 | **Global mutable `app_state`** (module-level singletons) | Harder to run tests in parallel, awkward to reason about. Wants a small dependency container | open |
 | TD-13 | **The Docker build is slow** — an unpinned `semgrep` made pip backtrack through dozens of 70 MB wheels | Pinned `semgrep==1.182.0`; a base/app layer split would help more | partly **[done]** |
 | TD-14 | **`/api/health` is too thin** — it says "ok" while the Metasploit DB is dead | `/api/capabilities` now covers it; `/api/health` should probably gain a `ready` flag | open |
-| TD-15 | **The lab tooling is undocumented and untested** (`scripts/transmission_rpc.py`, `torrent_seeder.py`, `torrent_tracker.py`) | They are the reason the Transmission chain works; they need docs + unit tests | partly **[done]** (docs written) |
+| TD-15 | **The lab tooling is undocumented and untested** (`scripts/transmission_rpc.py`, `torrent_seeder.py`, `torrent_tracker.py`) | They are the reason the Transmission chain works; they need docs + unit tests | **[done]** (`tests/test_lab_scripts.py`: bencode, RPC retry, seeder piece-serving, tracker/sanity client/report) |
 | TD-16 | **No per-tool rate limits or job quotas** — one operator can queue 50 scans | `H4K_RATE_LIMIT` exists for HTTP but not for tool invocations | open |
 
 ---

@@ -155,6 +155,8 @@ def _run_one_pass(cidr: str, engagement_id: str | None) -> dict[str, Any]:
         argv = [
             "nmap",
             "-sS",
+            "-sV",
+            "-O",
             "-T4",
             "-Pn",
             "-p",

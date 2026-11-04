@@ -54,6 +54,10 @@ make coverage # coverage report (90% gate)
 * New/changed UI → a Selenium test in `tests/e2e/`, targeting `data-testid`
   hooks.
 * Tests must be offline. Never require a live Metasploit or the network.
+  The two exceptions are opt-in and skipped by default: `H4K_LIVE=1 pytest
+  tests/test_live_stack.py` (live API) and `H4K_LIVE_E2E=1` +
+  `tests/e2e/test_live_flow.py` (live browser flow against a target you own,
+  recon only).
 
 ```sh
 pytest -k "my_feature" -v

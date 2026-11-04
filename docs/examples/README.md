@@ -117,7 +117,7 @@ cd vulnlab && docker build -t vulnlab . && \
 # fuzz it
 curl -s -X POST http://127.0.0.1:3137/api/fuzz \
   -H 'Content-Type: application/json' \
-  -d '{"url":"http://127.0.0.1:8080/","iterations":2000,"timeout":60}' \
+  -d '{"target":"127.0.0.1","port":8080,"iterations":2000,"timeout":60}' \
   | python3 -m json.tool
 ```
 

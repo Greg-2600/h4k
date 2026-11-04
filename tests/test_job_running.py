@@ -47,7 +47,9 @@ def test_run_fuzz_keeps_pre_start_abort(monkeypatch):
     req = SimpleNamespace(iterations=5, timeout=1.0, scheme="http")
     job = {"id": "j", "status": "abort_requested", "candidates": []}
     scan_router._run_fuzz(job, req, "127.0.0.1", 8080)
-    assert job["status"] == "done"  # fuzz has no mid-run abort; guard only preserves intent
+    assert (
+        job["status"] == "done"
+    )  # fuzz has no mid-run abort; guard only preserves intent
 
 
 def test_run_scan_flips_to_running(monkeypatch):
