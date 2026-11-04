@@ -18,8 +18,4 @@ pylint
 mypy
 bandit
 safety
-
-# System linting (install via your package manager):
-#   apt install shellcheck hadolint
-#   brew install shellcheck hadolint
-# These are NOT pip-installable; the Makefile checks for them via `command -v`.
+shellcheck-py  # provides the `shellcheck` binary; hadolint is fetched by make (see HADOLINT_VERSION)

@@ -12,7 +12,7 @@ Three layers, each with a different job.
 make test          # unit + API (in a python:3.11-slim container)
 make e2e           # Selenium, host chromium
 make e2e-container # Selenium, fully containerized
-make lint          # black ruff isort flake8 mypy pylint bandit
+make lint          # black ruff isort flake8 mypy pylint bandit + shellcheck (all scripts) + hadolint (all Dockerfiles)
 make coverage      # pytest + coverage (90% gate, in container)
 make qualify       # fresh images + live stack + full feature workout
 ```

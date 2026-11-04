@@ -11,12 +11,12 @@ lookup_domain() {
 		dns_server=$(get_dns_server)
 
 		# concat sub_domain, domain proper, and tld
-		test_domain=$(echo $sub_domain|sed "s/$/\.$domain/g")
+		test_domain=$(echo "$sub_domain" |sed "s/$/\.$domain/g")
 
 		# perform DNS lookup and only print resolved subdomains
-		host -W 1 $test_domain $dns_server|
+		host -W 1 "$test_domain" "$dns_server" |
 		grep 'has address'|
-		awk {'print $1,$4'}
+		awk '{print $1,$4}'
 	done 
 }
 
@@ -42,7 +42,7 @@ get_dns_server() {
 	37.235.1.177";
 
 	# select one at random
-	echo $dns_servers|tr " " "\\n"|sort -R|head -1
+	echo "$dns_servers" | tr " " "\\n"|sort -R|head -1
 }
 
 

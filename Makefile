@@ -131,22 +131,30 @@ lint-py: $(BLACK) $(ISORT) $(RUFF) $(FLAKE8) $(PYLINT) $(MYPY) $(BANDIT)
 
 lint-shell:
 	@printf "$(BOLD)Running shellcheck…$(RESET)\n"
-	@if ! command -v shellcheck > /dev/null 2>&1; then \
-		printf "  $(WARN) shellcheck not installed — skipping shell linting\n"; \
+	@if ! command -v shellcheck > /dev/null 2>&1 && [ ! -x .venv/bin/shellcheck ]; then \
+		printf "  $(WARN) shellcheck not installed (pip install shellcheck-py) — skipping shell linting\n"; \
 	else \
-		for f in $(wildcard scripts/*.sh); do \
-			shellcheck --shell=bash "$$f" || { printf "$(ERR) shellcheck failed: $$f\n"; exit 1; }; \
+		SCBIN=shellcheck; command -v shellcheck > /dev/null 2>&1 || SCBIN=.venv/bin/shellcheck; \
+		for f in $(wildcard scripts/*.sh) $(wildcard h4k/scripts/*.sh); do \
+			$$SCBIN --shell=bash --severity=warning "$$f" || { printf "$(ERR) shellcheck failed: $$f\n"; exit 1; }; \
 		done; \
 		printf "  $(OK) shellcheck\n"; \
 	fi
 
 ## ─────────────────────────────────────────────────────────────────────────────
-# Lint: Dockerfiles
+# Lint: Dockerfiles (hadolint, fetched once into the venv)
 ## ─────────────────────────────────────────────────────────────────────────────
 
-lint-docker:
+HADOLINT := .venv/bin/hadolint
+HADOLINT_VERSION := 2.12.0
+
+$(HADOLINT):
+	curl -sSfL -o $(HADOLINT) https://github.com/hadolint/hadolint/releases/download/v$(HADOLINT_VERSION)/hadolint-Linux-x86_64 && chmod +x $(HADOLINT)
+
+lint-docker: $(HADOLINT)
 	@printf "$(BOLD)Checking Dockerfiles…$(RESET)\n"
-	@printf "  $(WARN) hadolint not installed (apt install hadolint) — skipping\n"
+	$(HADOLINT) h4k/Dockerfile h4k/Dockerfile.test vulnlab/Dockerfile
+	@printf "  $(OK) hadolint\n"
 
 ## ─────────────────────────────────────────────────────────────────────────────
 # Docker Compose validation

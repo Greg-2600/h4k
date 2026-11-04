@@ -9,7 +9,7 @@ report - all from one container.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/Greg-2600/h4k/actions/workflows/ci.yml/badge.svg)](https://github.com/Greg-2600/h4k/actions)
-![tests: 1339](https://img.shields.io/badge/tests-1339_passing-90%25_coverage-brightgreen)
+![tests: 1367](https://img.shields.io/badge/tests-1367_passing-90%25_coverage-brightgreen)
 ![lint: green](https://img.shields.io/badge/lint-black%20%7C%20ruff%20%7C%20mypy%20%7C%20bandit-brightgreen)
 
 </div>

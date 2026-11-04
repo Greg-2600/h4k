@@ -17,7 +17,7 @@ check_prips() {
 expand_networks() {
 # return reverse CIDR notation 
 	cidr_networks=("$@")
-	for network in ${cidr_networks[*]}; do
+	for network in "${cidr_networks[@]}"; do
 		prips "$network"|sort -R
 	done
 }
