@@ -154,6 +154,14 @@ def stage_report(job_id: str) -> str:
 
 
 def stage_fingerprint() -> bool:
+    # fingerprint needs discovered neighbors — run discovery first (fresh
+    # stacks have none; the endpoint 400s with "run discovery first")
+    status, job = api("POST", "/api/neighbors/scan", {}, timeout=30)
+    disc_id = job.get("job_id", "") if isinstance(job, dict) else ""
+    if status != 200 or not disc_id:
+        return check("fingerprint: service/version sweep runs", False, f"discovery HTTP {status}")
+    if wait_job("/api/neighbors/status", disc_id, timeout=600).get("status") not in ("done", "completed"):
+        return check("fingerprint: service/version sweep runs", False, "discovery never finished")
     status, payload = api("POST", "/api/neighbors/fingerprint", {}, timeout=30)
     if status != 200 or not isinstance(payload, dict):
         return check("fingerprint: service/version sweep runs", False, f"HTTP {status}")
