@@ -23,3 +23,14 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 3
+  # SCA demo fixture intentionally pins vulnerable lodash 4.17.20 to prove
+  # osv-scanner detects known CVEs (see demos/sca-demo/package.json).
+  # Never "fix" the fixture — that breaks the demo and its docs.
+  - package-ecosystem: npm
+    directory: "/demos/sca-demo"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: lodash
