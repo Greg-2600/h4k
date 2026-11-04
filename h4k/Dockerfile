@@ -42,7 +42,7 @@ hydra ncrack john sqlmap \
 RUN CHISEL_VER=$(\
       curl -s https://api.github.com/repos/jpillora/chisel/releases/latest \
       | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
-    && curl -sSfL "https://github.com/jpillora/chisel/releases/download/${CHISEL_VER}/chisel_${CHISEL_VER#v}_linux_amd64.gz" \
+    && curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors "https://github.com/jpillora/chisel/releases/download/${CHISEL_VER}/chisel_${CHISEL_VER#v}_linux_amd64.gz" \
        -o /tmp/chisel.gz \
     && gunzip -f /tmp/chisel.gz && mv /tmp/chisel /usr/local/bin/chisel \
     && chmod +x /usr/local/bin/chisel
@@ -65,7 +65,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf
     && NUCLEI_VER=$(\
       curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
       | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
-    && curl -sSfL "https://github.com/projectdiscovery/nuclei/releases/download/${NUCLEI_VER}/nuclei_${NUCLEI_VER#v}_linux_amd64.zip" \
+    && curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors "https://github.com/projectdiscovery/nuclei/releases/download/${NUCLEI_VER}/nuclei_${NUCLEI_VER#v}_linux_amd64.zip" \
        -o /tmp/nuclei.zip \
     && unzip -o /tmp/nuclei.zip -d /usr/local/bin/ \
     && rm /tmp/nuclei.zip
@@ -73,7 +73,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf
 # Google platform-tools: an adb new enough for wireless `pair` (Debian's adb
 # predates the command). /usr/local/bin precedes /usr/bin on PATH, so this
 # adb shadows the distro one; fastboot comes along for free.
-RUN curl -sSfL -o /tmp/ptools.zip \
+RUN curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/ptools.zip \
       https://dl.google.com/android/repository/platform-tools-latest-linux.zip \
     && unzip -q /tmp/ptools.zip -d /opt \
     && ln -sf /opt/platform-tools/adb /usr/local/bin/adb \
@@ -83,7 +83,7 @@ RUN curl -sSfL -o /tmp/ptools.zip \
 # OWASP ZAP (Zed Attack Proxy) — web app scanner with active/passive scan,
 # spider, AJAX spider, fuzzer, API. Headless mode for automation.
 RUN ZAP_VER="2.17.0" \
-    && curl -sSfL "https://github.com/zaproxy/zaproxy/releases/download/v${ZAP_VER}/ZAP_${ZAP_VER}_Linux.tar.gz" \
+    && curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors "https://github.com/zaproxy/zaproxy/releases/download/v${ZAP_VER}/ZAP_${ZAP_VER}_Linux.tar.gz" \
        -o /tmp/zap.tar.gz \
     && tar -xzf /tmp/zap.tar.gz -C /opt \
     && mv /opt/ZAP_${ZAP_VER} /opt/zap \
@@ -121,10 +121,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 RUN OSV_VER=$(\
       curl -s https://api.github.com/repos/google/osv-scanner/releases/latest \
       | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
-    && curl -sSfL "https://github.com/google/osv-scanner/releases/download/${OSV_VER}/osv-scanner_linux_amd64" \
+    && curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors "https://github.com/google/osv-scanner/releases/download/${OSV_VER}/osv-scanner_linux_amd64" \
        -o /usr/local/bin/osv-scanner \
     && chmod +x /usr/local/bin/osv-scanner
-RUN curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+RUN curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
     | sh -s -- -b /usr/local/bin
 
 
