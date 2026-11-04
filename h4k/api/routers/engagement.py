@@ -147,6 +147,82 @@ def watch_status(engagement_id: str) -> dict[str, Any]:
     return get_store().watch_status(engagement_id)
 
 
+@router.get("/{engagement_id}/watch/config")
+def watch_config(engagement_id: str) -> dict[str, Any]:
+    store = get_store()
+    try:
+        return store.get_watch_config(engagement_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="engagement not found") from None
+
+
+@router.post("/{engagement_id}/watch/config")
+def watch_config_set(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    store = get_store()
+    try:
+        return store.set_watch_config(
+            engagement_id,
+            mode=(body or {}).get("mode"),
+            retain=(body or {}).get("retain"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/{engagement_id}/watch/trends")
+def watch_trends(engagement_id: str, limit: int = 100) -> dict[str, Any]:
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return store.watch_trends(engagement_id, limit=limit)
+
+
+@router.post("/{engagement_id}/watch/verify")
+def watch_verify(
+    engagement_id: str, body: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Verify-fix: snapshot the freshest finished scan data and diff it.
+
+    Run a scan first (scan button, autopilot, or auto-scan), then verify:
+    the newest finished scan job covering `host` (or any finished job) is
+    snapshotted with source "verify" and diffed against the previous pass.
+    A cleared finding after your patch shows up as cleared_vulns.
+    """
+    from routers.scan import JOBS
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    host = ((body or {}).get("host") or "").strip() or None
+    best_key: str | None = None
+    best_found: dict[str, Any] | None = None
+    best_created = ""
+    for key, job in JOBS.items():
+        if not isinstance(job, dict) or job.get("status") not in ("done", "completed"):
+            continue
+        found = job.get("report")
+        if found is None:
+            continue
+        if hasattr(found, "model_dump"):
+            found = found.model_dump()
+        if not isinstance(found, dict) or "hosts" not in found:
+            continue
+        if host and not any(h.get("address") == host for h in found.get("hosts") or []):
+            continue
+        created = str(job.get("created_at", ""))
+        if best_found is None or created > best_created:
+            best_key, best_found, best_created = key, found, created
+    if best_found is None:
+        raise HTTPException(
+            status_code=400,
+            detail="no finished scan to verify against — run a scan first",
+        )
+    job_id, report = best_key, best_found
+    res = store.record_watch_snapshot(engagement_id, report, source="verify")
+    res["job_id"] = job_id
+    return res
+
+
 @router.get("/{engagement_id}/assets")
 def list_assets(engagement_id: str) -> dict[str, Any]:
     return {"assets": get_store().assets(engagement_id)}

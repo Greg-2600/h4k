@@ -861,21 +861,42 @@ async function refreshWatch() {
   const list = $('watch-list');
   const empty = $('watch-empty');
   const status = $('watch-status');
+  const badge = $('watch-new');
   const engId = await currentEngagementId();
   if (!engId) {
     list.innerHTML = ''; empty.hidden = false; status.textContent = 'needs scope';
+    badge.hidden = true;
     return;
   }
   try {
-    const [st, ch] = await Promise.all([
+    const [st, ch, cfg] = await Promise.all([
       api(`/api/engagement/${engId}/watch/status`),
       api(`/api/engagement/${engId}/watch/changes?limit=10`),
+      api(`/api/engagement/${engId}/watch/config`).catch(() => ({ mode: 'notable' })),
     ]);
+    const sel = $('watch-mode');
+    if (sel && cfg.mode) sel.value = cfg.mode;
     status.textContent = st.snapshots
       ? `${st.snapshots} snapshot(s)${st.last_change ? ` · last change: ${st.last_change.summary}` : ' · no changes yet'}`
       : 'no snapshots yet — auto-scan records them';
     const items = (ch.changes) || [];
     empty.hidden = items.length > 0;
+    // digest: notable changes since this engagement was last viewed here
+    const mode = (cfg.mode) || 'notable';
+    let fresh = 0;
+    if (mode !== 'off') {
+      const seenKey = `h4k-watch-seen-${engId}`;
+      const seenAt = localStorage.getItem(seenKey) || '';
+      fresh = items.filter((c) => (c.created_at || '') > seenAt && (mode === 'all' || (c.diff && c.diff.notable))).length;
+      localStorage.setItem(seenKey, new Date().toISOString());
+    }
+    if (fresh > 0) {
+      badge.hidden = false;
+      badge.textContent = `${fresh} new`;
+      log(`watch: ${fresh} new notable change(s) since last visit`, 'warn');
+    } else {
+      badge.hidden = true;
+    }
     list.innerHTML = items.map((c) => {
       const d = c.diff || {};
       const parts = [];
@@ -1094,6 +1115,43 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   // lab watch: estate change history for the active engagement
   $('btn-watch-refresh').addEventListener('click', refreshWatch);
+  $('btn-watch-verify').addEventListener('click', async () => {
+    const engId = await currentEngagementId();
+    if (!engId) { log('engage a scope first', 'error'); return; }
+    try {
+      const res = await api(`/api/engagement/${engId}/watch/verify`, { method: 'POST', body: {} });
+      log(`watch verify: ${res.summary || res.snapshot_id}`, res.notable ? 'warn' : 'info');
+      refreshWatch();
+    } catch (e) { log(`verify failed: ${e.message}`, 'error'); }
+  });
+  $('btn-watch-trends').addEventListener('click', async () => {
+    const engId = await currentEngagementId();
+    if (!engId) { log('engage a scope first', 'error'); return; }
+    const box = $('watch-trends');
+    if (!box.hidden) { box.hidden = true; box.innerHTML = ''; return; }
+    try {
+      const t = await api(`/api/engagement/${engId}/watch/trends?limit=100`);
+      const hosts = t.hosts || {};
+      const rows = Object.keys(hosts).sort().map((addr) => {
+        const h = hosts[addr];
+        const svcs = Object.keys(h.services || {}).sort().map((k) => {
+          const s = h.services[k];
+          return `<div class="watch-line">· ${esc(k)} ${esc(s.service || '')} <span class="muted">${esc(s.first_seen || '')} → ${esc(s.last_seen || '')}</span></div>`;
+        }).join('');
+        return `<div class="watch-item"><div class="watch-head"><b>${esc(addr)}</b>${h.present ? '' : ' <span class="muted">(gone)</span>'}<span class="muted">${esc(h.first_seen || '')} → ${esc(h.last_seen || '')}</span></div>${svcs}</div>`;
+      }).join('');
+      box.innerHTML = rows || '<div class="muted">no snapshots yet</div>';
+      box.hidden = false;
+    } catch (e) { log(`trends failed: ${e.message}`, 'error'); }
+  });
+  $('watch-mode').addEventListener('change', async (e) => {
+    const engId = await currentEngagementId();
+    if (!engId) return;
+    try {
+      await api(`/api/engagement/${engId}/watch/config`, { method: 'POST', body: { mode: e.target.value } });
+      refreshWatch();
+    } catch (err) { log(`watch mode failed: ${err.message}`, 'error'); }
+  });
   $('btn-watch-baseline').addEventListener('click', async () => {
     const engId = await currentEngagementId();
     if (!engId) { log('engage a scope first', 'error'); return; }

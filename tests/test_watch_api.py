@@ -107,3 +107,53 @@ def test_watch_unknown_engagement_is_404(client):
     )
     assert client.get("/api/engagement/nope/watch/changes").status_code == 404
     assert client.get("/api/engagement/nope/watch/status").status_code == 404
+
+
+def test_config_round_trip(client):
+    eng = _engagement(client)
+    r = client.get(f"/api/engagement/{eng['id']}/watch/config")
+    assert r.status_code == 200 and r.json()["mode"] == "notable"
+    r = client.post(
+        f"/api/engagement/{eng['id']}/watch/config", json={"mode": "all", "retain": 7}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json() == {"mode": "all", "retain": 7}
+    r = client.post(f"/api/engagement/{eng['id']}/watch/config", json={"mode": "loud"})
+    assert r.status_code == 400
+    assert client.get("/api/engagement/nope/watch/config").status_code == 404
+
+
+def test_trends_endpoint(client):
+    eng = _engagement(client)
+    client.post(f"/api/engagement/{eng['id']}/watch/baseline", json=_report())
+    r = client.get(f"/api/engagement/{eng['id']}/watch/trends")
+    assert r.status_code == 200, r.text
+    hosts = r.json()["hosts"]
+    assert hosts["10.0.0.5"]["present"] is True
+    assert "22/tcp" in hosts["10.0.0.5"]["services"]
+
+
+def test_verify_needs_finished_scan(client):
+    eng = _engagement(client)
+    r = client.post(f"/api/engagement/{eng['id']}/watch/verify", json={})
+    assert r.status_code == 400
+
+
+def test_verify_snapshots_latest_scan(client):
+    from routers.scan import JOBS
+
+    eng = _engagement(client)
+    client.post(f"/api/engagement/{eng['id']}/watch/baseline", json=_report())
+    JOBS["watchjob2"] = {
+        "status": "done",
+        "report": _report(),
+        "created_at": "2099-01-01T00:00:00",
+    }
+    try:
+        r = client.post(f"/api/engagement/{eng['id']}/watch/verify", json={})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["job_id"] == "watchjob2"
+        assert body["diff"]["first_baseline"] is False
+    finally:
+        JOBS.pop("watchjob2", None)

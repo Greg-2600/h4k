@@ -97,3 +97,46 @@ def test_retention_prunes_old_snapshots(store, eng):
 def test_unknown_engagement_raises(store):
     with pytest.raises(ValueError, match="unknown engagement"):
         store.record_watch_snapshot("nope", {"hosts": []})
+
+
+def test_config_defaults_and_validation(store, eng):
+    cfg = store.get_watch_config(eng["id"])
+    assert cfg == {"mode": "notable", "retain": 30}
+    assert store.set_watch_config(eng["id"], mode="all")["mode"] == "all"
+    assert store.set_watch_config(eng["id"], retain=5)["retain"] == 5
+    with pytest.raises(ValueError, match="mode must be"):
+        store.set_watch_config(eng["id"], mode="loud")
+    with pytest.raises(ValueError, match="unknown engagement"):
+        store.get_watch_config("nope")
+
+
+def test_retain_prunes_on_set(store, eng):
+    for _ in range(10):
+        store.record_watch_snapshot(eng["id"], _report())
+    assert store.watch_status(eng["id"])["snapshots"] == 10
+    store.set_watch_config(eng["id"], retain=4)
+    assert store.watch_status(eng["id"])["snapshots"] <= 4
+
+
+def test_record_uses_configured_retain(store, eng):
+    store.set_watch_config(eng["id"], retain=3)
+    for _ in range(6):
+        store.record_watch_snapshot(eng["id"], _report())
+    assert store.watch_status(eng["id"])["snapshots"] <= 3
+
+
+def test_trends_first_last_seen(store, eng):
+    store.record_watch_snapshot(eng["id"], _report())
+    report = _report()
+    report["hosts"][0]["services"].append(
+        {"port": 443, "proto": "tcp", "service": "https"}
+    )
+    report["hosts"].append({"address": "10.0.0.9", "services": []})
+    store.record_watch_snapshot(eng["id"], report)
+    trends = store.watch_trends(eng["id"])
+    h5 = trends["hosts"]["10.0.0.5"]
+    assert h5["present"] is True
+    assert h5["first_seen"] <= h5["last_seen"]
+    assert set(h5["services"]) == {"22/tcp", "443/tcp"}
+    assert trends["hosts"]["10.0.0.9"]["present"] is True
+    assert trends["snapshots_considered"] == 2
