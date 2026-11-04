@@ -189,7 +189,7 @@ logs:
 # repo mounted — no project code executes on the host. e2e stays host-side
 # (needs local Chromium + a sandbox API) and runs in CI.
 TEST_IMAGE := python:3.11-slim
-TEST_DOCKER := docker run --rm --user "$(shell id -u):$(shell id -g)" -v "$(PWD):/work" -w /work -e PYTHONDONTWRITEBYTECODE=1 -e PIP_TARGET=/tmp/pylibs -e PYTHONPATH=/tmp/pylibs -e HOME=/tmp $(TEST_IMAGE)
+TEST_DOCKER := docker run --rm --user "$(shell id -u):$(shell id -g)" -v "$(PWD):/work" -w /work -e PYTHONDONTWRITEBYTECODE=1 -e PIP_TARGET=/tmp/pylibs -e PYTHONPATH=/tmp/pylibs -e PATH=/tmp/pylibs/bin:/usr/local/bin:/usr/bin:/bin -e HOME=/tmp $(TEST_IMAGE)
 TEST_SETUP := pip install -q --target=/tmp/pylibs -r requirements.txt -r requirements-dev.txt
 
 test: test-container
