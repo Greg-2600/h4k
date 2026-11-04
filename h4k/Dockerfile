@@ -1,5 +1,5 @@
 # h4k — Metasploit automation lab (school cybersecurity project)
-FROM debian:12-slim
+FROM debian:13-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 # AI triage: any OpenAI-compatible gateway; the opencode relay is keyless
