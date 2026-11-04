@@ -1,0 +1,21 @@
+# Root context (compose builds, vulnlab). Mirror h4k/.dockerignore intent:
+# never ship secrets, runtime state, or host tooling.
+
+.venv/
+__pycache__/
+*.py[co]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pylint.d/
+htmlcov/
+.coverage
+.git/
+*.db
+*.sqlite*
+*.pid
+docker.env
+.env
+h4k_data/
+engagements.db
+neighbors.db

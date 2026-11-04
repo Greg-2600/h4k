@@ -32,7 +32,6 @@ Metasploitable box. Every aggressive action is **off by default and opt-in**.
 |------|--------------|
 | **Host recon & scan** | 3 OPSEC modes (stealth / Tor / overt), fingerprinting, PTR, DNS, ARP neighbors, posture heuristic |
 | **Passive auto-scan** | on boot, h4k starts building a network and service map of the local subnet automatically — recon only, no creds, no exploits; the map is live at `/api/map` and in the console |
-| **Passive auto-scan** | on boot, h4k starts building a network and service map of the local subnet automatically — recon only, no creds, no exploits; the map is live at `/api/map` and in the console |
 | **Vuln analysis** | curated CVE archive, EOL/version leads, default-cred archive, ranked recommendations |
 | **Engagements** | persistent scope-enforced asset graph; replays *verified* credentials across the in-scope estate to find where they also work (lateral movement), with a dry-run plan first |
 | **Attack paths** | declare **crown jewels** (the objectives that matter) and get scored, evidence-backed paths to them — a 2.0 leak that pivots into the DC outranks a 9.8 on an isolated box |
@@ -143,13 +142,13 @@ the project.
 
 ```mermaid
 flowchart TB
-    subgraph browser["Browser"]
-        UI["web/ · index.html + app.js + style.css<br/>mission-control CTF console (Recon / Attack / Creds / Shells / Flags / Report)<br/>+ next-move queue, flag ledger, activity drawer"]
+    subgraph browser["Browser (kill-chain console)"]
+        UI["web/ · index.html + app.js + style.css<br/>Discover → Recon → Exploit → Pivot → Persist → Score<br/>+ ops rail (session + live activity)"]
     end
 
     subgraph api["FastAPI (api/)"]
-        R["routers/ scan.py · source.py · update.py"]
-        S["services · ~24 modules<br/>(scan_pipeline, sast, sca, fuzzer, triage, ai…)"]
+        R["routers/ scan · source · update · net · engagement"]
+        S["services ~65 modules<br/>(pipeline, recon, exploit, CTF tools,<br/>SAST/SCA, fuzzing, AI, Fire TV, container-fuzz)"]
     end
 
     subgraph msf["Metasploit"]
@@ -157,20 +156,20 @@ flowchart TB
         DB["PostgreSQL (hosts/services/vulns)"]
     end
 
-    subgraph tools["Offensive & analysis tools"]
-        TOOLS["nmap · hydra · nikto · sqlmap · semgrep<br/>trivy · osv-scanner · gobuster · masscan"]
+    subgraph tools["Offensive / analysis tools"]
+        TOOLS["nmap · whatweb · hydra · nikto · sqlmap<br/>semgrep · trivy · osv-scanner · gobuster<br/>libFuzzer/AFL++ · masscan"]
     end
 
-    subgraph llm["AI triage (optional, keyless)"]
-        OLLAMA["opencode relay (host) · or any OpenAI-compatible gateway"]
+    subgraph llm["Local LLM (optional)"]
+        OLLAMA["Ollama · qwen2.5 :11434/<sidecar>"]
     end
 
     subgraph lab["Fuzzing target (separate)"]
-        VULN["vulnlab · vulnerable HTTP server<br/>+ coverage-guided harness"]
+        VULN["vulnlab · intentionally-vulnerable<br/>HTTP server + coverage-guided harness"]
     end
 
     UI -->|HTTP/JSON :3137| R
-    R -->|RPC| RPC
+    R -->|RPC calls| RPC
     RPC --> DB
     R -->|subprocess| TOOLS
     R -->|local model| OLLAMA

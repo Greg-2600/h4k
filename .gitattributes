@@ -1,0 +1,19 @@
+# Linguist + diff hygiene for a security-lab repo.
+# Keep language stats honest and diffs reviewable.
+
+# generated / vendored
+h4k/data/cves.json linguist-vendored
+h4k/data/creds.json linguist-vendored
+h4k/data/wordlists/* linguist-vendored
+demos/** linguist-vendored
+
+# binary docs assets
+docs/img/*.png binary
+docs/img/*.gif binary
+*.png binary
+*.gif binary
+*.ico binary
+
+# never diff runtime stores
+*.db binary
+*.sqlite* binary

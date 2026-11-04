@@ -3473,7 +3473,7 @@ def try_local_root_go_bro() -> dict[str, Any]:
         "privilege": privilege,
         "verdict": verdict,
         "host_root_achieved": bool(audit.get("host_root_vector_found")),
-        "uses_password": False,
+        "uses_password": False,  # nosec B105 - dict key name, not a credential
     }
 
 

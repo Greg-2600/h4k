@@ -78,7 +78,11 @@ def _filecap_dac_probe(timeout: float = 10.0) -> tuple[bool, str]:
         return False, "gsr-kms-server not installed"
     try:
         proc = subprocess.run(  # nosec B603 B607 - fixed argv, no shell
-            [exe, "/tmp/h4k-probe-sock", "/etc/shadow"],
+            [
+                exe,
+                "/tmp/h4k-probe-sock",
+                "/etc/shadow",
+            ],  # nosec B108 - intentional fixed probe socket path
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -242,7 +246,7 @@ def _systemd_exec_audit(timeout: float = 20.0) -> dict[str, Any]:
                         writable_units.append(f"{name}:{frag}")
                 except Exception:
                     pass
-        except Exception:
+        except Exception:  # nosec B112 - best-effort audit, skip unreadable units
             continue
     writable_binaries = sorted(
         b for b in binaries if os.path.exists(b) and os.access(b, os.W_OK)
@@ -622,7 +626,7 @@ def host_privesc_audit(timeout: float = 30.0) -> dict[str, Any]:
         ),
         "uses_sudo": False,
         "uses_docker": False,
-        "uses_password": False,
+        "uses_password": False,  # nosec B105 - dict key name, not a credential
     }
 
 

@@ -8,8 +8,8 @@ you own or have written permission to test (see
 
 If you find a bug in h4k that could lead to unintended attacks — a scope
 check that can be bypassed, a command-injection in a tool wrapper, a
-credential leak — **do not open a public issue**. Report it privately to
-the maintainer (see the repo owner profile) with:
+credential leak — **do not open a public issue**. Use [private vulnerability
+reporting](https://github.com/Greg-2600/h4k/security/advisories/new) with:
 
 1. what you did,
 2. what you expected (scope enforced, no execution, no leak),

@@ -1,0 +1,35 @@
+# h4k Docker build context is `h4k/` (see `cd h4k && docker build -t h4k .`).
+# Keep the image lean and secret-free: never ship runtime state, history,
+# or host tooling into the image.
+
+# runtime state (mounted via h4k_data volume, never baked in)
+data/*.db
+data/*.run
+*.db
+*.sqlite*
+*.pid
+docker.env
+.env
+
+# host dev tooling / caches
+.venv/
+__pycache__/
+*.py[co]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pylint.d/
+htmlcov/
+.coverage
+
+# git + editor noise
+.git/
+.gitignore
+*.swp
+.DS_Store
+
+# docs + fixtures not needed at runtime (README kept for /opt/h4k/README.md)
+# (api/, web/, scripts/, data/, entrypoint.sh, Dockerfile stay)
+docs/
+tests/
+demos/
