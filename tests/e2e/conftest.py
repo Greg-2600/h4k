@@ -121,8 +121,8 @@ def api_server(tmp_path_factory):
     ready = False
     while time.time() < deadline:
         if proc.poll() is not None:
-            out = proc.stdout.read() if proc.stdout else ""
-            raise RuntimeError(f"h4k API died on startup:\n{out}")
+            log_text = log_path.read_text()[-4000:] if log_path.exists() else ""
+            raise RuntimeError(f"h4k API died on startup:\n{log_text}")
         try:
             status, _ = client.get("/api/health")
             if status == 200:
