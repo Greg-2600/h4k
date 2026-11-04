@@ -58,6 +58,7 @@ skips = ["B101", "B104", "B110", "B324", "B404", "B602"]
 minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+pythonpath = [".", "h4k/api"]
 addopts = "--tb=short"
 
 [tool.coverage.run]
