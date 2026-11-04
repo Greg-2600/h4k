@@ -5,10 +5,19 @@ Detection (docker_group_report) is read-only; the tries
 disabled in sandbox mode. The userns try uses no sudo and no docker.
 """
 
+import os
+
 import pytest
 from services import privesc as privesc_mod
 from services.capabilities import build_report
 from services.container_escape import ContainerEscape
+
+# GitHub runners have passwordless sudo + docker by design; these
+# live-host hardening assertions only hold on a hardened lab host.
+needs_hardened_host = pytest.mark.skipif(
+    os.environ.get("GITHUB_ACTIONS") == "true",
+    reason="needs hardened host (no passwordless sudo/docker); GH runners have both",
+)
 
 
 def test_privilege_report_shape():
@@ -146,6 +155,7 @@ def test_try_userns_disabled_in_sandbox(monkeypatch):
     assert "sandbox" in out["reason"]
 
 
+@needs_hardened_host
 def test_host_audit_uses_no_sudo_no_docker(monkeypatch):
     """Audit must never escalate and never touch docker.
 
@@ -202,6 +212,7 @@ def test_host_audit_uses_no_sudo_no_docker(monkeypatch):
     assert out["cve_posture"]["kernel_cve_hits"] == []
 
 
+@needs_hardened_host
 def test_credential_gates_prove_password_required():
     """sudo -n must fail and su trust must be off on this host."""
     gates = privesc_mod._credential_gates_check()
@@ -245,6 +256,7 @@ def test_zoneminder_second_order_sqli_range_matches_target():
     assert check_vulnerable_version("zoneminder", "1.36.38") == []
 
 
+@needs_hardened_host
 def test_filecap_probe_proves_no_dac_bypass():
     """Live probe: sys_admin file cap must not open root-only files."""
     bypassed, detail = privesc_mod._filecap_dac_probe()
@@ -274,6 +286,7 @@ def api_client(monkeypatch):
     return TestClient(main_module.app)
 
 
+@needs_hardened_host
 def test_try_local_root_go_bro_shape(api_client):
     """The feature: one shot, all passwordless paths + audit, no password."""
     r = api_client.post("/api/tryLocalRoot_go_bro")
