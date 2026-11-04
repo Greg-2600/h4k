@@ -34,7 +34,7 @@ hydra ncrack john sqlmap \
     ldap-utils samba-common-bin \
     bettercap aircrack-ng sshuttle \
     git \
-    openjdk-17-jre-headless \
+    default-jre-headless \
     golang-go \
     && rm -rf /var/lib/apt/lists/*
 
