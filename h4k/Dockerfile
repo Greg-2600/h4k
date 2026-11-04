@@ -1,5 +1,5 @@
 # h4k — Metasploit automation lab (school cybersecurity project)
-FROM debian:13-slim
+FROM debian:12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 # AI triage: any OpenAI-compatible gateway; the opencode relay is keyless
@@ -34,7 +34,7 @@ hydra ncrack john sqlmap \
     ldap-utils samba-common-bin \
     bettercap aircrack-ng sshuttle \
     git \
-    default-jre-headless \
+    openjdk-17-jre-headless \
     golang-go \
     && rm -rf /var/lib/apt/lists/*
 
@@ -48,7 +48,7 @@ RUN CHISEL_VER=$(\
     && chmod +x /usr/local/bin/chisel
 
 # impacket (secretsdump, wmiexec, GetNPUsers...) — powershell/AD RPC suite
-RUN python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed impacket \
+RUN python3 -m pip install --break-system-packages --no-cache-dir impacket \
   && for s in secretdump secretsdump wmiexec smbexec GetNPUsers getTGT GetADUsers \
              mssqlclient smbclient; do \
        if [ -f "/usr/lib/python3/dist-packages/impacket/examples/${s}.py" ]; then \
