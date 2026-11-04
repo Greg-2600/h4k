@@ -186,7 +186,7 @@ logs:
 ## ─────────────────────────────────────────────────────────────────────────────
 
 test:
-	$(PYTEST)
+	$(PYTEST) --ignore=tests/e2e
 
 # Selenium end-to-end suite (headless Chromium against a sandbox-mode API).
 # Needs: chromium + chromedriver on PATH, `selenium` in the venv.
@@ -202,7 +202,7 @@ sanity-test:
 	H4K_LIVE=1 $(PYTEST) tests/test_live_stack.py -v
 
 coverage:
-	$(PYTEST) --cov --cov-report=term-missing
+	$(PYTEST) --ignore=tests/e2e --cov --cov-report=term-missing
 
 ## ─────────────────────────────────────────────────────────────────────────────
 # Clean
