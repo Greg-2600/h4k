@@ -636,6 +636,19 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #49 — header/cookie session fuzz
+
+`POST /api/session/fuzz` replays one working session (headers and/or
+cookies) against an explicit URL, then mutates identity material —
+strip-all (CRITICAL when the authed marker survives), strip-each,
+empty carriers, null/false/0/-1/true/admin/`undefined` swaps, and
+`?role=admin&admin=true&is_admin=1` injection — diffing every response
+against the operator's authed marker (and optional privileged
+marker, whose appearance means privilege gain). Only the operator's
+URL is ever requested. With `engagement_id` the findings ledger as
+vulns on the URL host (scope-enforced; CWE-287). Web card session row
++ palette; sandbox fully canned.
+
 ## Backlog #42 — cloud metadata SSRF pack
 
 `POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,

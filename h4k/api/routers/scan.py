@@ -53,6 +53,8 @@ from schemas import (
     RbacAuditResult,
     Report,
     ScanRequest,
+    SessionFuzzRequest,
+    SessionFuzzResult,
     SqlmapRequest,
     SqlmapResult,
     SsrfProbeRequest,
@@ -3416,6 +3418,75 @@ def ssrf_probe_api(req: SsrfProbeRequest) -> SsrfProbeResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return SsrfProbeResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/session/fuzz", response_model=SessionFuzzResult)
+def session_fuzz_api(req: SessionFuzzRequest) -> SessionFuzzResult:
+    """Fuzz identity headers/cookies for auth-bypass leads.
+
+    Opt-in and explicit: only the operator-supplied `url` is ever
+    requested, with the operator's own session material. `engagement_id`
+    ledgers findings as vulns on the URL host (scope-enforced).
+    Sandbox returns canned probes.
+    """
+    from services import sandbox as sandbox_mode
+    from services.sessionfuzz import probe_session, sandbox_result, to_ledger
+
+    target = (req.url or "").strip()
+    if not target.startswith(("http://", "https://")):
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=400, detail="url must be an http(s) URL you own"
+        )
+    try:
+        if not (req.authed_marker or "").strip():
+            raise ValueError("authed_marker required (verdicts need a baseline signal)")
+        result = (
+            sandbox_result(target)
+            if sandbox_mode.enabled()
+            else probe_session(
+                target,
+                headers=dict(req.headers or {}),
+                cookies=dict(req.cookies or {}),
+                authed_marker=req.authed_marker,
+                privileged_marker=req.privileged_marker or "",
+                method=req.method,
+            )
+        )
+    except ValueError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    host = urllib.parse.urlsplit(result.get("url", "")).hostname or ""
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from fastapi import HTTPException
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(
+            host, result.get("url", ""), result.get("findings") or []
+        ):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+            except ValueError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return SessionFuzzResult(
         **{
             **result,
             "ingested": ingested,

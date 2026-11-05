@@ -928,6 +928,55 @@ async function runSsrfProbe() {
   }
 }
 
+async function runSessionFuzz() {
+  const target = $('web-target').value.trim();
+  if (!target) { log('session fuzz needs a target', 'warn'); return; }
+  const marker = $('sess-marker').value.trim();
+  if (!marker) { log('session fuzz needs an authed marker', 'warn'); return; }
+  let headers = {};
+  const rawH = $('sess-headers').value.trim();
+  if (rawH) {
+    try {
+      headers = JSON.parse(rawH);
+    } catch {
+      $('web-body').textContent = 'session headers must be JSON';
+      log('session fuzz needs valid JSON headers', 'warn');
+      return;
+    }
+  }
+  const cookies = {};
+  for (const pair of $('sess-cookies').value.split(';')) {
+    const [k, ...rest] = pair.split('=');
+    if (k && k.trim()) cookies[k.trim()] = rest.join('=').trim();
+  }
+  if (!Object.keys(headers).length && !Object.keys(cookies).length) {
+    log('session fuzz needs a session (headers or cookies)', 'warn');
+    return;
+  }
+  $('web-body').textContent = 'fuzzing session carriers…';
+  $('sess-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/session/fuzz', {
+      method: 'POST',
+      body: {
+        url: target, headers, cookies, authed_marker: marker,
+        privileged_marker: $('sess-priv').value.trim() || "",
+        engagement_id: engId || null,
+      },
+    });
+    const names = (res.findings || []).map((f) => `${f.probe || 'finding'} (${f.severity || '?'})`).join(', ');
+    const state = res.clean ? 'auth enforced' : `${res.finding_count || 0} finding(s)`;
+    const note = res.note ? ` — ${res.note}` : '';
+    $('web-body').innerHTML = `<div data-testid="sess-probes">${esc(`${state} across ${res.probe_count || 0} probe(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${note}${names ? `: ${names}` : ''}`)}</div>`;
+    $('sess-status').textContent = state;
+    log(`session fuzz done: ${state}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('web-body').textContent = `session fuzz failed: ${e.message}`;
+    log(`session fuzz failed: ${e.message}`, 'error');
+  }
+}
+
 async function runNuclei() {
   const target = $('web-target').value.trim();
   if (!target) { log('nuclei needs a target', 'warn'); return; }
@@ -1495,6 +1544,7 @@ function runCmd(cmd) {
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
   else if (cmd === 'ssrfprobe') { setTab('recon'); }
+  else if (cmd === 'sessfuzz') { setTab('recon'); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
@@ -1687,6 +1737,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-ssrf-probe').addEventListener('click', runSsrfProbe);
+  $('btn-sess-fuzz').addEventListener('click', runSessionFuzz);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);
