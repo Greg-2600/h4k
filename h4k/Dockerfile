@@ -109,12 +109,12 @@ RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \
 # wasted build time), and the AD tooling has its own dependency constraints.
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/* \
     && python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed --upgrade pip \
-    && python3 -m pip install --break-system-packages --no-cache-dir \
+    && python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed \
          "opentelemetry-api==1.37.0" \
          "opentelemetry-sdk==1.37.0" \
          "opentelemetry-exporter-otlp-proto-http==1.37.0" \
          "semgrep==1.182.0" \
-    && python3 -m pip install --break-system-packages --no-cache-dir \
+    && python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed \
          pymetasploit3 fastapi uvicorn python-multipart pyyaml \
          python-owasp-zap-v2.4 \
          mitm6 \
