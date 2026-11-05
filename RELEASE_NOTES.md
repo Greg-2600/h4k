@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #27 — privesc suggester
+
+`POST /api/privesc/suggest` runs ten read-only checks in the linPEAS
+spirit — kernel, SUID binaries (GTFOBins-flagged), file caps, sudo
+build, writable PATH dirs, writable cron files, NFS `no_root_squash`,
+pivot groups, shadow readability, loaded modules — each with a fix
+hint. No password, no writes, no payloads; every check degrades instead
+of raising. Sandbox returns a canned checklist. Pivot Checklist button.
+
 ## Backlog #25 — false-positive tuner
 
 `POST /api/engagement/{id}/vulns/suppress` hides a finding until a
