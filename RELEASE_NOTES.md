@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #39 — K8s RBAC audit
+
+`POST /api/rbac/audit` analyzes pasted Role/ClusterRole/Binding YAML
+entirely offline (`yaml.safe_load_all` — nothing contacts a cluster)
+and flags cluster-admin equivalents, wildcard verbs/resources,
+`escalate`/`bind`/`impersonate`, secret reads, pod creation, and
+bindings to `system:authenticated`/`system:unauthenticated` or
+`cluster-admin`. Parse problems are reported per document, never fatal.
+With `engagement_id` the findings ledger as vulns on the labeled host
+(scope-enforced). Container card Audit-RBAC row + palette.
+
 ## Backlog #37 — kubelet unauth audit
 
 `POST /api/kubelet/audit` probes one kubelet you own with read-only

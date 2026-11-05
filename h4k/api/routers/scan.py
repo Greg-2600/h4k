@@ -48,6 +48,8 @@ from schemas import (
     NucleiRequest,
     NucleiResult,
     PaginatedJobs,
+    RbacAuditRequest,
+    RbacAuditResult,
     Report,
     ScanRequest,
     SqlmapRequest,
@@ -3302,6 +3304,56 @@ def kubelet_audit_api(req: KubeletAuditRequest) -> KubeletAuditResult:
     return KubeletAuditResult(
         **{
             **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/rbac/audit", response_model=RbacAuditResult)
+def rbac_audit_api(req: RbacAuditRequest) -> RbacAuditResult:
+    """Audit pasted K8s RBAC manifests for over-permissive grants.
+
+    Offline analysis only — nothing contacts a cluster. `host` labels the
+    ledger entry. `engagement_id` ledgers findings as vulns on that host
+    (scope-enforced). Sandbox returns canned findings.
+    """
+    from services import sandbox as sandbox_mode
+    from services.rbac_audit import audit_documents, sandbox_result, to_ledger
+
+    try:
+        if not req.documents:
+            raise ValueError("documents required (paste Role/ClusterRole YAML)")
+        result = (
+            sandbox_result()
+            if sandbox_mode.enabled()
+            else audit_documents(req.documents)
+        )
+    except ValueError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from fastapi import HTTPException
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, result.get("findings") or []):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return RbacAuditResult(
+        **{
+            **result,
+            "host": host,
             "ingested": ingested,
             "skipped_out_of_scope": skipped,
         }
