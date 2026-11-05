@@ -290,6 +290,7 @@ sandbox stand-ins required where network/tooling is involved.
 45. **WebSocket fuzz** — frame mutation + replay.
 46. **gRPC enumerator + fuzz** — reflection + payload shapes.
 47. **GraphQL introspection + fuzz** — field/depth probes.
+  (done: `services/graphqlfuzz.py` urllib-only pack (compact introspection parse, schema-built depth probe, batch probe, garbage-arg/malformed field fuzz with stack-trace/SQL leak detection) + scope-enforced ledger; `POST /api/graphql/fuzz` (400 bad url, 404 unknown engagement) sandbox canned; Web card GraphQL row + palette; unit (incl. open vs hardened stub servers) + e2e `test_graphqlfuzz*`.)
 48. **OpenAPI import → fuzz** — spec-driven targets.
 49. **Header/cookie session fuzz** — auth-bypass leads.
 50. **JWT tester** — crack + alg-confusion, lab-only.

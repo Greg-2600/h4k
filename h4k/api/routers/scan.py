@@ -34,6 +34,8 @@ from schemas import (
     FuzzRequest,
     GobusterRequest,
     GobusterResult,
+    GraphqlProbeRequest,
+    GraphqlProbeResult,
     Job,
     JohnRequest,
     JohnResult,
@@ -3416,6 +3418,59 @@ def ssrf_probe_api(req: SsrfProbeRequest) -> SsrfProbeResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return SsrfProbeResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/graphql/fuzz", response_model=GraphqlProbeResult)
+def graphql_probe_api(req: GraphqlProbeRequest) -> GraphqlProbeResult:
+    """Run the GraphQL introspection + depth + batch + field-fuzz pack.
+
+    Opt-in and explicit: only the operator-supplied `url` is ever
+    requested. `engagement_id` ledgers findings as vulns on the URL
+    host (scope-enforced). Sandbox returns canned probes.
+    """
+    from services import sandbox as sandbox_mode
+    from services.graphqlfuzz import probe_endpoint, sandbox_result, to_ledger
+
+    target = (req.url or "").strip()
+    if not target.startswith(("http://", "https://")):
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=400, detail="url must be an http(s) URL you own"
+        )
+    if sandbox_mode.enabled():
+        result = sandbox_result(target)
+    else:
+        result = probe_endpoint(target, depth=req.depth, batch=req.batch)
+    host = urllib.parse.urlsplit(result.get("url", "")).hostname or ""
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from fastapi import HTTPException
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(
+            host, result.get("url", ""), result.get("findings") or []
+        ):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+            except ValueError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return GraphqlProbeResult(
         **{
             **result,
             "ingested": ingested,

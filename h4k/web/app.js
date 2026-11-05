@@ -928,6 +928,32 @@ async function runSsrfProbe() {
   }
 }
 
+async function runGraphqlProbe() {
+  let url = $('gql-url').value.trim();
+  if (!url) {
+    const base = $('web-target').value.trim().replace(/\/+$/, '');
+    if (!base) { log('GraphQL probe needs a target', 'warn'); return; }
+    url = `${base}/graphql`;
+  }
+  $('web-body').textContent = 'probing GraphQL (introspection + depth + batch + fields)…';
+  $('gql-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/graphql/fuzz', {
+      method: 'POST',
+      body: { url, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => `${f.probe || 'finding'} (${f.severity || '?'})`).join(', ');
+    const state = res.clean ? 'clean' : `${res.finding_count || 0} finding(s)`;
+    $('web-body').innerHTML = `<div data-testid="gql-probes">${esc(`${state} across ${res.probe_count || 0} probe(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('gql-status').textContent = state;
+    log(`GraphQL probe done: ${state}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('web-body').textContent = `GraphQL probe failed: ${e.message}`;
+    log(`GraphQL probe failed: ${e.message}`, 'error');
+  }
+}
+
 async function runNuclei() {
   const target = $('web-target').value.trim();
   if (!target) { log('nuclei needs a target', 'warn'); return; }
@@ -1495,6 +1521,7 @@ function runCmd(cmd) {
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
   else if (cmd === 'ssrfprobe') { setTab('recon'); }
+  else if (cmd === 'gqlprobe') { setTab('recon'); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
@@ -1687,6 +1714,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-ssrf-probe').addEventListener('click', runSsrfProbe);
+  $('btn-gql-probe').addEventListener('click', runGraphqlProbe);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);
