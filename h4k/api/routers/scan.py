@@ -33,6 +33,8 @@ from schemas import (
     FuzzRequest,
     GobusterRequest,
     GobusterResult,
+    ImageScanRequest,
+    ImageScanResult,
     Job,
     JohnRequest,
     JohnResult,
@@ -3250,6 +3252,65 @@ def nuclei_scan_api(req: NucleiRequest) -> NucleiResult:
         **{
             **result,
             "target": req.target,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/image/scan", response_model=ImageScanResult)
+def image_scan_api(req: ImageScanRequest) -> ImageScanResult:
+    """Scan one container image with trivy (opt-in, explicit).
+
+    `host` says where the image runs and is required when `engagement_id`
+    is set: findings ledger as vulns on that host (scope-enforced).
+    Sandbox returns canned findings without pulling anything.
+    """
+    from services import sandbox as sandbox_mode
+    from services.image_scan import (
+        sandbox_result,
+        scan_image,
+        to_ledger,
+        validate_image_ref,
+    )
+
+    try:
+        image = validate_image_ref(req.image)
+        if sandbox_mode.enabled():
+            result = sandbox_result(image)
+        else:
+            result = scan_image(image, severity=req.severity)
+    except ValueError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from fastapi import HTTPException
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        if not (req.host or "").strip():
+            raise HTTPException(
+                status_code=400, detail="host required when engagement_id is set"
+            )
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(
+            (req.host or "").strip(),
+            result.get("image", ""),
+            result.get("findings") or [],
+        ):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return ImageScanResult(
+        **{
+            **result,
             "ingested": ingested,
             "skipped_out_of_scope": skipped,
         }

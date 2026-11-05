@@ -652,6 +652,32 @@ class NucleiResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Container image scan ----
+class ImageScanRequest(BaseModel):
+    """Trivy image scan request (opt-in, explicit image ref)."""
+
+    image: str
+    severity: str | None = None
+    # host records *where the image runs*: required when engagement_id is set,
+    # because vulns ledger per host and scope is enforced per host.
+    host: str | None = None
+    engagement_id: str | None = None
+
+
+class ImageScanResult(BaseModel):
+    image: str = ""
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    success: bool = False
+    timed_out: bool = False
+    error: str = ""
+    stderr: str = ""
+    rc: int | None = None
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- SQLMap ----
 class SqlmapRequest(BaseModel):
     """SQLMap automated SQL injection scan request."""

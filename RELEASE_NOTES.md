@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #36 — container image scan
+
+`POST /api/image/scan` runs `trivy image --format json` on one explicit
+image ref (validated, fixed argv, no shell) and flattens
+`Results[].Vulnerabilities[]` into findings (CVE, package,
+installed/fixed, severity). With `host` + `engagement_id` the findings
+ledger as vulns on that host — scope-enforced, out-of-scope hosts
+reported and never stored. Sandbox returns canned openssl findings
+without pulling anything. Container card Scan-image row + palette.
+
 ## Backlog #27 — privesc suggester
 
 `POST /api/privesc/suggest` runs ten read-only checks in the linPEAS

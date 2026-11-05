@@ -980,6 +980,29 @@ async function detectContainerSurfaces() {
   }
 }
 
+async function scanImage() {
+  const image = $('img-ref').value.trim();
+  if (!image) { log('image scan needs an image ref', 'warn'); return; }
+  const host = $('img-host').value.trim();
+  const sev = $('img-sev').value.trim();
+  $('img-body').textContent = 'trivy scanning image…';
+  $('img-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/image/scan', {
+      method: 'POST',
+      body: { image, severity: sev || null, host: host || null, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => `${f.cve || 'finding'} in ${f.pkg || '?'}`).slice(0, 10).join(', ');
+    $('img-body').innerHTML = `<div data-testid="img-findings">${esc(`${res.finding_count || 0} finding(s) in ${res.image || image}${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}: ${names || 'none'}`)}</div>`;
+    $('img-status').textContent = `${res.finding_count || 0} finding(s)`;
+    log(`image scan done: ${res.finding_count || 0} finding(s)`, 'success');
+  } catch (e) {
+    $('img-body').textContent = `image scan failed: ${e.message}`;
+    log(`image scan failed: ${e.message}`, 'error');
+  }
+}
+
 async function startContainerFuzz() {
   const btn = $('btn-cf-start');
   if (btn) btn.disabled = true;
@@ -1433,6 +1456,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'imgscan') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'score') setTab('score');
   else if (cmd === 'theme') toggleTheme();
@@ -1617,6 +1641,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
+  $('btn-img-scan').addEventListener('click', scanImage);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }
     catch (e) { log(`cve refresh failed: ${e.message}`, 'error'); }
