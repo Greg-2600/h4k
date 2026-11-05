@@ -623,3 +623,15 @@ degraded instead of hot-looping). /api/health reports per-service state and
 restart counts; the ops rail shows daemon status. Qualify ends with a chaos
 stage: SIGKILL msfrpcd in the runtime container and require recovery with a
 recorded restart before teardown.
+
+## Debian 13 (trixie) base image (2026-11-05)
+
+Base moved from `debian:12-slim` to `debian:13-slim`, proven the hard way:
+fresh no-cache build, fresh boot (postgres 17 + msfrpcd + tor + API all
+healthy), and a full 24-stage qualify workout on the trixie stack. Trixie
+ships apt-owned Python packages without RECORD files, so system-site pip
+replaces fail — `--ignore-installed` on all pip installs (matching the
+existing impacket precedent). Also unmasked a latent hazard: the trailing
+`|| true` (meant for `pip check`) swallowed whole-layer install failures;
+`pip check` is clean so it now fails loudly, plus curl retries on every
+network fetch and a pinned trivy tarball instead of install.sh.
