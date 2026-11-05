@@ -145,6 +145,11 @@
               <span class="muted" id="tls-status" data-testid="tls-status"></span>
             </div>
             <div id="tls-body" data-testid="tls-body" class="muted">Version/cipher/cert per TLS port, with exact-match watchlist + heuristic leads.</div>
+            <div class="row">
+              <input type="text" id="tls-inv-targets" data-testid="tls-inv-targets" class="grow" placeholder="inventory: host[:port], comma-separated" />
+              <button class="btn" id="btn-tls-inv" data-testid="btn-tls-inv">Cert inventory</button>
+            </div>
+            <div id="tls-inv-body" data-testid="tls-inv-body" class="muted">Expiry/weak-cipher/self-signed leads across many hosts.</div>
           </div>
         </div>
         <div class="card">

@@ -256,6 +256,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/ipv6_discovery.py` NDP parse + explicit-CIDR nmap -6 only (never a blind v6 sweep) + scope-enforced asset ledger; `POST /api/net/ipv6/discover` sandbox canned; Discover Neighbors-v6 button + palette; unit + e2e `test_ipv6*`.)
 19. **mDNS/SSDP persistent map** — sweeps persist as assets.
 20. **TLS cert inventory** — expiry/weak-cipher/self-signed leads.
+  (done: `services/cert_inventory.py` multi-host inventory + 30-day expiry/self-signed/weak leads + scope-enforced vuln ledger; `POST /api/tls/inventory` sandbox canned; TLS card inventory row; unit + e2e `test_cert*`.)
 21. **Shodan/Censys BYO import** — JSON → leads, no key in repo.
 22. **CPE auto-correlate** — banner → CPE → CVE matcher.
 23. **KEV/EPSS enrichment** — CISA KEV flag + EPSS score on vulns.
