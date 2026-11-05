@@ -18,12 +18,23 @@
 #     attempt, not just at planning time.
 #   * It is opt-in and off by default, like every other active action here.
 import logging
+import time
 from collections.abc import Callable
 from typing import Any
 
 from services.creds import CredArchive
 from services.engagement import EngagementStore
 from services.msfrpc import MsfClient
+from services.spray_guard import (
+    DEFAULT_JITTER_MAX,
+    DEFAULT_MAX_PER_USER,
+    SprayPolicy,
+    apply_policy,
+    is_lockout_signal,
+    jitter_delay,
+    locked_users,
+    user_attempt_counts,
+)
 
 logger = logging.getLogger("h4k.propagate")
 
@@ -81,24 +92,39 @@ class PropagationService:
             self._archive = CredArchive()
         return self._archive
 
-    def plan(self, engagement_id: str) -> dict[str, Any]:
+    def plan(
+        self,
+        engagement_id: str,
+        max_per_user: int = DEFAULT_MAX_PER_USER,
+        jitter_max: float = DEFAULT_JITTER_MAX,
+    ) -> dict[str, Any]:
         """Dry-run: which (cred, service) pairs would be attempted.
 
         Returned without touching the network so the operator can see the blast
-        radius before authorizing anything.
+        radius before authorizing anything. The spray policy (per-user cap +
+        locked set) is applied to the pairs, so the plan shows exactly what
+        a run would do.
         """
         archive = self._cred_archive()
         known = self.store.verified_credentials(engagement_id)
         targets = self._candidate_targets(engagement_id, archive)
         attempts = self._pair_up(known, targets)
+        policy = SprayPolicy(max_per_user=max_per_user, jitter_max=jitter_max)
+        filtered = apply_policy(attempts, self.store.attempts(engagement_id), policy)
+        kept = filtered["pairs"]
         return {
             "engagement_id": engagement_id,
             "credentials": len(known),
             "targets": len(targets),
-            "attempts": len(attempts),
+            "attempts": len(kept),
             "max_attempts": MAX_ATTEMPTS,
-            "capped": len(attempts) > MAX_ATTEMPTS,
-            "pairs": attempts[:MAX_ATTEMPTS],
+            "capped": len(kept) > MAX_ATTEMPTS,
+            "pairs": kept[:MAX_ATTEMPTS],
+            "policy": filtered["policy"],
+            "held_locked": filtered["held_locked"],
+            "held_capped": filtered["held_capped"],
+            "locked_users": sorted(locked_users(self.store.attempts(engagement_id))),
+            "per_user": user_attempt_counts(self.store.attempts(engagement_id)),
         }
 
     def _candidate_targets(
@@ -174,26 +200,44 @@ class PropagationService:
         engagement_id: str,
         open_sessions: bool = False,
         max_attempts: int = MAX_ATTEMPTS,
+        max_per_user: int = DEFAULT_MAX_PER_USER,
+        jitter_max: float = DEFAULT_JITTER_MAX,
     ) -> dict[str, Any]:
         """Replay verified engagement credentials across in-scope services.
 
-        Returns the lateral-movement picture: which credentials reached which
-        additional hosts, and the attempt ledger.
+        Jitter pauses between attempts (0 = off); lockout signals are
+        ledgered as `locked` so the user is never retried.
         """
-        plan = self.plan(engagement_id)
+        from services import sandbox as sandbox_mode
+
+        policy = SprayPolicy(
+            max_per_user=max_per_user, jitter_max=jitter_max
+        ).normalized()
+        plan = self.plan(
+            engagement_id,
+            max_per_user=policy.max_per_user,
+            jitter_max=policy.jitter_max,
+        )
         pairs = plan["pairs"]
         cap = min(len(pairs), max(1, min(max_attempts, MAX_ATTEMPTS)))
+        sandbox = sandbox_mode.enabled()
         reached: list[dict[str, Any]] = []
         attempted: list[dict[str, Any]] = []
         failed = 0
+        locked = 0
         for idx, pair in enumerate(pairs[:cap]):
+            if idx and policy.jitter_max > 0 and not sandbox:
+                delay = jitter_delay(policy)
+                if delay > 0:
+                    time.sleep(delay)
             self.progress(
                 f"[propagate] {pair['user']} -> {pair['host']}:{pair['port']}"
                 f" ({pair['service']})",
                 int(100 * idx / cap) if cap else 100,
             )
-            ok = self._try(pair, open_sessions)
-            attempted.append({**pair, "verified": ok})
+            ok, was_locked = self._try(pair, open_sessions)
+            result = "verified" if ok else ("locked" if was_locked else "failed")
+            attempted.append({**pair, "verified": ok, "result": result})
             if ok:
                 reached.append(
                     {
@@ -213,9 +257,12 @@ class PropagationService:
                     origin_port=pair["port"],
                     verified=True,
                 )
+            elif was_locked:
+                locked += 1
             else:
                 failed += 1
-            # both outcomes go to the ledger so a repeat run is a no-op
+            # every outcome goes to the ledger so a repeat run is a no-op —
+            # and a locked user is never retried
             self.store.record_attempt(
                 engagement_id,
                 host=pair["host"],
@@ -223,7 +270,7 @@ class PropagationService:
                 service=pair["service"],
                 user=pair["user"],
                 password=pair["password"],
-                result="verified" if ok else "failed",
+                result=result,
                 module=pair["module"],
             )
         self.store.touch(engagement_id)
@@ -234,16 +281,21 @@ class PropagationService:
             "capped": len(pairs) > cap,
             "verified": len(reached),
             "failed": failed,
+            "locked": locked,
             "lateral_moves": sum(1 for r in reached if r["lateral"]),
             "reached": reached,
             "attempts": attempted,
+            "policy": plan["policy"],
+            "held_locked": plan["held_locked"],
+            "held_capped": plan["held_capped"],
             "note": (
                 "credential replay across in-scope services; failures recorded so "
                 "repeat runs do not re-attempt them"
             ),
         }
 
-    def _try(self, pair: dict[str, Any], open_sessions: bool) -> bool:
+    def _try(self, pair: dict[str, Any], open_sessions: bool) -> tuple[bool, bool]:
+        """One login attempt. Returns (verified, lockout_signal)."""
         opts: dict[str, Any] = {
             "RHOSTS": pair["host"],
             "RPORT": pair["port"],
@@ -264,7 +316,7 @@ class PropagationService:
                     res = self.msf.execute("auxiliary", pair["module"], opts)
                 else:
                     raise
-            return bool(res)
+            return bool(res), False
         except Exception as exc:
             logger.debug("propagate %s@%s failed: %s", pair["user"], pair["host"], exc)
-            return False
+            return False, is_lockout_signal(str(exc))

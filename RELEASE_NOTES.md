@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #10 — lockout-aware spray
+
+Propagation replays now run under a spray policy: at most N attempts per
+user per engagement (ledgered attempts count, default 25), an optional
+jitter pause between logins (0 = off, skipped in sandbox), and lockout
+signals recorded as `locked` so that user is never retried. Plan shows the
+policy plus held-back counts; the Pivot ledger card exposes both knobs.
+Unit + e2e `test_spray*` pin the cap, the ledger stop and the plan stats.
+
 ## Backlog #8 — Kerberos roast helpers
 
 `POST /api/kerberos/asrep` (no-preauth users) and
