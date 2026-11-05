@@ -250,6 +250,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/pdf_report.py` reportlab render + `GET /api/session/report?fmt=pdf` attachment (passwords masked); Report card Download PDF; `reportlab` in requirements + image; unit + e2e `test_pdf*`.)
 15. **Engagement compare/diff** — vulns/paths across runs.
 16. **JARM/JA3 TLS fingerprints** — C2/malware leads from handshakes.
+  (done: `services/tls_fingerprint.py` stdlib handshake inventory + stable fingerprint + operator watchlist (exact match) + heuristic leads; `POST /api/tls/fingerprint` sandbox canned; Recon TLS card + palette; unit + e2e `test_tls*`. Honest scope: not raw-ClientHello JARM — stdlib cannot emit the probes, exact-match only.)
 17. **SNMP community sweep** — community + MIB walk, opt-in.
 18. **IPv6 discovery** — NDP/arp6 + nmap -6, scope-checked.
 19. **mDNS/SSDP persistent map** — sweeps persist as assets.

@@ -762,6 +762,24 @@ async function krbRoast(kind) {
   } catch (e) { $('krb-body').textContent = `${kind} failed: ${e.message}`; }
 }
 
+async function runTlsFingerprint() {
+  const target = $('tls-target').value.trim() || $('target').value.trim();
+  if (!target) { log('tls needs a target', 'warn'); return; }
+  const ports = $('tls-ports').value.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => n > 0 && n < 65536);
+  $('tls-body').textContent = 'probing TLS…';
+  $('tls-status').textContent = '';
+  try {
+    const res = await api('/api/tls/fingerprint', { method: 'POST', body: { target, ports: ports.length ? ports : null } });
+    const rows = (res.probes || []).filter((p) => p.ok).map((p) => {
+      const leads = (p.leads || []).map((l) => `[${l.level}] ${l.lead}`).join('; ');
+      return `<div data-testid="tls-probe"><b>${esc(p.host)}:${p.port}</b> ${esc(p.version)} ${esc(p.cipher)} <span class="mono">${esc((p.fingerprint || '').slice(0, 16))}…</span>${leads ? `<br />⚠ ${esc(leads)}` : ''}</div>`;
+    }).join('');
+    $('tls-body').innerHTML = rows || 'no TLS services answered';
+    $('tls-status').textContent = `${(res.ports || []).length} TLS port(s), ${res.lead_count || 0} lead(s)`;
+    log(`tls fingerprint: ${(res.ports || []).length} port(s)`, 'success');
+  } catch (e) { $('tls-body').textContent = `tls failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1309,6 +1327,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
@@ -1482,6 +1501,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-tls-run').addEventListener('click', runTlsFingerprint);
   $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
   $('btn-krb-roast').addEventListener('click', () => krbRoast('kerberoast'));
   $('btn-nse-suggest').addEventListener('click', runNseSuggest);
