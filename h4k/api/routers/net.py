@@ -154,3 +154,37 @@ def net_sniff_pcap(body: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         eng_id, store = None, None
     return PassiveSniffer().analyze_pcap(pcap_file, eng_id, store)
+
+
+@router.post("/ipv6/discover")
+def net_ipv6_discover(body: dict[str, Any]) -> dict[str, Any]:
+    """IPv6 discovery: NDP neighbour table + optional explicit-CIDR sweep.
+
+    `engagement_id` records in-scope hosts as assets; out-of-scope
+    addresses are reported and never stored. Sandbox returns canned hosts.
+    """
+    from services import sandbox as sandbox_mode
+    from services.ipv6_discovery import discover, sandbox_discover
+
+    interface = str((body or {}).get("interface") or "").strip() or None
+    cidr = str((body or {}).get("cidr") or "").strip() or None
+    engagement_id = str((body or {}).get("engagement_id") or "").strip() or None
+    if sandbox_mode.enabled():
+        result = sandbox_discover()
+    else:
+        result = discover(interface=interface, cidr=cidr)
+    recorded = 0
+    skipped: list[str] = []
+    if engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for n in result.get("neighbors", []):
+            try:
+                recorded += store.upsert_asset(engagement_id, n["ip"])
+            except (ScopeError, ValueError):
+                skipped.append(n["ip"])
+    return {**result, "recorded": recorded, "skipped_out_of_scope": skipped}

@@ -107,6 +107,7 @@ Host recon/scan:
 - `GET /export/{id}?fmt=json|md`
 - `GET /api/session/report?fmt=json|md|pdf` (one-click assessment; PDF masks passwords)
 - `GET /neighbors` (ARP)
+- `POST /api/net/ipv6/discover` (NDP table + explicit-CIDR nmap -6, scope-enforced asset ledger)
 - `POST /attack`, `GET /attack/{id}`
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
 - `POST /vulnleads`
@@ -184,6 +185,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `ipv6_discovery.py` | IPv6 NDP table + explicit-CIDR nmap -6 sweep, scope-enforced asset ledger, sandbox canned |
 | `tls_fingerprint.py` | active TLS handshake inventory (version/cipher/cert) + exact-match watchlist + heuristic C2 leads, sandbox stand-in |
 | `pdf_report.py` | one-click assessment PDF: reportlab render of the session report (passwords masked) |
 | `loot_vault.py` | masked loot vault: verified creds + flags + shares, redaction + masked md/json export |

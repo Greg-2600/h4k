@@ -80,7 +80,11 @@
               </select>
               <button class="btn primary" id="btn-scan" data-testid="btn-scan">Scan</button>
               <button class="btn" id="btn-neighbors" data-testid="btn-neighbors" title="ARP discovery on local networks">Neighbors</button>
+              <button class="btn" id="btn-neighbors6" data-testid="btn-neighbors6" title="IPv6 NDP discovery (plus explicit-CIDR nmap -6 when scoped)">Neighbors v6</button>
               <span class="muted" id="scan-status" data-testid="scan-status">idle</span>
+            </div>
+            <div class="row">
+              <div class="muted" id="ipv6-body" data-testid="ipv6-body">NDP table + optional nmap -6 sweep; in-scope hosts recorded.</div>
             </div>
             <div class="row">
               <span class="pill" data-testid="live-map-status"><span data-testid="live-map-state">auto-scan: idle</span> · <span data-testid="live-map-counts">0 hosts · 0 services · 0 vulns</span></span>
@@ -455,6 +459,7 @@
       <div id="cmd-results">
         <div class="cmd-item" data-cmd="scan"><span>Discover: launch scan</span></div>
         <div class="cmd-item" data-cmd="neighbors"><span>Discover: find neighbors</span></div>
+        <div class="cmd-item" data-cmd="neighbors6"><span>Discover: IPv6 neighbors</span></div>
         <div class="cmd-item" data-cmd="fingerprint"><span>Recon: fingerprint services</span></div>
         <div class="cmd-item" data-cmd="autopilot"><span>Exploit: start autopilot</span></div>
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
