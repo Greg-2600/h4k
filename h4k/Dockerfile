@@ -113,6 +113,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
          "opentelemetry-api==1.37.0" \
          "opentelemetry-sdk==1.37.0" \
          "opentelemetry-exporter-otlp-proto-http==1.37.0" \
+         "click==8.4.2" \
          "semgrep==1.182.0" \
     && python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed \
          pymetasploit3 fastapi uvicorn python-multipart pyyaml \
@@ -123,6 +124,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
          "opentelemetry-api==1.37.0" \
          "opentelemetry-sdk==1.37.0" \
          "opentelemetry-exporter-otlp-proto-http==1.37.0" \
+         "click==8.4.2" \
     && python3 -m pip check
 
 # Build-time gate: semgrep must actually start (otel version skew has
