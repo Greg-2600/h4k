@@ -314,6 +314,28 @@ class SourceScanResult(BaseModel):
     findings: list[SourceFinding] = []
 
 
+# ---- SARIF import/export ----
+class SarifExportRequest(BaseModel):
+    """Export h4k findings to SARIF 2.1.0 (`findings` are SourceFinding dicts)."""
+
+    findings: list[dict[str, Any]] = []
+    tool_name: str = "h4k-sast"
+
+
+class SarifImportRequest(BaseModel):
+    """Import outside SARIF (e.g. Semgrep `--sarif`) into h4k findings."""
+
+    sarif: dict[str, Any] | str = Field(default_factory=dict)
+
+
+class SarifImportResult(BaseModel):
+    findings: list[SourceFinding] = []
+    finding_count: int = 0
+    skipped: int = 0
+    errors: list[str] = []
+    tool: str = ""
+
+
 # ---- Sanitizer diff ----
 class SanitizerDiffRequest(BaseModel):
     """Sanitizer diff request (offline; pasted report text only)."""

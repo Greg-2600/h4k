@@ -1554,6 +1554,65 @@ async function renderReportPreview() {
   } catch (e) { $('report-preview').textContent = `preview failed: ${e.message}`; }
 }
 
+async function sarifImport() {
+  const raw = $('sarif-paste').value.trim();
+  if (!raw) { log('SARIF import needs pasted JSON', 'warn'); return; }
+  let doc = null;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    $('sarif-output').hidden = false;
+    $('sarif-output').textContent = 'import needs valid JSON';
+    return;
+  }
+  $('sarif-output').hidden = false;
+  $('sarif-output').textContent = 'importing SARIF (offline)…';
+  $('sarif-status').textContent = '';
+  try {
+    const res = await api('/api/source/sarif/import', { method: 'POST', body: { sarif: doc } });
+    const names = (res.findings || []).slice(0, 8).map((f) => `${f.rule_id || 'finding'}: ${f.title || f.name || ''} (${f.severity || '?'})`).join(', ');
+    $('sarif-output').textContent = `${res.finding_count || 0} finding(s) from ${esc(res.tool || 'SARIF')}${res.errors && res.errors.length ? ` · ${res.errors.length} note(s): ${res.errors.slice(0, 2).join('; ')}` : ''}${names ? `\n${names}` : ''}`;
+    $('sarif-status').textContent = `${res.finding_count || 0} finding(s)`;
+    log(`SARIF import done: ${res.finding_count || 0}`, 'success');
+  } catch (e) {
+    $('sarif-output').textContent = `SARIF import failed: ${e.message}`;
+    log(`SARIF import failed: ${e.message}`, 'error');
+  }
+}
+
+async function sarifExport() {
+  const raw = $('sarif-paste').value.trim();
+  if (!raw) { log('SARIF export needs pasted h4k findings JSON', 'warn'); return; }
+  let findings = null;
+  try {
+    findings = JSON.parse(raw);
+    if (!Array.isArray(findings)) throw new Error('not a list');
+  } catch {
+    $('sarif-output').hidden = false;
+    $('sarif-output').textContent = 'export needs a JSON list of h4k findings';
+    return;
+  }
+  $('sarif-output').hidden = false;
+  $('sarif-output').textContent = 'converting to SARIF (offline)…';
+  try {
+    const res = await api('/api/source/sarif/export', { method: 'POST', body: { findings } });
+    const count = (res.sarif && res.sarif.runs && res.sarif.runs[0] && res.sarif.runs[0].results || []).length;
+    $('sarif-output').textContent = `${count} result(s) in SARIF 2.1.0`;
+    $('sarif-status').textContent = `${count} result(s)`;
+    const blob = new Blob([JSON.stringify(res.sarif, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'h4k-findings.sarif';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    log(`SARIF export done: ${count} result(s)`, 'success');
+  } catch (e) {
+    $('sarif-output').textContent = `SARIF export failed: ${e.message}`;
+    log(`SARIF export failed: ${e.message}`, 'error');
+  }
+}
+
 async function downloadSessionReport() {
   try {
     const res = await api('/api/session/report?fmt=md');
@@ -1615,6 +1674,7 @@ function runCmd(cmd) {
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
+  else if (cmd === 'sarifx') setTab('score');
   else if (cmd === 'score') setTab('score');
   else if (cmd === 'theme') toggleTheme();
   else if (cmd === 'clear') { $('activity-log').innerHTML = ''; }
@@ -1880,6 +1940,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   $('btn-attck').addEventListener('click', loadAttck);
   $('btn-session-report').addEventListener('click', downloadSessionReport);
+  $('btn-sarif-import').addEventListener('click', sarifImport);
+  $('btn-sarif-export').addEventListener('click', sarifExport);
   $('btn-session-pdf').addEventListener('click', downloadSessionPdf);
 
   // chrome

@@ -18,6 +18,9 @@ from schemas import (
     CustomRuleRequest,
     SanitizerDiffRequest,
     SanitizerDiffResult,
+    SarifExportRequest,
+    SarifImportRequest,
+    SarifImportResult,
     ScaResult,
     SourceExploitRequest,
     SourceFinding,
@@ -103,6 +106,79 @@ def sanitizer_diff(req: SanitizerDiffRequest) -> SanitizerDiffResult:
     return SanitizerDiffResult(
         bug_class=result.get("class", "unknown"),
         **{k: v for k, v in result.items() if k != "class"},
+    )
+
+
+@router.post("/sarif/export")
+def sarif_export(req: SarifExportRequest) -> dict[str, Any]:
+    """Export pasted h4k findings to SARIF 2.1.0 (offline).
+
+    Severities map critical|high→error, medium→warning, low→note,
+    info→none; CWEs ride in rule properties. Sandbox returns a canned
+    round-trip.
+    """
+    from services import sandbox as sandbox_mode
+    from services.sarif_exchange import h4k_to_sarif, sandbox_roundtrip
+
+    if not isinstance(req.findings, list) or not req.findings:
+        raise HTTPException(
+            status_code=400, detail="findings required (paste h4k findings JSON)"
+        )
+    sarif = sandbox_roundtrip()["sarif"] if sandbox_mode.enabled() else None
+    if sarif is None:
+        try:
+            sarif = h4k_to_sarif(req.findings, tool_name=req.tool_name or "h4k-sast")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"sarif": sarif}
+
+
+@router.post("/sarif/import", response_model=SarifImportResult)
+def sarif_import(req: SarifImportRequest) -> SarifImportResult:
+    """Import outside SARIF (e.g. Semgrep `--sarif`) into h4k findings.
+
+    Rules resolve against each run's driver for names + CWEs; the
+    producing tool is noted, never relabeled. Malformed results are
+    reported per index, never silently dropped. Sandbox returns canned
+    findings.
+    """
+    import json as json_lib
+
+    from services import sandbox as sandbox_mode
+    from services.sarif_exchange import sandbox_roundtrip, sarif_to_h4k
+
+    doc = req.sarif
+    if isinstance(doc, str):
+        if not doc.strip():
+            raise HTTPException(
+                status_code=400, detail="sarif required (paste SARIF JSON)"
+            )
+        try:
+            doc = json_lib.loads(doc)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail=f"sarif is not JSON: {exc}"
+            ) from exc
+    if not isinstance(doc, dict) or not doc:
+        raise HTTPException(status_code=400, detail="sarif required (paste SARIF JSON)")
+    if sandbox_mode.enabled():
+        doc = {"version": "2.1.0", "runs": sandbox_roundtrip()["sarif"]["runs"]}
+    try:
+        result = sarif_to_h4k(doc)
+    except (ValueError, AttributeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    findings: list[SourceFinding] = []
+    for finding in result.get("findings", []):
+        try:
+            findings.append(SourceFinding(**finding))
+        except ValueError:
+            continue
+    return SarifImportResult(
+        findings=findings,
+        finding_count=len(findings),
+        skipped=result.get("skipped", 0),
+        errors=result.get("errors", []),
+        tool=result.get("tool", ""),
     )
 
 
