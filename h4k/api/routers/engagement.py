@@ -238,6 +238,20 @@ def list_credentials(engagement_id: str) -> dict[str, Any]:
     }
 
 
+@router.get("/{engagement_id}/loot-timeline")
+def loot_timeline(engagement_id: str) -> dict[str, Any]:
+    """Chronological loot: sessions opened, creds verified, flags captured."""
+    from services.recon_pack import loot_timeline as build_timeline
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    try:
+        return build_timeline(store, engagement_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/{engagement_id}/hygiene")
 def credential_hygiene(engagement_id: str) -> dict[str, Any]:
     """Reuse/weak/default summary of verified credentials (read-only)."""

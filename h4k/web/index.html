@@ -346,6 +346,17 @@
             <div id="persist-sessions" class="muted"></div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>Recon pack + loot timeline</h2><span class="spacer"></span><button class="btn" id="btn-loot-timeline" data-testid="btn-loot-timeline">Load timeline</button></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="pack-session" data-testid="pack-session" class="grow" placeholder="session id (optional)" />
+              <button class="btn" id="btn-pack" data-testid="btn-pack">Load pack</button>
+            </div>
+            <div id="pack-body" data-testid="pack-body" class="muted">Stored sysinfo/getuid/hashdump for one session.</div>
+            <div id="loot-body" data-testid="loot-body" class="muted">Sessions opened → creds verified → flags captured, in order.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ═══ 6. SCORE: flags, objective, report ═══ -->

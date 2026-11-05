@@ -2504,6 +2504,17 @@ def list_sessions() -> dict[str, Any]:
     return {"sessions": merged, "count": len(merged)}
 
 
+@router.get("/sessions/{msf_session_id}/pack")
+def session_pack(msf_session_id: str) -> dict[str, Any]:
+    """Recon pack for one session: stored sysinfo/getuid/hashdump outputs.
+
+    Read-only; empty pack (found=false) when the session never ran recon.
+    """
+    from services.recon_pack import session_pack as build_pack
+
+    return build_pack(msf_session_id)
+
+
 @router.post("/sessions/{msf_session_id}/cmd")
 def session_cmd(msf_session_id: str, req: dict[str, Any]) -> dict[str, Any]:
     """Run a command on an open session (post-exploit console)."""

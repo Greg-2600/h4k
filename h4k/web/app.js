@@ -915,6 +915,30 @@ async function renderPersist() {
   sessBox.innerHTML = sessions.length
     ? sessions.map((s) => `<div class="shellrow"><span>💀</span><span class="mono">${esc(s.msf_session_id || s.id)}</span><span>${esc(s.host || '')}</span>${s.alive === false ? '<span class="muted">dead</span>' : '<span class="muted">alive</span>'}</div>`).join('')
     : 'no live sessions — re-enter below, then come back';
+  loadLootTimeline();
+}
+
+async function loadPack() {
+  const sid = $('pack-session').value.trim();
+  if (!sid) { $('pack-body').textContent = 'enter a session id to load its stored recon'; return; }
+  try {
+    const res = await api(`/api/sessions/${encodeURIComponent(sid)}/pack`);
+    if (!res.found) { $('pack-body').textContent = 'no stored recon for that session'; return; }
+    const rows = Object.entries(res.recon || {}).map(([cmd, out]) => `<div><b>${esc(cmd)}</b><div class="output">${esc(String(out).slice(0, 1500))}</div></div>`).join('');
+    $('pack-body').innerHTML = `<div data-testid="pack-recon">${rows || 'empty recon'}</div>`;
+  } catch (e) { $('pack-body').textContent = `pack failed: ${e.message}`; }
+}
+
+async function loadLootTimeline() {
+  const engId = await currentEngagementId();
+  if (!engId) { $('loot-body').textContent = 'set an active scope first'; return; }
+  try {
+    const res = await api(`/api/engagement/${engId}/loot-timeline`);
+    const items = res.events || [];
+    $('loot-body').innerHTML = items.length
+      ? items.map((e) => `<div data-testid="loot-event"><span class="muted">${esc(e.at || '—')}</span> <b>${esc(e.kind)}</b> — ${esc(e.detail)}</div>`).join('')
+      : 'no loot yet — open a session, verify a cred, capture a flag';
+  } catch (e) { $('loot-body').textContent = `timeline failed: ${e.message}`; }
 }
 
 /* ---------- 6. score: flags, objective, report ---------- */
@@ -1476,6 +1500,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // persist
   $('btn-reenter').addEventListener('click', async () => { setTab('pivot'); await loadPropagationPlan(); await executePropagation(); await renderPersist(); });
   $('btn-go-score').addEventListener('click', () => setTab('score'));
+  $('btn-pack').addEventListener('click', loadPack);
+  $('btn-loot-timeline').addEventListener('click', loadLootTimeline);
 
   // score
   $('btn-flag-add').addEventListener('click', addFlag);

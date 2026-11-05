@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #11 — session recon pack + loot timeline
+
+`GET /api/sessions/{id}/pack` bundles the stored post-exploit recon for one
+session (sysinfo/getuid/hashdump from `session_recon`); empty pack
+(`found=false`) when the session never ran recon — read-only either way.
+`GET /api/engagement/{id}/loot-timeline` merges sessions opened, creds
+verified and flags captured into one chronological feed, sessions filtered
+to in-scope hosts. Persist card: pack viewer + one-click timeline.
+
 ## Backlog #8 — Kerberos roast helpers
 
 `POST /api/kerberos/asrep` (no-preauth users) and

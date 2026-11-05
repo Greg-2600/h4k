@@ -242,6 +242,7 @@ sandbox stand-ins required where network/tooling is involved.
 9. **LLMNR/NBT-NS poison lab** — container-only listener + capture.
 10. **Lockout-aware spray** — jitter, per-user cap, ledger stop.
 11. **Session post-exploit recon pack** — sysinfo/getuid/loot timeline.
+  (done: `services/recon_pack.py` + `GET /api/sessions/{id}/pack` (stored recon) + `GET /api/engagement/{id}/loot-timeline` (sessions/creds/flags in order, scope-filtered, read-only); Persist card pack viewer + timeline; unit + e2e `test_recon_pack`/`test_pack_ui`.)
 12. **Loot vault with redaction** — creds/keys/flags, masked export.
 13. **Engagement timeline view** — scan→creds→sessions→paths chronology.
 14. **PDF client report** — one-click assessment PDF.
