@@ -321,6 +321,17 @@ def _loop() -> None:
                 summary["services"],
                 summary["vulns"],
             )
+            # per-engagement scheduled re-scans (Backlog #5): recon-only
+            # passes for engagements whose own cadence has elapsed.
+            try:
+                from services.engagement import EngagementStore as _EStore
+                from services.rescan import run_due_rescans as _run_due
+
+                _due = _run_due(_EStore())
+                if _due.get("ran"):
+                    logger.info("[auto-scan] scheduled rescans ran: %d", _due["ran"])
+            except Exception as exc:
+                logger.debug("auto-scan: scheduled rescans failed: %s", exc)
         except Exception as exc:
             logger.warning("[auto-scan] pass failed: %s", exc)
             with _lock:

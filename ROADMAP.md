@@ -233,6 +233,7 @@ sandbox stand-ins required where network/tooling is involved.
 3. **DAST spider + auth crawl** — depth-bounded, scope-checked link/form map.
 4. **Credential hygiene report** — reuse/weak/default summary per engagement.
 5. **Scheduled re-scans + diff alerts** — cadence per engagement, MD digest.
+  (done: `watch_interval` cadence in watch config + `services/rescan.py` due-check/recon pass/digest MD, auto-scan loop hook, `POST /api/engagement/{id}/rescan` + `GET .../watch/digest`, Lab watch card cadence/Rescan/Digest; unit + e2e `test_rescan*`/`test_watch_digest`.)
 6. **NSE vuln suggest-and-run** — service → script map, explicit run only.
 7. **SMB share enumerator** — shares/ACLs, read-only, into asset graph.
 8. **Kerberos roast helpers** — AS-REP/kerberoast → John, explicit only.

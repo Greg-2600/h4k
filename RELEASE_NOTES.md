@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #5 — scheduled re-scans + diff-alert digest
+
+Watch config gains `interval` (seconds, 0 = off, max 24 h): the auto-scan
+loop runs a recon-only pass for each due engagement and stamps the cadence
+clock; `POST /api/engagement/{id}/rescan` runs the same pass on demand.
+`GET .../watch/digest` renders recent Lab Watch changes as a markdown alert
+digest (🔴 entries with new attack surface first) for handoff/report, with
+`fmt=json` for data. Lab watch card: cadence select, Rescan now, Digest
+download.
+
 ## Backlog #2 — Nuclei offline bundle + ledger
 
 `POST /api/nuclei` (opt-in) now takes `offline` (bundled templates only, no

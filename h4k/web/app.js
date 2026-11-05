@@ -909,6 +909,8 @@ async function refreshWatch() {
     ]);
     const sel = $('watch-mode');
     if (sel && cfg.mode) sel.value = cfg.mode;
+    const iv = $('watch-interval');
+    if (iv && cfg.interval !== undefined) iv.value = String(cfg.interval);
     status.textContent = st.snapshots
       ? `${st.snapshots} snapshot(s)${st.last_change ? ` · last change: ${st.last_change.summary}` : ' · no changes yet'}`
       : 'no snapshots yet — auto-scan records them';
@@ -942,6 +944,27 @@ async function refreshWatch() {
       return `<div class="watch-item"><div class="watch-head"><span class="muted">${esc(c.created_at || '')} [${esc(c.source || '')}]</span><span>${esc(c.summary || '')}</span></div>${parts.join('')}</div>`;
     }).join('');
   } catch { status.textContent = 'unavailable'; }
+}
+
+async function runScheduledRescan() {
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  log('scheduled rescan pass started (recon only)…', 'info');
+  try {
+    const res = await api(`/api/engagement/${engId}/rescan`, { method: 'POST' });
+    log(`rescan done: ${res.hosts || 0} hosts, ${res.services || 0} services`, 'success');
+    refreshWatch();
+  } catch (e) { log(`rescan failed: ${e.message}`, 'error'); }
+}
+
+async function downloadWatchDigest() {
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  try {
+    const res = await api(`/api/engagement/${engId}/watch/digest?fmt=md`);
+    downloadText('h4k-watch-digest.md', res.content || '', 'text/markdown');
+    log('watch digest downloaded', 'success');
+  } catch (e) { log(`digest failed: ${e.message}`, 'error'); }
 }
 
 async function refreshHandoff() {
@@ -1285,6 +1308,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   // lab watch: estate change history for the active engagement
   $('btn-watch-refresh').addEventListener('click', refreshWatch);
+  $('btn-watch-rescan').addEventListener('click', runScheduledRescan);
+  $('btn-watch-digest').addEventListener('click', downloadWatchDigest);
+  $('watch-interval').addEventListener('change', async (e) => {
+    const engId = await currentEngagementId();
+    if (!engId) { log('engage a scope first', 'error'); return; }
+    try {
+      await apiOrThrow(`/api/engagement/${engId}/watch/config`, { method: 'POST', body: { interval: parseInt(e.target.value, 10) || 0 } });
+      log(`rescan cadence saved: ${e.target.value}s`, 'success');
+    } catch (err) { log(`cadence save failed: ${err.message}`, 'error'); }
+  });
   $('btn-watch-verify').addEventListener('click', async () => {
     const engId = await currentEngagementId();
     if (!engId) { log('engage a scope first', 'error'); return; }
