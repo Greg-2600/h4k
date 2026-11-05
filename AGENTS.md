@@ -115,6 +115,7 @@ Host recon/scan:
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
 - `POST /api/stateful_fuzz` (login → authed-flow fuzz + ledger)
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
+- `GET|POST /api/fuzz-profiles`, `DELETE /api/fuzz-profiles/{name}` (auth presets; values never listed)
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
@@ -175,6 +176,7 @@ Health/diagnostic:
 | `security.py` | traceroute + exposure -> posture heuristic |
 | `fuzzer.py` | signal-guided HTTP mutation engine + real libFuzzer crash minimizer |
 | `container_fuzz.py` | Docker API / kubelet / containerd-framing / HTTP surface fuzzing (job-based) + read-only surface inventory |
+| `fuzz_profiles.py` | named auth presets for fuzz runs (values stay server-side) |
 | `crashes.py` | crash fingerprinting + dedup (N crashes -> M distinct bugs) |
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |

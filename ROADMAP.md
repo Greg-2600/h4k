@@ -304,6 +304,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/stateful_fuzz.py` per-iteration login (cookies + JSON-token harvest), round-robin step×field×mutation replay with session attached, 5xx/error-text/timeout signals (session-loss noted, never ledgered) + scope-enforced ledger; `POST /api/stateful_fuzz` (400 bad login/flow, 404 unknown engagement) sandbox canned; Fuzz-lab row + palette; unit (incl. live login + authed stub) + e2e `test_stateful_fuzz*`.)
 57. **Rate-limit-aware fuzz** — 429 backoff + jitter.
 58. **Authenticated fuzz profiles** — cookie/header presets.
+  (done: `services/fuzz_profiles.py` JSON-backed named presets (masked list, fail-closed unknown names, explicit-wins merge) + `GET|POST|DELETE /api/fuzz-profiles` (400/404; values never listed) + `profile` on the stateful run (preset headers merged, preset cookies seed the jar under fresh logins); Fuzz-lab manager + attach field + palette; unit + e2e `test_fuzz_profiles*`.)
 59. **Fuzz sharding** — N workers, merged registry.
 60. **Coverage HTML import** — llvm-cov badge in UI.
 61. **SARIF import/export** — Semgrep interchange.

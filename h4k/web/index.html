@@ -311,6 +311,18 @@
             <textarea id="st-flow" data-testid="st-flow" rows="2" class="grow" placeholder='Flow JSON: [{"method":"POST","url":"http://h/items","fields":["body:name","query:q"]}]'></textarea>
             <div class="output" id="st-output" data-testid="st-output" hidden></div>
             <div class="row">
+              <input type="text" id="prof-name" data-testid="prof-name" placeholder="profile name" title="Preset name: letters, digits, _ -" />
+              <input type="text" id="prof-headers" data-testid="prof-headers" class="grow" placeholder='Headers JSON, e.g. {"Authorization":"Bearer …"}' title="Preset headers (values stay server-side)" />
+              <input type="text" id="prof-cookies" data-testid="prof-cookies" class="grow" placeholder="Cookies k=v; k2=v2" title="Preset cookies (values stay server-side)" />
+              <button class="btn" id="btn-prof-save" data-testid="btn-prof-save">Save preset</button>
+              <button class="btn" id="btn-prof-list" data-testid="btn-prof-list">Presets</button>
+              <span class="muted" id="prof-status" data-testid="prof-status"></span>
+            </div>
+            <div class="row">
+              <input type="text" id="st-profile" data-testid="st-profile" placeholder="auth preset for stateful fuzz (optional)" title="Name a saved preset; explicit session material still wins" />
+            </div>
+            <div class="output" id="prof-output" data-testid="prof-output" hidden></div>
+            <div class="row">
               <button class="btn" id="btn-sandiff" data-testid="btn-sandiff">Sanitizer diff</button>
               <span class="muted" id="sandiff-status" data-testid="sandiff-status"></span>
             </div>
@@ -550,6 +562,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="authprof"><span>Exploit: auth preset for fuzzing</span></div>
         <div class="cmd-item" data-cmd="stfuzz"><span>Exploit: stateful login → fuzz</span></div>
         <div class="cmd-item" data-cmd="sandiff"><span>Exploit: compare sanitizers on a report</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
