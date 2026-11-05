@@ -867,3 +867,26 @@ class ContainerFuzzRequest(BaseModel):
 class ContainerFuzzResult(BaseModel):
     job_id: str = ""
     status: str = ""
+
+
+# ---- OpenAPI import → fuzz ----
+class OpenapiFuzzRequest(BaseModel):
+    """LAB-ONLY: spec-driven fuzzing of an API you OWN.
+
+    `spec` is the pasted OpenAPI 3 / Swagger 2.0 document (object or
+    JSON/YAML text). `base_url` is the only host ever requested.
+    `headers` carries operator-supplied auth for the lab app.
+    `engagement_id` records crash signals as vulns (scope-enforced).
+    """
+
+    base_url: str = ""
+    spec: dict[str, Any] | str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
+    iterations: int = Field(default=40, ge=1, le=200)
+    timeout: float = Field(default=8.0, gt=0, le=30.0)
+    engagement_id: str | None = None
+
+
+class OpenapiFuzzResult(BaseModel):
+    job_id: str = ""
+    status: str = ""

@@ -48,6 +48,8 @@ from schemas import (
     NmapNSEResult,
     NucleiRequest,
     NucleiResult,
+    OpenapiFuzzRequest,
+    OpenapiFuzzResult,
     PaginatedJobs,
     RbacAuditRequest,
     RbacAuditResult,
@@ -3422,6 +3424,125 @@ def ssrf_probe_api(req: SsrfProbeRequest) -> SsrfProbeResult:
             "skipped_out_of_scope": skipped,
         }
     )
+
+
+_oapifuzz_jobs: dict[str, dict[str, Any]] = {}
+
+
+@router.post("/openapi_fuzz", response_model=OpenapiFuzzResult)
+def run_openapi_fuzz(
+    req: OpenapiFuzzRequest, background: BackgroundTasks
+) -> OpenapiFuzzResult:
+    """LAB-ONLY: spec-driven fuzzing of an API you own.
+
+    Runs as a background job like /ws_fuzz — poll
+    `/api/openapi_fuzz/{id}`. Sandbox returns canned candidates without
+    parsing or requesting anything.
+    """
+    from services import sandbox as sandbox_mode
+    from services.openapi_fuzz import loads_spec, parse_spec
+
+    base = (req.base_url or "").strip().rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="base_url must be an http(s) URL")
+    spec = req.spec
+    if isinstance(spec, str):
+        try:
+            spec = loads_spec(spec)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        result_targets = parse_spec(spec or {})
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if sandbox_mode.enabled():
+        pass  # validated above; canned result below
+    host = urllib.parse.urlsplit(base).hostname or ""
+    if not host:
+        raise HTTPException(status_code=400, detail="base_url must include a host")
+    job_id = uuid.uuid4().hex[:12]
+    job: dict[str, Any] = {
+        "id": job_id,
+        "base": base,
+        "host": host,
+        "status": "running",
+        "targets": result_targets,
+        "candidates": [],
+        "created": datetime.now(UTC).isoformat(),
+    }
+    _oapifuzz_jobs[job_id] = job
+    background.add_task(_run_openapi_fuzz, job, req)
+    return OpenapiFuzzResult(job_id=job_id, status="running")
+
+
+def _run_openapi_fuzz(job: dict[str, Any], req: OpenapiFuzzRequest) -> None:
+    from services import sandbox as sandbox_mode
+    from services.openapi_fuzz import fuzz_targets, sandbox_result, to_ledger
+
+    try:
+        if sandbox_mode.enabled():
+            result = sandbox_result(job["base"])
+        else:
+            result = fuzz_targets(
+                job["base"],
+                job["targets"],
+                headers=dict(req.headers or {}),
+                iterations=req.iterations,
+                timeout=req.timeout,
+                progress=lambda msg, pct: _update(job, message=msg, progress=pct),
+            )
+        job["targets"] = result.get("targets", len(job["targets"]))
+        job["iterations"] = result.get("iterations", 0)
+        job["candidates"] = result.get("candidates", [])
+        job["count"] = result.get("candidate_count", 0)
+        job["clean"] = result.get("clean", True)
+        ingested = 0
+        skipped: list[str] = []
+        if req.engagement_id:
+            from routers.engagement import get_store
+            from services.engagement import ScopeError
+
+            store = get_store()
+            if not store.get_engagement(req.engagement_id):
+                job["error"] = "engagement not found"
+            else:
+                for entry in to_ledger(
+                    job["host"], job["base"], job.get("candidates", [])
+                ):
+                    try:
+                        ingested += store.record_vuln(
+                            req.engagement_id, entry["host"], entry
+                        )
+                    except ScopeError:
+                        if entry["host"] not in skipped:
+                            skipped.append(entry["host"])
+                    except ValueError:
+                        if entry["host"] not in skipped:
+                            skipped.append(entry["host"])
+        job["ingested"] = ingested
+        job["skipped_out_of_scope"] = skipped
+        _update(job, status="done", progress=100.0, message="openapi fuzz complete")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("openapi fuzz job failed")
+        _update(job, status="error", error=str(exc), message="openapi fuzz failed")
+
+
+@router.get("/openapi_fuzz/{job_id}")
+def openapi_fuzz_status(job_id: str) -> dict[str, Any]:
+    job = _oapifuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="openapi fuzz job not found")
+    return job
+
+
+@router.post("/openapi_fuzz/{job_id}/abort")
+def openapi_fuzz_abort(job_id: str) -> dict[str, Any]:
+    job = _oapifuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="openapi fuzz job not found")
+    job["status"] = "aborted"
+    logger.info("[openapi fuzz %s] abort requested", job_id)
+    return {"status": "abort_requested"}
 
 
 @router.get("/nuclei/templates")

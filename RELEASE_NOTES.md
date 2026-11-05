@@ -636,6 +636,22 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #48 — OpenAPI import → fuzz
+
+`POST /api/openapi_fuzz` imports a pasted OpenAPI 3 / Swagger 2.0
+document (JSON or YAML, tolerant `$ref`, never fetched) into concrete
+requests with type-correct dummies, then fuzzes one field per
+iteration in deterministic round-robin order (oversize, empty, null,
+wrong-type, format tokens, SQLi, traversal, negative/huge ints).
+HTTP 5xx, leaked stack traces/SQL, and timeouts land as candidates.
+Only the operator's `base_url` (plus their auth headers) is ever
+requested. With `engagement_id` the signals ledger as vulns on the
+base host (scope-enforced; CWE-20). Fuzz-lab API row + palette;
+sandbox fully canned. Drive-by fix in the same pass: `ssrf_pack` now
+reads `HTTPError` bodies instead of swallowing 500s as drops (the
+identical gap predates in `graphqlfuzz`, still on its unmerged
+branch).
+
 ## Backlog #42 — cloud metadata SSRF pack
 
 `POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,

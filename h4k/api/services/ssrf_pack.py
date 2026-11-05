@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
@@ -95,6 +96,17 @@ def _fetch(
                 "body": body,
                 "elapsed": round(time.time() - started, 2),
             }
+    except urllib.error.HTTPError as exc:
+        try:
+            body = exc.read(8192).decode("utf-8", errors="replace")
+        except Exception:
+            body = ""
+        return {
+            "status": exc.code,
+            "length": len(body),
+            "body": body,
+            "elapsed": round(time.time() - started, 2),
+        }
     except Exception as exc:
         return {
             "status": None,
