@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #54 — crash bisection
+
+`POST /api/fuzz/bisect` delta-debugs a crashing input to its minimal
+trigger: offline marker mode halves to the smallest substring still
+containing the marker; URL mode replays shrunken candidates at the
+operator's endpoint and keeps the smallest input still tripping the
+status threshold or marker. Bounded rounds, per-step trace, 1 MiB cap.
+Unlike the existing minimize (a libFuzzer `-minimize_crash` wrapper
+needing a local binary), this works on any pasted input. Fuzz-lab
+Bisect row + palette; sandbox fully canned.
+
 ## Backlog #50 — JWT tester
 
 `POST /api/jwt/test` audits a pasted JWT offline — unsigned

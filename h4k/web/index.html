@@ -301,6 +301,14 @@
               <button class="btn" id="btn-fz-stop" hidden>Stop</button>
             </div>
             <div class="output" id="fz-output" hidden></div>
+            <div class="row">
+              <input type="text" id="bisect-input" data-testid="bisect-input" class="grow" placeholder="Crashing input text (or base64:…)" title="The crashing input to halve" />
+              <input type="text" id="bisect-marker" data-testid="bisect-marker" placeholder="TRIGGER (offline)" title="Marker the minimal input must keep — or the live crash signal" />
+              <input type="text" id="bisect-url" data-testid="bisect-url" placeholder="http://target (optional live)" title="Replay shrunken candidates here (your target only)" />
+              <button class="btn" id="btn-bisect" data-testid="btn-bisect">Bisect</button>
+              <span class="muted" id="bisect-status" data-testid="bisect-status"></span>
+            </div>
+            <div class="output" id="bisect-output" data-testid="bisect-output" hidden></div>
           </div>
         </div>
       </section>
@@ -535,6 +543,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="bisect"><span>Exploit: halve a crash to its trigger</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>

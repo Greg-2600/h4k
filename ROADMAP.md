@@ -298,6 +298,7 @@ sandbox stand-ins required where network/tooling is involved.
 52. **AFL++ persistent runner** — harness + stats.
 53. **Sanitizer diff** — ASan vs UBSan vs MSan compare.
 54. **Crash bisection** — input halve to minimal trigger.
+  (done: `services/bisect.py` Zeller ddmin (offline marker mode + live URL replay vs status/marker, bounded rounds, audit trace) distinct from the libFuzzer wrapper; `POST /api/fuzz/bisect` (400 bad input/uninteresting) sandbox canned; Fuzz-lab Bisect row + palette; unit (incl. live stub server) + e2e `test_bisect*`.)
 55. **PCAP → seed replay** — deterministic fuzz seeds.
 56. **Stateful fuzz** — login → authed-flow fuzz.
 57. **Rate-limit-aware fuzz** — 429 backoff + jitter.

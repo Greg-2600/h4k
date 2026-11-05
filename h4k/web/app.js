@@ -521,6 +521,28 @@ async function launchPassAttack(host, port, service) {
   } catch (e) { log(`password attack failed: ${e.message}`, 'error'); }
 }
 
+async function bisectInput() {
+  const raw = $('bisect-input').value;
+  if (!raw.trim()) { log('bisection needs a crashing input', 'warn'); return; }
+  const body = { method: 'POST' };
+  if (raw.startsWith('base64:')) body.input_b64 = raw.slice(7).trim();
+  else body.input = raw;
+  if ($('bisect-marker').value.trim()) body.marker = $('bisect-marker').value.trim();
+  if ($('bisect-url').value.trim()) body.url = $('bisect-url').value.trim();
+  $('bisect-output').hidden = false;
+  $('bisect-output').textContent = 'halving input…';
+  $('bisect-status').textContent = '';
+  try {
+    const res = await api('/api/fuzz/bisect', { method: 'POST', body });
+    $('bisect-output').textContent = (
+      `${res.original_size} → ${res.minimal_size} bytes (${res.reduction_pct}% off) in ${res.rounds} rounds [${res.mode}]\n`
+      + `minimal: ${res.minimal_text || '(binary)'}`
+    ).slice(0, 1000);
+    $('bisect-status').textContent = `${res.reduction_pct}% smaller`;
+    log(`bisection done: ${res.minimal_size} bytes`, 'success');
+  } catch (e) { $('bisect-output').textContent = `bisection failed: ${e.message}`; }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -1538,6 +1560,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'bisect') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1738,6 +1761,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-bisect').addEventListener('click', bisectInput);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());

@@ -24,6 +24,8 @@ from schemas import (
     AttackRequest,
     BatchScanRequest,
     BatchScanResult,
+    BisectRequest,
+    BisectResult,
     ContainerEscapeResult,
     ContainerFuzzRequest,
     ContainerFuzzResult,
@@ -3534,6 +3536,52 @@ def jwt_test_api(req: JwtTestRequest) -> JwtTestResult:
             "skipped_out_of_scope": skipped,
         }
     )
+
+
+@router.post("/fuzz/bisect", response_model=BisectResult)
+def fuzz_bisect(req: BisectRequest) -> BisectResult:
+    """Halve a crashing input to its minimal trigger (delta-debug).
+
+    Offline `marker` mode never touches the network; with `url`,
+    shrunken candidates are replayed at that endpoint only.
+    Sandbox returns a canned bisection.
+    """
+    import base64 as b64lib
+
+    from services import sandbox as sandbox_mode
+    from services.bisect import bisect_input, sandbox_result
+
+    if req.input_b64 is not None:
+        try:
+            data = b64lib.b64decode(req.input_b64, validate=True)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail=f"bad base64 input: {exc}"
+            ) from exc
+    elif req.input is not None:
+        data = req.input.encode("utf-8")
+    else:
+        raise HTTPException(status_code=400, detail="input_b64 or input required")
+    if not req.url and (req.marker or "").encode() not in data:
+        raise HTTPException(
+            status_code=400,
+            detail="original input is not interesting — check the marker",
+        )
+    if sandbox_mode.enabled():
+        return BisectResult(**sandbox_result())
+    try:
+        result = bisect_input(
+            data,
+            url=req.url or "",
+            method=req.method,
+            marker=req.marker or "",
+            status_ge=req.status_ge,
+            max_rounds=req.max_rounds,
+            timeout=req.timeout,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return BisectResult(**result)
 
 
 @router.get("/nuclei/templates")

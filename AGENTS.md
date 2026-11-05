@@ -112,7 +112,7 @@ Host recon/scan:
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
 - `POST /vulnleads`
 - `GET /api/kev/check` + `POST /api/kev/enrich` (bundled snapshot) + `POST /api/kev/refresh` (opt-in live)
-- `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
+- `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`, `POST /fuzz/bisect` (delta-debug to minimal trigger)
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
 
 CTF / lab toolkit (opt-in, each explicit):
@@ -177,6 +177,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
+| `bisect.py` | ddmin input halving (offline marker + live replay) with audit trace |
 | `jwt_tester.py` | offline JWT audit + capped HMAC crack + live alg-confusion vs marker, ledgered, sandbox canned |
 | `ssrf_pack.py` | opt-in metadata SSRF probe pack (AWS/GCP/Azure + encoding bypasses) + scope-enforced ledger, sandbox canned |
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses |

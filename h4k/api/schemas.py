@@ -901,3 +901,37 @@ class ContainerFuzzRequest(BaseModel):
 class ContainerFuzzResult(BaseModel):
     job_id: str = ""
     status: str = ""
+
+
+# ---- Crash bisection ----
+class BisectRequest(BaseModel):
+    """Delta-debug one crashing input down to its minimal trigger.
+
+    `input_b64` (preferred) or `input` text is the crashing input.
+    Offline `marker` mode keeps the smallest substring still containing
+    the marker; with `url`, shrunken candidates are replayed at that
+    endpoint and the smallest input still tripping `status_ge`/marker
+    wins. Only the operator's URL is ever requested.
+    """
+
+    input_b64: str | None = None
+    input: str | None = None
+    url: str | None = None
+    method: str = "POST"
+    marker: str | None = None
+    status_ge: int = 500
+    max_rounds: int = Field(default=32, ge=1, le=256)
+    timeout: float = Field(default=8.0, gt=0, le=30.0)
+
+
+class BisectResult(BaseModel):
+    mode: str = ""
+    minimal_b64: str = ""
+    minimal_text: str = ""
+    original_size: int = 0
+    minimal_size: int = 0
+    reduction_pct: float = 0.0
+    rounds: int = 0
+    trace: list[dict[str, Any]] = []
+    still_crashes: bool = False
+    sandbox: bool = False
