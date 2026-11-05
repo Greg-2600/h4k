@@ -359,8 +359,10 @@
           <div class="card-body">
             <div class="row">
               <button class="btn primary" id="btn-trylocalroot-run" title="Userns + docker-group tries plus full host audit (no password, nothing written)">tryLocalRoot_go_bro</button>
+              <button class="btn" id="btn-privesc-suggest" data-testid="btn-privesc-suggest" title="Read-only linPEAS-style checklist">Checklist</button>
             </div>
             <div id="trylocalroot-body" class="muted">User-namespace uid 0, docker-group read, SUID/caps/gates/CVE posture — one shot, no password.</div>
+            <div id="privesc-suggest-body" data-testid="privesc-suggest-body" class="muted">Ten read-only checks, no password, no writes.</div>
           </div>
         </div>
         <div class="card">

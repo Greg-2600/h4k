@@ -3159,6 +3159,20 @@ def privesc_check() -> dict[str, Any]:
     return docker_group_report()
 
 
+@router.post("/privesc/suggest")
+def privesc_suggest() -> dict[str, Any]:
+    """linPEAS-style read-only checklist (no password, no writes, no payloads).
+
+    Sandbox returns a canned checklist so demos and CI stay hermetic.
+    """
+    from services import sandbox as sandbox_mode
+    from services.privesc_suggest import sandbox_suggest, suggest
+
+    if sandbox_mode.enabled():
+        return sandbox_suggest()
+    return suggest()
+
+
 @router.post("/privesc/try-docker-group")
 def privesc_try() -> dict[str, Any]:
     """OPT-IN safe try: prove host-root read via a read-only mount.

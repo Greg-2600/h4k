@@ -708,6 +708,19 @@ async function runTryLocalRoot() {
   }
 }
 
+async function runPrivescSuggest() {
+  $('privesc-suggest-body').textContent = 'running read-only checklist…';
+  try {
+    const res = await api('/api/privesc/suggest', { method: 'POST', body: {} });
+    const checks = res.checks || [];
+    $('privesc-suggest-body').innerHTML = checks.map((c) => `<div data-testid="privesc-check">${c.status === 'fail' ? '🔴' : c.status === 'pass' ? '🟢' : '⚪'} <b>${esc(c.id)}</b> ${esc(c.title)} — ${esc(c.detail || '')}${c.fix ? `<br /><span class="muted">fix: ${esc(c.fix)}</span>` : ''}</div>`).join('') || 'no checks ran';
+    log(`privesc checklist: ${res.fails || 0}/${res.count || 0} failing`, 'info');
+  } catch (e) {
+    $('privesc-suggest-body').textContent = `checklist failed: ${e.message}`;
+    log(`checklist failed: ${e.message}`, 'error');
+  }
+}
+
 async function runEscapeCheck() {
   $('escape-body').textContent = 'checking…';
   try {
@@ -1629,6 +1642,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-db-run').addEventListener('click', runDbInterrogate);
   $('btn-escape-run').addEventListener('click', runEscapeCheck);
   $('btn-trylocalroot-run').addEventListener('click', runTryLocalRoot);
+  $('btn-privesc-suggest').addEventListener('click', runPrivescSuggest);
   $('btn-ftv-recon').addEventListener('click', () => ftvRun('recon'));
   $('btn-ftv-pair').addEventListener('click', () => {
     const code = $('ftv-code').value.trim();

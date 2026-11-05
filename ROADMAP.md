@@ -266,6 +266,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `vuln_suppressions` table (migration-safe) + suppress/unsuppress/list/effective endpoints (out-of-scope refused, expired rows inert); Recon Suppress-finding card + list; unit + e2e `test_suppress*`.)
 26. **BloodHound ingest** — SharpHound JSON → graph overlay.
 27. **Privesc suggester** — lin/winPEAS-style checklist, read-only.
+  (done: `services/privesc_suggest.py` 10 checks (SUID/GTFOBins, caps, sudo, PATH, cron, NFS, groups, shadow, modules) with fix hints, passwordless + writeless; `POST /api/privesc/suggest` sandbox canned; Pivot Checklist button; unit + e2e `test_privesc_suggest*`.)
 28. **XSS catch lab** — token/cookie catch + replay, lab-only.
 29. **SQLmap tamper flow** — dump → ledger, explicit only.
 30. **Hydra tune + resume** — parallel profile, checkpoint resume.
