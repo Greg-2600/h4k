@@ -770,6 +770,24 @@ async function runNse() {
   } catch (e) { $('nse-body').textContent = `nse failed: ${e.message}`; }
 }
 
+async function runSecretsdump() {
+  const target = $('sd-target').value.trim();
+  const user = $('sd-user').value.trim();
+  const secret = $('sd-pass').value;
+  if (!target || !user || !secret) { log('secretsdump needs target, user and password-or-hash', 'warn'); return; }
+  const isHash = /^[0-9a-fA-F]{32}$/.test(secret.trim());
+  $('sd-body').textContent = 'dumping…';
+  try {
+    const res = await api('/api/impacket/secretsdump', {
+      method: 'POST',
+      body: isHash ? { target, username: user, nthash: secret.trim() } : { target, username: user, password: secret },
+    });
+    const rows = (res.hashes || []).map((h) => `<div data-testid="sd-hash"><span class="mono">${esc(h.user)}</span> <span class="muted">rid ${esc(h.rid)}</span></div>`).join('');
+    $('sd-body').innerHTML = `<div data-testid="sd-count">${esc(`${res.hash_count || 0} hash(es)`)}</div>${rows || 'no hashes parsed'}`;
+    log(`secretsdump: ${res.hash_count || 0} hash(es)`, 'success');
+  } catch (e) { $('sd-body').textContent = `secretsdump failed: ${e.message}`; }
+}
+
 async function krbRoast(kind) {
   const domain = $('krb-domain').value.trim();
   if (!domain) { log('kerberos needs a domain', 'warn'); return; }
@@ -1430,6 +1448,7 @@ function runCmd(cmd) {
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
+  else if (cmd === 'secretsdump') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
@@ -1611,6 +1630,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-tls-inv').addEventListener('click', runTlsInventory);
   $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
   $('btn-krb-roast').addEventListener('click', () => krbRoast('kerberoast'));
+  $('btn-sd-run').addEventListener('click', runSecretsdump);
   $('btn-nse-suggest').addEventListener('click', runNseSuggest);
   $('btn-nse-run').addEventListener('click', runNse);
   $('btn-gobuster').addEventListener('click', runGobuster);
