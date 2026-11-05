@@ -88,13 +88,17 @@ are how you return.
 * **Flags** — captured flags (value, host, auto/manual). Add manually or Scan output (auto-detect in console output).
 * **Crown jewels → attack paths** — declare objectives, Compute paths (or
   Flag paths for captured flags), read score/hops/vulns.
+* **Blue-team handoff** — Navigator layer, experimental Sigma bundle, and
+  defender writeup generated from this engagement's observed techniques.
+  Download Layer / Sigma / Writeup; everything is marked tune-before-use.
 * **ATT&CK & detection** — findings mapped to techniques with telemetry.
 * **Lab watch** — estate change history for the active engagement. Every
   auto-scan pass snapshots the in-scope estate and diffs it: new/vanished
   hosts, opened/closed services, changed banners, new/cleared CVE matches.
   Snapshot now baselines the latest finished scan; rescan (or auto-scan) to
   see what moved. Session and merged reports include a Lab watch section.
-* **Report** — machine-generated markdown writeup, Download MD.
+* **Report** — machine-generated markdown writeup, Download MD. Includes a
+  Lab watch section and a Blue-team handoff section (observed techniques).
 
 ---
 

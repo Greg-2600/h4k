@@ -64,6 +64,7 @@ One line per service: what it does, what it touches, and how to test it.
 | `attck.py` | ATT&CK mapping + detection guidance | reads the store | `enrich_engagement(store, id)` |
 | `merged_report.py` | merge scan+SAST+SCA+fuzz+triage+watch | none | pure |
 | `watch.py` | canonicalize + diff estate snapshots | none | pure (`canonicalize`, `diff_snapshots`) |
+| `blue_team.py` | Navigator layer + Sigma bundle + defender writeup | none | pure (canned enriched engagement) |
 
 ## CTF / lab
 

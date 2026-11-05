@@ -347,6 +347,10 @@
           <div class="card-body"><div id="attck-body" data-testid="attck-body" class="muted">Press Load to map findings to techniques.</div></div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Blue-team handoff</h2><span class="spacer"></span><span class="muted" id="handoff-status" data-testid="handoff-status">no engagement</span><button class="btn" id="btn-handoff-layer" data-testid="handoff-layer" title="Download ATT&CK Navigator layer JSON">Layer</button> <button class="btn" id="btn-handoff-sigma" data-testid="handoff-sigma" title="Download experimental Sigma rules YAML">Sigma</button> <button class="btn" id="btn-handoff-summary" data-testid="handoff-summary" title="Download defender writeup markdown">Writeup</button></div>
+          <div class="card-body"><div id="handoff-list" data-testid="handoff-list" class="muted">Navigator layer + Sigma skeletons + defender writeup for this engagement.</div></div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Report</h2><span class="spacer"></span><button class="btn" id="btn-session-report">Download MD</button></div>
           <div class="card-body"><div class="output" id="report-preview" data-testid="report-preview">Press Download MD to fill.</div></div>
         </div>

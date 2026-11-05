@@ -497,6 +497,58 @@ def attck_techniques() -> dict[str, Any]:
     return {"techniques": list(TECHNIQUES.values())}
 
 
+@router.get("/{engagement_id}/handoff/navigator")
+def handoff_navigator(engagement_id: str) -> dict[str, Any]:
+    """ATT&CK Navigator layer for this engagement's observed techniques."""
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    from services import blue_team
+    from services.attck import enrich_engagement
+
+    eng = store.get_engagement(engagement_id) or {}
+    return blue_team.build_navigator_layer(
+        enrich_engagement(store, engagement_id), eng.get("name", engagement_id)
+    )
+
+
+@router.get("/{engagement_id}/handoff/sigma")
+def handoff_sigma(engagement_id: str) -> dict[str, Any]:
+    """Experimental Sigma detections for observed techniques (tune before use)."""
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    from services import blue_team
+    from services.attck import enrich_engagement
+
+    eng = store.get_engagement(engagement_id) or {}
+    enriched = enrich_engagement(store, engagement_id)
+    rules = blue_team.build_sigma_bundle(enriched, eng.get("name", engagement_id))
+    return {
+        "format": "sigma-yaml",
+        "count": len(rules),
+        "rules": rules,
+        "yaml": blue_team.rules_to_yaml(rules),
+    }
+
+
+@router.get("/{engagement_id}/handoff/summary")
+def handoff_summary(engagement_id: str) -> dict[str, Any]:
+    """Written defender handoff (markdown) for this engagement."""
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    from services import blue_team
+    from services.attck import enrich_engagement
+
+    eng = store.get_engagement(engagement_id) or {}
+    return {
+        "markdown": blue_team.defender_summary(
+            enrich_engagement(store, engagement_id), eng.get("name", engagement_id)
+        )
+    }
+
+
 @router.get("/{engagement_id}/propagate/plan")
 def propagation_plan(engagement_id: str) -> dict[str, Any]:
     """Dry run: blast radius before authorizing anything. No network calls."""
