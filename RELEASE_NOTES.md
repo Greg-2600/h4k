@@ -636,6 +636,19 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #50 — JWT tester
+
+`POST /api/jwt/test` audits a pasted JWT offline — unsigned
+`alg:none`, missing/expired/over-30-day `exp`, injectable `kid`,
+`jku`/`x5u` indirection — and dictionary-cracks HMAC secrets with
+stdlib crypto over a built-in weak-secret list plus an optional
+pasted wordlist (hard-capped, secrets never echoed). With `url` +
+`authed_marker` the none/empty-signature/confusion-key mutants are
+replayed live and diffed against the marker (acceptance is CRITICAL).
+With `engagement_id` the findings ledger as vulns on the URL host
+(labeled host for offline audits; scope-enforced; CWE-287). Web card
+JWT row + palette; sandbox fully canned.
+
 ## Backlog #42 — cloud metadata SSRF pack
 
 `POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,

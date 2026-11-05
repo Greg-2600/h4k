@@ -928,6 +928,41 @@ async function runSsrfProbe() {
   }
 }
 
+async function runJwtTest() {
+  const token = $('jwt-token').value.trim();
+  if (!token) { log('JWT test needs a pasted token', 'warn'); return; }
+  const url = $('jwt-url').value.trim() || null;
+  if (url && !$('jwt-marker').value.trim()) {
+    log('live confusion needs an authed marker', 'warn');
+    return;
+  }
+  $('web-body').textContent = 'testing JWT (offline audit + optional live confusion)…';
+  $('jwt-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/jwt/test', {
+      method: 'POST',
+      body: {
+        token, url,
+        authed_marker: $('jwt-marker').value.trim() || null,
+        crack: $('jwt-crack').checked,
+        engagement_id: engId || null,
+      },
+    });
+    const names = (res.findings || []).map((f) => `${f.probe || f.where || 'finding'} (${f.severity || '?'})`).join(', ');
+    const cracked = res.audit && res.audit.cracked && res.audit.cracked.cracked
+      ? ` · cracked in ${res.audit.cracked.attempts}`
+      : '';
+    const state = res.clean ? 'clean' : `${res.finding_count || 0} finding(s)`;
+    $('web-body').innerHTML = `<div data-testid="jwt-probes">${esc(`${state}${cracked}${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${res.note ? ` — ${res.note}` : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('jwt-status').textContent = state;
+    log(`JWT test done: ${state}${cracked}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('web-body').textContent = `JWT test failed: ${e.message}`;
+    log(`JWT test failed: ${e.message}`, 'error');
+  }
+}
+
 async function runNuclei() {
   const target = $('web-target').value.trim();
   if (!target) { log('nuclei needs a target', 'warn'); return; }
@@ -1495,6 +1530,7 @@ function runCmd(cmd) {
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
   else if (cmd === 'ssrfprobe') { setTab('recon'); }
+  else if (cmd === 'jwttest') { setTab('recon'); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
@@ -1687,6 +1723,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-ssrf-probe').addEventListener('click', runSsrfProbe);
+  $('btn-jwt-test').addEventListener('click', runJwtTest);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);

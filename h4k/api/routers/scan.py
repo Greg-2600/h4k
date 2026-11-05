@@ -37,6 +37,8 @@ from schemas import (
     Job,
     JohnRequest,
     JohnResult,
+    JwtTestRequest,
+    JwtTestResult,
     KerberosRoastRequest,
     KerberosRoastResult,
     KubeletAuditRequest,
@@ -3416,6 +3418,116 @@ def ssrf_probe_api(req: SsrfProbeRequest) -> SsrfProbeResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return SsrfProbeResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/jwt/test", response_model=JwtTestResult)
+def jwt_test_api(req: JwtTestRequest) -> JwtTestResult:
+    """Audit a pasted JWT and optionally test alg-confusion live.
+
+    Lab-only and explicit: offline audit (+ capped crack) always runs;
+    with `url` + `authed_marker` the forged-token mutants are replayed
+    at that endpoint. `engagement_id` ledgers findings as vulns on the
+    URL host (or the labeled host for offline audits). Sandbox returns
+    canned findings.
+    """
+    from services import sandbox as sandbox_mode
+    from services.jwt_tester import (
+        audit_token,
+        confusion_test,
+        sandbox_result,
+        to_ledger,
+    )
+
+    token = (req.token or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="token required (paste a JWT)")
+    from services.jwt_tester import decode_token
+
+    try:
+        decode_token(token)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if sandbox_mode.enabled():
+        result = sandbox_result(req.url)
+        host = urllib.parse.urlsplit(result.get("url", "")).hostname or ""
+    else:
+        try:
+            audit = audit_token(token, extra_secrets=req.wordlist, crack=req.crack)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        findings = list(audit.get("findings", []))
+        probes: list[dict[str, Any]] = []
+        url = (req.url or "").strip()
+        if url:
+            if not url.startswith(("http://", "https://")):
+                raise HTTPException(
+                    status_code=400, detail="url must be an http(s) URL you own"
+                )
+            try:
+                live = confusion_test(
+                    url,
+                    token,
+                    authed_marker=req.authed_marker or "",
+                    confusion_key=req.confusion_key or "",
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            probes = live["probes"]
+            findings.extend(live["findings"])
+            if live.get("note") and not findings:
+                pass
+            result = {
+                "url": url,
+                "audit": {"alg": audit.get("alg"), "cracked": audit.get("cracked")},
+                "probes": probes,
+                "probe_count": len(probes),
+                "findings": findings,
+                "finding_count": len(findings),
+                "clean": not findings,
+                "note": live.get("note", ""),
+            }
+        else:
+            result = {
+                "url": "",
+                "audit": {"alg": audit.get("alg"), "cracked": audit.get("cracked")},
+                "probes": [],
+                "probe_count": 0,
+                "findings": findings,
+                "finding_count": len(findings),
+                "clean": not findings,
+            }
+        host = (
+            urllib.parse.urlsplit(result.get("url", "")).hostname
+            or (req.host or "127.0.0.1").strip()
+            or "127.0.0.1"
+        )
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(
+            host, result.get("url", ""), result.get("findings") or []
+        ):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+            except ValueError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return JwtTestResult(
         **{
             **result,
             "ingested": ingested,
