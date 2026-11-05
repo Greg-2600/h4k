@@ -235,6 +235,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/hygiene.py` + `GET /api/engagement/{id}/hygiene` (reuse/weak/default + 0-100 score, read-only); Pivot ledger card button + findings; unit + e2e `test_hygiene*`.)
 5. **Scheduled re-scans + diff alerts** — cadence per engagement, MD digest.
 6. **NSE vuln suggest-and-run** — service → script map, explicit run only.
+  (done: `services/nse_suggest.py` curated map (16 services + generic fallback) + `GET /api/nse/suggest|services`; run stays explicit `POST /api/nmap/nse`; Recon NSE card suggest → Run flow; unit + e2e `test_nse*`.)
 7. **SMB share enumerator** — shares/ACLs, read-only, into asset graph.
 8. **Kerberos roast helpers** — AS-REP/kerberoast → John, explicit only.
 9. **LLMNR/NBT-NS poison lab** — container-only listener + capture.

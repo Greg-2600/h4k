@@ -2932,7 +2932,11 @@ def tshark_live_capture(req: TsharkRequest) -> TsharkResult:
 
 @router.post("/nmap/nse", response_model=NmapNSEResult)
 def nmap_nse_scan(req: NmapNSERequest) -> NmapNSEResult:
-    """Nmap with NSE vulnerability scripts (vuln/auth/default by default)."""
+    """Nmap with NSE vulnerability scripts (vuln/auth/default by default).
+
+    Explicit run only: nothing suggests or fires scripts on its own. Use
+    `GET /api/nse/suggest` first to pick scripts for a fingerprinted service.
+    """
     from services.toolkit import ToolkitRunner
 
     argv = ["nmap", "-sV", "-sC", "--script", req.scripts, f"-{req.timing}"]
@@ -2941,6 +2945,23 @@ def nmap_nse_scan(req: NmapNSERequest) -> NmapNSEResult:
     argv.append(req.target)
     out = ToolkitRunner().run_tool("nmap_nse", argv, timeout=600)
     return NmapNSEResult(target=req.target, tool=out)
+
+
+@router.get("/nse/suggest")
+def nse_suggest(service: str = "", product: str = "") -> dict[str, Any]:
+    """Suggest NSE scripts for a fingerprinted service (offline, read-only)."""
+    from services.nse_suggest import suggest
+
+    return suggest(service, product)
+
+
+@router.get("/nse/services")
+def nse_services() -> dict[str, Any]:
+    """Service names with curated NSE suggestions."""
+    from services.nse_suggest import services_covered
+
+    covered = services_covered()
+    return {"services": covered, "count": len(covered)}
 
 
 @router.post("/nikto", response_model=NiktoResult)

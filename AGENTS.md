@@ -114,7 +114,7 @@ Host recon/scan:
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
-- `POST /nmap/nse`, `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
   apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
 - `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +
@@ -181,6 +181,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `nse_suggest.py` | curated service → NSE script map (suggest offline, run explicit) |
 | `hygiene.py` | read-only credential hygiene: reuse/weak/default summary + score over verified creds |
 | `graph_canvas.py` | deterministic canvas layout for the asset graph (hosts circle, services ring, creds top row; powers the interactive SVG + PNG export) |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |

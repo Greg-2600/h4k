@@ -636,6 +636,14 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #6 — NSE vuln suggest-and-run
+
+`GET /api/nse/suggest?service=&product=` maps a fingerprinted service to
+curated NSE scripts (16 services; unknown falls back to the generic
+`vuln,default` sweep rather than inventing names). Running stays explicit
+via `POST /api/nmap/nse` — nothing fires on suggest. Recon NSE card:
+Suggest → per-script list → Run. Sandbox refuses to spawn nmap and says so.
+
 ## Backlog #4 — credential hygiene report
 
 `GET /api/engagement/{id}/hygiene` summarizes the hygiene of already-verified
