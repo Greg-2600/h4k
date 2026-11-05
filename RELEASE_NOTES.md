@@ -782,6 +782,19 @@ ledger as vulns on the flow host (scope-enforced; CWE-20). Fuzz-lab
 row (login URL + creds JSON + session field + flow JSON) + palette;
 sandbox fully canned.
 
+## Backlog #58 — authenticated fuzz profiles
+
+Named cookie/header presets for fuzz runs, stored as one JSON
+document: `GET|POST /api/fuzz-profiles` lists key names only (values
+never leave the server) and `DELETE` removes one (400 bad name,
+404 missing). `resolve_auth` merges preset-under-explicit — explicit
+values win, the preset fills gaps, unknown names fail closed so a
+typo never fuzzes unauthenticated. `POST /api/stateful_fuzz` accepts
+`profile`: preset headers merge into the login, preset cookies seed
+the per-iteration jar under fresh login cookies. Fuzz-lab manager
+(save/list/delete with masked display) + attach field on stateful
+runs + palette. Stacked on the stateful-fuzz branch.
+
 ## Backlog #53 — sanitizer diff
 
 `POST /api/source/sanitizer/diff` classifies one pasted report with

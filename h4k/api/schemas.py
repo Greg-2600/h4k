@@ -1203,6 +1203,7 @@ class StatefulFuzzRequest(BaseModel):
     flow: list[dict[str, Any]] = []
     iterations: int = Field(default=30, ge=1, le=200)
     timeout: float = Field(default=8.0, gt=0, le=30.0)
+    profile: str | None = None
     engagement_id: str | None = None
 
 
@@ -1216,3 +1217,21 @@ class StatefulFuzzResult(BaseModel):
     sandbox: bool = False
     ingested: int = 0
     skipped_out_of_scope: list[str] = []
+
+
+# ---- Authenticated fuzz profiles ----
+class FuzzProfileSave(BaseModel):
+    """Save a named auth preset (headers + cookies, values stay server-side)."""
+
+    name: str
+    headers: dict[str, str] = Field(default_factory=dict)
+    cookies: dict[str, str] = Field(default_factory=dict)
+
+
+class FuzzProfile(BaseModel):
+    name: str = ""
+    headers: list[str] = []
+    cookies: list[str] = []
+    header_count: int = 0
+    cookie_count: int = 0
+    updated: float = 0.0
