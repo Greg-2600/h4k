@@ -148,6 +148,22 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Intel import</h2><span class="spacer"></span><span class="muted">your Shodan/Censys JSON, no keys · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <select id="intel-source" data-testid="intel-source" title="Export format">
+                <option value="auto" selected>auto</option>
+                <option value="shodan">shodan</option>
+                <option value="censys">censys</option>
+                <option value="generic">generic</option>
+              </select>
+              <button class="btn primary" id="btn-intel-import" data-testid="btn-intel-import">Import</button>
+            </div>
+            <div class="row"><textarea id="intel-json" data-testid="intel-json" class="grow" rows="3" placeholder='[{"host": "10.0.0.5", "port": 22, "service": "ssh"}]'></textarea></div>
+            <div id="intel-body" data-testid="intel-body" class="muted">Paste export JSON — out-of-scope hosts are skipped, never stored.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Web assessment</h2><span class="spacer"></span><span class="muted">nikto + gobuster + nuclei · opt-in</span></div>
           <div class="card-body">
             <div class="row">
@@ -465,6 +481,7 @@
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="intel"><span>Recon: intel import (BYO Shodan/Censys JSON)</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>

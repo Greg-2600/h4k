@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #21 — Shodan/Censys BYO import
+
+No API keys live in this repo, so there is no live Shodan/Censys client.
+`POST /api/intel/import` takes JSON the operator already exported from
+their own account — Shodan host objects (ports, product, `vulns` map),
+Censys hosts (services list), both search envelopes, or a minimal
+generic row — and ledgers assets, services and CVE leads scope-checked
+(out-of-scope reported, never stored). Recon card with source picker +
+JSON textarea; `GET /api/intel/formats` documents the accepted shapes.
+
 ## Backlog #18 — IPv6 discovery
 
 `POST /api/net/ipv6/discover` reads the kernel NDP table (`ip -6 neigh`,
