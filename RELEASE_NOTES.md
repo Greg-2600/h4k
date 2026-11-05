@@ -636,6 +636,19 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #43 — IAM key hygiene
+
+`POST /api/iam/keys` audits AWS-style access keys read-only — pasted
+key rows (tolerant field names) or one live
+`aws iam get-credential-report` call with `live: true` (fixed argv,
+clean error when the CLI is absent). Stale active keys (HIGH, CRITICAL
+past twice the window), dormant inactive keys (LOW), long-unused keys
+(HIGH); temporary `ASIA` session credentials are noted, never
+flagged. IDs are masked to their last 4 everywhere and every finding
+ships a rotation/deletion policy. With `engagement_id` the findings
+ledger as vulns on the labeled host (scope-enforced; CWE-613). Recon
+Cloud-audit card + palette; sandbox fully canned.
+
 ## Backlog #39 — K8s RBAC audit
 
 `POST /api/rbac/audit` analyzes pasted Role/ClusterRole/Binding YAML

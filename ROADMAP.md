@@ -285,6 +285,7 @@ sandbox stand-ins required where network/tooling is involved.
 41. **Terraform/IaC scan** — Checkov-style offline misconfigs.
 42. **Cloud metadata SSRF pack** — 169.254 probes, opt-in.
 43. **IAM key hygiene** — age/rotation, read-only.
+  (done: `services/iam_hygiene.py` pasted-keys or one live `get-credential-report` audit (stale active, ancient, dormant, unused; ASIA temp never flagged; IDs masked to last-4) + per-finding rotation policy + scope-enforced vuln ledger; `POST /api/iam/keys` (400 no input, 404 unknown engagement) sandbox canned; Recon Cloud-audit card + palette; unit (incl. CSV parse + no-aws live path) + e2e `test_iam_hygiene*`.)
 44. **S3 policy linter** — public/ACL offline eval.
 45. **WebSocket fuzz** — frame mutation + replay.
 46. **gRPC enumerator + fuzz** — reflection + payload shapes.

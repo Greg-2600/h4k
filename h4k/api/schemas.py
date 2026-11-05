@@ -677,6 +677,38 @@ class RbacAuditResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- IAM key hygiene ----
+class IamKeysRequest(BaseModel):
+    """IAM key hygiene request (read-only; pasted keys or one live report).
+
+    `keys` is a tolerant JSON list (UserName/key_id/Status/CreateDate/
+    LastUsedDate). With `live: true` the API runs a single
+    `aws iam get-credential-report` call instead. `host` labels the
+    engagement ledger entry.
+    """
+
+    account: str = "cloud"
+    keys: list[dict[str, Any]] | None = None
+    live: bool = False
+    max_age_days: int = 90
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class IamKeysResult(BaseModel):
+    account: str = ""
+    keys: list[dict[str, Any]] = []
+    key_count: int = 0
+    errors: list[str] = []
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    clean: bool = True
+    sandbox: bool = False
+    error: str = ""
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Kubelet audit ----
 class KubeletAuditRequest(BaseModel):
     """Kubelet unauth audit request (read-only GETs, explicit target)."""

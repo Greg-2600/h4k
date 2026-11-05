@@ -905,6 +905,53 @@ async function runGobuster() {
   }
 }
 
+async function auditIamKeys() {
+  const account = $('iam-account').value.trim() || 'cloud';
+  const host = $('iam-host').value.trim() || '127.0.0.1';
+  const maxAge = parseInt($('iam-age').value, 10) || 90;
+  const live = $('iam-live').checked;
+  let keys = null;
+  const raw = $('iam-keys').value.trim();
+  if (raw) {
+    try {
+      keys = JSON.parse(raw);
+    } catch {
+      $('iam-body').textContent = 'keys must be a JSON list';
+      log('IAM audit needs valid JSON', 'warn');
+      return;
+    }
+    if (!Array.isArray(keys)) {
+      $('iam-body').textContent = 'keys must be a JSON list';
+      log('IAM audit needs a JSON list', 'warn');
+      return;
+    }
+  }
+  if (!live && !keys) { log('IAM audit needs pasted keys or live report', 'warn'); return; }
+  $('iam-body').textContent = 'auditing keys (read-only)…';
+  $('iam-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/iam/keys', {
+      method: 'POST',
+      body: { account, keys, live, max_age_days: maxAge, host, engagement_id: engId || null },
+    });
+    if (res.error) {
+      $('iam-body').textContent = `IAM audit unavailable: ${res.error}`;
+      $('iam-status').textContent = 'unavailable';
+      log(`IAM audit unavailable: ${res.error}`, 'warn');
+      return;
+    }
+    const names = (res.findings || []).map((f) => `${f.key || 'finding'} (${f.severity || '?'})`).slice(0, 8).join(', ');
+    const state = res.clean ? `clean (${res.key_count || 0} keys)` : `${res.finding_count || 0} finding(s)`;
+    $('iam-body').innerHTML = `<div data-testid="iam-findings">${esc(`${account} ${state}${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${(res.errors || []).length ? ` · ${res.errors.length} parse note(s)` : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('iam-status').textContent = state;
+    log(`IAM audit done: ${state}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('iam-body').textContent = `IAM audit failed: ${e.message}`;
+    log(`IAM audit failed: ${e.message}`, 'error');
+  }
+}
+
 async function runNuclei() {
   const target = $('web-target').value.trim();
   if (!target) { log('nuclei needs a target', 'warn'); return; }
@@ -1473,6 +1520,7 @@ function runCmd(cmd) {
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
+  else if (cmd === 'iamkeys') setTab('recon');
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
@@ -1662,6 +1710,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-nse-run').addEventListener('click', runNse);
   $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-nuclei').addEventListener('click', runNuclei);
+  $('btn-iam-audit').addEventListener('click', auditIamKeys);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);

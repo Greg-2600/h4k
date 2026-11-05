@@ -33,6 +33,8 @@ from schemas import (
     FuzzRequest,
     GobusterRequest,
     GobusterResult,
+    IamKeysRequest,
+    IamKeysResult,
     Job,
     JohnRequest,
     JohnResult,
@@ -3354,6 +3356,71 @@ def rbac_audit_api(req: RbacAuditRequest) -> RbacAuditResult:
         **{
             **result,
             "host": host,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/iam/keys", response_model=IamKeysResult)
+def iam_keys_api(req: IamKeysRequest) -> IamKeysResult:
+    """Audit IAM access-key age/rotation (read-only, explicit).
+
+    Pasted `keys` are audited offline; `live: true` runs one
+    `aws iam get-credential-report` call instead (nothing is rotated or
+    deleted). `host` labels the ledger entry. `engagement_id` ledgers
+    findings as vulns on that host (scope-enforced). Sandbox returns
+    canned findings.
+    """
+    from services import sandbox as sandbox_mode
+    from services.iam_hygiene import audit_keys, live_report, sandbox_result, to_ledger
+
+    account = (req.account or "cloud").strip() or "cloud"
+    try:
+        window = int(req.max_age_days or 90)
+    except (TypeError, ValueError):
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=400, detail="max_age_days must be an integer"
+        ) from None
+    if window < 1:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail="max_age_days must be >= 1")
+    if req.keys is None and not req.live:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail="keys required (or live: true)")
+    if sandbox_mode.enabled():
+        result = sandbox_result(account)
+    elif req.live:
+        fetched = live_report()
+        if fetched.get("error"):
+            return IamKeysResult(account=account, error=str(fetched["error"]))
+        result = {"account": account, **audit_keys(fetched.get("keys") or [], window)}
+    else:
+        result = {"account": account, **audit_keys(req.keys or [], window)}
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from fastapi import HTTPException
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, account, result.get("findings") or []):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return IamKeysResult(
+        **{
+            **result,
             "ingested": ingested,
             "skipped_out_of_scope": skipped,
         }

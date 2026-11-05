@@ -201,6 +201,21 @@
             <div id="web-body" data-testid="web-body" class="muted">Vulnerability scan and content discovery for one web surface you own.</div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>Cloud audit</h2><span class="spacer"></span><span class="muted">IAM keys · read-only</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="iam-account" data-testid="iam-account" value="lab-account" title="Account label (findings + ledger)" />
+              <input type="text" id="iam-age" data-testid="iam-age" value="90" title="Rotation window in days" />
+              <input type="text" id="iam-host" data-testid="iam-host" value="127.0.0.1" title="Host label for the ledger entry" />
+              <label class="muted"><input type="checkbox" id="iam-live" data-testid="iam-live" /> live report</label>
+              <button class="btn" id="btn-iam-audit" data-testid="btn-iam-audit">Audit keys</button>
+              <span class="muted" id="iam-status" data-testid="iam-status"></span>
+            </div>
+            <textarea id="iam-keys" data-testid="iam-keys" rows="3" class="grow" placeholder='Paste keys JSON: [{"UserName":"a","AccessKeyId":"AKIA…","Status":"Active","CreateDate":"2024-01-01"}]'></textarea>
+            <div id="iam-body" data-testid="iam-body" class="muted">Stale, dormant and unused keys. Key IDs stay masked. Nothing is rotated or deleted.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ═══ 3. EXPLOIT: queue, autopilot, creds attacks, fuzz ═══ -->
@@ -515,6 +530,7 @@
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
         <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
+        <div class="cmd-item" data-cmd="iamkeys"><span>Recon: IAM key hygiene (read-only)</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
