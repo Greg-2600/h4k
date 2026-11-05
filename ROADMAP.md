@@ -314,6 +314,7 @@ sandbox stand-ins required where network/tooling is involved.
 63. **Secret baseline + allowlist** — noise reduction.
   (done: `services/secret_baseline.py` bundle secret scan (7 shapes) + fingerprint baseline diff + audited allowlist suppression + new-only scope-enforced ledger; `POST /api/source/secrets/scan` (=== path === bundle or files, 400 empty/bad-allowlist, 404 unknown engagement) sandbox canned; Container card row + palette; unit + e2e `test_secret_baseline*`.)
 64. **Reachability filter** — import-graph prunes dead code.
+  (done: `services/reachability.py` module graph (py ast + JS/PHP imports, same-dir relative resolution, explicit-or-guessed entries flagged) + reached/unreached split + unresolved list; `POST /api/source/reachability` (400 empty) sandbox canned; Container card row + palette; unit + e2e `test_reachability*`.)
 65. **Rule CI gate** — fail on high-severity SAST.
 66. **Delta SAST** — diff-only findings per PR.
 67. **Inline suppress** — NOSAST with expiry + owner.

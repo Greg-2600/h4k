@@ -636,6 +636,20 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #64 — reachability filter
+
+`POST /api/source/reachability` builds a module-level import graph
+over pasted sources — Python via `ast`, JS/TS via import/require
+patterns, PHP via use/include patterns — resolves each import against
+the bundle (same-directory relative hops included), and splits files
+into reached vs unreachable from the entry points. Entries are
+explicit when given, otherwise guessed (`__main__` guards,
+main/app/index/cli names) and always labeled as such, since a wrong
+root set is the classic way this analysis lies. Unresolvable (stdlib,
+external) imports are listed separately, never counted as dead.
+Advisory output only — dead code is not a vuln, so nothing ledgers.
+Container card row + palette; sandbox fully canned.
+
 ## Backlog #63 — secret baseline + allowlist
 
 `POST /api/source/secrets/scan` finds hardcoded secrets (AWS keys,

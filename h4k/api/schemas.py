@@ -945,6 +945,36 @@ class ContainerFuzzResult(BaseModel):
     status: str = ""
 
 
+# ---- Reachability filter ----
+class ReachabilityRequest(BaseModel):
+    """Import-graph dead-code triage (offline; pasted sources only).
+
+    `bundle` holds sources as `=== path ===` blocks; `files` is the
+    equivalent structured form. `entries` pins the roots; without it
+    roots are guessed (`__main__` guards, main/app/index/cli names)
+    and flagged as such. Advisory output only — nothing ledgers.
+    """
+
+    bundle: str = ""
+    files: list[dict[str, str]] = Field(default_factory=list)
+    entries: list[str] = Field(default_factory=list)
+
+
+class ReachabilityResult(BaseModel):
+    files: int = 0
+    entries: list[str] = []
+    entry_guessed: bool = True
+    unknown_entries: list[str] = []
+    edges: dict[str, list[str]] = {}
+    reachable: list[str] = []
+    reachable_count: int = 0
+    unreachable: list[str] = []
+    unreachable_count: int = 0
+    unresolved: list[dict[str, str]] = []
+    pruned_ratio: float = 0.0
+    sandbox: bool = False
+
+
 # ---- Taint rules pack ----
 class TaintScanRequest(BaseModel):
     """Taint audit request (offline; pasted sources or explicit file list).

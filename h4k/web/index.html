@@ -301,6 +301,13 @@
         </div>
         <textarea id="sec-bundle" data-testid="sec-bundle" rows="3" class="grow" placeholder="Paste sources as === path === blocks (committed-secret scan + baseline diff)"></textarea>
         <div id="sec-body" data-testid="sec-body" class="muted">Only new, non-allowlisted secrets shout. Repeat runs stay quiet.</div>
+        <div class="row">
+          <input type="text" id="reach-entries" data-testid="reach-entries" class="grow" placeholder="Entries, comma-separated (empty = auto-detect)" title="Pin the roots; blank guesses from __main__/main/app/index/cli" />
+          <button class="btn" id="btn-reach" data-testid="btn-reach">Reachability</button>
+          <span class="muted" id="reach-status" data-testid="reach-status"></span>
+        </div>
+        <textarea id="reach-bundle" data-testid="reach-bundle" rows="3" class="grow" placeholder="Paste sources as === path === blocks (import-graph dead code)"></textarea>
+        <div id="reach-body" data-testid="reach-body" class="muted">Unreachable files are audit leads, not vulns — nothing ledgers.</div>
           </div>
         </div>
         <div class="card">
@@ -591,6 +598,7 @@
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="taintsast"><span>Exploit: taint-check pasted sources</span></div>
         <div class="cmd-item" data-cmd="secretscan"><span>Exploit: scan committed secrets</span></div>
+        <div class="cmd-item" data-cmd="reachmap"><span>Exploit: map import reachability</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="sarifx"><span>Score: SARIF import/export</span></div>

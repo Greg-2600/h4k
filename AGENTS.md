@@ -150,6 +150,7 @@ Source analysis (source router):
 - `POST /source/ai`, `POST /source/ai/loop`, `GET /source/ai/models` (Ollama)
 - `POST /source/rules/test`, `GET /rules`, `POST /rules/save`, `DELETE /rules/{id}`, `POST /rules/run`
 - `POST /source/report/merge`, `POST/GET /source/report/md`
+- `POST /source/reachability` (import-graph dead-code triage)
 - `POST /source/secrets/scan` (committed secrets + baseline/allowlist)
 - `POST /source/taint/scan` (offline source→sink taint pack + ledger)
 - `POST /source/sarif/export`, `POST /source/sarif/import` (SARIF interchange)
@@ -183,6 +184,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
+| `reachability.py` | import-graph dead-code triage (py/JS/php) + entry guessing |
 | `secret_baseline.py` | committed-secret scan with baseline diff + allowlist |
 | `taint_pack.py` | source→sink taint pack (Python/JS/PHP) + scope-enforced ledger |
 | `sarif_exchange.py` | h4k↔SARIF 2.1.0 interchange (lossless h4k round-trip) |
