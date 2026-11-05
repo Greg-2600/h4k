@@ -1154,6 +1154,30 @@ async function scanTaint() {
   }
 }
 
+async function scanSecrets() {
+  const bundle = $('sec-bundle').value.trim();
+  if (!bundle) { log('secret scan needs a pasted bundle', 'warn'); return; }
+  const host = $('sec-host').value.trim() || '127.0.0.1';
+  const allowlist = $('sec-allow').value.split(',').map((s) => s.trim()).filter(Boolean);
+  $('sec-body').textContent = 'scanning secrets (offline)…';
+  $('sec-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/source/secrets/scan', {
+      method: 'POST',
+      body: { bundle, host, allowlist, engagement_id: engId || null },
+    });
+    const names = (res.new || []).map((f) => `${f.rule_id || 'finding'} (${f.severity || '?'})`).slice(0, 8).join(', ');
+    const state = res.clean ? 'clean' : `${res.new_count || 0} new`;
+    $('sec-body').innerHTML = `<div data-testid="sec-findings">${esc(`${state} (${res.finding_count || 0} total · ${res.baselined_count || 0} baseline · ${res.allowlisted_count || 0} allowlisted)${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('sec-status').textContent = state;
+    log(`secret scan done: ${state}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('sec-body').textContent = `secret scan failed: ${e.message}`;
+    log(`secret scan failed: ${e.message}`, 'error');
+  }
+}
+
 async function auditRbac() {
   const documents = [$('rbac-docs').value.trim()].filter(Boolean);
   if (!documents.length) { log('RBAC audit needs pasted YAML', 'warn'); return; }
@@ -1696,6 +1720,7 @@ function runCmd(cmd) {
   else if (cmd === 'sandiff') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'taintsast') setTab('exploit');
+  else if (cmd === 'secretscan') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'sarifx') setTab('score');
@@ -1886,6 +1911,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);
   $('btn-taint-scan').addEventListener('click', scanTaint);
+  $('btn-sec-scan').addEventListener('click', scanSecrets);
   $('btn-rbac-audit').addEventListener('click', auditRbac);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }

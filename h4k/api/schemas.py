@@ -972,6 +972,39 @@ class TaintScanResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Secret baseline + allowlist ----
+class SecretsScanRequest(BaseModel):
+    """Secret scan with baseline + allowlist noise reduction (offline).
+
+    `bundle` holds sources as `=== path ===` blocks; `files` is the
+    equivalent structured form. `baseline` accepts fingerprints or
+    finding dicts. `allowlist` holds regexes (matched against path +
+    line, recorded per suppression). `host` labels the ledger entry.
+    """
+
+    bundle: str = ""
+    files: list[dict[str, str]] = Field(default_factory=list)
+    baseline: list[Any] = Field(default_factory=list)
+    allowlist: list[str] = Field(default_factory=list)
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class SecretsScanResult(BaseModel):
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    new: list[dict[str, Any]] = []
+    new_count: int = 0
+    baselined: list[dict[str, Any]] = []
+    baselined_count: int = 0
+    allowlisted: list[dict[str, Any]] = []
+    allowlisted_count: int = 0
+    clean: bool = True
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Fuzz sharding ----
 class ShardFuzzRequest(BaseModel):
     """LAB-ONLY: N workers over disjoint mutation slices, one merged registry."""

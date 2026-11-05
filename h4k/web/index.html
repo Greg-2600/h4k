@@ -293,6 +293,14 @@
         </div>
         <textarea id="taint-bundle" data-testid="taint-bundle" rows="3" class="grow" placeholder="Paste sources as === path.py === blocks (offline source→sink taint)"></textarea>
         <div id="taint-body" data-testid="taint-body" class="muted">Python/JS/PHP source→sink flows: shell, SQL, XSS, LFI, SSTI, pickle.</div>
+        <div class="row">
+          <input type="text" id="sec-host" data-testid="sec-host" value="127.0.0.1" title="Host label for the ledger entry (analysis is offline)" />
+          <input type="text" id="sec-allow" data-testid="sec-allow" class="grow" placeholder="Allowlist regexes, comma-separated (e.g. fixtures,example)" title="Suppress matches; the pattern is recorded per hit" />
+          <button class="btn" id="btn-sec-scan" data-testid="btn-sec-scan">Scan secrets</button>
+          <span class="muted" id="sec-status" data-testid="sec-status"></span>
+        </div>
+        <textarea id="sec-bundle" data-testid="sec-bundle" rows="3" class="grow" placeholder="Paste sources as === path === blocks (committed-secret scan + baseline diff)"></textarea>
+        <div id="sec-body" data-testid="sec-body" class="muted">Only new, non-allowlisted secrets shout. Repeat runs stay quiet.</div>
           </div>
         </div>
         <div class="card">
@@ -582,6 +590,7 @@
         <div class="cmd-item" data-cmd="sandiff"><span>Exploit: compare sanitizers on a report</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="taintsast"><span>Exploit: taint-check pasted sources</span></div>
+        <div class="cmd-item" data-cmd="secretscan"><span>Exploit: scan committed secrets</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="sarifx"><span>Score: SARIF import/export</span></div>

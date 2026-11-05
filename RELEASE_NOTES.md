@@ -636,6 +636,18 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #63 — secret baseline + allowlist
+
+`POST /api/source/secrets/scan` finds hardcoded secrets (AWS keys,
+private key blocks, GitHub/Slack/Stripe tokens, bearer tokens,
+secret-looking assignments) and then quiets repeat runs two ways: a
+`baseline` of fingerprints or finding dicts splits results into new
+vs already-known, and `allowlist` regexes suppress fixtures and
+example keys with the matching pattern recorded per hit (bad regexes
+are a 400 naming the index, never silent). Only `new` findings ledger
+as vulns on the labeled host (scope-enforced; CWE-798). Container
+card row (bundle + allowlist input) + palette; sandbox fully canned.
+
 ## Backlog #62 — taint rules pack
 
 `POST /api/source/taint/scan` runs a 15-rule source→sink pack over
