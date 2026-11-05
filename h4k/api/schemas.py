@@ -652,6 +652,40 @@ class NucleiResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- JWT tester ----
+class JwtTestRequest(BaseModel):
+    """JWT tester request (lab-only, explicit pasted token).
+
+    Without `url` this is a pure offline audit (+ optional capped
+    crack). With `url` + `authed_marker` the confusion mutants are
+    replayed at that endpoint. `confusion_key` (e.g. an RSA public
+    key) is tried as an HMAC secret for alg-confusion.
+    """
+
+    token: str
+    url: str | None = None
+    authed_marker: str | None = None
+    confusion_key: str | None = None
+    wordlist: list[str] | None = None
+    crack: bool = True
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class JwtTestResult(BaseModel):
+    url: str = ""
+    audit: dict[str, Any] = {}
+    probes: list[dict[str, Any]] = []
+    probe_count: int = 0
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    clean: bool = True
+    note: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Cloud metadata SSRF pack ----
 class SsrfProbeRequest(BaseModel):
     """SSRF metadata probe request (opt-in, explicit lab target)."""

@@ -293,6 +293,7 @@ sandbox stand-ins required where network/tooling is involved.
 48. **OpenAPI import → fuzz** — spec-driven targets.
 49. **Header/cookie session fuzz** — auth-bypass leads.
 50. **JWT tester** — crack + alg-confusion, lab-only.
+  (done: `services/jwt_tester.py` offline audit (unsigned/long-lived/no-exp/kid/jku flags) + capped stdlib HMAC crack (built-in + pasted wordlist, masked reporting) + live none/empty-sig/confusion-key mutants vs marker; `POST /api/jwt/test` (400 bad token/url, 404 unknown engagement) sandbox canned; Web card JWT row + palette; unit (incl. strict vs open stub servers) + e2e `test_jwt_tester*`.)
 51. **Corpus sync** — shared corpus dir across runs.
 52. **AFL++ persistent runner** — harness + stats.
 53. **Sanitizer diff** — ASan vs UBSan vs MSan compare.

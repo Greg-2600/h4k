@@ -205,6 +205,14 @@
               <span class="muted" id="ssrf-status" data-testid="ssrf-status"></span>
             </div>
             <div class="muted">Opt-in metadata pack: AWS/GCP/Azure 169.254 payloads + encoding bypasses against the target above.</div>
+            <div class="row">
+              <input type="text" id="jwt-token" data-testid="jwt-token" class="grow" placeholder="eyJhbGciOi… (paste a JWT you own)" title="JWT to audit (offline decode + optional crack)" />
+              <input type="text" id="jwt-url" data-testid="jwt-url" placeholder="http://target/api (optional live confusion)" title="Endpoint to replay forged tokens at" />
+              <input type="text" id="jwt-marker" data-testid="jwt-marker" placeholder="Logout (needs url)" title="String present when authenticated" />
+              <label class="muted"><input type="checkbox" id="jwt-crack" data-testid="jwt-crack" checked /> crack</label>
+              <button class="btn" id="btn-jwt-test" data-testid="btn-jwt-test">JWT test</button>
+              <span class="muted" id="jwt-status" data-testid="jwt-status"></span>
+            </div>
           </div>
         </div>
       </section>
@@ -520,6 +528,7 @@
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
         <div class="cmd-item" data-cmd="ssrfprobe"><span>Recon: SSRF metadata pack (opt-in)</span></div>
+        <div class="cmd-item" data-cmd="jwttest"><span>Recon: JWT audit + alg-confusion</span></div>
         <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
