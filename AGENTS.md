@@ -131,6 +131,7 @@ Engagement (persistent memory + cred propagation, engagement router):
 - `GET /api/engagement/{id}/assets|credentials|graph`, `GET .../graph/canvas` (deterministic x/y layout for the interactive SVG canvas + PNG export)
 - `GET /api/engagement/{id}/propagate/plan` (dry run, spray policy: `max_per_user` + `jitter_max`), `POST /api/engagement/{id}/propagate` (opt-in, lockout ledgered as `locked`)
 - `GET /api/engagement/{id}/hygiene` (read-only reuse/weak/default summary + score)
+- `POST /api/engagement/{id}/vulns/suppress` (reason + expiry, audit-trailed) + `DELETE .../vulns/suppress` + `GET .../vulns/suppressions|effective`
 - `GET /api/engagement/{id}/vault` (masked loot: creds/flags/shares, `reveal=true` unmasks) + `GET .../vault/export` (md/json handoff)
 - `POST|GET /api/engagement/{id}/crown-jewels`, `DELETE .../crown-jewels/{id}`
 - `GET /api/engagement/{id}/attack-paths` (scored paths to crown jewels)

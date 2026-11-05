@@ -837,6 +837,34 @@ async function runKevRefresh() {
   } catch (e) { $('kev-body').textContent = `kev refresh failed: ${e.message}`; }
 }
 
+async function runSuppress() {
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  const body = {
+    host: $('sup-host').value.trim(), name: $('sup-name').value.trim(),
+    reason: $('sup-reason').value.trim(),
+    days: parseInt($('sup-days').value, 10) || 30,
+  };
+  if (!body.host || !body.name || !body.reason) { log('suppress needs host, name and reason', 'warn'); return; }
+  try {
+    const res = await apiOrThrow(`/api/engagement/${engId}/vulns/suppress`, { method: 'POST', body });
+    $('sup-body').innerHTML = `<div data-testid="sup-done">suppressed <b>${esc(res.name)}</b> on ${esc(res.host)} until ${esc(res.expires_at || '')}</div>`;
+    log(`suppressed ${res.name}`, 'success');
+  } catch (e) { $('sup-body').textContent = `suppress failed: ${e.message}`; }
+}
+
+async function listSuppressions() {
+  const engId = await currentEngagementId();
+  if (!engId) return;
+  try {
+    const res = await api(`/api/engagement/${engId}/vulns/suppressions`);
+    const items = res.suppressions || [];
+    $('sup-body').innerHTML = items.length
+      ? items.map((s) => `<div data-testid="sup-item"><b>${esc(s.name)}</b> on ${esc(s.host)} — ${esc(s.reason)} <span class="muted">until ${esc(s.expires_at || '—')}</span></div>`).join('')
+      : 'no suppressions recorded';
+  } catch (e) { $('sup-body').textContent = `list failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1385,6 +1413,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
@@ -1561,6 +1590,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-suppress').addEventListener('click', runSuppress);
+  $('btn-sup-list').addEventListener('click', listSuppressions);
   $('btn-kev').addEventListener('click', runKevCheck);
   $('btn-kev-refresh').addEventListener('click', runKevRefresh);
   $('btn-tls-run').addEventListener('click', runTlsFingerprint);

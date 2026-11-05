@@ -164,6 +164,22 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Suppress finding</h2><span class="spacer"></span><span class="muted">with reason + expiry · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="sup-host" data-testid="sup-host" placeholder="host" />
+              <input type="text" id="sup-name" data-testid="sup-name" class="grow" placeholder="finding name" />
+              <input type="text" id="sup-days" data-testid="sup-days" value="30" title="Days until expiry" />
+            </div>
+            <div class="row">
+              <input type="text" id="sup-reason" data-testid="sup-reason" class="grow" placeholder="reason (required — e.g. patched, verified false positive)" />
+              <button class="btn primary" id="btn-suppress" data-testid="btn-suppress">Suppress</button>
+              <button class="btn" id="btn-sup-list" data-testid="btn-sup-list">List</button>
+            </div>
+            <div id="sup-body" data-testid="sup-body" class="muted">Suppressions hide findings until expiry — they never delete evidence.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Web assessment</h2><span class="spacer"></span><span class="muted">nikto + gobuster + nuclei · opt-in</span></div>
           <div class="card-body">
             <div class="row">
@@ -481,6 +497,7 @@
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>

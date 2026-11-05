@@ -92,6 +92,18 @@ CREATE TABLE IF NOT EXISTS vulns (
     first_seen    TEXT NOT NULL,
     PRIMARY KEY (engagement_id, host, name)
 );
+-- False-positive suppressions: hide a finding until it expires, with a
+-- reason on record. Expired rows are inert but kept for the audit trail.
+CREATE TABLE IF NOT EXISTS vuln_suppressions (
+    engagement_id TEXT NOT NULL,
+    host          TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    reason        TEXT NOT NULL DEFAULT '',
+    expires_at    TEXT,
+    actor         TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL,
+    PRIMARY KEY (engagement_id, host, name)
+);
 -- Attempt ledger. Deliberately NOT the credentials table: a failed login is
 -- not a credential, and recording it as one would put a bogus credential edge
 -- in the graph and inflate the credential count.
@@ -490,6 +502,93 @@ class EngagementStore:
             ),
         )
         return int(is_new)
+
+    def suppress_vuln(
+        self,
+        engagement_id: str,
+        host: str,
+        name: str,
+        reason: str,
+        days: int = 30,
+        actor: str = "",
+    ) -> dict[str, Any]:
+        """Suppress a finding until expiry, with a reason on record."""
+        from datetime import UTC, datetime, timedelta
+
+        self._require_scope(engagement_id, host)
+        if not (name or "").strip():
+            raise ValueError("name required")
+        if not (reason or "").strip():
+            raise ValueError("reason required")
+        try:
+            days_n = int(days)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("days must be an integer 1-3650") from exc
+        if not 1 <= days_n <= 3650:
+            raise ValueError("days must be an integer 1-3650")
+        expires = (datetime.now(UTC) + timedelta(days=days_n)).isoformat()
+        self._write(
+            "INSERT INTO vuln_suppressions (engagement_id, host, name, reason,"
+            " expires_at, actor, created_at) VALUES (?,?,?,?,?,?,?)"
+            " ON CONFLICT(engagement_id, host, name) DO UPDATE SET"
+            " reason=excluded.reason, expires_at=excluded.expires_at,"
+            " actor=excluded.actor, created_at=excluded.created_at",
+            (engagement_id, host, name, reason, expires, actor, _now()),
+        )
+        return {
+            "host": host,
+            "name": name,
+            "reason": reason,
+            "expires_at": expires,
+            "actor": actor,
+        }
+
+    def unsuppress_vuln(self, engagement_id: str, host: str, name: str) -> bool:
+        """Lift a suppression early (the lift is itself logged by deletion)."""
+        self._require_scope(engagement_id, host)
+        before = self._scalar(
+            "SELECT COUNT(*) FROM vuln_suppressions WHERE engagement_id=? AND host=? AND name=?",
+            (engagement_id, host, name),
+        )
+        self._write(
+            "DELETE FROM vuln_suppressions WHERE engagement_id=? AND host=? AND name=?",
+            (engagement_id, host, name),
+        )
+        return bool(before)
+
+    def list_suppressions(self, engagement_id: str) -> list[dict[str, Any]]:
+        rows = self._query(
+            "SELECT host, name, reason, expires_at, actor, created_at"
+            " FROM vuln_suppressions WHERE engagement_id=?"
+            " ORDER BY created_at DESC, rowid DESC",
+            (engagement_id,),
+        )
+        return [dict(r) for r in rows]
+
+    def suppressed_keys(
+        self, engagement_id: str, now: str | None = None
+    ) -> set[tuple[str, str]]:
+        """(host, name) pairs with a live suppression as of `now`."""
+        from datetime import UTC, datetime
+
+        stamp = now or datetime.now(UTC).isoformat()
+        rows = self._query(
+            "SELECT host, name FROM vuln_suppressions"
+            " WHERE engagement_id=? AND created_at <= ?"
+            " AND (expires_at IS NULL OR expires_at > ?)",
+            (engagement_id, stamp, stamp),
+        )
+        return {(r["host"], r["name"]) for r in rows}
+
+    def effective_vulns(self, engagement_id: str) -> list[dict[str, Any]]:
+        """Findings annotated with live suppressions (never deleted)."""
+        hidden = self.suppressed_keys(engagement_id)
+        out = []
+        for v in self.vulns(engagement_id):
+            d = dict(v)
+            d["suppressed"] = (d.get("host"), d.get("name")) in hidden
+            out.append(d)
+        return sorted(out, key=lambda v: (v.get("host") or "", v.get("name") or ""))
 
     def _touch(self, engagement_id: str) -> None:
         self._write(

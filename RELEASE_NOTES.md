@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #25 — false-positive tuner
+
+`POST /api/engagement/{id}/vulns/suppress` hides a finding until a
+chosen expiry (default 30 days) with a mandatory reason on record; a
+`vuln_suppressions` table keeps the audit trail (actor, timestamps) and
+expired rows go inert automatically while staying visible for review.
+`DELETE .../vulns/suppress` lifts early; `GET .../vulns/effective`
+annotates findings with live suppressions (`hide_suppressed` filters).
+Out-of-scope hosts are refused, never recorded. Recon card with reason
+field + suppression list.
+
 ## Backlog #23 — KEV/EPSS enrichment
 
 `h4k/data/kev.json` snapshots the live CISA catalog filtered to the 37

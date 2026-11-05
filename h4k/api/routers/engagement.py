@@ -284,6 +284,66 @@ def credential_hygiene(engagement_id: str) -> dict[str, Any]:
     return hygiene_report(store, engagement_id)
 
 
+@router.post("/{engagement_id}/vulns/suppress")
+def suppress_vuln(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Suppress a finding until expiry, with a reason on record."""
+    from services.engagement import ScopeError
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    try:
+        return store.suppress_vuln(
+            engagement_id,
+            str((body or {}).get("host") or "").strip(),
+            str((body or {}).get("name") or "").strip(),
+            str((body or {}).get("reason") or ""),
+            days=(body or {}).get("days", 30),
+            actor=str((body or {}).get("actor") or "operator"),
+        )
+    except (ValueError, ScopeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/{engagement_id}/vulns/suppress")
+def unsuppress_vuln(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Lift a suppression early."""
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    ok = store.unsuppress_vuln(
+        engagement_id,
+        str((body or {}).get("host") or "").strip(),
+        str((body or {}).get("name") or "").strip(),
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="no such suppression")
+    return {"unsuppressed": True}
+
+
+@router.get("/{engagement_id}/vulns/suppressions")
+def list_suppressions(engagement_id: str) -> dict[str, Any]:
+    """Active + expired suppressions with reasons (audit trail)."""
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return {"suppressions": store.list_suppressions(engagement_id)}
+
+
+@router.get("/{engagement_id}/vulns/effective")
+def effective_vulns(
+    engagement_id: str, hide_suppressed: bool = False
+) -> dict[str, Any]:
+    """Findings annotated with live suppressions (never deleted)."""
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    vulns = store.effective_vulns(engagement_id)
+    if hide_suppressed:
+        vulns = [v for v in vulns if not v.get("suppressed")]
+    return {"vulns": vulns, "count": len(vulns)}
+
+
 @router.get("/{engagement_id}/graph")
 def engagement_graph(engagement_id: str) -> dict[str, Any]:
     return get_store().graph(engagement_id)
