@@ -980,6 +980,28 @@ async function detectContainerSurfaces() {
   }
 }
 
+async function auditKubelet() {
+  const host = $('kube-host').value.trim() || '127.0.0.1';
+  const port = parseInt($('kube-port').value, 10) || 10250;
+  $('kube-body').textContent = 'auditing kubelet (read-only)…';
+  $('kube-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/kubelet/audit', {
+      method: 'POST',
+      body: { host, port, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => `${f.check || 'finding'} (${f.severity || '?'})`).join(', ');
+    const state = res.reachable ? (res.secure ? 'secure' : `${res.finding_count || 0} finding(s)`) : 'unreachable';
+    $('kube-body').innerHTML = `<div data-testid="kube-findings">${esc(`${host}:${port} ${state}${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${names ? `: ${names}` : ''}${res.note ? ` — ${res.note}` : ''}`)}</div>`;
+    $('kube-status').textContent = state;
+    log(`kubelet audit done: ${state}`, res.secure ? 'success' : 'warn');
+  } catch (e) {
+    $('kube-body').textContent = `kubelet audit failed: ${e.message}`;
+    log(`kubelet audit failed: ${e.message}`, 'error');
+  }
+}
+
 async function startContainerFuzz() {
   const btn = $('btn-cf-start');
   if (btn) btn.disabled = true;
@@ -1433,6 +1455,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'score') setTab('score');
   else if (cmd === 'theme') toggleTheme();
@@ -1617,6 +1640,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
+  $('btn-kube-audit').addEventListener('click', auditKubelet);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }
     catch (e) { log(`cve refresh failed: ${e.message}`, 'error'); }

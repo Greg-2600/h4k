@@ -652,6 +652,29 @@ class NucleiResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Kubelet audit ----
+class KubeletAuditRequest(BaseModel):
+    """Kubelet unauth audit request (read-only GETs, explicit target)."""
+
+    host: str = "127.0.0.1"
+    port: int = 10250
+    engagement_id: str | None = None
+
+
+class KubeletAuditResult(BaseModel):
+    host: str = ""
+    port: int = 10250
+    reachable: bool = False
+    checks: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    secure: bool = True
+    sandbox: bool = False
+    note: str = ""
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- SQLMap ----
 class SqlmapRequest(BaseModel):
     """SQLMap automated SQL injection scan request."""
