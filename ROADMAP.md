@@ -260,6 +260,7 @@ sandbox stand-ins required where network/tooling is involved.
 21. **Shodan/Censys BYO import** — JSON → leads, no key in repo.
 22. **CPE auto-correlate** — banner → CPE → CVE matcher.
 23. **KEV/EPSS enrichment** — CISA KEV flag + EPSS score on vulns.
+  (done: `services/kev.py` + `h4k/data/kev.json` (37 real KEV+EPSS entries, sources+date stamped) + check/enrich/refresh endpoints; Recon KEV card with opt-in refresh; unit (incl. keep-table-on-failure) + e2e `test_kev*`.)
 24. **CVSS v4 re-score** — override with audit trail.
 25. **False-positive tuner** — suppress with reason + expiry.
 26. **BloodHound ingest** — SharpHound JSON → graph overlay.

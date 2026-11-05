@@ -111,6 +111,7 @@ Host recon/scan:
 - `POST /attack`, `GET /attack/{id}`
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
 - `POST /vulnleads`
+- `GET /api/kev/check` + `POST /api/kev/enrich` (bundled snapshot) + `POST /api/kev/refresh` (opt-in live)
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
 
@@ -185,6 +186,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |
 | `ipv6_discovery.py` | IPv6 NDP table + explicit-CIDR nmap -6 sweep, scope-enforced asset ledger, sandbox canned |
 | `tls_fingerprint.py` | active TLS handshake inventory (version/cipher/cert) + exact-match watchlist + heuristic C2 leads, sandbox stand-in |

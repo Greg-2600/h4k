@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #23 — KEV/EPSS enrichment
+
+`h4k/data/kev.json` snapshots the live CISA catalog filtered to the 37
+archive CVEs it actually hits, plus current FIRST EPSS scores — fetched
+at implementation time, with catalog date and both source URLs stamped
+in (no hand-written scores). `GET /api/kev/check` + `POST /api/kev/enrich`
+serve the snapshot; `POST /api/kev/refresh` re-fetches and swaps the live
+table, keeping the old one on any failure. Recon KEV card with opt-in
+refresh. Unknown CVEs honestly report `kev:false, epss:null`.
+
 ## Backlog #20 — TLS cert inventory
 
 `POST /api/tls/inventory` probes `host[:port]` targets and reports

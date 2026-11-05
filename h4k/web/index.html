@@ -153,6 +153,17 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>KEV / EPSS</h2><span class="spacer"></span><span class="muted">bundled snapshot · opt-in refresh</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="kev-cves" data-testid="kev-cves" class="grow" placeholder="CVE-2021-44228, CVE-2017-0144" />
+              <button class="btn" id="btn-kev" data-testid="btn-kev">Check</button>
+              <button class="btn" id="btn-kev-refresh" data-testid="btn-kev-refresh" title="Live refresh from CISA + FIRST">Refresh</button>
+            </div>
+            <div id="kev-body" data-testid="kev-body" class="muted">Known-exploited flag + EPSS score per CVE.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Web assessment</h2><span class="spacer"></span><span class="muted">nikto + gobuster + nuclei · opt-in</span></div>
           <div class="card-body">
             <div class="row">
@@ -470,6 +481,7 @@
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
