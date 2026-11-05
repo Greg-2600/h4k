@@ -52,6 +52,8 @@ from schemas import (
     SqlmapResult,
     TlsFingerprintRequest,
     TlsFingerprintResult,
+    TlsInventoryRequest,
+    TlsInventoryResult,
     TsharkRequest,
     TsharkResult,
     VulnLeadsRequest,
@@ -2989,6 +2991,55 @@ def tls_fingerprint_api(req: TlsFingerprintRequest) -> TlsFingerprintResult:
             ).items()
             if k != "host"
         },
+    )
+
+
+@router.post("/tls/inventory", response_model=TlsInventoryResult)
+def tls_inventory_api(req: TlsInventoryRequest) -> TlsInventoryResult:
+    """TLS cert inventory over host[:port] targets you own (opt-in).
+
+    Expiry (<30d), expired, self-signed and weak-crypto leads, ledgered
+    as vulns with `engagement_id` (scope-enforced). Sandbox is canned.
+    """
+    from services import sandbox as sandbox_mode
+    from services.cert_inventory import inventory, sandbox_inventory
+
+    if sandbox_mode.enabled():
+        result = sandbox_inventory(req.targets)
+    else:
+        result = inventory(req.targets, timeout=req.timeout, watchlist=req.watchlist)
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in result.get("entries", []):
+            if not entry.get("ok") or not entry.get("leads"):
+                continue
+            for lead in entry["leads"]:
+                try:
+                    ingested += store.record_vuln(
+                        req.engagement_id,
+                        entry["host"],
+                        {
+                            "name": f"TLS: {lead['lead']}",
+                            "severity": lead["level"],
+                            "cwe": "CWE-327",
+                            "module": "tls-inventory",
+                            "reference": entry.get("fingerprint", ""),
+                        },
+                    )
+                except ScopeError:
+                    if entry["host"] not in skipped:
+                        skipped.append(entry["host"])
+    return TlsInventoryResult(
+        **{**result, "ingested": ingested, "skipped_out_of_scope": skipped}
     )
 
 

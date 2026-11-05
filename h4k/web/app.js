@@ -796,6 +796,25 @@ async function runTlsFingerprint() {
   } catch (e) { $('tls-body').textContent = `tls failed: ${e.message}`; }
 }
 
+async function runTlsInventory() {
+  const raw = $('tls-inv-targets').value.trim() || $('tls-target').value.trim();
+  if (!raw) { log('tls inventory needs targets', 'warn'); return; }
+  $('tls-inv-body').textContent = 'inventorying certs…';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/tls/inventory', {
+      method: 'POST',
+      body: { targets: raw.split(',').map((s) => s.trim()).filter(Boolean), engagement_id: engId || null },
+    });
+    const rows = (res.entries || []).filter((e) => e.ok).map((e) => {
+      const leads = (e.leads || []).map((l) => `[${l.level}] ${l.lead}`).join('; ');
+      return `<div data-testid="tls-inv-entry"><b>${esc(e.host)}:${e.port}</b> ${esc(e.version || '?')} <span class="mono">${esc((e.fingerprint || '').slice(0, 16))}…</span>${leads ? `<br />⚠ ${esc(leads)}` : ''}</div>`;
+    }).join('');
+    $('tls-inv-body').innerHTML = rows || 'no TLS services answered';
+    log(`tls inventory: ${res.count || 0} host(s), ${res.lead_count || 0} lead(s)${res.ingested ? `, ${res.ingested} ledgered` : ''}`, 'success');
+  } catch (e) { $('tls-inv-body').textContent = `tls inventory failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1520,6 +1539,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('btn-nikto').addEventListener('click', runNikto);
   $('btn-tls-run').addEventListener('click', runTlsFingerprint);
+  $('btn-tls-inv').addEventListener('click', runTlsInventory);
   $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
   $('btn-krb-roast').addEventListener('click', () => krbRoast('kerberoast'));
   $('btn-nse-suggest').addEventListener('click', runNseSuggest);

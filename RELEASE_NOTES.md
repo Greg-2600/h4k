@@ -636,6 +636,14 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #20 — TLS cert inventory
+
+`POST /api/tls/inventory` probes `host[:port]` targets and reports
+expiry (expired high, <30 days medium), self-signed certs and weak
+protocol/ciphers per host, ledgering each lead as a vuln with
+`engagement_id` (scope-enforced). TLS card inventory row takes a
+comma-separated list. Sandbox returns canned hosts.
+
 ## Backlog #18 — IPv6 discovery
 
 `POST /api/net/ipv6/discover` reads the kernel NDP table (`ip -6 neigh`,

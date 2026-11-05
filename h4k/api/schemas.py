@@ -509,6 +509,26 @@ class TlsFingerprintResult(BaseModel):
     sandbox: bool = False
 
 
+class TlsInventoryRequest(BaseModel):
+    """TLS cert inventory over host[:port] targets you own (opt-in)."""
+
+    targets: list[str] = []
+    timeout: float = Field(default=10.0, gt=0, le=60.0)
+    watchlist: list[str] | None = None  # known-bad fingerprints (exact match)
+    engagement_id: str | None = None  # ledger expiry/weak/self-signed leads
+
+
+class TlsInventoryResult(BaseModel):
+    targets: list[str] = []
+    entries: list[dict[str, Any]] = []
+    count: int = 0
+    lead_count: int = 0
+    fingerprints: list[str] = []
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+    sandbox: bool = False
+
+
 class KerberosRoastRequest(BaseModel):
     """AS-REP / Kerberos roast request (explicit, opt-in)."""
 
