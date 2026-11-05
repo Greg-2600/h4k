@@ -122,6 +122,7 @@ Host recon/scan:
 - `POST /api/fuzz/shard` (N workers, merged registry)
 - `POST /api/rate_fuzz` (polite throttle probe + ledger)
 - `POST /api/stateful_fuzz` (login → authed-flow fuzz + ledger)
+- `GET|POST /api/corpus`, `POST /api/corpus/import`, `GET|DELETE /api/corpus/{sha}` (shared seed store)
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
 - `GET|POST /api/fuzz-profiles`, `DELETE /api/fuzz-profiles/{name}` (auth presets; values never listed)
 
@@ -215,6 +216,7 @@ Health/diagnostic:
 | `stateful_fuzz.py` | login → authed-flow fuzz with session harvest + ledger |
 | `sanitizer_diff.py` | pasted-report ASan/UBSan/MSan coverage compare + one confirming rebuild |
 | `jwt_tester.py` | offline JWT audit + capped HMAC crack + live alg-confusion vs marker, ledgered, sandbox canned |
+| `corpus.py` | persistent content-addressed shared seed store (dedup, caps, sidecars) |
 | `ssrf_pack.py` | opt-in metadata SSRF probe pack (AWS/GCP/Azure + encoding bypasses) + scope-enforced ledger, sandbox canned |
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses |
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |

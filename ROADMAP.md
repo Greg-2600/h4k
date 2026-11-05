@@ -320,6 +320,7 @@ where network/tooling is involved.
 55. **OpenAPI import → fuzz** [risk] — spec-driven targets. *(was #48; in flight: PR #69)*
 56. **Header/cookie session fuzz** [risk] — auth-bypass leads. *(was #49; in flight: PR #70)*
 57. **Corpus sync** [debt] — shared corpus dir across runs. *(was #51; in flight: PR #72)*
+  (done: `services/corpus.py` content-addressed store under `<data_dir>/corpus` (dedup, 1 MiB/entry, 500-entry cap with oldest-evict, sha validation, per-item-error batch import); `GET|POST /api/corpus`, `POST /api/corpus/import`, `GET|DELETE /api/corpus/{sha}` (400 bad data/sha, 404 missing); Fuzz-lab Share-seed row + Corpus list + palette; unit + e2e `test_corpus*`.)
 58. **AFL++ persistent runner** [wow] — harness + stats. *(was #52; in flight: PR #73)*
 59. **Crash bisection** [wow] — input halve to minimal trigger. *(was #54; in flight: PR #75)*
 60. **PCAP → seed replay** [wow] — deterministic fuzz seeds. *(was #55; in flight: PR #76)*
