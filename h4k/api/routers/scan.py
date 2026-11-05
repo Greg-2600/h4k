@@ -51,6 +51,8 @@ from schemas import (
     NucleiRequest,
     NucleiResult,
     PaginatedJobs,
+    RateFuzzRequest,
+    RateFuzzResult,
     RbacAuditRequest,
     RbacAuditResult,
     Report,
@@ -3528,6 +3530,63 @@ def jwt_test_api(req: JwtTestRequest) -> JwtTestResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return JwtTestResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/rate_fuzz", response_model=RateFuzzResult)
+def run_rate_fuzz(req: RateFuzzRequest) -> RateFuzzResult:
+    """Characterize one endpoint's throttling, politely (bounded GETs).
+
+    Every 429 / Retry-After is honored with backoff + jitter and
+    logged to the timeline. With `engagement_id`, an absent throttle
+    ledgers as a brute-forceability note (CWE-799) on the URL host;
+    honored throttles are INFO and never ledgered. Sandbox returns a
+    canned characterization.
+    """
+    from services import sandbox as sandbox_mode
+    from services.ratefuzz import probe_rate_limit, sandbox_result, to_ledger
+
+    target = (req.url or "").strip()
+    if not target.startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=400, detail="url must be an http(s) URL you own"
+        )
+    if sandbox_mode.enabled():
+        result = sandbox_result(target)
+    else:
+        result = probe_rate_limit(
+            target,
+            requests=req.requests,
+            timeout=req.timeout,
+            max_backoff=req.max_backoff,
+        )
+    host = urllib.parse.urlsplit(result.get("url", "")).hostname or ""
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(
+            host, result.get("url", ""), result.get("findings") or []
+        ):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+            except ValueError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return RateFuzzResult(
         **{
             **result,
             "ingested": ingested,

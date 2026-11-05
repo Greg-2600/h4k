@@ -302,6 +302,7 @@ sandbox stand-ins required where network/tooling is involved.
 55. **PCAP → seed replay** — deterministic fuzz seeds.
 56. **Stateful fuzz** — login → authed-flow fuzz.
 57. **Rate-limit-aware fuzz** — 429 backoff + jitter.
+  (done: `services/ratefuzz.py` bounded polite probe (Retry-After seconds/date honored + capped, exponential base with decay, ±jitter, per-request timeline; injectable sleeper) + no-throttle MEDIUM finding (CWE-799) vs honored-throttle INFO; `POST /api/rate_fuzz` (400 bad url, 404 unknown engagement) sandbox canned; Fuzz-lab row + palette; unit (incl. open vs throttling stub servers, no-sleep) + e2e `test_ratefuzz*`.)
 58. **Authenticated fuzz profiles** — cookie/header presets.
 59. **Fuzz sharding** — N workers, merged registry.
 60. **Coverage HTML import** — llvm-cov badge in UI.
