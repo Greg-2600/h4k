@@ -144,6 +144,7 @@ Source analysis (source router):
 - `POST /source/scan` (git URL SAST), `POST /source/scan/upload` (zip/tar/tgz)
 - `POST /source/exploit`, `POST /source/exploit/download` (PoC/disclosure skeleton)
 - `POST /source/sca`, `GET /source/sca/git`, `GET /source/sca/sbom` (SCA/SBOM)
+- `POST /source/terraform/scan` (offline Terraform misconfig audit + ledger)
 - `POST /source/triage`, `POST /source/triage/minimize`
 - `POST /source/ai`, `POST /source/ai/loop`, `GET /source/ai/models` (Ollama)
 - `POST /source/rules/test`, `GET /rules`, `POST /rules/save`, `DELETE /rules/{id}`, `POST /rules/run`
@@ -177,6 +178,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
+| `terraform_scan.py` | offline Terraform misconfig audit (SG/RDS/S3/EBS/IAM/secrets) + scope-enforced ledger, sandbox canned |
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses |
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |
 | `sanitizer.py` | sanitizer-first: ASan/UBSan flags, trace env, bug-class table |

@@ -266,6 +266,14 @@
             </div>
             <div id="kube-body" data-testid="kube-body" class="muted">Read-only: /healthz, /pods, /metrics + read-only-port probe. Nothing is executed.</div>
             <div class="row">
+              <input type="text" id="tf-stack" data-testid="tf-stack" value="lab/stack" title="Stack name (labels findings)" />
+              <input type="text" id="tf-host" data-testid="tf-host" value="127.0.0.1" title="Host label for the ledger entry (analysis is offline)" />
+              <button class="btn" id="btn-tf-scan" data-testid="btn-tf-scan">Scan IaC</button>
+              <span class="muted" id="tf-status" data-testid="tf-status"></span>
+            </div>
+            <textarea id="tf-bundle" data-testid="tf-bundle" rows="3" class="grow" placeholder="Paste terraform files as === path === blocks (offline, never applied)"></textarea>
+            <div id="tf-body" data-testid="tf-body" class="muted">Checkov-style: open SGs, public/unencrypted DBs, secret defaults, unpinned versions.</div>
+            <div class="row">
               <input type="text" id="rbac-host" data-testid="rbac-host" value="127.0.0.1" title="Host label for the ledger entry (analysis is offline)" />
               <button class="btn" id="btn-rbac-audit" data-testid="btn-rbac-audit">Audit RBAC</button>
               <span class="muted" id="rbac-status" data-testid="rbac-status"></span>
@@ -519,6 +527,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="iacscan"><span>Exploit: scan Terraform IaC (offline)</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>

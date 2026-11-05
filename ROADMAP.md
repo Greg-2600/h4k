@@ -283,6 +283,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/rbac_audit.py` offline `safe_load_all` manifest audit (* verbs/resources, escalate/bind/impersonate, secret read, pod create, authenticated/unauthenticated + cluster-admin bindings) + scope-enforced vuln ledger; `POST /api/rbac/audit` (400 empty docs) sandbox canned; Container card Audit-RBAC row + palette; unit + e2e `test_rbac_audit*`.)
 40. **Helm chart SAST** — templating + secret checks.
 41. **Terraform/IaC scan** — Checkov-style offline misconfigs.
+  (done: `services/terraform_scan.py` brace-counting block parser + checklist (open SG incl. admin ports, public/unencrypted RDS, S3 versioning/encryption/logging, EBS encryption, IMDSv2, wildcard IAM, secret defaults, unpinned versions) with H4K-prefixed check IDs + scope-enforced vuln ledger; `POST /api/source/terraform/scan` (400 empty bundle) sandbox canned; Container card Scan-IaC row + palette; unit + e2e `test_terraform_scan*`.)
 42. **Cloud metadata SSRF pack** — 169.254 probes, opt-in.
 43. **IAM key hygiene** — age/rotation, read-only.
 44. **S3 policy linter** — public/ACL offline eval.
