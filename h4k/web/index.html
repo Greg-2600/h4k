@@ -205,6 +205,17 @@
               <span class="muted" id="ssrf-status" data-testid="ssrf-status"></span>
             </div>
             <div class="muted">Opt-in metadata pack: AWS/GCP/Azure 169.254 payloads + encoding bypasses against the target above.</div>
+            <div class="row">
+              <input type="text" id="sess-marker" data-testid="sess-marker" class="grow" value="Logout" title="String present only when authenticated" />
+              <input type="text" id="sess-priv" data-testid="sess-priv" placeholder="Admin panel (optional)" title="String present only with privilege" />
+              <button class="btn" id="btn-sess-fuzz" data-testid="btn-sess-fuzz">Session fuzz</button>
+              <span class="muted" id="sess-status" data-testid="sess-status"></span>
+            </div>
+            <div class="row">
+              <input type="text" id="sess-headers" data-testid="sess-headers" class="grow" placeholder='Session headers JSON, e.g. {"Authorization":"Bearer …"}' title="One working session you own" />
+              <input type="text" id="sess-cookies" data-testid="sess-cookies" class="grow" placeholder="Cookies k=v; k2=v2" title="One working session you own" />
+            </div>
+            <div class="muted">Strips, empties and swaps your session carriers against the target above. Needs a logged-in marker.</div>
           </div>
         </div>
       </section>
@@ -520,6 +531,7 @@
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
         <div class="cmd-item" data-cmd="ssrfprobe"><span>Recon: SSRF metadata pack (opt-in)</span></div>
+        <div class="cmd-item" data-cmd="sessfuzz"><span>Recon: session fuzz (auth-bypass leads)</span></div>
         <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>

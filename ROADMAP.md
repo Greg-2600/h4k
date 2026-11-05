@@ -292,6 +292,7 @@ sandbox stand-ins required where network/tooling is involved.
 47. **GraphQL introspection + fuzz** — field/depth probes.
 48. **OpenAPI import → fuzz** — spec-driven targets.
 49. **Header/cookie session fuzz** — auth-bypass leads.
+  (done: `services/sessionfuzz.py` marker-differential pack (strip-all/each, empty, null/false/0/admin swaps, role-param injection; CRITICAL on missing auth check, role-param privilege gain) + scope-enforced ledger; `POST /api/session/fuzz` (400 bad url/missing marker, 404 unknown engagement) sandbox canned; Web card session row + palette; unit (incl. strict vs open stub servers) + e2e `test_sessionfuzz*`.)
 50. **JWT tester** — crack + alg-confusion, lab-only.
 51. **Corpus sync** — shared corpus dir across runs.
 52. **AFL++ persistent runner** — harness + stats.

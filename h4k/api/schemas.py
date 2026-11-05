@@ -652,6 +652,38 @@ class NucleiResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Header/cookie session fuzz ----
+class SessionFuzzRequest(BaseModel):
+    """Session fuzz request (opt-in, explicit lab target).
+
+    `headers`/`cookies` carry one working session. `authed_marker` is
+    required — verdicts diff against it. `privileged_marker` enables
+    the privilege-escalation checks.
+    """
+
+    url: str
+    method: str = "GET"
+    headers: dict[str, str] = Field(default_factory=dict)
+    cookies: dict[str, str] = Field(default_factory=dict)
+    authed_marker: str = ""
+    privileged_marker: str | None = None
+    engagement_id: str | None = None
+
+
+class SessionFuzzResult(BaseModel):
+    url: str = ""
+    carriers: list[str] = []
+    probes: list[dict[str, Any]] = []
+    probe_count: int = 0
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    clean: bool = True
+    note: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Cloud metadata SSRF pack ----
 class SsrfProbeRequest(BaseModel):
     """SSRF metadata probe request (opt-in, explicit lab target)."""
