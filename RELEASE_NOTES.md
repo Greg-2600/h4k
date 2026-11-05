@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #15 — engagement compare/diff
+
+`GET /api/engagement/compare?from_id=&to_id=` diffs two runs: vulns
+added/cleared, credentials banked/lost, crown jewels declared/retired and
+the best attack-path score on each side. Registered above
+`/{engagement_id}` so the static path is never swallowed by the
+engagement-id parameter. Score Compare card diffs the active engagement
+against a pasted id.
+
 ## Backlog #12 — loot vault with redaction
 
 `GET /api/engagement/{id}/vault` rolls verified credentials, captured

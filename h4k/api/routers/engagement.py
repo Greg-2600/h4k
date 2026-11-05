@@ -59,6 +59,23 @@ def parse_scope_endpoint(body: dict[str, Any]) -> dict[str, Any]:
     return {"scope": parse_scope(text)}
 
 
+@router.get("/compare")
+def compare_engagements_route(from_id: str = "", to_id: str = "") -> dict[str, Any]:
+    """Diff two engagements: vulns added/cleared, creds, jewels, path scores.
+
+    Registered above `/{engagement_id}` so "compare" is not swallowed by
+    the engagement-id path parameter.
+    """
+    from services.compare import compare_engagements as diff
+
+    if not from_id.strip() or not to_id.strip():
+        raise HTTPException(status_code=400, detail="from_id and to_id required")
+    try:
+        return diff(get_store(), from_id.strip(), to_id.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/{engagement_id}")
 def get_engagement(engagement_id: str) -> dict[str, Any]:
     store = get_store()

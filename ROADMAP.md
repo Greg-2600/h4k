@@ -248,6 +248,7 @@ sandbox stand-ins required where network/tooling is involved.
 13. **Engagement timeline view** — scan→creds→sessions→paths chronology.
 14. **PDF client report** — one-click assessment PDF.
 15. **Engagement compare/diff** — vulns/paths across runs.
+  (done: `services/compare.py` + `GET /api/engagement/compare` (registered above `/{engagement_id}`); Score Compare card; unit + e2e `test_compare*`.)
 16. **JARM/JA3 TLS fingerprints** — C2/malware leads from handshakes.
 17. **SNMP community sweep** — community + MIB walk, opt-in.
 18. **IPv6 discovery** — NDP/arp6 + nmap -6, scope-checked.

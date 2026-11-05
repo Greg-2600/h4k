@@ -411,6 +411,16 @@
           <div class="card-body"><div id="handoff-list" data-testid="handoff-list" class="muted">Navigator layer + Sigma skeletons + defender writeup for this engagement.</div></div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Compare</h2><span class="spacer"></span><span class="muted">vulns/paths across runs</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="cmp-to" data-testid="cmp-to" class="grow" placeholder="other engagement id" />
+              <button class="btn" id="btn-compare" data-testid="btn-compare">Compare vs active</button>
+            </div>
+            <div id="compare-body" data-testid="compare-body" class="muted">Diff this engagement against another run.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Report</h2><span class="spacer"></span><button class="btn" id="btn-session-report">Download MD</button></div>
           <div class="card-body"><div class="output" id="report-preview" data-testid="report-preview">Press Download MD to fill.</div></div>
         </div>

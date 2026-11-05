@@ -1256,6 +1256,21 @@ function exportCanvasPng() {
   } catch (e) { log(`PNG export failed: ${e.message}`, 'error'); }
 }
 
+async function loadCompare() {
+  const engId = await currentEngagementId();
+  const other = $('cmp-to').value.trim();
+  if (!engId || !other) { log('need the active scope plus another engagement id', 'warn'); return; }
+  try {
+    const res = await api(`/api/engagement/compare?from_id=${encodeURIComponent(engId)}&to_id=${encodeURIComponent(other)}`);
+    const v = res.vulns || {};
+    const p = res.paths || {};
+    $('compare-body').innerHTML = `<div data-testid="compare-summary">+${v.added_count || 0} / −${v.cleared_count || 0} vulns · path score ${p.from_best ?? '?'} → ${p.to_best ?? '?'}</div>`
+      + (v.added || []).slice(0, 10).map((x) => `<div data-testid="compare-added">+ <b>${esc(x.name)}</b> on ${esc(x.host)}</div>`).join('')
+      + (v.cleared || []).slice(0, 10).map((x) => `<div data-testid="compare-cleared">− <b>${esc(x.name)}</b> on ${esc(x.host)}</div>`).join('');
+    log(`compare: +${v.added_count || 0}/−${v.cleared_count || 0}`, 'success');
+  } catch (e) { $('compare-body').textContent = `compare failed: ${e.message}`; }
+}
+
 async function renderReportPreview() {
   try {
     const res = await api('/api/session/report?fmt=md');
@@ -1550,6 +1565,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   $('btn-attck').addEventListener('click', loadAttck);
   $('btn-session-report').addEventListener('click', downloadSessionReport);
+  $('btn-compare').addEventListener('click', loadCompare);
 
   // chrome
   $('activity-toggle').addEventListener('click', () => { $('activity-drawer').hidden = !$('activity-drawer').hidden; });
