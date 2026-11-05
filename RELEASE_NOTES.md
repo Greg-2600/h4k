@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #19 — mDNS/SSDP persistent map
+
+Sweep results used to die with the response. `services/zeroconf_map.py`
+normalizes mDNS/SSDP devices into assets and records the in-scope ones
+(VLAN printers, TVs, speakers included) so scans, the graph and the
+timeline all see the fleet; out-of-scope addresses are reported, never
+stored. Both endpoints take `engagement_id` and serve canned devices in
+sandbox. Fire TV card sweep buttons.
+
 ## Backlog #16 — JARM/JA3 TLS fingerprints
 
 `POST /api/tls/fingerprint` handshakes TLS ports with stdlib `ssl` and

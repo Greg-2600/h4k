@@ -254,6 +254,7 @@ sandbox stand-ins required where network/tooling is involved.
 17. **SNMP community sweep** — community + MIB walk, opt-in.
 18. **IPv6 discovery** — NDP/arp6 + nmap -6, scope-checked.
 19. **mDNS/SSDP persistent map** — sweeps persist as assets.
+  (done: `services/zeroconf_map.py` normalize + scope-enforced asset ledger; `POST /api/firetv/mdns|ssdp` take `engagement_id` + sandbox canned; Fire TV card sweep buttons; unit + e2e `test_zeroconf*`.)
 20. **TLS cert inventory** — expiry/weak-cipher/self-signed leads.
 21. **Shodan/Censys BYO import** — JSON → leads, no key in repo.
 22. **CPE auto-correlate** — banner → CPE → CVE matcher.

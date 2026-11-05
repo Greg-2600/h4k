@@ -832,6 +832,21 @@ async function runNuclei() {
 
 /* ---------- pivot: Fire TV via adb ---------- */
 
+async function ftvSweep(kind) {
+  const engId = await currentEngagementId();
+  $('ftv-body').textContent = `${kind} sweep…`;
+  try {
+    const res = await api(`/api/firetv/${kind}`, { method: 'POST', body: { target: '', engagement_id: engId || null } });
+    const detail = res.detail || {};
+    const ledger = detail.ledger || {};
+    const devices = detail.devices || [];
+    $('ftv-body').innerHTML = `<div data-testid="ftv-sweep">${esc(res.output || '')}</div>`
+      + devices.map((d) => `<div data-testid="ftv-device">${esc(d.ip)} <span class="muted">${esc((d.names || []).join(', '))}</span></div>`).join('')
+      + `<div class="muted">${ledger.recorded || 0} in ledger, ${(ledger.skipped_out_of_scope || []).length} out of scope</div>`;
+    log(`firetv ${kind}: ${devices.length} device(s)`, 'success');
+  } catch (e) { $('ftv-body').textContent = `firetv ${kind} failed: ${e.message}`; }
+}
+
 async function ftvRun(action, extra = {}) {
   const target = $('ftv-target').value.trim() || '127.0.0.1';
   $('ftv-body').textContent = `${action}…`;
@@ -1536,6 +1551,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-escape-run').addEventListener('click', runEscapeCheck);
   $('btn-trylocalroot-run').addEventListener('click', runTryLocalRoot);
   $('btn-ftv-recon').addEventListener('click', () => ftvRun('recon'));
+  $('btn-ftv-mdns').addEventListener('click', () => ftvSweep('mdns'));
+  $('btn-ftv-ssdp').addEventListener('click', () => ftvSweep('ssdp'));
   $('btn-ftv-pair').addEventListener('click', () => {
     const code = $('ftv-code').value.trim();
     if (!code) { log('pair needs the 6-digit on-screen code', 'warn'); return; }

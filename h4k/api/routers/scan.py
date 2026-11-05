@@ -3293,33 +3293,62 @@ def firetv_recon(req: FireTVRequest) -> FireTVResult:
 @router.post("/firetv/mdns", response_model=FireTVResult)
 def firetv_mdns(req: FireTVRequest) -> FireTVResult:
     """Listen for Fire TV mDNS announcements (no target needed)."""
+    from services import sandbox as sandbox_mode
     from services.firetv import mdns_discover
+    from services.zeroconf_map import persist, sandbox_devices
 
-    out = mdns_discover(queries=req.queries)
+    if sandbox_mode.enabled():
+        devices = sandbox_devices("mdns")
+        out = {"success": True, "devices": devices, "sandbox": True}
+    else:
+        out = mdns_discover(queries=req.queries)
+    persisted: dict[str, Any] = {"recorded": 0, "skipped_out_of_scope": []}
+    if req.engagement_id and out.get("success"):
+        from routers.engagement import get_store
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        persisted = persist(store, req.engagement_id, out.get("devices", []), "mdns")
     ok = bool(out.get("success"))
     return FireTVResult(
         target="multicast",
         action="mdns",
         success=ok,
-        output=f"{len(out.get('devices', []))} device(s)",
-        detail=out,
+        output=f"{len(out.get('devices', []))} device(s), {persisted['recorded']} in ledger",
+        detail={**out, "ledger": persisted},
         error=None if ok else out.get("error"),
     )
 
 
 @router.post("/firetv/ssdp", response_model=FireTVResult)
-def firetv_ssdp() -> FireTVResult:
+def firetv_ssdp(req: FireTVRequest | None = None) -> FireTVResult:
     """UPnP/SSDP discovery sweep (no target needed)."""
+    from services import sandbox as sandbox_mode
     from services.firetv import ssdp_discover
+    from services.zeroconf_map import persist, sandbox_devices
 
-    out = ssdp_discover()
+    engagement_id = (req.engagement_id if req else None) or None
+    if sandbox_mode.enabled():
+        devices = sandbox_devices("ssdp")
+        out = {"success": True, "devices": devices, "sandbox": True}
+    else:
+        out = ssdp_discover()
+    persisted: dict[str, Any] = {"recorded": 0, "skipped_out_of_scope": []}
+    if engagement_id and out.get("success"):
+        from routers.engagement import get_store
+
+        store = get_store()
+        if not store.get_engagement(engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        persisted = persist(store, engagement_id, out.get("devices", []), "ssdp")
     ok = bool(out.get("success"))
     return FireTVResult(
         target="multicast",
         action="ssdp",
         success=ok,
-        output=f"{len(out.get('devices', []))} device(s)",
-        detail=out,
+        output=f"{len(out.get('devices', []))} device(s), {persisted['recorded']} in ledger",
+        detail={**out, "ledger": persisted},
         error=None if ok else out.get("error"),
     )
 

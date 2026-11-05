@@ -118,7 +118,8 @@ CTF / lab toolkit (opt-in, each explicit):
 - `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads), `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /kerberos/asrep`, `POST /kerberos/kerberoast` (explicit roast, optional John crack)
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
-  apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
+  apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb;
+  mdns/ssdp sweeps persist in-scope hosts as assets with `engagement_id`)
 - `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +
   docker-group tries + host audit, read-only, no password)
 
@@ -184,6 +185,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `zeroconf_map.py` | mDNS/SSDP sweep normalization + scope-enforced asset ledger, sandbox canned |
 | `tls_fingerprint.py` | active TLS handshake inventory (version/cipher/cert) + exact-match watchlist + heuristic C2 leads, sandbox stand-in |
 | `pdf_report.py` | one-click assessment PDF: reportlab render of the session report (passwords masked) |
 | `loot_vault.py` | masked loot vault: verified creds + flags + shares, redaction + masked md/json export |

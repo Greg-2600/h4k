@@ -592,6 +592,7 @@ class FireTVRequest(BaseModel):
     local: str | None = None  # pull: local name / install: local APK path
     lines: int = 200  # logcat: recent line count
     queries: list[str] | None = None  # mdns: service types to ask for
+    engagement_id: str | None = None  # mdns/ssdp: persist sweep as assets
 
 
 class FireTVResult(BaseModel):
