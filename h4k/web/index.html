@@ -258,6 +258,18 @@
               <button class="btn primary" id="btn-cf-start" data-testid="btn-cf-start">Start fuzzing</button>
             </div>
             <div class="output" id="cf-output" data-testid="cf-output" hidden></div>
+            <div class="row">
+              <input type="text" id="img-ref" data-testid="img-ref" class="grow" value="lab/app:latest" title="Image ref to scan with trivy (name[:tag])" />
+              <input type="text" id="img-host" data-testid="img-host" placeholder="runs on host (for ledger)" title="Host where this image runs — required to ledger into the engagement" />
+              <select id="img-sev" data-testid="img-sev" title="Trivy severity filter">
+                <option value="">all severities</option>
+                <option value="CRITICAL,HIGH" selected>critical,high</option>
+                <option value="CRITICAL,HIGH,MEDIUM">critical,high,medium</option>
+              </select>
+              <button class="btn" id="btn-img-scan" data-testid="btn-img-scan">Scan image</button>
+              <span class="muted" id="img-status" data-testid="img-status"></span>
+            </div>
+            <div id="img-body" data-testid="img-body" class="muted">Trivy image scan, opt-in. Findings ledger to the host above when a scope is active.</div>
           </div>
         </div>
         <div class="card">
@@ -505,6 +517,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="imgscan"><span>Exploit: scan a container image (trivy)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>
         <div class="cmd-item" data-cmd="theme"><span>Toggle theme</span></div>

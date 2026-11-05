@@ -276,6 +276,7 @@ sandbox stand-ins required where network/tooling is involved.
 34. **Chisel/sshuttle pivot** — one-click tunnel + proxied rescan.
 35. **SOCKS-aware scan** — TCP scan via pivot.
 36. **Container image scan** — trivy image → engagement vulns.
+  (done: `services/image_scan.py` fixed-argv `trivy image --format json` + ref validation + finding flatten + scope-enforced vuln ledger; `POST /api/image/scan` (host required with engagement_id) sandbox canned; Container card Scan-image row + palette; unit + e2e `test_image_scan*`.)
 37. **Kubelet unauth audit** — read-only checks.
 38. **Docker socket guard** — detect + policy suggestion.
 39. **K8s RBAC audit** — over-permissive roles flagged.
