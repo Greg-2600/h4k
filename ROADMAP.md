@@ -287,6 +287,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/ssrf_pack.py` 10-payload pack (AWS/GCP/Azure + decimal/octal/hex bypasses) with baseline + marker-differential verdicts, urllib-only; `POST /api/ssrf/probe` (400 bad target, 404 unknown engagement) sandbox canned; Web card SSRF row + palette; unit (incl. live safe/vulnerable stub servers) + e2e `test_ssrf_pack*`.)
 43. **IAM key hygiene** — age/rotation, read-only.
 44. **S3 policy linter** — public/ACL offline eval.
+  (done: `services/s3_linter.py` offline policy (wildcard principal × read/write/full, NotPrincipal, conditioned) + canned/raw ACL ladder + full public-access-block neutralization with note + scope-enforced vuln ledger; `POST /api/s3/lint` (400 bad policy JSON, 404 unknown engagement) sandbox canned; Recon Cloud-audit card row + palette; unit + e2e `test_s3_linter*`.)
 45. **WebSocket fuzz** — frame mutation + replay.
 46. **gRPC enumerator + fuzz** — reflection + payload shapes.
 47. **GraphQL introspection + fuzz** — field/depth probes.

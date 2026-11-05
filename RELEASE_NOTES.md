@@ -636,6 +636,19 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #44 — S3 policy linter
+
+`POST /api/s3/lint` evaluates a pasted bucket policy (object or JSON
+text) plus a canned ACL name or raw grant list, entirely offline —
+wildcard-principal read (CRITICAL), full access (CRITICAL), write
+(HIGH), `NotPrincipal` (HIGH), conditioned grants (MEDIUM), and the
+canned/raw ACL ladder (`public-read-write` CRITICAL down to
+`authenticated-read` MEDIUM). A complete public-access-block (all four
+flags) neutralizes grants into a single INFO with the grant kept on
+record. With `engagement_id` the findings ledger as vulns on the
+labeled host (scope-enforced; CWE-732). Recon Cloud-audit card row +
+palette; sandbox fully canned.
+
 ## Backlog #42 — cloud metadata SSRF pack
 
 `POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,
