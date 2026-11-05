@@ -554,6 +554,29 @@ class KerberosRoastResult(BaseModel):
     timed_out: bool = False
 
 
+class ImpacketSecretsdumpRequest(BaseModel):
+    """One explicit secretsdump run (single known credential, opt-in)."""
+
+    target: str
+    username: str
+    password: str | None = None  # or nthash; one of the two required
+    nthash: str | None = None
+    domain: str = ""
+    timeout: int = Field(default=600, ge=30, le=3600)
+
+
+class ImpacketSecretsdumpResult(BaseModel):
+    target: str = ""
+    hashes: list[dict[str, str]] = []
+    hash_count: int = 0
+    stdout: str = ""
+    stderr: str = ""
+    rc: int | None = None
+    success: bool = False
+    timed_out: bool = False
+    sandbox: bool = False
+
+
 class NiktoRequest(BaseModel):
     """Standalone nikto web vulnerability scan."""
 

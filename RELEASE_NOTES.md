@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #32 — impacket one-clicks
+
+`POST /api/impacket/secretsdump` runs one secretsdump with one
+already-known credential (password or NT hash — one required, never a
+spray, never a guess), parses `user:rid:lm:nt:::` lines and returns the
+hashes. Sandbox returns 2 canned hashes. Pivot Secretsdump card sends
+`username` (32-hex input auto-routes to `nthash`). GetNPUsers and
+kerberoast were already live as `POST /api/kerberos/*`.
+
 ## Backlog #27 — privesc suggester
 
 `POST /api/privesc/suggest` runs ten read-only checks in the linPEAS

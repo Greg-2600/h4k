@@ -333,6 +333,20 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Secretsdump</h2><span class="spacer"></span><span class="muted">one explicit credential · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="sd-target" data-testid="sd-target" class="grow" placeholder="10.10.10.42" />
+              <input type="text" id="sd-user" data-testid="sd-user" placeholder="user" />
+              <input type="password" id="sd-pass" data-testid="sd-pass" placeholder="password or NT hash" />
+            </div>
+            <div class="row">
+              <button class="btn danger" id="btn-sd-run" data-testid="btn-sd-run">Dump SAM/LSA</button>
+            </div>
+            <div id="sd-body" data-testid="sd-body" class="muted">Needs one known credential — this is a replay, not a spray.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Route map</h2><span class="spacer"></span><span class="muted">read-only pivot planning</span></div>
           <div class="card-body">
             <div class="row">
@@ -503,6 +517,7 @@
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
+    <div class="cmd-item" data-cmd="secretsdump"><span>Pivot: secretsdump (one credential)</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>

@@ -272,6 +272,7 @@ sandbox stand-ins required where network/tooling is involved.
 30. **Hydra tune + resume** — parallel profile, checkpoint resume.
 31. **ffuf/wpscan pack** — dir + plugin enum, explicit.
 32. **Impacket one-clicks** — secretsdump/GetNPUsers, explicit creds.
+  (done: `services/impacket_runs.py` single-credential secretsdump + `user:rid:lm:nt` parser (GetNPUsers/kerberoast already live as `POST /api/kerberos/*`); `POST /api/impacket/secretsdump` (password-or-hash required); Pivot Secretsdump card (auto-detects 32-hex NT hash); unit + e2e `test_impacket*`/`test_secretsdump_ui` — e2e caught a `user` vs `username` contract bug.)
 33. **NTLM relay lab** — container-only, explicit.
 34. **Chisel/sshuttle pivot** — one-click tunnel + proxied rescan.
 35. **SOCKS-aware scan** — TCP scan via pivot.

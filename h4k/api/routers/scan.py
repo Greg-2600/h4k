@@ -33,6 +33,8 @@ from schemas import (
     FuzzRequest,
     GobusterRequest,
     GobusterResult,
+    ImpacketSecretsdumpRequest,
+    ImpacketSecretsdumpResult,
     Job,
     JohnRequest,
     JohnResult,
@@ -3342,6 +3344,35 @@ def kerberos_kerberoast(req: KerberosRoastRequest) -> KerberosRoastResult:
             max_time=req.max_time,
         ).get("cracked", [])
     return KerberosRoastResult(**{**result, "kind": kind, "cracked": cracked})
+
+
+@router.post("/impacket/secretsdump", response_model=ImpacketSecretsdumpResult)
+def impacket_secretsdump(req: ImpacketSecretsdumpRequest) -> ImpacketSecretsdumpResult:
+    """One explicit secretsdump run (single known credential, opt-in).
+
+    Needs `username` plus a password or NT hash — never sprays, never
+    guesses. Sandbox returns canned hashes.
+    """
+    if not req.target.strip() or not req.username.strip():
+        raise HTTPException(status_code=400, detail="target and username required")
+    if not (req.password or "").strip() and not (req.nthash or "").strip():
+        raise HTTPException(status_code=400, detail="password or nthash required")
+    from services import sandbox as sandbox_mode
+    from services.impacket_runs import sandbox_dump, secretsdump
+
+    if sandbox_mode.enabled():
+        return ImpacketSecretsdumpResult(**sandbox_dump(req.target))
+    out = secretsdump(
+        req.target,
+        req.username,
+        password=req.password,
+        nthash=req.nthash,
+        domain=req.domain,
+        timeout=req.timeout,
+    )
+    return ImpacketSecretsdumpResult(
+        target=req.target, **{k: v for k, v in out.items() if k != "target"}
+    )
 
 
 @router.post("/ad/responder")
