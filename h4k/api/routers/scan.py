@@ -64,6 +64,8 @@ from schemas import (
     TsharkRequest,
     TsharkResult,
     VulnLeadsRequest,
+    WsFuzzRequest,
+    WsFuzzResult,
     ZapRequest,
     ZapResult,
 )
@@ -2766,6 +2768,103 @@ def container_surfaces(req: dict[str, Any]) -> dict[str, Any]:
 
     target = str((req or {}).get("target") or "127.0.0.1")
     return detect_surfaces(target)
+
+
+_wsfuzz_jobs: dict[str, dict[str, Any]] = {}
+
+
+@router.post("/ws_fuzz", response_model=WsFuzzResult)
+def run_ws_fuzz(req: WsFuzzRequest, background: BackgroundTasks) -> WsFuzzResult:
+    """LAB-ONLY: replay mutated frames at a WebSocket endpoint you own.
+
+    Runs as a background job like /fuzz — poll `/api/ws_fuzz/{id}`.
+    Sandbox returns canned candidates without opening any socket.
+    """
+    url = (req.url or "").strip()
+    if not url.startswith(("ws://", "wss://")):
+        raise HTTPException(status_code=400, detail="url must be ws:// or wss://")
+    host = urllib.parse.urlsplit(url).hostname or ""
+    if not host:
+        raise HTTPException(status_code=400, detail="url must include a host")
+    job_id = uuid.uuid4().hex[:12]
+    job: dict[str, Any] = {
+        "id": job_id,
+        "url": url,
+        "seed": (req.seed or "")[:256],
+        "status": "running",
+        "candidates": [],
+        "created": datetime.now(UTC).isoformat(),
+    }
+    _wsfuzz_jobs[job_id] = job
+    background.add_task(_run_ws_fuzz, job, req, host)
+    return WsFuzzResult(job_id=job_id, status="running")
+
+
+def _run_ws_fuzz(job: dict[str, Any], req: WsFuzzRequest, host: str) -> None:
+    from services import sandbox as sandbox_mode
+    from services.wsfuzz import fuzz_ws, sandbox_fuzz, to_ledger
+
+    try:
+        if sandbox_mode.enabled():
+            result = sandbox_fuzz(job["url"], job["seed"])
+        else:
+            result = fuzz_ws(
+                job["url"],
+                seed=job["seed"],
+                iterations=req.iterations,
+                timeout=req.timeout,
+                progress=lambda msg, pct: _update(job, message=msg, progress=pct),
+            )
+        job["candidates"] = result["candidates"]
+        job["count"] = result["candidate_count"]
+        job["clean"] = result["clean"]
+        ingested = 0
+        skipped: list[str] = []
+        if req.engagement_id:
+            from routers.engagement import get_store
+            from services.engagement import ScopeError
+
+            store = get_store()
+            if not store.get_engagement(req.engagement_id):
+                job["error"] = "engagement not found"
+            else:
+                for entry in to_ledger(
+                    host, result.get("url", job["url"]), result.get("candidates") or []
+                ):
+                    try:
+                        ingested += store.record_vuln(
+                            req.engagement_id, entry["host"], entry
+                        )
+                    except ScopeError:
+                        if entry["host"] not in skipped:
+                            skipped.append(entry["host"])
+                    except ValueError:
+                        if entry["host"] not in skipped:
+                            skipped.append(entry["host"])
+        job["ingested"] = ingested
+        job["skipped_out_of_scope"] = skipped
+        _update(job, status="done", progress=100.0, message="ws fuzz complete")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("ws fuzz job failed")
+        _update(job, status="error", error=str(exc), message="ws fuzz failed")
+
+
+@router.get("/ws_fuzz/{job_id}")
+def ws_fuzz_status(job_id: str) -> dict[str, Any]:
+    job = _wsfuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="ws fuzz job not found")
+    return job
+
+
+@router.post("/ws_fuzz/{job_id}/abort")
+def ws_fuzz_abort(job_id: str) -> dict[str, Any]:
+    job = _wsfuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="ws fuzz job not found")
+    job["status"] = "aborted"
+    logger.info("[ws fuzz %s] abort requested", job_id)
+    return {"status": "abort_requested"}
 
 
 @router.post("/container_fuzz", response_model=ContainerFuzzResult)

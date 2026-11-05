@@ -114,6 +114,7 @@ Host recon/scan:
 - `GET /api/kev/check` + `POST /api/kev/enrich` (bundled snapshot) + `POST /api/kev/refresh` (opt-in live)
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
+- `POST /ws_fuzz` + `GET /ws_fuzz/{id}` (WebSocket frame-mutation jobs + ledger)
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
@@ -177,6 +178,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
+| `wsfuzz.py` | stdlib WS client + seeded frame mutations + crash-signal ledger, sandbox canned |
 | `ssrf_pack.py` | opt-in metadata SSRF probe pack (AWS/GCP/Azure + encoding bypasses) + scope-enforced ledger, sandbox canned |
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses |
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |

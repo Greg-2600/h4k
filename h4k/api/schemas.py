@@ -867,3 +867,24 @@ class ContainerFuzzRequest(BaseModel):
 class ContainerFuzzResult(BaseModel):
     job_id: str = ""
     status: str = ""
+
+
+# ---- WebSocket fuzz ----
+class WsFuzzRequest(BaseModel):
+    """LAB-ONLY: replay mutated frames at a WebSocket endpoint you OWN.
+
+    `seed` is the baseline message to mutate (empty = protocol-level
+    shapes only). `host` is derived from `url` for the ledger; pass
+    `engagement_id` to record crash signals as vulns (scope-enforced).
+    """
+
+    url: str = ""
+    seed: str = ""
+    iterations: int = Field(default=50, ge=1, le=500)
+    timeout: float = Field(default=5.0, gt=0, le=30.0)
+    engagement_id: str | None = None
+
+
+class WsFuzzResult(BaseModel):
+    job_id: str = ""
+    status: str = ""
