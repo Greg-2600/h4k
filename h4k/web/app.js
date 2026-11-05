@@ -521,6 +521,23 @@ async function launchPassAttack(host, port, service) {
   } catch (e) { log(`password attack failed: ${e.message}`, 'error'); }
 }
 
+async function sanitizerDiff() {
+  const report = $('sandiff-report').value.trim();
+  if (!report) { log('sanitizer diff needs a pasted report', 'warn'); return; }
+  $('sandiff-body').textContent = 'comparing sanitizers (offline)…';
+  $('sandiff-status').textContent = '';
+  try {
+    const res = await api('/api/source/sanitizer/diff', { method: 'POST', body: { report } });
+    const rows = (res.matrix || []).map((m) => `${m.sanitizer}: ${m.would_detect}`).join(', ');
+    $('sandiff-body').innerHTML = `<div data-testid="sandiff-findings">${esc(`${res.detected || '?'} → ${res.bug_class || 'unknown'}${res.cwe ? ` (${res.cwe})` : ''} · ${rows}${(res.blind_spots || []).length ? ` · blind: ${res.blind_spots.join(', ')}` : ''}${res.recommendation && res.recommendation.build ? ` · rebuild: ${res.recommendation.build}` : ''}`)}</div>`;
+    $('sandiff-status').textContent = res.bug_class || 'unknown';
+    log(`sanitizer diff done: ${res.bug_class}`, 'success');
+  } catch (e) {
+    $('sandiff-body').textContent = `sanitizer diff failed: ${e.message}`;
+    log(`sanitizer diff failed: ${e.message}`, 'error');
+  }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -1538,6 +1555,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'sandiff') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1738,6 +1756,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-sandiff').addEventListener('click', sanitizerDiff);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());

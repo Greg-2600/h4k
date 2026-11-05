@@ -148,6 +148,7 @@ Source analysis (source router):
 - `POST /source/ai`, `POST /source/ai/loop`, `GET /source/ai/models` (Ollama)
 - `POST /source/rules/test`, `GET /rules`, `POST /rules/save`, `DELETE /rules/{id}`, `POST /rules/run`
 - `POST /source/report/merge`, `POST/GET /source/report/md`
+- `POST /source/sanitizer/diff` (offline ASan/UBSan/MSan compare)
 - `POST /source/ossfuzz`
 
 Updater:
@@ -177,6 +178,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
+| `sanitizer_diff.py` | pasted-report ASan/UBSan/MSan coverage compare + one confirming rebuild |
 | `jwt_tester.py` | offline JWT audit + capped HMAC crack + live alg-confusion vs marker, ledgered, sandbox canned |
 | `ssrf_pack.py` | opt-in metadata SSRF probe pack (AWS/GCP/Azure + encoding bypasses) + scope-enforced ledger, sandbox canned |
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses |

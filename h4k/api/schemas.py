@@ -314,6 +314,26 @@ class SourceScanResult(BaseModel):
     findings: list[SourceFinding] = []
 
 
+# ---- Sanitizer diff ----
+class SanitizerDiffRequest(BaseModel):
+    """Sanitizer diff request (offline; pasted report text only)."""
+
+    report: str = ""
+
+
+class SanitizerDiffResult(BaseModel):
+    detected: str = "unknown"
+    bug_class: str = "unknown"
+    summary: str = ""
+    cwe: str = ""
+    cwe_name: str = ""
+    frames: list[str] = []
+    matrix: list[dict[str, Any]] = []
+    blind_spots: list[str] = []
+    recommendation: dict[str, Any] = {}
+    sandbox: bool = False
+
+
 class SourceExploitRequest(BaseModel):
     """Generate a proof-of-concept skeleton for a finding (disclosure only)."""
 

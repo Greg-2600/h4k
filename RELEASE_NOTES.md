@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #53 — sanitizer diff
+
+`POST /api/source/sanitizer/diff` classifies one pasted report with
+the existing classifier (plus the MSan uninitialized-read flagship
+the table lacks) and compares the three families from a stated
+coverage table: would-detect yes/no/maybe per family, blind spots
+named, and one confirming rebuild with exact flags, env and replay
+recipe — rebuild once instead of three times. Fuzz-lab row + palette;
+sandbox fully canned.
+
 ## Backlog #50 — JWT tester
 
 `POST /api/jwt/test` audits a pasted JWT offline — unsigned

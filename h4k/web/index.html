@@ -301,6 +301,12 @@
               <button class="btn" id="btn-fz-stop" hidden>Stop</button>
             </div>
             <div class="output" id="fz-output" hidden></div>
+            <div class="row">
+              <button class="btn" id="btn-sandiff" data-testid="btn-sandiff">Sanitizer diff</button>
+              <span class="muted" id="sandiff-status" data-testid="sandiff-status"></span>
+            </div>
+            <textarea id="sandiff-report" data-testid="sandiff-report" rows="3" class="grow" placeholder="Paste sanitizer output (ASan/UBSan/MSan) — offline compare, nothing is rebuilt"></textarea>
+            <div id="sandiff-body" data-testid="sandiff-body" class="muted">ASan vs UBSan vs MSan: who would catch it, blind spots, one confirming rebuild.</div>
           </div>
         </div>
       </section>
@@ -535,6 +541,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="sandiff"><span>Exploit: compare sanitizers on a report</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>

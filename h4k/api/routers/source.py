@@ -16,6 +16,8 @@ from schemas import (
     AiRequest,
     AiResult,
     CustomRuleRequest,
+    SanitizerDiffRequest,
+    SanitizerDiffResult,
     ScaResult,
     SourceExploitRequest,
     SourceFinding,
@@ -79,6 +81,29 @@ async def scan_upload(
     except ingest.IngestError as exc:
         shutil.rmtree(work, ignore_errors=True)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/sanitizer/diff", response_model=SanitizerDiffResult)
+def sanitizer_diff(req: SanitizerDiffRequest) -> SanitizerDiffResult:
+    """Compare ASan vs UBSan vs MSan on one pasted report (offline).
+
+    Classifies the report, states per-family would-detect verdicts from
+    a coverage table, names the blind spots, and recommends the single
+    best confirming rebuild. Sandbox returns a canned diff.
+    """
+    from services import sandbox as sandbox_mode
+    from services.sanitizer_diff import diff_report, sandbox_result
+
+    try:
+        if not (req.report or "").strip():
+            raise ValueError("report required (paste sanitizer output)")
+        result = sandbox_result() if sandbox_mode.enabled() else diff_report(req.report)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SanitizerDiffResult(
+        bug_class=result.get("class", "unknown"),
+        **{k: v for k, v in result.items() if k != "class"},
+    )
 
 
 @router.post("/exploit")
