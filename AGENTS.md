@@ -117,7 +117,7 @@ Host recon/scan:
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
-- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /kubelet/audit` (read-only kubelet exposure audit + ledger), `POST /rbac/audit` (offline K8s RBAC audit + ledger), `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `POST /nikto`, `POST /ssrf/probe` (metadata SSRF pack + ledger), `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /kubelet/audit` (read-only kubelet exposure audit + ledger), `POST /rbac/audit` (offline K8s RBAC audit + ledger), `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /kerberos/asrep`, `POST /kerberos/kerberoast` (explicit roast, optional John crack)
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
   apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
@@ -177,6 +177,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
+| `ssrf_pack.py` | opt-in metadata SSRF probe pack (AWS/GCP/Azure + encoding bypasses) + scope-enforced ledger, sandbox canned |
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses |
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |
 | `sanitizer.py` | sanitizer-first: ASan/UBSan flags, trace env, bug-class table |

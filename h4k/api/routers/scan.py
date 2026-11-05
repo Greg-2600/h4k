@@ -5,6 +5,7 @@ import logging
 import socket
 import sqlite3
 import time
+import urllib.parse
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
@@ -54,6 +55,8 @@ from schemas import (
     ScanRequest,
     SqlmapRequest,
     SqlmapResult,
+    SsrfProbeRequest,
+    SsrfProbeResult,
     TlsFingerprintRequest,
     TlsFingerprintResult,
     TlsInventoryRequest,
@@ -3354,6 +3357,67 @@ def rbac_audit_api(req: RbacAuditRequest) -> RbacAuditResult:
         **{
             **result,
             "host": host,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/ssrf/probe", response_model=SsrfProbeResult)
+def ssrf_probe_api(req: SsrfProbeRequest) -> SsrfProbeResult:
+    """Probe one URL-fetching endpoint with cloud metadata payloads.
+
+    Opt-in and explicit: only the operator-supplied `target` is ever
+    requested (baseline + one request per payload). `engagement_id`
+    ledgers VULNERABLE probes as vulns on the target host
+    (scope-enforced). Sandbox returns canned findings.
+    """
+    from services import sandbox as sandbox_mode
+    from services.ssrf_pack import probe_target, sandbox_result, to_ledger
+
+    try:
+        target = (req.target or "").strip()
+        if not target.startswith(("http://", "https://")):
+            raise ValueError("target must be an http(s) URL you own")
+        result = (
+            sandbox_result(target)
+            if sandbox_mode.enabled()
+            else probe_target(
+                target,
+                param=req.param,
+                method=req.method,
+                payload_names=req.payloads,
+            )
+        )
+    except ValueError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    host = urllib.parse.urlsplit(result.get("target", "")).hostname or ""
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from fastapi import HTTPException
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(
+            host, result.get("target", ""), result.get("probes") or []
+        ):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+            except ValueError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return SsrfProbeResult(
+        **{
+            **result,
             "ingested": ingested,
             "skipped_out_of_scope": skipped,
         }

@@ -636,6 +636,18 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #42 — cloud metadata SSRF pack
+
+`POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,
+GCP, Azure IMDS plus decimal/octal/hex IP-encoding bypasses) into the
+operator-named URL-fetching parameter of one explicit target, after a
+benign baseline — marker-differential verdicts (VULNERABLE only on
+real metadata markers like `ami-id`/`security-credentials`), urllib
+only, GET or POST. Only the operator's target is ever requested.
+With `engagement_id` the VULNERABLE probes ledger as CRITICAL vulns
+on the target host (scope-enforced; CWE-918). Web card SSRF row +
+palette; sandbox fully canned.
+
 ## Backlog #39 — K8s RBAC audit
 
 `POST /api/rbac/audit` analyzes pasted Role/ClusterRole/Binding YAML
