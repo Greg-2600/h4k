@@ -119,6 +119,7 @@ CTF / lab toolkit (opt-in, each explicit):
   apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
 - `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +
   docker-group tries + host audit, read-only, no password)
+- `POST /smb/shares` (read-only share inventory, null session default) + `GET /api/engagement/{id}/shares` (ledger, also in graph payload)
 
 Engagement (persistent memory + cred propagation, engagement router):
 - `POST /api/engagement` (declare authorized scope), `GET /api/engagement`, `GET|DELETE /api/engagement/{id}`
@@ -181,6 +182,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `smb_shares.py` | read-only SMB share inventory (smbclient/smbmap parse, scope-enforced share ledger + graph payload) |
 | `hygiene.py` | read-only credential hygiene: reuse/weak/default summary + score over verified creds |
 | `graph_canvas.py` | deterministic canvas layout for the asset graph (hosts circle, services ring, creds top row; powers the interactive SVG + PNG export) |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |

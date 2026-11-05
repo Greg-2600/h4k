@@ -236,6 +236,7 @@ sandbox stand-ins required where network/tooling is involved.
 5. **Scheduled re-scans + diff alerts** — cadence per engagement, MD digest.
 6. **NSE vuln suggest-and-run** — service → script map, explicit run only.
 7. **SMB share enumerator** — shares/ACLs, read-only, into asset graph.
+  (done: `services/smb_shares.py` smbclient/smbmap parse + `POST /api/smb/shares` (null session default) with scope-enforced share ledger (`shares` table, `GET .../shares`, included in graph payload); Recon SMB card + palette; unit + e2e `test_smb*`.)
 8. **Kerberos roast helpers** — AS-REP/kerberoast → John, explicit only.
 9. **LLMNR/NBT-NS poison lab** — container-only listener + capture.
 10. **Lockout-aware spray** — jitter, per-user cap, ledger stop.

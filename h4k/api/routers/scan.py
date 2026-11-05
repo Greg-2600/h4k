@@ -46,6 +46,8 @@ from schemas import (
     PaginatedJobs,
     Report,
     ScanRequest,
+    SmbSharesRequest,
+    SmbSharesResult,
     SqlmapRequest,
     SqlmapResult,
     TsharkRequest,
@@ -3148,6 +3150,46 @@ def lateral_movement(req: LateralRequest) -> dict[str, Any]:
     from services.lateral import LateralMovement
 
     return LateralMovement().discover_network(req.cidr)
+
+
+@router.post("/smb/shares", response_model=SmbSharesResult)
+def smb_shares_enum(req: SmbSharesRequest) -> SmbSharesResult:
+    """Read-only SMB share inventory (null session default, opt-in).
+
+    `engagement_id` records shares per host (scope-enforced ledger, also
+    surfaced in the asset-graph payload).
+    """
+    from services import sandbox as sandbox_mode
+    from services.smb_shares import enumerate_shares, sandbox_shares
+
+    if sandbox_mode.enabled():
+        result = sandbox_shares(req.target)
+    else:
+        result = enumerate_shares(req.target, user=req.user, password=req.password)
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="engagement not found")
+        try:
+            for share in result.get("shares", []):
+                ingested += store.record_share(req.engagement_id, req.target, share)
+        except ScopeError:
+            skipped.append(req.target)
+    return SmbSharesResult(
+        **{
+            **result,
+            "target": req.target,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
 
 
 @router.post("/db_interrogate")

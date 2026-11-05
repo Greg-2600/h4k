@@ -489,6 +489,26 @@ class NmapNSEResult(BaseModel):
     tool: dict[str, Any] = {}
 
 
+class SmbSharesRequest(BaseModel):
+    """Read-only SMB share enumeration (null session default, opt-in)."""
+
+    target: str
+    user: str = ""
+    password: str = ""
+    # engagement_id opts into the ledger: shares recorded per host.
+    engagement_id: str | None = None
+
+
+class SmbSharesResult(BaseModel):
+    target: str = ""
+    shares: list[dict[str, Any]] = []
+    count: int = 0
+    tools: list[dict[str, Any]] = []
+    success: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 class NiktoRequest(BaseModel):
     """Standalone nikto web vulnerability scan."""
 

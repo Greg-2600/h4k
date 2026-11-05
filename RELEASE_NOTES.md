@@ -636,6 +636,14 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #7 — SMB share enumerator
+
+`POST /api/smb/shares` (opt-in, null session default) parses `smbclient -L`
+and `smbmap` output into structured shares with access flags. With
+`engagement_id`, shares are recorded per host in a scope-enforced `shares`
+table, readable via `GET .../shares` and included in the asset-graph payload
+so shares sit alongside hosts and services. Sandbox returns 3 canned shares.
+
 ## Backlog #4 — credential hygiene report
 
 `GET /api/engagement/{id}/hygiene` summarizes the hygiene of already-verified

@@ -707,6 +707,21 @@ function renderToolResult(elId, res, label) {
   log(`${label} done: ${tool.status || (res.success ? 'ok' : 'failed')}`, 'info');
 }
 
+async function runSmbEnum() {
+  const target = $('smb-target').value.trim() || $('target').value.trim();
+  if (!target) { log('smb needs a target', 'warn'); return; }
+  $('smb-body').textContent = 'enumerating shares…';
+  $('smb-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/smb/shares', { method: 'POST', body: { target, engagement_id: engId || null } });
+    const names = (res.shares || []).map((s) => `${s.name}${s.access ? ` (${s.access})` : ''}`).join(', ');
+    $('smb-body').innerHTML = `<div data-testid="smb-shares">${esc(`${res.count || 0} share(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}: ${names || 'none'}`)}</div>`;
+    $('smb-status').textContent = `${res.count || 0} share(s)`;
+    log(`smb enum done: ${res.count || 0} share(s)`, 'success');
+  } catch (e) { $('smb-body').textContent = `smb enum failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1211,6 +1226,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'smb') { setTab('recon'); runSmbEnum(); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
@@ -1383,6 +1399,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-smb-enum').addEventListener('click', runSmbEnum);
   $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
