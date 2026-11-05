@@ -116,7 +116,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
          "click==8.4.2" \
          "semgrep==1.182.0" \
     && python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed \
-         pymetasploit3 fastapi uvicorn python-multipart pyyaml \
+         pymetasploit3 fastapi uvicorn python-multipart pyyaml reportlab \
          python-owasp-zap-v2.4 \
          mitm6 \
          responder3 \

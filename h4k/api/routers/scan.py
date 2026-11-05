@@ -529,10 +529,11 @@ def get_session() -> dict[str, Any]:
 
 
 @router.get("/session/report")
-def session_report(fmt: str = "json") -> dict[str, Any]:
+def session_report(fmt: str = "json") -> Any:
     """Full session writeup: hosts, services, vulns, creds, sessions, attacks.
 
-    Markdown for the disclosure writeup, JSON for further processing.
+    Markdown for the disclosure writeup, JSON for further processing,
+    PDF for the one-click client handoff.
     """
     meta = _ensure_session_row()
     conn = _neighbor_db()
@@ -752,6 +753,19 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
             "> Generated for authorized lab use — verify every target was owned before citing it."
         )
         return {"fmt": "md", "content": "\n".join(lines)}
+    if fmt == "pdf":
+        from fastapi.responses import Response
+        from services.pdf_report import build_session_pdf
+
+        try:
+            pdf = build_session_pdf(report)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=h4k-session.pdf"},
+        )
     return {"fmt": "json", "report": report}
 
 

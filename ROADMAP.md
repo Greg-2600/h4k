@@ -247,6 +247,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/loot_vault.py` masked rollup + md/json export, reveal-gated; `GET /api/engagement/{id}/vault|vault/export`; Score vault card masked-first + reveal checkbox + MD export; unit + e2e `test_loot_vault`/`test_vault_ui`.)
 13. **Engagement timeline view** — scan→creds→sessions→paths chronology.
 14. **PDF client report** — one-click assessment PDF.
+  (done: `services/pdf_report.py` reportlab render + `GET /api/session/report?fmt=pdf` attachment (passwords masked); Report card Download PDF; `reportlab` in requirements + image; unit + e2e `test_pdf*`.)
 15. **Engagement compare/diff** — vulns/paths across runs.
 16. **JARM/JA3 TLS fingerprints** — C2/malware leads from handshakes.
 17. **SNMP community sweep** — community + MIB walk, opt-in.

@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #14 — PDF client report
+
+`GET /api/session/report?fmt=pdf` downloads the assessment as a real PDF
+(reportlab headings + tables, `Content-Disposition: attachment`), with
+passwords masked like the loot vault — the MD/JSON exports keep full
+detail. Report card Download PDF button fetches it as a blob. `reportlab`
+joins `requirements.txt` and the image layer (pure-Python, no system
+deps); a bare environment fails loudly instead of shipping an empty file.
+
 ## Backlog #12 — loot vault with redaction
 
 `GET /api/engagement/{id}/vault` rolls verified credentials, captured

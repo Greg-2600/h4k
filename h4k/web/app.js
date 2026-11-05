@@ -1277,6 +1277,20 @@ async function downloadSessionReport() {
   } catch (e) { log(`report failed: ${e.message}`, 'error'); }
 }
 
+async function downloadSessionPdf() {
+  try {
+    const r = await fetch('/api/session/report?fmt=pdf');
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'h4k-session.pdf';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    log('session PDF downloaded', 'success');
+  } catch (e) { log(`PDF failed: ${e.message}`, 'error'); }
+}
+
 /* ---------- palette + keyboard ---------- */
 
 function togglePalette(show) {
@@ -1550,6 +1564,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   $('btn-attck').addEventListener('click', loadAttck);
   $('btn-session-report').addEventListener('click', downloadSessionReport);
+  $('btn-session-pdf').addEventListener('click', downloadSessionPdf);
 
   // chrome
   $('activity-toggle').addEventListener('click', () => { $('activity-drawer').hidden = !$('activity-drawer').hidden; });
