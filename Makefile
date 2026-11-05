@@ -120,6 +120,8 @@ lint-py: $(BLACK) $(ISORT) $(RUFF) $(FLAKE8) $(PYLINT) $(MYPY) $(BANDIT)
 	@printf "  $(OK) ruff\n"
 	$(FLAKE8) $(SRC_PY) $(TESTS) || { printf "$(ERR) flake8 failed\n"; exit 1; }
 	@printf "  $(OK) flake8\n"
+	$(PYLINT) $(SRC_PY) --fail-under=7.0 || { printf "$(ERR) pylint failed\n"; exit 1; }
+	@printf "  $(OK) pylint\n"
 	$(MYPY) $(SRC_PY) || { printf "$(ERR) mypy failed\n"; exit 1; }
 	@printf "  $(OK) mypy\n"
 	$(BANDIT) -r $(SRC_PY) -q --configfile pyproject.toml || { printf "$(ERR) bandit failed\n"; exit 1; }

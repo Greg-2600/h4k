@@ -1,7 +1,11 @@
+from pathlib import Path
+from typing import Any
+
+from _pytest.monkeypatch import MonkeyPatch
 from services.graph_canvas import layout_graph
 
 
-def _graph():
+def _graph() -> dict[str, Any]:
     return {
         "nodes": [
             {"id": "10.0.0.5", "label": "10.0.0.5", "type": "host"},
@@ -25,13 +29,13 @@ def _graph():
     }
 
 
-def test_layout_is_deterministic():
+def test_layout_is_deterministic() -> None:
     a = layout_graph(_graph())
     b = layout_graph(_graph())
     assert a == b
 
 
-def test_layout_synthesizes_missing_endpoints():
+def test_layout_synthesizes_missing_endpoints() -> None:
     out = layout_graph(_graph())
     ids = {n["id"] for n in out["nodes"]}
     assert "10.0.0.5:22" in ids
@@ -41,14 +45,14 @@ def test_layout_synthesizes_missing_endpoints():
         assert 0 <= n["x"] <= 800 and 0 <= n["y"] <= 600
 
 
-def test_layout_empty_graph():
+def test_layout_empty_graph() -> None:
     out = layout_graph({"nodes": [], "edges": [], "summary": {}})
     assert out["nodes"] == [] and out["edges"] == []
     assert out["stage"] == {"width": 800, "height": 600}
     assert len(out["legend"]) == 4
 
 
-def test_canvas_router(tmp_path, monkeypatch):
+def test_canvas_router(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     from contextlib import asynccontextmanager
 
     monkeypatch.setenv("H4K_REFRESH_CVE", "0")
@@ -60,7 +64,7 @@ def test_canvas_router(tmp_path, monkeypatch):
     monkeypatch.setattr(eng_router, "get_store", lambda: store)
 
     @asynccontextmanager
-    async def _noop(_app):
+    async def _noop(_app: Any) -> Any:
         yield
 
     main_module.app.router.lifespan_context = _noop
