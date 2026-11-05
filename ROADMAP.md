@@ -288,6 +288,7 @@ sandbox stand-ins required where network/tooling is involved.
 43. **IAM key hygiene** — age/rotation, read-only.
 44. **S3 policy linter** — public/ACL offline eval.
 45. **WebSocket fuzz** — frame mutation + replay.
+  (done: `services/wsfuzz.py` stdlib RFC 6455 client + 11 seeded mutations + crash signals (drop/abnormal-close/timeout/error-text) + scope-enforced ledger; `POST /api/ws_fuzz` job + `GET /api/ws_fuzz/{id}` poll + abort (400 bad url, 404 unknown job) sandbox canned; Fuzz-lab Socket row + palette; unit (incl. live stub server) + e2e `test_wsfuzz*`.)
 46. **gRPC enumerator + fuzz** — reflection + payload shapes.
 47. **GraphQL introspection + fuzz** — field/depth probes.
 48. **OpenAPI import → fuzz** — spec-driven targets.

@@ -636,6 +636,18 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #45 — WebSocket fuzz
+
+`POST /api/ws_fuzz` starts a background job that replays an
+operator-supplied seed through 11 deterministic mutations
+(bitflip/truncate/repeat/oversize/empty/format/JSON-break/null/
+newline/unicode/giant-number) over a fresh stdlib-only RFC 6455
+connection per iteration, recording drops, abnormal closes, timeouts
+and leaked error text as candidates. `GET /api/ws_fuzz/{id}` polls,
+`POST …/abort` stops. With `engagement_id` the candidates ledger as
+vulns on the URL host (scope-enforced; CWE-20). Fuzz-lab Socket row +
+palette; sandbox fully canned.
+
 ## Backlog #42 — cloud metadata SSRF pack
 
 `POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,

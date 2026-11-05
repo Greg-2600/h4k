@@ -553,6 +553,54 @@ async function startFuzzing() {
   } catch (e) { log(`fuzz failed: ${e.message}`, 'error'); if (btn) btn.disabled = false; }
 }
 
+async function startWsFuzz() {
+  const btn = $('btn-ws-start');
+  if (btn) btn.disabled = true;
+  $('btn-ws-stop').hidden = false;
+  $('ws-output').hidden = false;
+  $('ws-output').textContent = 'fuzzing socket…';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/ws_fuzz', {
+      method: 'POST',
+      body: {
+        url: $('ws-url').value.trim(),
+        seed: $('ws-seed').value,
+        iterations: parseInt($('ws-iters').value, 10) || 20,
+        engagement_id: engId || null,
+      },
+    });
+    if (!jobIdOf(res)) { log(`ws fuzz refused: ${res.detail || 'error'}`, 'error'); if (btn) btn.disabled = false; return; }
+    const jobId = jobIdOf(res);
+    log(`ws fuzz ${jobId}`, 'info');
+    if (state.wsTimer) clearInterval(state.wsTimer);
+    state.wsTimer = setInterval(async () => {
+      try {
+        const st = await api(`/api/ws_fuzz/${jobId}`);
+        const cands = st.candidates || [];
+        $('ws-output').textContent = st.status === 'done'
+          ? `${cands.length} candidate(s)${st.ingested ? ` · ${st.ingested} in ledger` : ''}${(st.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}\n`
+            + cands.map((c) => `${c.mutation} → ${c.signal}: ${c.evidence || ''}`).join('\n').slice(0, 4000)
+          : 'fuzzing socket…';
+        if (isDone(st.status)) {
+          clearInterval(state.wsTimer); state.wsTimer = null;
+          if (btn) btn.disabled = false;
+          $('btn-ws-stop').hidden = true;
+          log(`ws fuzz done: ${cands.length} candidate(s)`, 'success');
+        }
+      } catch (e) { log(`ws fuzz poll: ${e.message}`, 'error'); }
+    }, 2000);
+  } catch (e) { log(`ws fuzz failed: ${e.message}`, 'error'); if (btn) btn.disabled = false; }
+}
+
+async function stopWsFuzz() {
+  $('btn-ws-stop').hidden = true;
+  if (state.wsTimer) { clearInterval(state.wsTimer); state.wsTimer = null; }
+  const btn = $('btn-ws-start');
+  if (btn) btn.disabled = false;
+  log('ws fuzz stop requested', 'warn');
+}
+
 /* ---------- 4. pivot ---------- */
 
 async function loadCredLedger() {
@@ -1502,6 +1550,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'wsfuzz') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1701,6 +1750,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-ws-start').addEventListener('click', startWsFuzz);
+  $('btn-ws-stop').addEventListener('click', stopWsFuzz);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());
