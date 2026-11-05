@@ -48,8 +48,11 @@ from schemas import (
     PaginatedJobs,
     Report,
     ScanRequest,
+    SqlmapDumpRequest,
+    SqlmapDumpResult,
     SqlmapRequest,
     SqlmapResult,
+    SqlmapTamperRequest,
     TlsFingerprintRequest,
     TlsFingerprintResult,
     TlsInventoryRequest,
@@ -3276,6 +3279,97 @@ def sqlmap_scan_api(req: SqlmapRequest) -> SqlmapResult:
     from services.sqlmap import sqlmap_scan
 
     return SqlmapResult(**sqlmap_scan(req.url, **req.options))
+
+
+@router.get("/sqlmap/tampers")
+def sqlmap_tampers() -> dict[str, Any]:
+    """Curated tamper-script checklist (nothing runs implicitly)."""
+    from services.sqlmap_flow import TAMPERS
+
+    return {"tampers": TAMPERS, "count": len(TAMPERS)}
+
+
+@router.post("/sqlmap/tamper", response_model=SqlmapResult)
+def sqlmap_tamper_api(req: SqlmapTamperRequest) -> SqlmapResult:
+    """Explicit tamper-aware scan (validates tamper names first)."""
+    from services.sqlmap_flow import run_tamper_scan
+
+    try:
+        out = run_tamper_scan(req.url, req.tampers or [], **req.options)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SqlmapResult(
+        url=req.url, findings=[], **{k: v for k, v in out.items() if k != "tables"}
+    )
+
+
+@router.post("/sqlmap/dump", response_model=SqlmapDumpResult)
+def sqlmap_dump_api(req: SqlmapDumpRequest) -> SqlmapDumpResult:
+    """Explicit dump: parse tables → ledger flags + UNVERIFIED creds.
+
+    Creds are recorded unverified (propagation ignores them); flags go
+    to the flag ledger. Host-scoped; out-of-scope hosts are skipped.
+    """
+    from services import sandbox as sandbox_mode
+    from services.sqlmap import SQLMapService
+    from services.sqlmap_flow import TAMPERS, ledger, parse_dump_tables, sandbox_dump
+
+    unknown = [t for t in (req.tampers or []) if t not in TAMPERS]
+    if unknown:
+        raise HTTPException(
+            status_code=400, detail=f"unknown tamper script(s): {', '.join(unknown)}"
+        )
+    if sandbox_mode.enabled():
+        dumped = sandbox_dump()
+        tables = dumped["tables"]
+        stdout, success = dumped["stdout"], True
+    else:
+        argv = ["sqlmap", "-u", req.url, "--dump", "--batch"]
+        if req.tampers:
+            argv += ["--tamper", ",".join(req.tampers)]
+        if req.database:
+            argv += ["-D", req.database]
+        if req.tables:
+            argv += ["-T", ",".join(req.tables)]
+        out = SQLMapService()._run(argv, timeout=req.timeout + 60)
+        if out.get("status") == "missing":
+            raise HTTPException(status_code=501, detail="sqlmap not installed")
+        tables = parse_dump_tables(out.get("stdout", ""))
+        stdout, success = out.get("stdout", ""), bool(out.get("success"))
+    ingested: dict[str, int] = {"flags": 0, "credentials": 0}
+    skipped: list[str] = []
+    if req.engagement_id and tables:
+        import urllib.parse
+
+        from routers.engagement import get_store
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        host = (req.host or "").strip() or (
+            urllib.parse.urlsplit(req.url).hostname or ""
+        )
+        if not host or not store.in_scope(req.engagement_id, host):
+            skipped.append(host or req.url)
+        else:
+            try:
+                res = ledger(store, req.engagement_id, host, tables)
+                ingested = {"flags": res["flags"], "credentials": res["credentials"]}
+            except ValueError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from services.sqlmap_flow import extract_creds, extract_flags
+
+    return SqlmapDumpResult(
+        url=req.url,
+        tables=tables,
+        flags=[f["value"] for f in extract_flags(tables)],
+        credentials=extract_creds(tables),
+        ingested=ingested,
+        skipped_out_of_scope=skipped,
+        stdout=stdout[:4000],
+        success=success,
+        sandbox=sandbox_mode.enabled(),
+    )
 
 
 @router.post("/ad/bloodhound")

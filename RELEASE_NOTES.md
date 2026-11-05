@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #29 — SQLmap tamper flow
+
+`GET /api/sqlmap/tampers` lists the curated tamper scripts;
+`POST /api/sqlmap/tamper` runs an explicit scan with the chosen ones
+(unknown names rejected up front). `POST /api/sqlmap/dump` parses the
+`--dump` tables into rows: flag-shaped values ledger as flags,
+user/password column pairs ledger as *unverified* credentials (the
+propagation engine only replays verified ones, so a dump can never
+widen access). Host-scoped, out-of-scope skipped. Exploit SQLMap card
+with tamper input + palette entry.
+
 ## Backlog #27 — privesc suggester
 
 `POST /api/privesc/suggest` runs ten read-only checks in the linPEAS

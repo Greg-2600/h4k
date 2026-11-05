@@ -670,6 +670,38 @@ class SqlmapResult(BaseModel):
     timed_out: bool = False
 
 
+class SqlmapTamperRequest(BaseModel):
+    """Explicit tamper-aware SQLMap scan (opt-in)."""
+
+    url: str
+    tampers: list[str] = []
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class SqlmapDumpRequest(BaseModel):
+    """Explicit dump: parse tables → ledger flags + UNVERIFIED creds."""
+
+    url: str
+    tampers: list[str] = []
+    database: str | None = None
+    tables: list[str] | None = None
+    host: str | None = None  # attribute loot to this host
+    engagement_id: str | None = None
+    timeout: int = Field(default=300, ge=1, le=3600)
+
+
+class SqlmapDumpResult(BaseModel):
+    url: str = ""
+    tables: list[dict[str, Any]] = []
+    flags: list[str] = []
+    credentials: list[dict[str, Any]] = []
+    ingested: dict[str, int] = {}
+    skipped_out_of_scope: list[str] = []
+    stdout: str = ""
+    success: bool = False
+    sandbox: bool = False
+
+
 # ---- AD Tools ----
 class ADBloodhoundRequest(BaseModel):
     domain: str

@@ -261,6 +261,18 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>SQLMap tamper + dump</h2><span class="spacer"></span><span class="muted">explicit only · ledgered</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="sql-url" data-testid="sql-url" class="grow" placeholder="http://target/vuln.php?id=1" />
+              <input type="text" id="sql-tamper" data-testid="sql-tamper" placeholder="tampers: space2comment,between" />
+              <button class="btn primary" id="btn-sql-dump" data-testid="btn-sql-dump">Dump → ledger</button>
+              <span class="muted" id="sql-status" data-testid="sql-status"></span>
+            </div>
+            <div id="sql-body" data-testid="sql-body" class="muted">Tamper-aware dump; flags + UNVERIFIED creds land in the engagement ledger.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Fuzz lab</h2><span class="spacer"></span><span class="muted" id="fz-live">ready</span></div>
           <div class="card-body">
             <p class="muted">Lab-only: fuzz a service you own. Crashes get reproduce commands.</p>
@@ -499,6 +511,7 @@
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="sqldump"><span>Exploit: sqlmap dump → ledger</span></div>
         <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>

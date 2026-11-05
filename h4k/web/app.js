@@ -521,6 +521,25 @@ async function launchPassAttack(host, port, service) {
   } catch (e) { log(`password attack failed: ${e.message}`, 'error'); }
 }
 
+async function runSqlmapDump() {
+  const url = $('sql-url').value.trim();
+  if (!url) { log('sqlmap needs a target URL', 'warn'); return; }
+  const tampers = $('sql-tamper').value.split(',').map((s) => s.trim()).filter(Boolean);
+  $('sql-body').textContent = 'dumping…';
+  $('sql-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    let host = '';
+    try { host = new URL(url).hostname; } catch { host = ''; }
+    const res = await api('/api/sqlmap/dump', {
+      method: 'POST', body: { url, tampers, engagement_id: engId || null, host: host || null },
+    });
+    $('sql-body').innerHTML = `<div data-testid="sql-dump">${esc(`${(res.tables || []).length} table(s), flags: ${(res.flags || []).join(', ') || 'none'}, creds: ${(res.credentials || []).length}`)}${res.ingested ? ` · ledger ${JSON.stringify(res.ingested)}` : ''}</div>`;
+    $('sql-status').textContent = `${(res.tables || []).length} table(s)`;
+    log(`sqlmap dump: ${(res.tables || []).length} table(s)`, 'success');
+  } catch (e) { $('sql-body').textContent = `dump failed: ${e.message}`; }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -1426,6 +1445,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'sqldump') { setTab('exploit'); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
@@ -1627,6 +1647,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-sql-dump').addEventListener('click', runSqlmapDump);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());

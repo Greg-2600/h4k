@@ -110,6 +110,7 @@ Host recon/scan:
 - `POST /api/net/ipv6/discover` (NDP table + explicit-CIDR nmap -6, scope-enforced asset ledger)
 - `POST /attack`, `GET /attack/{id}`
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
+- `GET /api/sqlmap/tampers` + `POST /api/sqlmap/tamper|dump` (explicit tamper scan, dump → flag/unverified-cred ledger)
 - `POST /vulnleads`
 - `GET /api/kev/check` + `POST /api/kev/enrich` (bundled snapshot) + `POST /api/kev/refresh` (opt-in live)
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
@@ -188,6 +189,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `sqlmap_flow.py` | tamper-aware scan + dump parse → flag/unverified-cred ledger (explicit only) |
 | `privesc_suggest.py` | read-only linPEAS-style checklist (10 checks, pass/fail + fix hints, sandbox canned) |
 | `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |
