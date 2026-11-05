@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #18 — IPv6 discovery
+
+`POST /api/net/ipv6/discover` reads the kernel NDP table (`ip -6 neigh`,
+skipping FAILED/INCOMPLETE) and runs `nmap -6 -sn` only against an
+explicit operator-supplied CIDR — never a blind v6 sweep. With
+`engagement_id`, in-scope hosts are recorded as assets; out-of-scope
+addresses are reported, never stored. Sandbox returns 3 canned hosts.
+Discover Neighbors-v6 button + palette command.
+
 ## Backlog #16 — JARM/JA3 TLS fingerprints
 
 `POST /api/tls/fingerprint` handshakes TLS ports with stdlib `ssl` and

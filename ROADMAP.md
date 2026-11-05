@@ -253,6 +253,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/tls_fingerprint.py` stdlib handshake inventory + stable fingerprint + operator watchlist (exact match) + heuristic leads; `POST /api/tls/fingerprint` sandbox canned; Recon TLS card + palette; unit + e2e `test_tls*`. Honest scope: not raw-ClientHello JARM — stdlib cannot emit the probes, exact-match only.)
 17. **SNMP community sweep** — community + MIB walk, opt-in.
 18. **IPv6 discovery** — NDP/arp6 + nmap -6, scope-checked.
+  (done: `services/ipv6_discovery.py` NDP parse + explicit-CIDR nmap -6 only (never a blind v6 sweep) + scope-enforced asset ledger; `POST /api/net/ipv6/discover` sandbox canned; Discover Neighbors-v6 button + palette; unit + e2e `test_ipv6*`.)
 19. **mDNS/SSDP persistent map** — sweeps persist as assets.
 20. **TLS cert inventory** — expiry/weak-cipher/self-signed leads.
 21. **Shodan/Censys BYO import** — JSON → leads, no key in repo.

@@ -289,6 +289,22 @@ async function launchNeighbors() {
   } catch (e) { log(`neighbors failed: ${e.message}`, 'error'); }
 }
 
+async function launchNeighbors6() {
+  $('ipv6-body').textContent = 'discovering IPv6 neighbors…';
+  try {
+    const engId = await currentEngagementId();
+    const target = $('target').value.trim();
+    const cidr = /:/.test(target) ? target : null;
+    const res = await api('/api/net/ipv6/discover', {
+      method: 'POST', body: { cidr, engagement_id: engId || null },
+    });
+    const rows = (res.neighbors || []).map((n) => `<div data-testid="ipv6-neighbor">${esc(n.ip)} <span class="muted">${esc(n.dev || '')} ${esc(n.mac || '')} ${esc(n.state || '')}</span></div>`).join('');
+    $('ipv6-body').innerHTML = rows || 'no IPv6 neighbors seen';
+    if (res.recorded) log(`ipv6: ${res.recorded} in-scope host(s) recorded`, 'success');
+    if ((res.skipped_out_of_scope || []).length) log(`ipv6: ${res.skipped_out_of_scope.length} out-of-scope skipped`, 'warn');
+  } catch (e) { $('ipv6-body').textContent = `ipv6 failed: ${e.message}`; }
+}
+
 /* ---------- 2. recon ---------- */
 
 function renderHosts(rows) {
@@ -1323,6 +1339,7 @@ function runCmd(cmd) {
   togglePalette(false);
   if (cmd === 'scan') { setTab('discover'); launchScan(); }
   else if (cmd === 'neighbors') { setTab('discover'); launchNeighbors(); }
+  else if (cmd === 'neighbors6') { setTab('discover'); launchNeighbors6(); }
   else if (cmd === 'fingerprint') { setTab('recon'); startFingerprint(); }
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
@@ -1479,6 +1496,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-scan').addEventListener('click', launchScan);
   $('target').addEventListener('keydown', (e) => { if (e.key === 'Enter') launchScan(); });
   $('btn-neighbors').addEventListener('click', launchNeighbors);
+  $('btn-neighbors6').addEventListener('click', launchNeighbors6);
   $('btn-live-map-toggle').addEventListener('click', async () => {
     try {
       const cur = await api('/api/map/status');
