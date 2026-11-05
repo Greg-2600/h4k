@@ -1232,6 +1232,39 @@ async function ciGate() {
   }
 }
 
+async function sastDelta() {
+  const rawBase = $('delta-base').value.trim();
+  const rawCur = $('delta-cur').value.trim();
+  if (!rawBase || !rawCur) { log('SAST delta needs baseline + current findings JSON', 'warn'); return; }
+  let baseline = null;
+  let current = null;
+  try {
+    baseline = JSON.parse(rawBase);
+    current = JSON.parse(rawCur);
+    if (!Array.isArray(baseline) || !Array.isArray(current)) throw new Error('not lists');
+  } catch {
+    $('delta-body').textContent = 'baseline and current must both be JSON lists';
+    log('SAST delta needs JSON lists', 'warn');
+    return;
+  }
+  $('delta-body').textContent = 'diffing findings (offline)…';
+  $('delta-status').textContent = '';
+  try {
+    const res = await api('/api/source/sast/delta', {
+      method: 'POST',
+      body: { baseline, current },
+    });
+    const names = (res.new || []).map((f) => `${f.rule_id || 'finding'} (${f.severity || '?'})`).slice(0, 8).join(', ');
+    const state = (res.new_count || 0) ? `DIRTY · ${res.new_count} new` : 'CLEAN · nothing new';
+    $('delta-body').innerHTML = `<div data-testid="delta-findings">${esc(`${state} (${res.current_count || 0} current vs ${res.baseline_count || 0} baseline · ${res.fixed_count || 0} fixed · ${res.moved_count || 0} moved)${names ? ` · new: ${names}` : ''}`)}</div>`;
+    $('delta-status').textContent = state;
+    log(`SAST delta done: ${state}`, res.new_count ? 'error' : 'success');
+  } catch (e) {
+    $('delta-body').textContent = `SAST delta failed: ${e.message}`;
+    log(`SAST delta failed: ${e.message}`, 'error');
+  }
+}
+
 async function auditRbac() {
   const documents = [$('rbac-docs').value.trim()].filter(Boolean);
   if (!documents.length) { log('RBAC audit needs pasted YAML', 'warn'); return; }
@@ -1777,6 +1810,7 @@ function runCmd(cmd) {
   else if (cmd === 'secretscan') setTab('exploit');
   else if (cmd === 'reachmap') setTab('exploit');
   else if (cmd === 'cigate') setTab('exploit');
+  else if (cmd === 'sastdelta') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'sarifx') setTab('score');
@@ -1970,6 +2004,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-sec-scan').addEventListener('click', scanSecrets);
   $('btn-reach').addEventListener('click', reachability);
   $('btn-ci-gate').addEventListener('click', ciGate);
+  $('btn-sast-delta').addEventListener('click', sastDelta);
   $('btn-rbac-audit').addEventListener('click', auditRbac);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }

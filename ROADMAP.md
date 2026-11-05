@@ -318,6 +318,7 @@ sandbox stand-ins required where network/tooling is involved.
 65. **Rule CI gate** — fail on high-severity SAST.
   (done: `services/ci_gate.py` threshold gate (critical|high|medium|low, unknown→medium fail-closed) + audited ignore list echoed back; `POST /api/source/ci/gate` (400 bad threshold/entries) sandbox canned FAIL; Container card row + palette; unit + e2e `test_ci_gate*`.)
 66. **Delta SAST** — diff-only findings per PR.
+  (done: `services/sast_delta.py` baseline-vs-current diff (exact rule/file/line = unchanged; same rule+file within move_tolerance = moved with was_line; rest = new/fixed); `POST /api/source/sast/delta` (400 bad entries/tolerance) sandbox canned; Container card row + palette; unit + e2e `test_sast_delta*`.)
 67. **Inline suppress** — NOSAST with expiry + owner.
 68. **Multi-lang pack** — Go/Rust/Ruby/PHP/C# rules.
 69. **Vuln-lib taint** — vuln dep → sink path.

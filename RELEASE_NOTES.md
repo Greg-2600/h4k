@@ -1,5 +1,15 @@
 # h4k — Release Notes
 
+## Backlog #66 — delta SAST
+
+`POST /api/source/sast/delta` diffs pasted h4k findings, baseline (main) vs
+current (the PR): exact (rule, file, line) matches are unchanged; same rule in
+the same file within `move_tolerance` lines (default 3, stated in the result)
+is moved — code shifted, not a new vuln; the rest of current is new and the
+rest of baseline is fixed. Read-only, nothing ledgers. Malformed entries are a
+400, never silent. Container card row + palette (`sastdelta`); baseline +
+current JSON textareas; sandbox returns a canned diff (1 new, 1 moved, 1 fixed).
+
 ## Backlog #65 — rule CI gate
 
 `POST /api/source/ci/gate` gates pasted h4k findings: anything at or above
