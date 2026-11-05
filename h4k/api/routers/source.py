@@ -16,6 +16,8 @@ from schemas import (
     AiRequest,
     AiResult,
     CustomRuleRequest,
+    ReachabilityRequest,
+    ReachabilityResult,
     SanitizerDiffRequest,
     SanitizerDiffResult,
     SarifExportRequest,
@@ -294,6 +296,32 @@ def taint_scan(req: TaintScanRequest) -> TaintScanResult:
             "skipped_out_of_scope": skipped,
         }
     )
+
+
+@router.post("/reachability", response_model=ReachabilityResult)
+def reachability(req: ReachabilityRequest) -> ReachabilityResult:
+    """Build an import graph and report unreachable files (offline).
+
+    `bundle` (=== path === blocks) or `files`. Entries pin the roots;
+    without them roots are guessed and flagged. Advisory output only —
+    dead code is not a vuln, so nothing ledgers. Sandbox returns a
+    canned graph.
+    """
+    from services import sandbox as sandbox_mode
+    from services.reachability import analyze, sandbox_result
+    from services.taint_pack import parse_bundle
+
+    files = list(req.files or [])
+    if req.bundle and req.bundle.strip():
+        files.extend(parse_bundle(req.bundle))
+    if not files:
+        raise HTTPException(status_code=400, detail="bundle or files required")
+    if sandbox_mode.enabled():
+        return ReachabilityResult(**sandbox_result())
+    try:
+        return ReachabilityResult(**analyze(files, entries=req.entries or None))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/exploit")

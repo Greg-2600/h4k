@@ -1178,6 +1178,28 @@ async function scanSecrets() {
   }
 }
 
+async function reachability() {
+  const bundle = $('reach-bundle').value.trim();
+  if (!bundle) { log('reachability needs a pasted bundle', 'warn'); return; }
+  const entries = $('reach-entries').value.split(',').map((s) => s.trim()).filter(Boolean);
+  $('reach-body').textContent = 'building import graph (offline)…';
+  $('reach-status').textContent = '';
+  try {
+    const res = await api('/api/source/reachability', {
+      method: 'POST',
+      body: { bundle, entries },
+    });
+    const dead = (res.unreachable || []).slice(0, 8).join(', ');
+    const state = res.unreachable_count ? `${res.unreachable_count} unreachable` : 'all reachable';
+    $('reach-body').innerHTML = `<div data-testid="reach-findings">${esc(`${state} across ${res.files || 0} file(s)${res.entry_guessed ? ' · roots guessed' : ''}${dead ? `: ${dead}` : ''}${(res.unresolved || []).length ? ` · ${res.unresolved.length} external/unresolved` : ''}`)}</div>`;
+    $('reach-status').textContent = state;
+    log(`reachability done: ${state}`, res.unreachable_count ? 'warn' : 'success');
+  } catch (e) {
+    $('reach-body').textContent = `reachability failed: ${e.message}`;
+    log(`reachability failed: ${e.message}`, 'error');
+  }
+}
+
 async function auditRbac() {
   const documents = [$('rbac-docs').value.trim()].filter(Boolean);
   if (!documents.length) { log('RBAC audit needs pasted YAML', 'warn'); return; }
@@ -1721,6 +1743,7 @@ function runCmd(cmd) {
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'taintsast') setTab('exploit');
   else if (cmd === 'secretscan') setTab('exploit');
+  else if (cmd === 'reachmap') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'sarifx') setTab('score');
@@ -1912,6 +1935,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-kube-audit').addEventListener('click', auditKubelet);
   $('btn-taint-scan').addEventListener('click', scanTaint);
   $('btn-sec-scan').addEventListener('click', scanSecrets);
+  $('btn-reach').addEventListener('click', reachability);
   $('btn-rbac-audit').addEventListener('click', auditRbac);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }
