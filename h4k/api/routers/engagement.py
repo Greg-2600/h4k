@@ -238,6 +238,17 @@ def list_credentials(engagement_id: str) -> dict[str, Any]:
     }
 
 
+@router.get("/{engagement_id}/hygiene")
+def credential_hygiene(engagement_id: str) -> dict[str, Any]:
+    """Reuse/weak/default summary of verified credentials (read-only)."""
+    from services.hygiene import hygiene_report
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return hygiene_report(store, engagement_id)
+
+
 @router.get("/{engagement_id}/graph")
 def engagement_graph(engagement_id: str) -> dict[str, Any]:
     return get_store().graph(engagement_id)

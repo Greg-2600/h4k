@@ -232,6 +232,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `h4k/data/nuclei-templates/` ships 3 CVE templates; `POST /api/nuclei` gains `offline` + `engagement_id` ledger ingest with scope enforcement; `GET /api/nuclei/templates` exposes the bundle; sandbox canned finding; Recon card + palette button; unit + e2e `test_nuclei_*`.)
 3. **DAST spider + auth crawl** — depth-bounded, scope-checked link/form map.
 4. **Credential hygiene report** — reuse/weak/default summary per engagement.
+  (done: `services/hygiene.py` + `GET /api/engagement/{id}/hygiene` (reuse/weak/default + 0-100 score, read-only); Pivot ledger card button + findings; unit + e2e `test_hygiene*`.)
 5. **Scheduled re-scans + diff alerts** — cadence per engagement, MD digest.
 6. **NSE vuln suggest-and-run** — service → script map, explicit run only.
 7. **SMB share enumerator** — shares/ACLs, read-only, into asset graph.

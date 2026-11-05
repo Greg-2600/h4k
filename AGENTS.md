@@ -126,6 +126,7 @@ Engagement (persistent memory + cred propagation, engagement router):
 - `POST /api/engagement/{id}/ingest` (raw report or `{job_id}`) → asset graph
 - `GET /api/engagement/{id}/assets|credentials|graph`, `GET .../graph/canvas` (deterministic x/y layout for the interactive SVG canvas + PNG export)
 - `GET /api/engagement/{id}/propagate/plan` (dry run), `POST /api/engagement/{id}/propagate` (opt-in)
+- `GET /api/engagement/{id}/hygiene` (read-only reuse/weak/default summary + score)
 - `POST|GET /api/engagement/{id}/crown-jewels`, `DELETE .../crown-jewels/{id}`
 - `GET /api/engagement/{id}/attack-paths` (scored paths to crown jewels)
 - `GET /api/engagement/{id}/attck` (technique mapping + detection guidance)
@@ -180,6 +181,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `hygiene.py` | read-only credential hygiene: reuse/weak/default summary + score over verified creds |
 | `graph_canvas.py` | deterministic canvas layout for the asset graph (hosts circle, services ring, creds top row; powers the interactive SVG + PNG export) |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |
 | `attack_paths.py` | crown jewels -> scored, evidence-backed attack paths |

@@ -636,6 +636,14 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #4 — credential hygiene report
+
+`GET /api/engagement/{id}/hygiene` summarizes the hygiene of already-verified
+credentials: reuse (same pair on N hosts), weak (short/common heuristic,
+labeled as such), default (pair ships in `data/creds.json`), plus a 0–100
+score. Read-only — nothing is sprayed. Pivot ledger card button + findings;
+sandbox-seeded estate shows reuse on its first load.
+
 ## Backlog #2 — Nuclei offline bundle + ledger
 
 `POST /api/nuclei` (opt-in) now takes `offline` (bundled templates only, no
