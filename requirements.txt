@@ -4,3 +4,4 @@ pymetasploit3
 pydantic
 python-multipart
 pyyaml
+reportlab

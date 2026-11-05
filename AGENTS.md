@@ -105,6 +105,7 @@ Host recon/scan:
 - `GET /jobs` `?active=true` (job monitor: merges **all** job families), `GET /jobs/{id}`
 - `GET /report/{id}`, `POST /scan/{id}/abort`
 - `GET /export/{id}?fmt=json|md`
+- `GET /api/session/report?fmt=json|md|pdf` (one-click assessment; PDF masks passwords)
 - `GET /neighbors` (ARP)
 - `POST /attack`, `GET /attack/{id}`
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
@@ -183,6 +184,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `pdf_report.py` | one-click assessment PDF: reportlab render of the session report (passwords masked) |
 | `loot_vault.py` | masked loot vault: verified creds + flags + shares, redaction + masked md/json export |
 | `kerberos.py` | AS-REP + Kerberoast via impacket (explicit roast, optional John crack, sandbox canned hashes) |
 | `nse_suggest.py` | curated service → NSE script map (suggest offline, run explicit) |
