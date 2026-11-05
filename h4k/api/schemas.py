@@ -558,6 +558,33 @@ class FireTVResult(BaseModel):
     error: str | None = None
 
 
+# ---- Spider ----
+class SpiderRequest(BaseModel):
+    """Lightweight DAST spider (opt-in): depth-bounded same-origin crawl."""
+
+    target: str
+    max_depth: int = Field(default=2, ge=0, le=5)
+    max_pages: int = Field(default=50, ge=1, le=500)
+    auth_header: str | None = None  # e.g. "Bearer <token>"
+    auth_cookie: str | None = None  # e.g. "session=abc"
+    # engagement_id opts into the ledger: discovered in-scope hosts recorded.
+    engagement_id: str | None = None
+
+
+class SpiderResult(BaseModel):
+    target: str = ""
+    origin: str = ""
+    pages: list[dict[str, Any]] = []
+    forms: list[dict[str, Any]] = []
+    page_count: int = 0
+    form_count: int = 0
+    external: list[str] = []
+    external_count: int = 0
+    auth_used: bool = False
+    ingested_assets: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Nuclei ----
 class NucleiRequest(BaseModel):
     """Nuclei template-based vulnerability scan request."""

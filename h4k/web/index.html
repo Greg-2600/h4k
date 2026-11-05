@@ -130,6 +130,23 @@
             <div id="web-body" data-testid="web-body" class="muted">Vulnerability scan and content discovery for one web surface you own.</div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>DAST spider</h2><span class="spacer"></span><span class="muted">same-origin crawl + auth · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="spider-target" data-testid="spider-target" class="grow" placeholder="http://192.168.1.13" />
+              <select id="spider-depth" data-testid="spider-depth" title="Crawl depth">
+                <option value="1">depth 1</option>
+                <option value="2" selected>depth 2</option>
+                <option value="3">depth 3</option>
+              </select>
+              <input type="text" id="spider-auth" data-testid="spider-auth" class="grow" placeholder="auth: Bearer TOKEN or session=abc (optional)" />
+              <button class="btn primary" id="btn-spider" data-testid="btn-spider">Crawl</button>
+              <span class="muted" id="spider-status" data-testid="spider-status"></span>
+            </div>
+            <div id="spider-body" data-testid="spider-body" class="muted">Link/form map of one web surface you own. Only the target origin is fetched.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ═══ 3. EXPLOIT: queue, autopilot, creds attacks, fuzz ═══ -->
@@ -395,6 +412,7 @@
         <div class="cmd-item" data-cmd="autopilot"><span>Exploit: start autopilot</span></div>
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="spider"><span>Recon: DAST spider crawl (same-origin + auth)</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>

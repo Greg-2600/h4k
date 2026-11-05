@@ -230,6 +230,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/graph_canvas.py` + `GET /api/engagement/{id}/graph/canvas` returns deterministic x/y + legend; Score-tab SVG with drag-pan, wheel-zoom, click details, PNG export; unit + e2e `test_graph_canvas`.)
 2. **Nuclei template runner** — opt-in CVE templates, offline bundle + ledger.
 3. **DAST spider + auth crawl** — depth-bounded, scope-checked link/form map.
+  (done: `services/dast_spider.py` same-origin BFS + auth header/cookie + `POST /api/spider` with scope-enforced asset ledger; sandbox canned map; DAST spider card + palette cmd; unit + e2e `test_*spider*`.)
 4. **Credential hygiene report** — reuse/weak/default summary per engagement.
 5. **Scheduled re-scans + diff alerts** — cadence per engagement, MD digest.
 6. **NSE vuln suggest-and-run** — service → script map, explicit run only.

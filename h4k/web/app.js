@@ -708,6 +708,33 @@ async function runNikto() {
   }
 }
 
+async function runSpider() {
+  const raw = $('spider-target').value.trim() || $('web-target').value.trim();
+  if (!raw) { log('spider needs a target', 'warn'); return; }
+  const auth = $('spider-auth').value.trim();
+  const body = {
+    target: raw,
+    max_depth: parseInt($('spider-depth').value, 10) || 2,
+    engagement_id: await currentEngagementId(),
+  };
+  if (auth) {
+    if (/^Bearer |^Api-Key |^X-Api-Key/i.test(auth)) body.auth_header = auth;
+    else body.auth_cookie = auth;
+  }
+  $('spider-body').textContent = 'crawling…';
+  $('spider-status').textContent = '';
+  try {
+    const res = await api('/api/spider', { method: 'POST', body });
+    const formNames = (res.forms || []).map((f) => `${f.method} ${f.action}`).slice(0, 8).join(', ');
+    $('spider-body').innerHTML = `<div data-testid="spider-map">${esc(`${res.page_count || 0} page(s), ${res.form_count || 0} form(s), ${res.external_count || 0} external${res.ingested_assets ? ` · ${res.ingested_assets} asset(s) in ledger` : ''}: ${formNames || 'no forms'}`)}</div>`;
+    $('spider-status').textContent = `${res.page_count || 0} pages`;
+    log(`spider done: ${res.page_count || 0} pages, ${res.form_count || 0} forms`, 'success');
+  } catch (e) {
+    $('spider-body').textContent = `spider failed: ${e.message}`;
+    log(`spider failed: ${e.message}`, 'error');
+  }
+}
+
 async function runGobuster() {
   const target = $('web-target').value.trim();
   if (!target) { log('gobuster needs a target', 'warn'); return; }
@@ -1176,6 +1203,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'spider') { setTab('recon'); runSpider(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1348,6 +1376,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('btn-nikto').addEventListener('click', runNikto);
   $('btn-gobuster').addEventListener('click', runGobuster);
+  $('btn-spider').addEventListener('click', runSpider);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-cve-refresh').addEventListener('click', async () => {

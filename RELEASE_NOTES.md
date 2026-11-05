@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #3 — DAST spider + auth crawl
+
+`POST /api/spider` (opt-in) crawls one web surface you own with a
+dependency-free same-origin BFS (ZAP's spider needs the ZAP daemon): depth
+and page caps, optional `Authorization` header / session cookie so the
+*authed* surface is mapped, off-origin links reported as external and never
+fetched. `engagement_id` records discovered in-scope hosts (out-of-scope
+reported, never stored). Sandbox mode returns a canned 3-page/2-form map so
+the DAST spider card + palette command and e2e stay hermetic.
+
 ## Backlog #1 — interactive attack-graph canvas
 
 `GET /api/engagement/{id}/graph/canvas` (`services/graph_canvas.py`) lays out

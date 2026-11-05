@@ -109,6 +109,7 @@ Host recon/scan:
 - `POST /attack`, `GET /attack/{id}`
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
 - `POST /vulnleads`
+- `POST /spider` (opt-in same-origin DAST crawl: depth-bounded link/form map, auth header/cookie, scope-enforced asset ledger)
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
 
@@ -180,6 +181,7 @@ Health/diagnostic:
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
 | `graph_canvas.py` | deterministic canvas layout for the asset graph (hosts circle, services ring, creds top row; powers the interactive SVG + PNG export) |
+| `dast_spider.py` | opt-in lightweight DAST crawl: depth-bounded same-origin BFS, auth header/cookie, form map, scope-enforced asset ledger, sandbox stand-in |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |
 | `attack_paths.py` | crown jewels -> scored, evidence-backed attack paths |
 | `flag_paths.py` | foothold -> captured-flag chains (one objective per flag host) |
