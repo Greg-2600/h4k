@@ -112,6 +112,7 @@ Host recon/scan:
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
 - `POST /vulnleads`
 - `GET /api/kev/check` + `POST /api/kev/enrich` (bundled snapshot) + `POST /api/kev/refresh` (opt-in live)
+- `POST /spider` (opt-in same-origin DAST crawl: depth-bounded link/form map, auth header/cookie, scope-enforced asset ledger)
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
 - `POST /api/fuzz/shard` (N workers, merged registry)
 - `POST /api/rate_fuzz` (polite throttle probe + ledger)
@@ -229,6 +230,7 @@ Health/diagnostic:
 | `nse_suggest.py` | curated service → NSE script map (suggest offline, run explicit) |
 | `hygiene.py` | read-only credential hygiene: reuse/weak/default summary + score over verified creds |
 | `graph_canvas.py` | deterministic canvas layout for the asset graph (hosts circle, services ring, creds top row; powers the interactive SVG + PNG export) |
+| `dast_spider.py` | opt-in lightweight DAST crawl: depth-bounded same-origin BFS, auth header/cookie, form map, scope-enforced asset ledger, sandbox stand-in |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |
 | `spray_guard.py` | lockout-aware spray policy: per-user cap, jitter, locked-user ledger stop |
 | `attack_paths.py` | crown jewels -> scored, evidence-backed attack paths |
