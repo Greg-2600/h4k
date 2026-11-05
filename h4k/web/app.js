@@ -910,11 +910,18 @@ async function tunScan() {
   if (!target) { log('proxied scan needs a target', 'warn'); return; }
   const body = { target };
   if (state.tunnel) body.tunnel_id = state.tunnel.id;
+  const engId = await currentEngagementId();
+  if (engId) body.engagement_id = engId;
   $('tun-body').textContent = 'scanning through tunnel…';
   try {
     const res = await api('/api/net/tunnel/scan', { method: 'POST', body });
-    const rows = (res.results || []).filter((r) => r.open).map((r) => `<div data-testid="tun-open"><b>${r.port}</b> ${esc(r.banner || 'open')}</div>`).join('');
-    $('tun-body').innerHTML = `<div data-testid="tun-summary">${esc(`${res.open_count || 0} open via ${res.proxy || ''}`)}</div>${rows || 'nothing open'}`;
+    const rows = (res.results || []).filter((r) => r.open).map((r) => {
+      const svc = [r.service, r.product, r.version].filter(Boolean).join(' ').trim();
+      return `<div data-testid="tun-open"><b>${r.port}</b> ${esc(svc || r.banner || 'open')}</div>`;
+    }).join('');
+    const ledger = res.recorded ? ` · ledgered ${res.recorded}` : '';
+    const skipped = (res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : '';
+    $('tun-body').innerHTML = `<div data-testid="tun-summary">${esc(`${res.open_count || 0} open (${res.fingerprinted || 0} fingerprinted) via ${res.proxy || ''}${ledger}${skipped}`)}</div>${rows || 'nothing open'}`;
     log(`proxied scan: ${res.open_count || 0} open`, 'success');
   } catch (e) { $('tun-body').textContent = `proxied scan failed: ${e.message}`; }
 }
