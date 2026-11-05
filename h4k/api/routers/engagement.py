@@ -238,6 +238,56 @@ def list_credentials(engagement_id: str) -> dict[str, Any]:
     }
 
 
+@router.post("/{engagement_id}/ad/ingest")
+def ad_ingest(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Ingest SharpHound JSON into the per-engagement AD overlay."""
+    from services.bloodhound import parse_sharphound
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    data = (body or {}).get("data", body)
+    if isinstance(data, dict) and "data" in data and len(data) == 1:
+        data = data["data"]
+    try:
+        parsed = parse_sharphound(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    stored = store.record_ad_graph(engagement_id, parsed["nodes"], parsed["edges"])
+    return {"engagement_id": engagement_id, **parsed, **{"stored": stored}}
+
+
+@router.get("/{engagement_id}/ad/graph")
+def ad_graph(engagement_id: str) -> dict[str, Any]:
+    """Stored AD overlay: nodes + edges for canvas rendering."""
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return store.ad_graph(engagement_id)
+
+
+@router.get("/{engagement_id}/ad/paths")
+def ad_paths(engagement_id: str, target: str = "", limit: int = 5) -> dict[str, Any]:
+    """Shortest AD paths to a high-value target (label or SID)."""
+    from services.bloodhound import shortest_paths
+
+    if not target.strip():
+        raise HTTPException(status_code=400, detail="target required")
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    graph = store.ad_graph(engagement_id)
+    paths = shortest_paths(
+        graph["nodes"], graph["edges"], target, limit=max(1, min(limit, 25))
+    )
+    return {
+        "engagement_id": engagement_id,
+        "target": target.strip(),
+        "paths": paths,
+        "count": len(paths),
+    }
+
+
 @router.get("/{engagement_id}/vault")
 def loot_vault(engagement_id: str, reveal: bool = False) -> dict[str, Any]:
     """Masked loot vault: verified creds, flags, shares. reveal=true unmasks."""

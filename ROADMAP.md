@@ -264,6 +264,7 @@ sandbox stand-ins required where network/tooling is involved.
 24. **CVSS v4 re-score** — override with audit trail.
 25. **False-positive tuner** — suppress with reason + expiry.
 26. **BloodHound ingest** — SharpHound JSON → graph overlay.
+  (done: `services/bloodhound.py` parser (documented relation subset, idempotent store) + ingest/graph/paths endpoints; Pivot card with shortest-path lookup; unit + e2e `test_bloodhound*`.)
 27. **Privesc suggester** — lin/winPEAS-style checklist, read-only.
 28. **XSS catch lab** — token/cookie catch + replay, lab-only.
 29. **SQLmap tamper flow** — dump → ledger, explicit only.

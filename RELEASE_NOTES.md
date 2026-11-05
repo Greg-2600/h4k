@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #26 — BloodHound ingest
+
+`POST /api/engagement/{id}/ad/ingest` takes SharpHound output (dict of
+lists or a bare array) and stores named nodes plus a documented subset
+of relations (MemberOf, AdminTo, HasSession, AllowedToDelegate,
+AllowedToAct) in per-engagement tables — idempotent on re-ingest.
+`GET .../ad/graph` serves the overlay; `GET .../ad/paths?target=` runs
+BFS shortest paths (label or SID, substring fallback) to e.g. Domain
+Admins. Unknown relations stay in raw node props instead of being
+guessed at. Pivot card with ingest + path lookup.
+
 ## Backlog #23 — KEV/EPSS enrichment
 
 `h4k/data/kev.json` snapshots the live CISA catalog filtered to the 37

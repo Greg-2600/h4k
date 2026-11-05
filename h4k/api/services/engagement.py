@@ -92,6 +92,25 @@ CREATE TABLE IF NOT EXISTS vulns (
     first_seen    TEXT NOT NULL,
     PRIMARY KEY (engagement_id, host, name)
 );
+-- BloodHound overlay: SharpHound nodes/edges per engagement. Read-only
+-- analysis surface; the asset graph itself is never rewritten.
+CREATE TABLE IF NOT EXISTS ad_nodes (
+    engagement_id TEXT NOT NULL,
+    node_id       TEXT NOT NULL,
+    label         TEXT NOT NULL DEFAULT '',
+    kind          TEXT NOT NULL DEFAULT 'object',
+    props         TEXT NOT NULL DEFAULT '{}',
+    first_seen    TEXT NOT NULL,
+    PRIMARY KEY (engagement_id, node_id)
+);
+CREATE TABLE IF NOT EXISTS ad_edges (
+    engagement_id TEXT NOT NULL,
+    source        TEXT NOT NULL,
+    target        TEXT NOT NULL,
+    rel           TEXT NOT NULL,
+    first_seen    TEXT NOT NULL,
+    PRIMARY KEY (engagement_id, source, target, rel)
+);
 -- Attempt ledger. Deliberately NOT the credentials table: a failed login is
 -- not a credential, and recording it as one would put a bogus credential edge
 -- in the graph and inflate the credential count.
@@ -490,6 +509,96 @@ class EngagementStore:
             ),
         )
         return int(is_new)
+
+    def record_ad_graph(
+        self,
+        engagement_id: str,
+        nodes: list[dict[str, Any]],
+        edges: list[dict[str, Any]],
+    ) -> dict[str, int]:
+        """Store a SharpHound overlay (no scope: SIDs, not hosts)."""
+        if not self.get_engagement(engagement_id):
+            raise ValueError("unknown engagement")
+        import json as _json
+
+        ts = _now()
+        added_nodes = 0
+        for n in nodes or []:
+            nid = str(n.get("id") or "").strip()
+            if not nid:
+                continue
+            is_new = not self._exists(
+                "SELECT 1 FROM ad_nodes WHERE engagement_id=? AND node_id=?",
+                (engagement_id, nid),
+            )
+            self._write(
+                "INSERT INTO ad_nodes (engagement_id, node_id, label, kind, props,"
+                " first_seen) VALUES (?,?,?,?,?,?)"
+                " ON CONFLICT(engagement_id, node_id) DO UPDATE SET"
+                " label=excluded.label, kind=excluded.kind, props=excluded.props",
+                (
+                    engagement_id,
+                    nid,
+                    str(n.get("label") or nid),
+                    str(n.get("kind") or "object"),
+                    _json.dumps(n.get("props") or {}),
+                    ts,
+                ),
+            )
+            added_nodes += int(is_new)
+        added_edges = 0
+        for e in edges or []:
+            src, tgt, rel = (
+                str(e.get("source") or ""),
+                str(e.get("target") or ""),
+                str(e.get("rel") or ""),
+            )
+            if not src or not tgt or not rel or src == tgt:
+                continue
+            is_new = not self._exists(
+                "SELECT 1 FROM ad_edges WHERE engagement_id=? AND source=? AND target=? AND rel=?",
+                (engagement_id, src, tgt, rel),
+            )
+            self._write(
+                "INSERT INTO ad_edges (engagement_id, source, target, rel, first_seen)"
+                " VALUES (?,?,?,?,?)"
+                " ON CONFLICT(engagement_id, source, target, rel) DO NOTHING",
+                (engagement_id, src, tgt, rel, ts),
+            )
+            added_edges += int(is_new)
+        return {"nodes": added_nodes, "edges": added_edges}
+
+    def ad_graph(self, engagement_id: str) -> dict[str, Any]:
+        import json as _json
+
+        node_rows = self._query(
+            "SELECT node_id, label, kind, props FROM ad_nodes WHERE engagement_id=? ORDER BY node_id",
+            (engagement_id,),
+        )
+        edge_rows = self._query(
+            "SELECT source, target, rel FROM ad_edges WHERE engagement_id=? ORDER BY source, target",
+            (engagement_id,),
+        )
+        nodes = []
+        for r in node_rows:
+            try:
+                props = _json.loads(r["props"] or "{}")
+            except (ValueError, TypeError):
+                props = {}
+            nodes.append(
+                {
+                    "id": r["node_id"],
+                    "label": r["label"],
+                    "kind": r["kind"],
+                    "props": props,
+                }
+            )
+        return {
+            "nodes": nodes,
+            "edges": [dict(r) for r in edge_rows],
+            "node_count": len(nodes),
+            "edge_count": len(edge_rows),
+        }
 
     def _touch(self, engagement_id: str) -> None:
         self._write(

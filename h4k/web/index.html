@@ -317,6 +317,18 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>BloodHound ingest</h2><span class="spacer"></span><span class="muted">SharpHound JSON → graph</span></div>
+          <div class="card-body">
+            <div class="row"><textarea id="bh-json" data-testid="bh-json" class="grow" rows="3" placeholder='{"users": [...], "computers": [...], "groups": [...]}'></textarea></div>
+            <div class="row">
+              <input type="text" id="bh-target" data-testid="bh-target" value="Domain Admins" title="Path target (label or SID)" />
+              <button class="btn primary" id="btn-bh-ingest" data-testid="btn-bh-ingest">Ingest</button>
+              <button class="btn" id="btn-bh-paths" data-testid="btn-bh-paths">Paths</button>
+            </div>
+            <div id="bh-body" data-testid="bh-body" class="muted">Paste SharpHound output — nodes and edges land in this engagement.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Route map</h2><span class="spacer"></span><span class="muted">read-only pivot planning</span></div>
           <div class="card-body">
             <div class="row">
@@ -487,6 +499,7 @@
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
+        <div class="cmd-item" data-cmd="bloodhound"><span>Pivot: BloodHound ingest</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>
         <div class="cmd-item" data-cmd="theme"><span>Toggle theme</span></div>
         <div class="cmd-item" data-cmd="clear"><span>Clear log</span></div>

@@ -577,6 +577,34 @@ function sprayPolicy() {
   return { max_per_user: mu, jitter_max: ji };
 }
 
+async function bhIngest() {
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  let data;
+  try { data = JSON.parse($('bh-json').value.trim() || 'null'); }
+  catch { $('bh-body').textContent = 'invalid JSON — paste a SharpHound object or array'; return; }
+  if (!data) { log('paste SharpHound JSON first', 'warn'); return; }
+  $('bh-body').textContent = 'ingesting…';
+  try {
+    const res = await api(`/api/engagement/${engId}/ad/ingest`, { method: 'POST', body: { data } });
+    $('bh-body').innerHTML = `<div data-testid="bh-summary">${esc(`${res.node_count || 0} nodes, ${res.edge_count || 0} edges`)}</div>`;
+    log(`bloodhound: ${res.node_count || 0} nodes`, 'success');
+  } catch (e) { $('bh-body').textContent = `ingest failed: ${e.message}`; }
+}
+
+async function bhPaths() {
+  const engId = await currentEngagementId();
+  if (!engId) return;
+  const target = $('bh-target').value.trim() || 'Domain Admins';
+  try {
+    const res = await api(`/api/engagement/${engId}/ad/paths?target=${encodeURIComponent(target)}`);
+    const paths = res.paths || [];
+    $('bh-body').innerHTML = paths.length
+      ? paths.map((p) => `<div data-testid="bh-path">${esc(p.join(' → '))}</div>`).join('')
+      : `no path to ${target}`;
+  } catch (e) { $('bh-body').textContent = `paths failed: ${e.message}`; }
+}
+
 async function loadPropagationPlan() {
   const engId = await currentEngagementId();
   if (!engId) { log('set an active scope first', 'warn'); return; }
@@ -1392,6 +1420,7 @@ function runCmd(cmd) {
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
+  else if (cmd === 'bloodhound') setTab('pivot');
   else if (cmd === 'score') setTab('score');
   else if (cmd === 'theme') toggleTheme();
   else if (cmd === 'clear') { $('activity-log').innerHTML = ''; }
@@ -1592,6 +1621,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ex-cmd').addEventListener('click', () => { const v = $('ex-cmd').value.trim(); if (v) { runSessionCmd(v); $('ex-cmd').value = ''; } });
   $('ex-cmd').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const v = e.target.value.trim(); if (v) { runSessionCmd(v); e.target.value = ''; } } });
   $('btn-propagate-plan').addEventListener('click', loadPropagationPlan);
+  $('btn-bh-ingest').addEventListener('click', bhIngest);
+  $('btn-bh-paths').addEventListener('click', bhPaths);
   $('btn-hygiene').addEventListener('click', loadHygiene);
   $('btn-propagate-run').addEventListener('click', executePropagation);
   $('btn-lateral-map').addEventListener('click', mapLateralRoutes);

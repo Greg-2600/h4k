@@ -131,6 +131,7 @@ Engagement (persistent memory + cred propagation, engagement router):
 - `GET /api/engagement/{id}/assets|credentials|graph`, `GET .../graph/canvas` (deterministic x/y layout for the interactive SVG canvas + PNG export)
 - `GET /api/engagement/{id}/propagate/plan` (dry run, spray policy: `max_per_user` + `jitter_max`), `POST /api/engagement/{id}/propagate` (opt-in, lockout ledgered as `locked`)
 - `GET /api/engagement/{id}/hygiene` (read-only reuse/weak/default summary + score)
+- `POST /api/engagement/{id}/ad/ingest` (SharpHound JSON → overlay) + `GET .../ad/graph|paths` (shortest paths to a target)
 - `GET /api/engagement/{id}/vault` (masked loot: creds/flags/shares, `reveal=true` unmasks) + `GET .../vault/export` (md/json handoff)
 - `POST|GET /api/engagement/{id}/crown-jewels`, `DELETE .../crown-jewels/{id}`
 - `GET /api/engagement/{id}/attack-paths` (scored paths to crown jewels)
@@ -186,6 +187,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `bloodhound.py` | SharpHound JSON → nodes/edges + shortest paths (documented relation subset) |
 | `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |
 | `ipv6_discovery.py` | IPv6 NDP table + explicit-CIDR nmap -6 sweep, scope-enforced asset ledger, sandbox canned |
