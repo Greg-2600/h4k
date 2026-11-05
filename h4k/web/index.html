@@ -207,6 +207,26 @@
             <div class="muted">Opt-in metadata pack: AWS/GCP/Azure 169.254 payloads + encoding bypasses against the target above.</div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>Cloud audit</h2><span class="spacer"></span><span class="muted">S3 policies · offline</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="s3-bucket" data-testid="s3-bucket" value="lab-bucket" title="Bucket name (labels findings)" />
+              <select id="s3-acl" data-testid="s3-acl" title="Canned ACL (empty = skip ACL check)">
+                <option value="">acl: skip</option>
+                <option value="private" selected>private</option>
+                <option value="public-read">public-read</option>
+                <option value="public-read-write">public-read-write</option>
+                <option value="authenticated-read">authenticated-read</option>
+              </select>
+              <input type="text" id="s3-host" data-testid="s3-host" value="127.0.0.1" title="Host label for the ledger entry" />
+              <button class="btn" id="btn-s3-lint" data-testid="btn-s3-lint">Lint bucket</button>
+              <span class="muted" id="s3-status" data-testid="s3-status"></span>
+            </div>
+            <textarea id="s3-policy" data-testid="s3-policy" rows="3" class="grow" placeholder='Paste bucket policy JSON (optional): {"Version":"…","Statement":[…]}'></textarea>
+            <div id="s3-body" data-testid="s3-body" class="muted">Public/ACL policy eval, offline. A full public-access-block neutralizes grants.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ═══ 3. EXPLOIT: queue, autopilot, creds attacks, fuzz ═══ -->
@@ -522,6 +542,7 @@
         <div class="cmd-item" data-cmd="ssrfprobe"><span>Recon: SSRF metadata pack (opt-in)</span></div>
         <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
+        <div class="cmd-item" data-cmd="s3lint"><span>Recon: lint an S3 policy (offline)</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>

@@ -928,6 +928,40 @@ async function runSsrfProbe() {
   }
 }
 
+async function lintS3() {
+  const bucket = $('s3-bucket').value.trim() || 'bucket';
+  const acl = $('s3-acl').value || null;
+  const host = $('s3-host').value.trim() || '127.0.0.1';
+  const raw = $('s3-policy').value.trim();
+  let policy = null;
+  if (raw) {
+    try {
+      policy = JSON.parse(raw);
+    } catch {
+      $('s3-body').textContent = 'policy must be valid JSON';
+      log('S3 lint needs valid JSON', 'warn');
+      return;
+    }
+  }
+  $('s3-body').textContent = 'linting bucket policy (offline)…';
+  $('s3-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/s3/lint', {
+      method: 'POST',
+      body: { bucket, policy, acl, host, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => `${f.title || 'finding'} (${f.severity || '?'})`).slice(0, 8).join(', ');
+    const state = res.clean ? 'clean' : res.public ? 'PUBLIC' : `${res.finding_count || 0} finding(s)`;
+    $('s3-body').innerHTML = `<div data-testid="s3-findings">${esc(`${bucket} ${state}${res.blocked ? ' · blocked' : ''}${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${res.note ? ` — ${res.note}` : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('s3-status').textContent = state;
+    log(`S3 lint done: ${state}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('s3-body').textContent = `S3 lint failed: ${e.message}`;
+    log(`S3 lint failed: ${e.message}`, 'error');
+  }
+}
+
 async function runNuclei() {
   const target = $('web-target').value.trim();
   if (!target) { log('nuclei needs a target', 'warn'); return; }
@@ -1497,6 +1531,7 @@ function runCmd(cmd) {
   else if (cmd === 'ssrfprobe') { setTab('recon'); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
+  else if (cmd === 's3lint') setTab('recon');
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
@@ -1687,6 +1722,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-ssrf-probe').addEventListener('click', runSsrfProbe);
+  $('btn-s3-lint').addEventListener('click', lintS3);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);

@@ -52,6 +52,8 @@ from schemas import (
     RbacAuditRequest,
     RbacAuditResult,
     Report,
+    S3LintRequest,
+    S3LintResult,
     ScanRequest,
     SqlmapRequest,
     SqlmapResult,
@@ -3416,6 +3418,65 @@ def ssrf_probe_api(req: SsrfProbeRequest) -> SsrfProbeResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return SsrfProbeResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/s3/lint", response_model=S3LintResult)
+def s3_lint_api(req: S3LintRequest) -> S3LintResult:
+    """Lint a bucket policy + ACL for public grants (offline, explicit).
+
+    `host` labels the ledger entry. `engagement_id` ledgers findings as
+    vulns on that host (scope-enforced). Sandbox returns canned
+    findings.
+    """
+    import json as json_lib
+
+    from services import sandbox as sandbox_mode
+    from services.s3_linter import lint_bucket, sandbox_result, to_ledger
+
+    bucket = (req.bucket or "bucket").strip() or "bucket"
+    policy = req.policy
+    if isinstance(policy, str):
+        if not policy.strip():
+            policy = None
+        else:
+            try:
+                policy = json_lib.loads(policy)
+            except ValueError:
+                from fastapi import HTTPException
+
+                raise HTTPException(
+                    status_code=400, detail="policy must be a JSON object or text"
+                ) from None
+    if sandbox_mode.enabled():
+        result = sandbox_result(bucket)
+    else:
+        result = lint_bucket(
+            bucket, policy=policy, acl=req.acl, block_public=req.block_public
+        )
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from fastapi import HTTPException
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, bucket, result.get("findings") or []):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return S3LintResult(
         **{
             **result,
             "ingested": ingested,

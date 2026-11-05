@@ -703,6 +703,37 @@ class RbacAuditResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- S3 policy linter ----
+class S3LintRequest(BaseModel):
+    """S3 policy linter request (offline eval, nothing contacts AWS).
+
+    `policy` is a bucket policy object or its JSON text. `acl` is a
+    canned name (private/public-read/…) or a raw grant list.
+    `block_public` maps the four public-access-block flags. `host`
+    labels the engagement ledger entry.
+    """
+
+    bucket: str = "bucket"
+    policy: dict[str, Any] | str | None = None
+    acl: Any = None
+    block_public: dict[str, Any] | None = None
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class S3LintResult(BaseModel):
+    bucket: str = ""
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    public: bool = False
+    blocked: bool = False
+    clean: bool = True
+    note: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Kubelet audit ----
 class KubeletAuditRequest(BaseModel):
     """Kubelet unauth audit request (read-only GETs, explicit target)."""
