@@ -130,7 +130,8 @@ CTF / lab toolkit (opt-in, each explicit):
 - `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `POST /nikto`, `POST /ssrf/probe` (metadata SSRF pack + ledger), `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /jwt/test` (JWT audit + alg-confusion + ledger), `POST /kubelet/audit` (read-only kubelet exposure audit + ledger), `POST /rbac/audit` (offline K8s RBAC audit + ledger), `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /kerberos/asrep`, `POST /kerberos/kerberoast` (explicit roast, optional John crack)
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
-  apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
+  apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb;
+  mdns/ssdp sweeps persist in-scope hosts as assets with `engagement_id`)
 - `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +
   docker-group tries + host audit, read-only, no password)
 - `POST /api/privesc/suggest` (10-check read-only checklist, sandbox canned)
@@ -230,6 +231,7 @@ Health/diagnostic:
 | `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |
 | `ipv6_discovery.py` | IPv6 NDP table + explicit-CIDR nmap -6 sweep, scope-enforced asset ledger, sandbox canned |
+| `zeroconf_map.py` | mDNS/SSDP sweep normalization + scope-enforced asset ledger, sandbox canned |
 | `tls_fingerprint.py` | active TLS handshake inventory (version/cipher/cert) + exact-match watchlist + heuristic C2 leads, sandbox stand-in |
 | `pdf_report.py` | one-click assessment PDF: reportlab render of the session report (passwords masked) |
 | `loot_vault.py` | masked loot vault: verified creds + flags + shares, redaction + masked md/json export |
