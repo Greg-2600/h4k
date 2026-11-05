@@ -489,6 +489,31 @@ class NmapNSEResult(BaseModel):
     tool: dict[str, Any] = {}
 
 
+class KerberosRoastRequest(BaseModel):
+    """AS-REP / Kerberos roast request (explicit, opt-in)."""
+
+    domain: str
+    dc_ip: str | None = None
+    users: list[str] | None = None  # asrep: accounts to request
+    user: str | None = None  # kerberoast: one valid account
+    password: str | None = None
+    crack: bool = False  # hand hashes to John (explicit second step)
+    wordlist: str | None = None
+    max_time: int = Field(default=60, ge=1, le=3600)
+
+
+class KerberosRoastResult(BaseModel):
+    kind: str = ""
+    hashes: list[str] = []
+    hash_count: int = 0
+    cracked: list[dict[str, Any]] = []
+    stdout: str = ""
+    stderr: str = ""
+    rc: int | None = None
+    success: bool = False
+    timed_out: bool = False
+
+
 class NiktoRequest(BaseModel):
     """Standalone nikto web vulnerability scan."""
 

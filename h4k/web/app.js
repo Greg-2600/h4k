@@ -732,6 +732,27 @@ async function runNse() {
   } catch (e) { $('nse-body').textContent = `nse failed: ${e.message}`; }
 }
 
+async function krbRoast(kind) {
+  const domain = $('krb-domain').value.trim();
+  if (!domain) { log('kerberos needs a domain', 'warn'); return; }
+  const body = { domain, dc_ip: $('krb-dc').value.trim() || null };
+  if (kind === 'asrep') {
+    const users = $('krb-users').value.split(',').map((s) => s.trim()).filter(Boolean);
+    if (users.length) body.users = users;
+  } else {
+    if (!$('krb-user').value.trim()) { log('kerberoast needs a valid account', 'warn'); return; }
+    body.user = $('krb-user').value.trim();
+    body.password = $('krb-pass').value;
+  }
+  $('krb-body').textContent = `${kind} roasting…`;
+  try {
+    const res = await api(`/api/kerberos/${kind}`, { method: 'POST', body });
+    const hashes = res.hashes || [];
+    $('krb-body').innerHTML = `<div data-testid="krb-hashes">${esc(`${hashes.length} hash(es): ${hashes.slice(0, 3).join(' ').slice(0, 300) || 'none'}`)}</div>`;
+    log(`${kind}: ${hashes.length} hash(es)`, 'success');
+  } catch (e) { $('krb-body').textContent = `${kind} failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1236,6 +1257,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'kerberos') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
@@ -1408,6 +1430,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
+  $('btn-krb-roast').addEventListener('click', () => krbRoast('kerberoast'));
   $('btn-nse-suggest').addEventListener('click', runNseSuggest);
   $('btn-nse-run').addEventListener('click', runNse);
   $('btn-gobuster').addEventListener('click', runGobuster);

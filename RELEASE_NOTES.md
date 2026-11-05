@@ -636,6 +636,14 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #8 — Kerberos roast helpers
+
+`POST /api/kerberos/asrep` (no-preauth users) and
+`POST /api/kerberos/kerberoast` (service accounts, needs one valid login)
+roast via impacket and return `$krb5asrep$`/`$krb5tgs$` hashes; `crack=true`
+hands them to John as an explicit second step that never fires on its own.
+Sandbox returns canned hashes (crack skipped). Pivot roast card + palette.
+
 ## Backlog #6 — NSE vuln suggest-and-run
 
 `GET /api/nse/suggest?service=&product=` maps a fingerprinted service to

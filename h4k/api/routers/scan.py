@@ -36,6 +36,8 @@ from schemas import (
     Job,
     JohnRequest,
     JohnResult,
+    KerberosRoastRequest,
+    KerberosRoastResult,
     LateralRequest,
     NiktoRequest,
     NiktoResult,
@@ -3153,6 +3155,56 @@ def ad_mitm6_attack(req: ADMitm6Request) -> dict[str, Any]:
     from services.ad_tools import mitm6_attack
 
     return mitm6_attack(req.interface, **req.options)
+
+
+@router.post("/kerberos/asrep", response_model=KerberosRoastResult)
+def kerberos_asrep(req: KerberosRoastRequest) -> KerberosRoastResult:
+    """AS-REP roast: request hashes for no-preauth users (explicit, opt-in)."""
+    from services import sandbox as sandbox_mode
+    from services.kerberos import KerberosService, crack_hashes, sandbox_hashes
+
+    if sandbox_mode.enabled():
+        result = sandbox_hashes("asrep")
+        kind = "asrep"
+    else:
+        kind = "asrep"
+        result = KerberosService().asrep_roast(
+            req.domain, dc_ip=req.dc_ip, users=req.users
+        )
+    cracked: list[dict[str, Any]] = []
+    if req.crack and result.get("hashes") and not sandbox_mode.enabled():
+        cracked = crack_hashes(
+            result["hashes"], kind, wordlist=req.wordlist, max_time=req.max_time
+        ).get("cracked", [])
+    return KerberosRoastResult(**{**result, "kind": kind, "cracked": cracked})
+
+
+@router.post("/kerberos/kerberoast", response_model=KerberosRoastResult)
+def kerberos_kerberoast(req: KerberosRoastRequest) -> KerberosRoastResult:
+    """Kerberoast: request service-ticket hashes (explicit, opt-in)."""
+    from fastapi import HTTPException
+    from services import sandbox as sandbox_mode
+    from services.kerberos import KerberosService, crack_hashes, sandbox_hashes
+
+    if not req.user and not sandbox_mode.enabled():
+        raise HTTPException(status_code=400, detail="user required")
+    if sandbox_mode.enabled():
+        result = sandbox_hashes("kerberoast")
+        kind = "kerberoast"
+    else:
+        kind = "kerberoast"
+        result = KerberosService().kerberoast(
+            req.domain, req.user or "", req.password or "", dc_ip=req.dc_ip
+        )
+    cracked = []
+    if req.crack and result.get("hashes") and not sandbox_mode.enabled():
+        cracked = crack_hashes(
+            result["hashes"],
+            "kerberoast",
+            wordlist=req.wordlist,
+            max_time=req.max_time,
+        ).get("cracked", [])
+    return KerberosRoastResult(**{**result, "kind": kind, "cracked": cracked})
 
 
 @router.post("/ad/responder")
