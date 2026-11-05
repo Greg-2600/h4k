@@ -316,6 +316,7 @@ sandbox stand-ins required where network/tooling is involved.
 64. **Reachability filter** — import-graph prunes dead code.
   (done: `services/reachability.py` module graph (py ast + JS/PHP imports, same-dir relative resolution, explicit-or-guessed entries flagged) + reached/unreached split + unresolved list; `POST /api/source/reachability` (400 empty) sandbox canned; Container card row + palette; unit + e2e `test_reachability*`.)
 65. **Rule CI gate** — fail on high-severity SAST.
+  (done: `services/ci_gate.py` threshold gate (critical|high|medium|low, unknown→medium fail-closed) + audited ignore list echoed back; `POST /api/source/ci/gate` (400 bad threshold/entries) sandbox canned FAIL; Container card row + palette; unit + e2e `test_ci_gate*`.)
 66. **Delta SAST** — diff-only findings per PR.
 67. **Inline suppress** — NOSAST with expiry + owner.
 68. **Multi-lang pack** — Go/Rust/Ruby/PHP/C# rules.

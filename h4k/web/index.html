@@ -308,6 +308,19 @@
         </div>
         <textarea id="reach-bundle" data-testid="reach-bundle" rows="3" class="grow" placeholder="Paste sources as === path === blocks (import-graph dead code)"></textarea>
         <div id="reach-body" data-testid="reach-body" class="muted">Unreachable files are audit leads, not vulns — nothing ledgers.</div>
+        <div class="row">
+          <select id="ci-threshold" data-testid="ci-threshold" title="Fail the gate at or above this severity">
+            <option value="critical">fail: critical</option>
+            <option value="high" selected>fail: high+</option>
+            <option value="medium">fail: medium+</option>
+            <option value="low">fail: low+</option>
+          </select>
+          <input type="text" id="ci-ignore" data-testid="ci-ignore" class="grow" placeholder="Ignore rule ids, comma-separated" title="Waived rules are echoed back — never silent" />
+          <button class="btn" id="btn-ci-gate" data-testid="btn-ci-gate">CI gate</button>
+          <span class="muted" id="ci-status" data-testid="ci-status"></span>
+        </div>
+        <textarea id="ci-paste" data-testid="ci-paste" rows="3" class="grow" placeholder='Paste h4k findings JSON: [{"rule_id":…,"name":…,"severity":"high",…}]'></textarea>
+        <div id="ci-body" data-testid="ci-body" class="muted">Paste findings, pick a threshold — green only when nothing blocking and waivers listed.</div>
           </div>
         </div>
         <div class="card">
@@ -599,6 +612,7 @@
         <div class="cmd-item" data-cmd="taintsast"><span>Exploit: taint-check pasted sources</span></div>
         <div class="cmd-item" data-cmd="secretscan"><span>Exploit: scan committed secrets</span></div>
         <div class="cmd-item" data-cmd="reachmap"><span>Exploit: map import reachability</span></div>
+        <div class="cmd-item" data-cmd="cigate"><span>Exploit: SAST CI gate check</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="sarifx"><span>Score: SARIF import/export</span></div>

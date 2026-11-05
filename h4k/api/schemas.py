@@ -314,6 +314,27 @@ class SourceScanResult(BaseModel):
     findings: list[SourceFinding] = []
 
 
+# ---- Rule CI gate ----
+class CiGateRequest(BaseModel):
+    """Fail a CI run on high-severity SAST (pasted h4k findings)."""
+
+    findings: list[Any]
+    fail_on: str = "high"
+    ignore_rule_ids: list[str] = Field(default_factory=list)
+
+
+class CiGateResult(BaseModel):
+    passed: bool = True
+    threshold: str = "high"
+    counts: dict[str, int] = {}
+    evaluated: int = 0
+    blocking: list[dict[str, Any]] = []
+    blocking_count: int = 0
+    ignored: list[dict[str, Any]] = []
+    ignored_count: int = 0
+    sandbox: bool = False
+
+
 # ---- SARIF import/export ----
 class SarifExportRequest(BaseModel):
     """Export h4k findings to SARIF 2.1.0 (`findings` are SourceFinding dicts)."""

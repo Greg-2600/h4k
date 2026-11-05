@@ -636,13 +636,13 @@ def session_report(fmt: str = "json") -> Any:
             }
             for r in rows
         ]
+    recon_bysess: dict[str, list[dict[str, Any]]] = {}
     with suppress(Exception):
         conn = _neighbor_db()
         recon_rows = conn.execute(
             "SELECT msf_session_id, command, output FROM session_recon ORDER BY at"
         ).fetchall()
         conn.close()
-        recon_bysess: dict[str, list[dict[str, Any]]] = {}
         for r in recon_rows:
             recon_bysess.setdefault(str(r[0]), []).append(
                 {"command": r[1], "output": str(r[2])[:600]}

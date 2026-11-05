@@ -1,5 +1,15 @@
 # h4k — Release Notes
 
+## Backlog #65 — rule CI gate
+
+`POST /api/source/ci/gate` gates pasted h4k findings: anything at or above
+`fail_on` (critical|high|medium|low, default high) blocks unless its `rule_id`
+is in `ignore_rule_ids` — and every waiver is echoed back in `ignored`, so a
+green gate never hides what was waived. Unknown severities count as `medium`
+(fail-closed toward visibility, stated in the result). Malformed entries are a
+400, never silent. Container card row + palette (`cigate`); threshold select +
+ignore box + findings JSON textarea; sandbox returns a canned FAIL.
+
 **Version 1.0 · h4k :: Intrusion-Suite**
 
 A self-contained, containerized security **analysis platform** for authorized lab
