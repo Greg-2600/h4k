@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #28 — XSS catch lab
+
+Blind XSS needs somewhere to phone home: `POST /api/xss/catch/start`
+brings up a stdlib HTTP catcher bound to 127.0.0.1 only (ephemeral
+port, 204 replies) that records tokens, cookies, paths and sources;
+`POST /api/xss/replay` re-sends a captured cookie at a target you own
+and compares baseline vs authed responses so a live session is proven,
+not assumed. Sandbox serves canned hits. Recon XSS card + palette.
+
 ## Backlog #25 — false-positive tuner
 
 `POST /api/engagement/{id}/vulns/suppress` hides a finding until a

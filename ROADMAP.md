@@ -267,6 +267,7 @@ sandbox stand-ins required where network/tooling is involved.
 26. **BloodHound ingest** — SharpHound JSON → graph overlay.
 27. **Privesc suggester** — lin/winPEAS-style checklist, read-only.
 28. **XSS catch lab** — token/cookie catch + replay, lab-only.
+  (done: `services/xss_catch.py` loopback-only catcher (ephemeral port) + baseline-vs-cookie replay verifier; start/stop/hits/replay endpoints; Recon XSS card + palette; unit (live socket roundtrip) + e2e `test_xss*`.)
 29. **SQLmap tamper flow** — dump → ledger, explicit only.
 30. **Hydra tune + resume** — parallel profile, checkpoint resume.
 31. **ffuf/wpscan pack** — dir + plugin enum, explicit.

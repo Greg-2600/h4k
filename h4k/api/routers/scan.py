@@ -2927,6 +2927,54 @@ def zap_scan_api(req: ZapRequest) -> ZapResult:
     return ZapResult(**zap_scan(req.target, mode=req.mode))
 
 
+@router.post("/xss/catch/start")
+def xss_catch_start() -> dict[str, Any]:
+    """Start the loopback-only XSS catch server (lab-only, no-op in sandbox)."""
+    from services import sandbox as sandbox_mode, xss_catch
+
+    if sandbox_mode.enabled():
+        return {
+            "running": True,
+            "port": 0,
+            "sandbox": True,
+            "url": "http://127.0.0.1:0/hook (sandbox canned)",
+        }
+    out = xss_catch.start()
+    return {**out, "url": f"http://127.0.0.1:{out['port']}/hook?token=..."}
+
+
+@router.post("/xss/catch/stop")
+def xss_catch_stop() -> dict[str, Any]:
+    """Stop the catch server (hits are kept)."""
+    from services import xss_catch
+
+    return xss_catch.stop()
+
+
+@router.get("/xss/catch/hits")
+def xss_catch_hits(clear: bool = False) -> dict[str, Any]:
+    """Recorded catches (sandbox returns canned hits)."""
+    from services import sandbox as sandbox_mode, xss_catch
+
+    if sandbox_mode.enabled() and not xss_catch.hits():
+        hits = xss_catch.sandbox_hits()
+    else:
+        hits = xss_catch.hits(clear=clear)
+    return {"hits": hits, "count": len(hits)}
+
+
+@router.post("/xss/replay")
+def xss_replay(body: dict[str, Any]) -> dict[str, Any]:
+    """Replay a captured cookie at a target you own (read-only GETs)."""
+    from services import xss_catch
+
+    target = str((body or {}).get("target") or "").strip()
+    cookie = str((body or {}).get("cookie") or "")
+    if not target:
+        raise HTTPException(status_code=400, detail="target required")
+    return xss_catch.replay(target, cookie)
+
+
 @router.post("/john", response_model=JohnResult)
 def john_crack(req: JohnRequest) -> JohnResult:
     """Crack hashes with John the Ripper over a bounded set of formats."""

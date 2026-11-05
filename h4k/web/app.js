@@ -865,6 +865,33 @@ async function listSuppressions() {
   } catch (e) { $('sup-body').textContent = `list failed: ${e.message}`; }
 }
 
+async function xssStart() {
+  try {
+    const res = await api('/api/xss/catch/start', { method: 'POST', body: {} });
+    $('xss-body').innerHTML = `<div data-testid="xss-url">catcher up: <span class="mono">${esc(res.url || '')}</span></div>`;
+    log('xss catcher started', 'success');
+  } catch (e) { $('xss-body').textContent = `catcher failed: ${e.message}`; }
+}
+
+async function xssHits() {
+  try {
+    const res = await api('/api/xss/catch/hits');
+    const hits = res.hits || [];
+    $('xss-body').innerHTML = hits.length
+      ? hits.map((h) => `<div data-testid="xss-hit">token=<span class="mono">${esc(h.token || '—')}</span> cookie=<span class="mono">${esc((h.cookie || '').slice(0, 80))}</span> <span class="muted">${esc(h.client || '')}</span></div>`).join('')
+      : 'no catches yet — fire the payload at the catcher URL';
+  } catch (e) { $('xss-body').textContent = `hits failed: ${e.message}`; }
+}
+
+async function xssReplay() {
+  const target = $('xss-target').value.trim();
+  if (!target) { log('xss replay needs a target', 'warn'); return; }
+  try {
+    const res = await api('/api/xss/replay', { method: 'POST', body: { target, cookie: $('xss-cookie').value } });
+    $('xss-body').innerHTML = `<div data-testid="xss-replay">baseline ${res.baseline?.status} (${res.baseline?.length}B) → authed ${res.authed?.status} (${res.authed?.length}B) · session live: ${res.session_live ? 'YES' : 'no'}</div>`;
+  } catch (e) { $('xss-body').textContent = `replay failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1413,6 +1440,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'xss') { setTab('recon'); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
@@ -1590,6 +1618,10 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-xss-start').addEventListener('click', xssStart);
+  $('btn-xss-hits').addEventListener('click', xssHits);
+  $('btn-xss-stop').addEventListener('click', async () => { await api('/api/xss/catch/stop', { method: 'POST', body: {} }); log('catcher stopped', 'info'); });
+  $('btn-xss-replay').addEventListener('click', xssReplay);
   $('btn-suppress').addEventListener('click', runSuppress);
   $('btn-sup-list').addEventListener('click', listSuppressions);
   $('btn-kev').addEventListener('click', runKevCheck);

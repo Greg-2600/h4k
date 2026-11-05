@@ -201,6 +201,22 @@
             <div id="web-body" data-testid="web-body" class="muted">Vulnerability scan and content discovery for one web surface you own.</div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>XSS catch lab</h2><span class="spacer"></span><span class="muted">loopback catcher + replay · lab-only</span></div>
+          <div class="card-body">
+            <div class="row">
+              <button class="btn primary" id="btn-xss-start" data-testid="btn-xss-start">Start catcher</button>
+              <button class="btn" id="btn-xss-hits" data-testid="btn-xss-hits">List catches</button>
+              <button class="btn" id="btn-xss-stop" data-testid="btn-xss-stop">Stop</button>
+            </div>
+            <div class="row">
+              <input type="text" id="xss-target" data-testid="xss-target" class="grow" placeholder="replay target http://…" />
+              <input type="text" id="xss-cookie" data-testid="xss-cookie" class="grow" placeholder="captured cookie" />
+              <button class="btn" id="btn-xss-replay" data-testid="btn-xss-replay">Replay</button>
+            </div>
+            <div id="xss-body" data-testid="xss-body" class="muted">Catcher binds 127.0.0.1 only — point blind-XSS payloads at its URL.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ═══ 3. EXPLOIT: queue, autopilot, creds attacks, fuzz ═══ -->
@@ -497,6 +513,7 @@
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="xss"><span>Recon: XSS catch lab</span></div>
         <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
