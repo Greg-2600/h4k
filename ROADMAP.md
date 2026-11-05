@@ -312,6 +312,7 @@ sandbox stand-ins required where network/tooling is involved.
 62. **Taint rules pack** — source→sink Python/JS/PHP.
   (done: `services/taint_pack.py` 15-rule data-driven pack (py/js/php sources, sinks, sanitizers) + 6-line windowed source→sink match with sanitizer clearing + one-hit-per-rule-per-file; `POST /api/source/taint/scan` (=== path === bundle or files, 400 empty, 404 unknown engagement) sandbox canned; Container card row + palette; unit (incl. window edge + sanitizer clearing) + e2e `test_taint_pack*`.)
 63. **Secret baseline + allowlist** — noise reduction.
+  (done: `services/secret_baseline.py` bundle secret scan (7 shapes) + fingerprint baseline diff + audited allowlist suppression + new-only scope-enforced ledger; `POST /api/source/secrets/scan` (=== path === bundle or files, 400 empty/bad-allowlist, 404 unknown engagement) sandbox canned; Container card row + palette; unit + e2e `test_secret_baseline*`.)
 64. **Reachability filter** — import-graph prunes dead code.
 65. **Rule CI gate** — fail on high-severity SAST.
 66. **Delta SAST** — diff-only findings per PR.
