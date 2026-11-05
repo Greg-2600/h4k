@@ -28,6 +28,8 @@ from schemas import (
     ContainerFuzzResult,
     DBInterrogateRequest,
     DeepAttackRequest,
+    FfufRequest,
+    FfufResult,
     FireTVRequest,
     FireTVResult,
     FuzzRequest,
@@ -57,6 +59,8 @@ from schemas import (
     TsharkRequest,
     TsharkResult,
     VulnLeadsRequest,
+    WpscanRequest,
+    WpscanResult,
     ZapRequest,
     ZapResult,
 )
@@ -3128,6 +3132,54 @@ def gobuster_scan_api(req: GobusterRequest) -> GobusterResult:
         argv += ["-x", req.extensions.strip()]
     out = ToolkitRunner().run_tool("gobuster", argv, timeout=900)
     return GobusterResult(target=req.target, tool=out)
+
+
+@router.post("/ffuf", response_model=FfufResult)
+def ffuf_scan_api(req: FfufRequest) -> FfufResult:
+    """Standalone ffuf content fuzzing (explicit, opt-in)."""
+    from services.toolkit import ToolkitRunner, _web_wordlist
+
+    target = (req.target or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="target required")
+    if "FUZZ" not in target.upper():
+        target = target.rstrip("/") + "/FUZZ"
+    argv = [
+        "ffuf",
+        "-u",
+        target,
+        "-w",
+        (req.wordlist or "").strip() or _web_wordlist(),
+        "-t",
+        str(max(1, min(int(req.threads), 200))),
+        "-s",
+    ]
+    if (req.extensions or "").strip():
+        argv += ["-e", req.extensions.strip()]
+    if (req.status_codes or "").strip():
+        argv += ["-mc", req.status_codes.strip()]
+    out = ToolkitRunner().run_tool("ffuf", argv, timeout=900)
+    return FfufResult(target=req.target, tool=out)
+
+
+@router.post("/wpscan", response_model=WpscanResult)
+def wpscan_api(req: WpscanRequest) -> WpscanResult:
+    """Standalone WPScan plugin/theme enumeration (explicit, opt-in)."""
+    from services.toolkit import ToolkitRunner
+
+    target = (req.target or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="target required")
+    scope = (req.enumerate or "vp").strip().lower()
+    if scope not in ("vp", "ap", "vt", "at", "u", "tt", "cb", "dbe"):
+        raise HTTPException(
+            status_code=400, detail="enumerate must be vp|ap|vt|at|u|tt|cb|dbe"
+        )
+    argv = ["wpscan", "--url", target, "--enumerate", scope, "--no-update", "--batch"]
+    out = ToolkitRunner().run_tool(
+        "wpscan", argv, timeout=max(10, min(int(req.max_timeout), 3600))
+    )
+    return WpscanResult(target=req.target, tool=out)
 
 
 @router.post("/container_escape", response_model=ContainerEscapeResult)

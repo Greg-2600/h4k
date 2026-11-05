@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #31 — ffuf/wpscan pack
+
+`POST /api/ffuf` is standalone dir/content fuzzing (bundled wordlist,
+`FUZZ` appended when missing, match-code filter, thread cap);
+`POST /api/wpscan` is standalone plugin/theme/user enumeration with a
+validated enum set, `--no-update --batch` so it never prompts and never
+phones home for a DB refresh. Both run only when the operator presses
+their Web-assessment buttons (palette entries too); sandbox refuses to
+spawn either and says so, which the e2e asserts.
+
 ## Backlog #27 — privesc suggester
 
 `POST /api/privesc/suggest` runs ten read-only checks in the linPEAS
