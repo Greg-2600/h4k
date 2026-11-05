@@ -867,3 +867,27 @@ class ContainerFuzzRequest(BaseModel):
 class ContainerFuzzResult(BaseModel):
     job_id: str = ""
     status: str = ""
+
+
+# ---- gRPC enumerator + fuzz ----
+class GrpcFuzzRequest(BaseModel):
+    """LAB-ONLY: enumerate (reflection) + fuzz a gRPC endpoint you OWN.
+
+    Cleartext h2c by default; `use_tls` negotiates h2 via ALPN. With no
+    `method`, reflection picks the first service (…/Fuzz). Results
+    ledger on the target host with `engagement_id` (scope-enforced).
+    """
+
+    host: str = "127.0.0.1"
+    port: int = 50051
+    method: str = ""
+    seed: str = ""
+    iterations: int = Field(default=40, ge=1, le=200)
+    timeout: float = Field(default=5.0, gt=0, le=30.0)
+    use_tls: bool = False
+    engagement_id: str | None = None
+
+
+class GrpcFuzzResult(BaseModel):
+    job_id: str = ""
+    status: str = ""

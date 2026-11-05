@@ -289,6 +289,7 @@ sandbox stand-ins required where network/tooling is involved.
 44. **S3 policy linter** — public/ACL offline eval.
 45. **WebSocket fuzz** — frame mutation + replay.
 46. **gRPC enumerator + fuzz** — reflection + payload shapes.
+  (done: `services/grpcfuzz.py` hand-rolled h2 (h2c + ALPN-h2) reflection list_services with heuristic string-scan + 8 unary framing mutations + GOAWAY/RST/drop/timeout/grpc-status signals + ledger; `POST /api/grpc_fuzz` job + poll + abort sandbox canned; Fuzz-lab gRPC row + palette; unit (incl. live stub h2 server) + e2e `test_grpcfuzz*`.)
 47. **GraphQL introspection + fuzz** — field/depth probes.
 48. **OpenAPI import → fuzz** — spec-driven targets.
 49. **Header/cookie session fuzz** — auth-bypass leads.

@@ -34,6 +34,8 @@ from schemas import (
     FuzzRequest,
     GobusterRequest,
     GobusterResult,
+    GrpcFuzzRequest,
+    GrpcFuzzResult,
     Job,
     JohnRequest,
     JohnResult,
@@ -2766,6 +2768,116 @@ def container_surfaces(req: dict[str, Any]) -> dict[str, Any]:
 
     target = str((req or {}).get("target") or "127.0.0.1")
     return detect_surfaces(target)
+
+
+_grpcfuzz_jobs: dict[str, dict[str, Any]] = {}
+
+
+@router.post("/grpc_fuzz", response_model=GrpcFuzzResult)
+def run_grpc_fuzz(req: GrpcFuzzRequest, background: BackgroundTasks) -> GrpcFuzzResult:
+    """LAB-ONLY: enumerate (reflection) + fuzz a gRPC endpoint you own.
+
+    Runs as a background job like /ws_fuzz — poll `/api/grpc_fuzz/{id}`.
+    Sandbox returns canned services + candidates without any socket.
+    """
+    host = (req.host or "").strip()
+    if not host:
+        raise HTTPException(status_code=400, detail="host required")
+    if not 1 <= req.port <= 65535:
+        raise HTTPException(status_code=400, detail="port must be 1-65535")
+    if req.method and not req.method.startswith("/"):
+        raise HTTPException(
+            status_code=400, detail="method must look like /package.Service/Method"
+        )
+    job_id = uuid.uuid4().hex[:12]
+    job: dict[str, Any] = {
+        "id": job_id,
+        "host": host,
+        "port": req.port,
+        "method": req.method,
+        "status": "running",
+        "services": [],
+        "candidates": [],
+        "created": datetime.now(UTC).isoformat(),
+    }
+    _grpcfuzz_jobs[job_id] = job
+    background.add_task(_run_grpc_fuzz, job, req)
+    return GrpcFuzzResult(job_id=job_id, status="running")
+
+
+def _run_grpc_fuzz(job: dict[str, Any], req: GrpcFuzzRequest) -> None:
+    from services import sandbox as sandbox_mode
+    from services.grpcfuzz import enumerate_and_fuzz, sandbox_enumeration, to_ledger
+
+    try:
+        if sandbox_mode.enabled():
+            result = sandbox_enumeration(req.host, req.port)
+        else:
+            result = enumerate_and_fuzz(
+                job["host"],
+                req.port,
+                method=req.method,
+                seed=req.seed,
+                iterations=req.iterations,
+                use_tls=req.use_tls,
+                timeout=req.timeout,
+            )
+        if result.get("error") and not result.get("services"):
+            job["error"] = result["error"]
+        job["services"] = result.get("services", [])
+        job["service_count"] = result.get("service_count", len(job["services"]))
+        job["method"] = result.get("method", job["method"])
+        job["reflection"] = result.get("reflection", False)
+        job["candidates"] = result.get("candidates", [])
+        job["count"] = result.get("candidate_count", 0)
+        job["clean"] = result.get("clean", True)
+        ingested = 0
+        skipped: list[str] = []
+        if req.engagement_id:
+            from routers.engagement import get_store
+            from services.engagement import ScopeError
+
+            store = get_store()
+            if not store.get_engagement(req.engagement_id):
+                job["error"] = "engagement not found"
+            else:
+                for entry in to_ledger(
+                    job["host"], req.port, job["services"], job["candidates"]
+                ):
+                    try:
+                        ingested += store.record_vuln(
+                            req.engagement_id, entry["host"], entry
+                        )
+                    except ScopeError:
+                        if entry["host"] not in skipped:
+                            skipped.append(entry["host"])
+                    except ValueError:
+                        if entry["host"] not in skipped:
+                            skipped.append(entry["host"])
+        job["ingested"] = ingested
+        job["skipped_out_of_scope"] = skipped
+        _update(job, status="done", progress=100.0, message="grpc fuzz complete")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("grpc fuzz job failed")
+        _update(job, status="error", error=str(exc), message="grpc fuzz failed")
+
+
+@router.get("/grpc_fuzz/{job_id}")
+def grpc_fuzz_status(job_id: str) -> dict[str, Any]:
+    job = _grpcfuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="grpc fuzz job not found")
+    return job
+
+
+@router.post("/grpc_fuzz/{job_id}/abort")
+def grpc_fuzz_abort(job_id: str) -> dict[str, Any]:
+    job = _grpcfuzz_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="grpc fuzz job not found")
+    job["status"] = "aborted"
+    logger.info("[grpc fuzz %s] abort requested", job_id)
+    return {"status": "abort_requested"}
 
 
 @router.post("/container_fuzz", response_model=ContainerFuzzResult)
