@@ -113,6 +113,7 @@ Host recon/scan:
 - `POST /vulnleads`
 - `GET /api/kev/check` + `POST /api/kev/enrich` (bundled snapshot) + `POST /api/kev/refresh` (opt-in live)
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
+- `GET|POST /api/corpus`, `POST /api/corpus/import`, `GET|DELETE /api/corpus/{sha}` (shared seed store)
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
 
 CTF / lab toolkit (opt-in, each explicit):
@@ -177,6 +178,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
+| `corpus.py` | persistent content-addressed shared seed store (dedup, caps, sidecars) |
 | `ssrf_pack.py` | opt-in metadata SSRF probe pack (AWS/GCP/Azure + encoding bypasses) + scope-enforced ledger, sandbox canned |
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses |
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |

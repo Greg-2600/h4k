@@ -27,6 +27,9 @@ from schemas import (
     ContainerEscapeResult,
     ContainerFuzzRequest,
     ContainerFuzzResult,
+    CorpusAddRequest,
+    CorpusEntry,
+    CorpusImportRequest,
     DBInterrogateRequest,
     DeepAttackRequest,
     FireTVRequest,
@@ -3422,6 +3425,78 @@ def ssrf_probe_api(req: SsrfProbeRequest) -> SsrfProbeResult:
             "skipped_out_of_scope": skipped,
         }
     )
+
+
+@router.get("/corpus")
+def corpus_list() -> dict[str, Any]:
+    """List the shared corpus (newest first)."""
+    from services.corpus import list_entries
+
+    return list_entries()
+
+
+@router.post("/corpus", response_model=CorpusEntry)
+def corpus_add(req: CorpusAddRequest) -> CorpusEntry:
+    """Add one seed (base64 bytes or text); identical bytes dedup."""
+    import base64 as b64lib
+
+    from services.corpus import add_entry
+
+    raw = req.data_b64 if req.data_b64 is not None else req.data
+    if raw is None or (isinstance(raw, str) and not raw):
+        raise HTTPException(status_code=400, detail="data_b64 or data required")
+    try:
+        data = (
+            b64lib.b64decode(raw, validate=True)
+            if req.data_b64 is not None
+            else str(raw).encode("utf-8")
+        )
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=f"bad data: {exc}") from exc
+    try:
+        return CorpusEntry(
+            **add_entry(data, name=req.name, source=req.source, tags=req.tags)
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/corpus/import")
+def corpus_import(req: CorpusImportRequest) -> dict[str, Any]:
+    """Import many seeds; per-item errors are reported, not fatal."""
+    from services.corpus import import_bytes_batch
+
+    if not req.items:
+        raise HTTPException(status_code=400, detail="items required")
+    return import_bytes_batch(req.items, source=req.source)
+
+
+@router.get("/corpus/{sha}")
+def corpus_get(sha: str) -> Any:
+    """Download one raw seed by SHA-256."""
+    from fastapi.responses import Response
+    from services.corpus import read_bytes
+
+    try:
+        data = read_bytes(sha)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if data is None:
+        raise HTTPException(status_code=404, detail="corpus entry not found")
+    return Response(content=data, media_type="application/octet-stream")
+
+
+@router.delete("/corpus/{sha}")
+def corpus_delete(sha: str) -> dict[str, Any]:
+    """Remove one seed and its sidecar."""
+    from services.corpus import delete_entry
+
+    try:
+        if not delete_entry(sha):
+            raise HTTPException(status_code=404, detail="corpus entry not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"deleted": sha}
 
 
 @router.get("/nuclei/templates")

@@ -636,6 +636,18 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #51 — corpus sync
+
+`GET|POST /api/corpus`, `POST /api/corpus/import` and
+`GET|DELETE /api/corpus/{sha}` expose one content-addressed seed
+store under `<data_dir>/corpus`, so every fuzz run (and the operator)
+shares the same seeds across restarts: identical bytes dedup with tag
+merge, 1 MiB per entry, 500 entries with oldest-evict, strict SHA
+validation, and per-item error reporting on batch import.
+`H4K_DATA_DIR`-aware, so tests stay hermetic with zero sandbox
+special-casing. Fuzz-lab Share-seed row (text or `base64:` bytes) +
+Corpus list + palette.
+
 ## Backlog #42 — cloud metadata SSRF pack
 
 `POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,
