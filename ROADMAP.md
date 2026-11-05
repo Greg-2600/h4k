@@ -281,6 +281,7 @@ sandbox stand-ins required where network/tooling is involved.
 38. **Docker socket guard** — detect + policy suggestion.
 39. **K8s RBAC audit** — over-permissive roles flagged.
 40. **Helm chart SAST** — templating + secret checks.
+  (done: `services/helm_sast.py` offline `=== path ===` bundle audit (privileged/host namespaces/caps, runAs gaps, floating tags, template-controlled exec, hardcoded values/Secret literals) + scope-enforced vuln ledger; `POST /api/source/helm/scan` (400 empty bundle) sandbox canned; Container card Scan-chart row + palette; unit + e2e `test_helm_sast*`.)
 41. **Terraform/IaC scan** — Checkov-style offline misconfigs.
 42. **Cloud metadata SSRF pack** — 169.254 probes, opt-in.
 43. **IAM key hygiene** — age/rotation, read-only.

@@ -636,6 +636,18 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #40 — Helm chart SAST
+
+`POST /api/source/helm/scan` analyzes a pasted chart bundle
+(`=== path ===` blocks) entirely offline — privileged and
+root-running containers, host namespaces, dangerous capabilities,
+missing runAsNonRoot/readOnlyRootFilesystem/limits, floating `:latest`
+tags, `{{ }}`-controlled command/args, and hardcoded secrets in
+`values.yaml` or Secret manifests (a `b64enc` literal is still a
+committed secret). With `engagement_id` the findings ledger as vulns
+on the labeled host (scope-enforced). Container card Scan-chart row +
+palette.
+
 ## Backlog #37 — kubelet unauth audit
 
 `POST /api/kubelet/audit` probes one kubelet you own with read-only

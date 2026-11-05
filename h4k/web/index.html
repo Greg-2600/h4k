@@ -265,6 +265,14 @@
               <span class="muted" id="kube-status" data-testid="kube-status"></span>
             </div>
             <div id="kube-body" data-testid="kube-body" class="muted">Read-only: /healthz, /pods, /metrics + read-only-port probe. Nothing is executed.</div>
+            <div class="row">
+              <input type="text" id="helm-chart" data-testid="helm-chart" value="lab/app" title="Chart name (labels findings)" />
+              <input type="text" id="helm-host" data-testid="helm-host" value="127.0.0.1" title="Host label for the ledger entry (analysis is offline)" />
+              <button class="btn" id="btn-helm-scan" data-testid="btn-helm-scan">Scan chart</button>
+              <span class="muted" id="helm-status" data-testid="helm-status"></span>
+            </div>
+            <textarea id="helm-bundle" data-testid="helm-bundle" rows="3" class="grow" placeholder="Paste chart files as === path === blocks (offline SAST, nothing deployed)"></textarea>
+            <div id="helm-body" data-testid="helm-body" class="muted">Templating + secret checks: privileged, host namespaces, floating tags, hardcoded secrets.</div>
           </div>
         </div>
         <div class="card">
@@ -512,6 +520,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="helmsast"><span>Exploit: SAST a Helm chart (offline)</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>

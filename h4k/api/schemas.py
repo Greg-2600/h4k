@@ -314,6 +314,33 @@ class SourceScanResult(BaseModel):
     findings: list[SourceFinding] = []
 
 
+# ---- Helm chart SAST ----
+class HelmScanRequest(BaseModel):
+    """Helm chart SAST request (offline bundle analysis, nothing deployed).
+
+    `bundle` holds chart files as `=== path ===` blocks. `host` labels
+    the engagement ledger entry.
+    """
+
+    chart: str = "chart"
+    bundle: str = ""
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class HelmScanResult(BaseModel):
+    chart: str = ""
+    files: int = 0
+    parsed: int = 0
+    errors: list[str] = []
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    clean: bool = True
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 class SourceExploitRequest(BaseModel):
     """Generate a proof-of-concept skeleton for a finding (disclosure only)."""
 

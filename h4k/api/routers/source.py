@@ -16,6 +16,8 @@ from schemas import (
     AiRequest,
     AiResult,
     CustomRuleRequest,
+    HelmScanRequest,
+    HelmScanResult,
     ScaResult,
     SourceExploitRequest,
     SourceFinding,
@@ -79,6 +81,55 @@ async def scan_upload(
     except ingest.IngestError as exc:
         shutil.rmtree(work, ignore_errors=True)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/helm/scan", response_model=HelmScanResult)
+def helm_scan(req: HelmScanRequest) -> HelmScanResult:
+    """SAST a pasted Helm chart bundle (offline — nothing rendered/deployed).
+
+    `host` labels the ledger entry. `engagement_id` ledgers findings as
+    vulns on that host (scope-enforced). Sandbox returns canned findings.
+    """
+    from services import sandbox as sandbox_mode
+    from services.helm_sast import parse_bundle, sandbox_result, scan_files, to_ledger
+
+    try:
+        if not (req.bundle or "").strip():
+            raise ValueError(
+                "bundle required (paste chart files as === path === blocks)"
+            )
+        result = (
+            sandbox_result(req.chart)
+            if sandbox_mode.enabled()
+            else {"chart": req.chart, **scan_files(parse_bundle(req.bundle))}
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(
+            host, result.get("chart", req.chart), result.get("findings") or []
+        ):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return HelmScanResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
 
 
 @router.post("/exploit")
