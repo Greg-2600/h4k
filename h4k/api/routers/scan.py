@@ -19,6 +19,8 @@ from schemas import (
     ADBloodhoundRequest,
     ADMitm6Request,
     ADResponderRequest,
+    AflRunRequest,
+    AflRunResult,
     AircrackRequest,
     AircrackResult,
     AttackRequest,
@@ -3534,6 +3536,178 @@ def jwt_test_api(req: JwtTestRequest) -> JwtTestResult:
             "skipped_out_of_scope": skipped,
         }
     )
+
+
+_afl_jobs: dict[str, Any] = {}
+
+
+@router.post("/afl/run", response_model=AflRunResult)
+def afl_run(req: AflRunRequest) -> AflRunResult:
+    """LAB-ONLY: supervise an AFL++ campaign against your afl-cc binary.
+
+    Creates the run dir (seeds + harness template), pulls tagged seeds
+    from the shared corpus when available, and launches `afl-fuzz`
+    supervised — or parks the run as `ready` with setup notes when the
+    binary is absent. Sandbox returns a canned running run.
+    """
+    from services import sandbox as sandbox_mode
+    from services.afl_runner import create_run, launch, sandbox_run
+
+    target = (req.target or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="target required")
+    if sandbox_mode.enabled():
+        result = sandbox_run(target)
+        return AflRunResult(
+            run_id=result["run_id"],
+            target=result["target"],
+            status="running",
+            seeds=result["seeds"],
+            started=True,
+            sandbox=True,
+        )
+    seeds: list[bytes] = []
+    for seed in req.seeds or []:
+        if seed.startswith("base64:"):
+            import base64 as b64lib
+
+            try:
+                seeds.append(b64lib.b64decode(seed[7:], validate=True))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=f"bad seed: {exc}") from exc
+        else:
+            seeds.append(seed.encode())
+    if req.corpus_tags:
+        try:
+            from services.corpus import list_entries, read_bytes
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=501,
+                detail="shared corpus lands with the corpus-sync change",
+            ) from exc
+        wanted = set(req.corpus_tags)
+        for entry in list_entries().get("entries", []):
+            if wanted & set(entry.get("tags", [])):
+                blob = read_bytes(entry["sha"])
+                if blob:
+                    seeds.append(blob)
+    try:
+        meta = create_run(
+            target, args=req.args, seeds=seeds or [b"seed"], func=req.func
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    launched = launch(meta["id"], target, args=req.args, oneshot=False)
+    if launched.get("started"):
+        _afl_jobs[meta["id"]] = {"pid": launched.get("pid")}
+    return AflRunResult(
+        run_id=meta["id"],
+        target=target,
+        status="running" if launched.get("started") else "ready",
+        seeds=meta["seeds"],
+        started=bool(launched.get("started")),
+        pid=launched.get("pid"),
+        error=launched.get("error", ""),
+        note=launched.get("note", ""),
+    )
+
+
+@router.get("/afl")
+def afl_list() -> dict[str, Any]:
+    """List supervised AFL++ runs (newest first)."""
+    from services.afl_runner import afl_dir
+
+    runs: list[dict[str, Any]] = []
+    try:
+        for meta_path in sorted(
+            afl_dir().glob("*/run.json"), key=lambda p: p.stat().st_mtime, reverse=True
+        ):
+            try:
+                import json as jsonlib
+
+                runs.append(jsonlib.loads(meta_path.read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                continue
+    except OSError:
+        pass
+    return {"runs": runs, "count": len(runs)}
+
+
+@router.get("/afl/{run_id}")
+def afl_status(run_id: str) -> dict[str, Any]:
+    """Live stats for one run (re-reads out/fuzzer_stats every poll)."""
+    from services import sandbox as sandbox_mode
+    from services.afl_runner import list_crashes, read_stats, sandbox_run
+
+    if sandbox_mode.enabled():
+        return sandbox_run()
+    try:
+        stats = read_stats(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    stats["run_id"] = run_id
+    stats["crash_list"] = list_crashes(run_id)
+    return stats
+
+
+@router.post("/afl/{run_id}/ledger")
+def afl_ledger(run_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Ledger a run's crash candidates as engagement vulns (scope-enforced)."""
+    from routers.engagement import get_store
+    from services.afl_runner import list_crashes, to_ledger
+    from services.engagement import ScopeError
+
+    engagement_id = str((body or {}).get("engagement_id") or "")
+    host = str((body or {}).get("host") or "127.0.0.1")
+    if not engagement_id:
+        raise HTTPException(status_code=400, detail="engagement_id required")
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    from services import sandbox as sandbox_mode
+
+    if sandbox_mode.enabled():
+        from services.afl_runner import sandbox_run
+
+        crashes = sandbox_run()["crashes"]
+    else:
+        try:
+            from services.afl_runner import _load_meta
+
+            _load_meta(run_id)
+            crashes = list_crashes(run_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    for entry in to_ledger(host, run_id, crashes):
+        try:
+            ingested += store.record_vuln(engagement_id, entry["host"], entry)
+        except ScopeError:
+            if entry["host"] not in skipped:
+                skipped.append(entry["host"])
+    return {
+        "ingested": ingested,
+        "skipped_out_of_scope": skipped,
+        "crashes": len(crashes),
+    }
+
+
+@router.post("/afl/{run_id}/abort")
+def afl_abort(run_id: str) -> dict[str, Any]:
+    """Stop a supervised run (SIGTERM the afl-fuzz child, if any)."""
+    from services import sandbox as sandbox_mode
+
+    if sandbox_mode.enabled():
+        return {"stopped": True, "run_id": run_id}
+    from services.afl_runner import stop_run
+
+    try:
+        return stop_run(run_id, _afl_jobs)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    finally:
+        _afl_jobs.pop(run_id, None)
 
 
 @router.get("/nuclei/templates")

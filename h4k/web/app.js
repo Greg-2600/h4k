@@ -553,6 +553,53 @@ async function startFuzzing() {
   } catch (e) { log(`fuzz failed: ${e.message}`, 'error'); if (btn) btn.disabled = false; }
 }
 
+async function startAfl() {
+  const btn = $('btn-afl-start');
+  if (btn) btn.disabled = true;
+  $('btn-afl-stop').hidden = false;
+  $('afl-output').hidden = false;
+  $('afl-output').textContent = 'starting AFL++ run…';
+  $('afl-status').textContent = '';
+  try {
+    const start = await api('/api/afl/run', {
+      method: 'POST',
+      body: { target: $('afl-target').value.trim() || '/lab/harness' },
+    });
+    if (!start.run_id) { log(`AFL++ refused: ${start.detail || 'error'}`, 'error'); if (btn) btn.disabled = false; return; }
+    if (!start.started) {
+      $('afl-output').textContent = `ready, not running: ${start.error || start.note || 'afl-fuzz missing'}`;
+      $('afl-status').textContent = 'ready (afl-fuzz missing)';
+      if (btn) btn.disabled = false;
+      $('btn-afl-stop').hidden = true;
+      log('AFL++ run parked ready (binary missing)', 'warn');
+      return;
+    }
+    state.aflRun = start.run_id;
+    log(`AFL++ run ${start.run_id}`, 'info');
+    if (state.aflTimer) clearInterval(state.aflTimer);
+    state.aflTimer = setInterval(async () => {
+      try {
+        const st = await api(`/api/afl/${state.aflRun}`);
+        $('afl-output').textContent = `execs ${st.execs ?? '?'} · edges ${st.edges ?? '?'} · crashes ${st.crashes ?? 0} · hangs ${st.hangs ?? 0}\n`
+          + `last crash: ${st.last_crash || 'none'}\n${(st.crash_files || []).slice(0, 10).join('\n')}`.slice(0, 4000);
+        $('afl-status').textContent = `${st.crashes ?? 0} crash(es)`;
+      } catch (e) { log(`AFL++ poll: ${e.message}`, 'error'); }
+    }, 3000);
+  } catch (e) { log(`AFL++ failed: ${e.message}`, 'error'); if (btn) btn.disabled = false; }
+}
+
+async function stopAfl() {
+  $('btn-afl-stop').hidden = true;
+  if (state.aflTimer) { clearInterval(state.aflTimer); state.aflTimer = null; }
+  const btn = $('btn-afl-start');
+  if (btn) btn.disabled = false;
+  if (state.aflRun) {
+    try { await api(`/api/afl/${state.aflRun}/abort`, { method: 'POST' }); } catch { /* already gone */ }
+    state.aflRun = null;
+  }
+  log('AFL++ stop requested', 'warn');
+}
+
 /* ---------- 4. pivot ---------- */
 
 async function loadCredLedger() {
@@ -1538,6 +1585,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'aflrun') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1738,6 +1786,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-afl-start').addEventListener('click', startAfl);
+  $('btn-afl-stop').addEventListener('click', stopAfl);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());

@@ -901,3 +901,37 @@ class ContainerFuzzRequest(BaseModel):
 class ContainerFuzzResult(BaseModel):
     job_id: str = ""
     status: str = ""
+
+
+# ---- AFL++ persistent runner ----
+class AflRunRequest(BaseModel):
+    """LAB-ONLY: supervise an AFL++ campaign against YOUR afl-cc binary.
+
+    `target` is the path to the instrumented binary on this machine.
+    `seeds` are pasted inputs; `corpus_tags` pulls seeds from the
+    shared corpus (#51). `oneshot` adds `-V 5` (CI-style short run).
+    Nothing is compiled or fetched — build the target yourself.
+    """
+
+    target: str
+    args: list[str] = Field(default_factory=list)
+    seeds: list[str] = Field(default_factory=list)
+    corpus_tags: list[str] = Field(default_factory=list)
+    func: str = "target_func"
+    oneshot: bool = False
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class AflRunResult(BaseModel):
+    run_id: str = ""
+    target: str = ""
+    status: str = ""
+    seeds: int = 0
+    started: bool = False
+    pid: int | None = None
+    error: str = ""
+    note: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []

@@ -296,6 +296,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/jwt_tester.py` offline audit (unsigned/long-lived/no-exp/kid/jku flags) + capped stdlib HMAC crack (built-in + pasted wordlist, masked reporting) + live none/empty-sig/confusion-key mutants vs marker; `POST /api/jwt/test` (400 bad token/url, 404 unknown engagement) sandbox canned; Web card JWT row + palette; unit (incl. strict vs open stub servers) + e2e `test_jwt_tester*`.)
 51. **Corpus sync** — shared corpus dir across runs.
 52. **AFL++ persistent runner** — harness + stats.
+  (done: `services/afl_runner.py` supervised run dirs (seeds + persistent-mode `harness.c` template + build notes, tagged-seed pull from shared corpus, `afl-fuzz` fixed-argv launch or honest `ready` + setup notes when absent, live `fuzzer_stats` parse, SIGTERM stop, crash→corpus import) + scope-enforced crash ledger; `POST /api/afl/run`, `GET /api/afl[/{id}]`, `POST …/abort|ledger` (400/404) sandbox canned; Fuzz-lab Run row + palette; unit (incl. fake afl-fuzz lifecycle + no-binary path) + e2e `test_afl_runner*`.)
 53. **Sanitizer diff** — ASan vs UBSan vs MSan compare.
 54. **Crash bisection** — input halve to minimal trigger.
 55. **PCAP → seed replay** — deterministic fuzz seeds.

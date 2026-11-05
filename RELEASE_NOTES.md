@@ -636,6 +636,21 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #52 — AFL++ persistent runner
+
+`POST /api/afl/run` creates a supervised campaign dir
+(`in/` seeds, `out/` findings, persistent-mode `harness.c` with the
+exact `afl-clang-fast` build line, `run.json`) — seeds pasted inline
+or pulled by tag from the shared corpus when it is available (clean
+501 otherwise) — then launches `afl-fuzz` supervised, or parks the
+run `ready` with setup notes when the binary is absent instead of
+pretending to fuzz. `GET /api/afl/{id}` re-reads `out/fuzzer_stats`
+per poll (execs/edges/crashes/hangs/last crash), `POST …/abort`
+SIGTERMs the child, `POST …/ledger` records crash candidates as
+unclassified vulns (CWE-119, scope-enforced). Crash→corpus import
+ships in the service and activates fully once the corpus-sync change
+merges. Fuzz-lab Run row + palette; sandbox fully canned.
+
 ## Backlog #50 — JWT tester
 
 `POST /api/jwt/test` audits a pasted JWT offline — unsigned
