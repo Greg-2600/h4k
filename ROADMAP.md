@@ -257,6 +257,7 @@ sandbox stand-ins required where network/tooling is involved.
 19. **mDNS/SSDP persistent map** — sweeps persist as assets.
 20. **TLS cert inventory** — expiry/weak-cipher/self-signed leads.
 21. **Shodan/Censys BYO import** — JSON → leads, no key in repo.
+  (done: `services/intel_import.py` normalizes Shodan/Censys/generic (+ search envelopes) → scope-checked asset/vuln ledger; `GET /api/intel/formats` + `POST /api/intel/import`; Recon card with JSON textarea + palette; unit + e2e `test_intel*`.)
 22. **CPE auto-correlate** — banner → CPE → CVE matcher.
 23. **KEV/EPSS enrichment** — CISA KEV flag + EPSS score on vulns.
 24. **CVSS v4 re-score** — override with audit trail.

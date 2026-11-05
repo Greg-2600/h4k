@@ -3009,6 +3009,47 @@ def nse_services() -> dict[str, Any]:
     return {"services": covered, "count": len(covered)}
 
 
+@router.get("/intel/formats")
+def intel_formats() -> dict[str, Any]:
+    """Accepted BYO intel shapes (no API keys involved)."""
+    return {
+        "sources": ["auto", "shodan", "censys", "generic"],
+        "notes": "paste your own Shodan/Censys export JSON; hosts outside the engagement scope are skipped",
+    }
+
+
+@router.post("/intel/import")
+def intel_import(body: dict[str, Any]) -> dict[str, Any]:
+    """Import operator-supplied Shodan/Censys JSON as engagement leads."""
+    from routers.engagement import get_store
+    from services.intel_import import ledger, normalize
+
+    engagement_id = str((body or {}).get("engagement_id") or "").strip()
+    if not engagement_id:
+        raise HTTPException(status_code=400, detail="engagement_id required")
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    try:
+        rows = normalize(
+            str((body or {}).get("source") or "auto"), (body or {}).get("data")
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not rows:
+        return {
+            "engagement_id": engagement_id,
+            "rows": 0,
+            "recorded": 0,
+            "skipped_out_of_scope": [],
+        }
+    try:
+        out = ledger(store, engagement_id, rows)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"engagement_id": engagement_id, **out}
+
+
 @router.post("/nikto", response_model=NiktoResult)
 def nikto_scan_api(req: NiktoRequest) -> NiktoResult:
     """Standalone nikto web scan (also runs inside deepattack/autopilot)."""

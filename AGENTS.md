@@ -116,7 +116,7 @@ Host recon/scan:
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
-- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads), `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads), `GET /api/intel/formats` + `POST /api/intel/import` (BYO Shodan/Censys JSON, no keys), `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /kerberos/asrep`, `POST /kerberos/kerberoast` (explicit roast, optional John crack)
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
   apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
@@ -185,6 +185,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `intel_import.py` | BYO Shodan/Censys JSON normalize → scope-checked asset/vuln ledger (no keys) |
 | `ipv6_discovery.py` | IPv6 NDP table + explicit-CIDR nmap -6 sweep, scope-enforced asset ledger, sandbox canned |
 | `tls_fingerprint.py` | active TLS handshake inventory (version/cipher/cert) + exact-match watchlist + heuristic C2 leads, sandbox stand-in |
 | `pdf_report.py` | one-click assessment PDF: reportlab render of the session report (passwords masked) |

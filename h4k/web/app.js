@@ -796,6 +796,22 @@ async function runTlsFingerprint() {
   } catch (e) { $('tls-body').textContent = `tls failed: ${e.message}`; }
 }
 
+async function runIntelImport() {
+  const raw = $('intel-json').value.trim();
+  if (!raw) { log('intel import needs JSON', 'warn'); return; }
+  let data;
+  try { data = JSON.parse(raw); } catch { $('intel-body').textContent = 'invalid JSON — paste an array or object'; return; }
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  $('intel-body').textContent = 'importing…';
+  try {
+    const res = await api('/api/intel/import', { method: 'POST', body: { engagement_id: engId, source: $('intel-source').value, data } });
+    $('intel-body').innerHTML = `<div data-testid="intel-result">${esc(`${res.rows || 0} row(s), ${res.recorded || 0} recorded, ${(res.skipped_out_of_scope || []).length} out of scope`)}</div>`;
+    log(`intel import: ${res.recorded || 0} recorded`, 'success');
+    refreshStatus();
+  } catch (e) { $('intel-body').textContent = `intel import failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1344,6 +1360,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'intel') { setTab('recon'); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
@@ -1519,6 +1536,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-intel-import').addEventListener('click', runIntelImport);
   $('btn-tls-run').addEventListener('click', runTlsFingerprint);
   $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
   $('btn-krb-roast').addEventListener('click', () => krbRoast('kerberoast'));
