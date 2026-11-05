@@ -305,6 +305,7 @@ sandbox stand-ins required where network/tooling is involved.
 57. **Rate-limit-aware fuzz** — 429 backoff + jitter.
   (done: `services/ratefuzz.py` bounded polite probe (Retry-After seconds/date honored + capped, exponential base with decay, ±jitter, per-request timeline; injectable sleeper) + no-throttle MEDIUM finding (CWE-799) vs honored-throttle INFO; `POST /api/rate_fuzz` (400 bad url, 404 unknown engagement) sandbox canned; Fuzz-lab row + palette; unit (incl. open vs throttling stub servers, no-sleep) + e2e `test_ratefuzz*`.)
 58. **Authenticated fuzz profiles** — cookie/header presets.
+  (done: `services/fuzz_profiles.py` JSON-backed named presets (masked list, fail-closed unknown names, explicit-wins merge) + `GET|POST|DELETE /api/fuzz-profiles` (400/404; values never listed) + `profile` on the stateful run (preset headers merged, preset cookies seed the jar under fresh logins); Fuzz-lab manager + attach field + palette; unit + e2e `test_fuzz_profiles*`.)
 59. **Fuzz sharding** — N workers, merged registry.
   (done: `services/fuzz_shard.py` coordinator (deterministic disjoint slices, seeded per worker, shared locked `CrashRegistry`, per-worker errors never fatal, stable sorted output) + `POST /api/fuzz/shard` (400 no target) sandbox canned; Fuzz-lab row + palette; unit (incl. live RST stub proving cross-worker dedup to 1) + e2e `test_fuzz_shard*`.)
 60. **Coverage HTML import** — llvm-cov badge in UI.

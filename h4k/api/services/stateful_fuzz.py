@@ -141,8 +141,13 @@ def fuzz_flow(
     steps: list[dict[str, Any]] | None = None,
     iterations: int = 30,
     timeout: float = 8.0,
+    preset_cookies: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Login per iteration, replay one mutated authed step, collect signals."""
+    """Login per iteration, replay one mutated authed step, collect signals.
+
+    `preset_cookies` (from an auth profile) seed the jar; fresh login
+    cookies override same-named entries.
+    """
     if not steps:
         raise ValueError("flow steps required (at least one method + url)")
     clean_steps: list[dict[str, Any]] = []
@@ -174,6 +179,8 @@ def fuzz_flow(
         except ValueError as exc:
             raise ValueError(f"iteration {i}: {exc}") from exc
         logins += 1
+        jar = dict(preset_cookies or {})
+        jar.update(session.get("cookies", {}))
         step = clean_steps[i % len(clean_steps)]
         fields = step["fields"] or ["_query_q"]
         field = fields[(i // max(len(clean_steps), 1)) % len(fields)]
@@ -205,10 +212,8 @@ def fuzz_flow(
         )
         body = json.dumps(obj).encode() if obj else None
         headers: dict[str, str] = {}
-        if session["cookies"]:
-            headers["Cookie"] = "; ".join(
-                f"{k}={v}" for k, v in session["cookies"].items()
-            )
+        if jar:
+            headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in jar.items())
         if session["token"]:
             headers["Authorization"] = f"Bearer {session['token']}"
         if body is not None:

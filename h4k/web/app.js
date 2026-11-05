@@ -620,6 +620,7 @@ async function startStatefulFuzz() {
       body: {
         login_url: $('st-login').value.trim(), login_body: creds,
         session_json_field: $('st-session').value.trim() || "",
+        profile: $('st-profile').value.trim() || null,
         flow, iterations: 30, engagement_id: engId || null,
       },
     });
@@ -632,6 +633,46 @@ async function startStatefulFuzz() {
     $('st-output').textContent = `stateful fuzz failed: ${e.message}`;
     log(`stateful fuzz failed: ${e.message}`, 'error');
   } finally { if (btn) btn.disabled = false; }
+}
+
+async function savePreset() {
+  const name = $('prof-name').value.trim();
+  if (!name) { log('preset needs a name', 'warn'); return; }
+  let headers = {};
+  const raw = $('prof-headers').value.trim();
+  if (raw) {
+    try {
+      headers = JSON.parse(raw);
+    } catch {
+      $('prof-output').textContent = 'preset headers must be JSON';
+      $('prof-output').hidden = false;
+      return;
+    }
+  }
+  const cookies = {};
+  for (const pair of $('prof-cookies').value.split(';')) {
+    const [k, ...rest] = pair.split('=');
+    if (k && k.trim()) cookies[k.trim()] = rest.join('=').trim();
+  }
+  try {
+    const res = await api('/api/fuzz-profiles', { method: 'POST', body: { name, headers, cookies } });
+    $('prof-status').textContent = `saved ${res.name}`;
+    log(`auth preset saved: ${res.name}`, 'success');
+    await listPresets();
+  } catch (e) { log(`preset save failed: ${e.message}`, 'error'); }
+}
+
+async function listPresets() {
+  try {
+    const res = await api('/api/fuzz-profiles');
+    $('prof-output').hidden = false;
+    const rows = (res.profiles || []).map((p) => {
+      const keys = [...(p.headers || []), ...(p.cookies || []).map((c) => `cookie:${c}`)].join(', ');
+      return `<div data-testid="prof-row">${esc(p.name)} — ${esc(keys || 'empty')} <button class="btn small" data-profdel="${esc(p.name)}">delete</button></div>`;
+    }).join('');
+    $('prof-output').innerHTML = `<div>${esc(`${res.count || 0} preset(s) (values never shown)`)}</div>${rows || '<div class="muted">no presets yet</div>'}`;
+    $('prof-status').textContent = `${res.count || 0} preset(s)`;
+  } catch (e) { log(`preset list failed: ${e.message}`, 'error'); }
 }
 
 async function startFuzzing() {
@@ -1813,6 +1854,7 @@ function runCmd(cmd) {
   else if (cmd === 'cfuzz') setTab('exploit');
   else if (cmd === 'shardfuzz') setTab('exploit');
   else if (cmd === 'rateprobe') setTab('exploit');
+  else if (cmd === 'authprof') setTab('exploit');
   else if (cmd === 'stfuzz') setTab('exploit');
   else if (cmd === 'sandiff') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
@@ -2027,6 +2069,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-sh-start').addEventListener('click', startShardFuzz);
   $('btn-rate-start').addEventListener('click', startRateProbe);
   $('btn-st-start').addEventListener('click', startStatefulFuzz);
+  $('btn-prof-save').addEventListener('click', savePreset);
+  $('btn-prof-list').addEventListener('click', listPresets);
   $('btn-sandiff').addEventListener('click', sanitizerDiff);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
@@ -2135,6 +2179,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('click', (e) => {
+    const pd = e.target.closest('[data-profdel]');
+    if (pd) {
+      api(`/api/fuzz-profiles/${encodeURIComponent(pd.dataset.profdel)}`, { method: 'DELETE' })
+        .then(() => listPresets())
+        .catch((err) => log(`preset delete failed: ${err.message}`, 'error'));
+      return;
+    }
     const mv = e.target.closest('[data-move]');
     if (mv) { const m = state.moves[parseInt(mv.dataset.move, 10)]; if (m) fireMove(m); return; }
     const fd = e.target.closest('[data-flagdel]');
