@@ -1200,6 +1200,38 @@ async function reachability() {
   }
 }
 
+async function ciGate() {
+  const raw = $('ci-paste').value.trim();
+  if (!raw) { log('CI gate needs pasted findings JSON', 'warn'); return; }
+  let findings = null;
+  try {
+    findings = JSON.parse(raw);
+    if (!Array.isArray(findings)) throw new Error('not a list');
+  } catch {
+    $('ci-body').textContent = 'findings must be a JSON list';
+    log('CI gate needs a JSON list', 'warn');
+    return;
+  }
+  const ignore = $('ci-ignore').value.split(',').map((s) => s.trim()).filter(Boolean);
+  $('ci-body').textContent = 'evaluating gate (offline)…';
+  $('ci-status').textContent = '';
+  try {
+    const res = await api('/api/source/ci/gate', {
+      method: 'POST',
+      body: { findings, fail_on: $('ci-threshold').value, ignore_rule_ids: ignore },
+    });
+    const names = (res.blocking || []).map((f) => `${f.rule_id || 'finding'} (${f.severity || '?'})`).slice(0, 8).join(', ');
+    const waived = (res.ignored || []).map((f) => f.rule_id).slice(0, 8).join(', ');
+    const state = res.passed ? 'PASS' : `FAIL · ${res.blocking_count || 0} blocking`;
+    $('ci-body').innerHTML = `<div data-testid="ci-findings">${esc(`${state} (${res.evaluated || 0} evaluated, threshold ${res.threshold || ''})${waived ? ` · waived: ${waived}` : ''}${names ? ` · blocking: ${names}` : ''}`)}</div>`;
+    $('ci-status').textContent = state;
+    log(`CI gate done: ${state}`, res.passed ? 'success' : 'error');
+  } catch (e) {
+    $('ci-body').textContent = `CI gate failed: ${e.message}`;
+    log(`CI gate failed: ${e.message}`, 'error');
+  }
+}
+
 async function auditRbac() {
   const documents = [$('rbac-docs').value.trim()].filter(Boolean);
   if (!documents.length) { log('RBAC audit needs pasted YAML', 'warn'); return; }
@@ -1744,6 +1776,7 @@ function runCmd(cmd) {
   else if (cmd === 'taintsast') setTab('exploit');
   else if (cmd === 'secretscan') setTab('exploit');
   else if (cmd === 'reachmap') setTab('exploit');
+  else if (cmd === 'cigate') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'sarifx') setTab('score');
@@ -1936,6 +1969,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-taint-scan').addEventListener('click', scanTaint);
   $('btn-sec-scan').addEventListener('click', scanSecrets);
   $('btn-reach').addEventListener('click', reachability);
+  $('btn-ci-gate').addEventListener('click', ciGate);
   $('btn-rbac-audit').addEventListener('click', auditRbac);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }

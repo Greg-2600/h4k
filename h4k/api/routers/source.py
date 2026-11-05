@@ -15,6 +15,8 @@ from schemas import (
     AiLoopResult,
     AiRequest,
     AiResult,
+    CiGateRequest,
+    CiGateResult,
     CustomRuleRequest,
     ReachabilityRequest,
     ReachabilityResult,
@@ -322,6 +324,34 @@ def reachability(req: ReachabilityRequest) -> ReachabilityResult:
         return ReachabilityResult(**analyze(files, entries=req.entries or None))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/ci/gate", response_model=CiGateResult)
+def ci_gate(req: CiGateRequest) -> CiGateResult:
+    """Fail a CI run on high-severity SAST findings (offline).
+
+    `fail_on` sets the blocking threshold (critical|high|medium|low).
+    Ignored rule ids are echoed back — a green gate never hides what
+    was waived. Garbage entries are a 400, never silent. Sandbox
+    returns a canned FAIL.
+    """
+    from services import sandbox as sandbox_mode
+    from services.ci_gate import VALID_THRESHOLDS, evaluate, sandbox_result
+
+    if str(req.fail_on or "").strip().lower() not in VALID_THRESHOLDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"fail_on must be one of {', '.join(VALID_THRESHOLDS)}",
+        )
+    if sandbox_mode.enabled():
+        return CiGateResult(**sandbox_result())
+    try:
+        result = evaluate(
+            req.findings, fail_on=req.fail_on, ignore_rule_ids=req.ignore_rule_ids
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return CiGateResult(**result)
 
 
 @router.post("/exploit")
