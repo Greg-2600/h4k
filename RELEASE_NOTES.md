@@ -636,6 +636,14 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #22 — CPE auto-correlate
+
+`GET /api/cpe/correlate?service=&product=&version=&vendor=` canonicalizes
+a fingerprinted banner into a CPE 2.3 string (vendor inference for the
+famous products, product fallback otherwise — never invented) and reuses
+the banner-aware matcher, so the CVE list is identical to a scan
+correlation for the same banner. Recon CPE card + palette command.
+
 ## Backlog #20 — TLS cert inventory
 
 `POST /api/tls/inventory` probes `host[:port]` targets and reports

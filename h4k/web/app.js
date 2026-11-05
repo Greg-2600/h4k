@@ -815,6 +815,19 @@ async function runTlsInventory() {
   } catch (e) { $('tls-inv-body').textContent = `tls inventory failed: ${e.message}`; }
 }
 
+async function runCpeCorrelate() {
+  const service = $('cpe-service').value.trim();
+  const product = $('cpe-product').value.trim();
+  if (!service && !product) { log('cpe needs a service or product', 'warn'); return; }
+  try {
+    const q = `service=${encodeURIComponent(service)}&product=${encodeURIComponent(product)}&version=${encodeURIComponent($('cpe-version').value.trim())}`;
+    const res = await api(`/api/cpe/correlate?${q}`);
+    const names = (res.matches || []).map((m) => m.id).slice(0, 8).join(', ');
+    $('cpe-body').innerHTML = `<div data-testid="cpe-result"><span class="mono">${esc(res.cpe || '')}</span><br />${esc(`${res.match_count || 0} match(es)${names ? `: ${names}` : ''}`)}</div>`;
+    log(`cpe: ${res.cpe}`, 'info');
+  } catch (e) { $('cpe-body').textContent = `cpe failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1363,6 +1376,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'cpe') { setTab('recon'); runCpeCorrelate(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
@@ -1538,6 +1552,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-cpe').addEventListener('click', runCpeCorrelate);
   $('btn-tls-run').addEventListener('click', runTlsFingerprint);
   $('btn-tls-inv').addEventListener('click', runTlsInventory);
   $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
