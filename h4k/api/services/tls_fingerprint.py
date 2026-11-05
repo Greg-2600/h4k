@@ -59,16 +59,18 @@ def probe_host(host: str, port: int, timeout: float = 10.0) -> dict[str, Any]:
     ctx.verify_mode = ssl.CERT_NONE
     result: dict[str, Any] = {"host": host, "port": port}
     try:
-        with socket.create_connection((host, port), timeout=timeout) as sock:
-            with ctx.wrap_socket(sock, server_hostname=host) as tls:
-                result["version"] = tls.version() or ""
-                cipher = tls.cipher() or ("", "", 0)
-                result["cipher"] = cipher[0] or ""
-                result["cipher_bits"] = cipher[2] if len(cipher) > 2 else 0
-                der = tls.getpeercert(binary_form=True)
-                result["cert_sha256"] = hashlib.sha256(der).hexdigest() if der else ""
-                result["cert"] = _cert_summary(tls.getpeercert())
-                result["ok"] = True
+        with (
+            socket.create_connection((host, port), timeout=timeout) as sock,
+            ctx.wrap_socket(sock, server_hostname=host) as tls,
+        ):
+            result["version"] = tls.version() or ""
+            cipher = tls.cipher() or ("", "", 0)
+            result["cipher"] = cipher[0] or ""
+            result["cipher_bits"] = cipher[2] if len(cipher) > 2 else 0
+            der = tls.getpeercert(binary_form=True)
+            result["cert_sha256"] = hashlib.sha256(der).hexdigest() if der else ""
+            result["cert"] = _cert_summary(tls.getpeercert())
+            result["ok"] = True
     except (OSError, ssl.SSLError, ValueError) as exc:
         logger.debug("tls probe failed for %s:%s: %s", host, port, exc)
         result.update({"ok": False, "error": str(exc)[:200]})
