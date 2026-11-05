@@ -284,6 +284,61 @@ def credential_hygiene(engagement_id: str) -> dict[str, Any]:
     return hygiene_report(store, engagement_id)
 
 
+@router.post("/{engagement_id}/vulns/override")
+def override_vuln(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Re-score one finding with a CVSS vector + rationale (audit-trailed).
+
+    v3.1 vectors are scored exactly; v4.0 vectors are validated and need
+    an asserted score. The vuln row itself is never edited.
+    """
+    from services.cvss import score_vector, severity_for
+    from services.engagement import ScopeError
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    host = str((body or {}).get("host") or "").strip()
+    name = str((body or {}).get("name") or "").strip()
+    vector = str((body or {}).get("vector") or "").strip()
+    if not host or not name or not vector:
+        raise HTTPException(status_code=400, detail="host, name and vector required")
+    try:
+        scored = score_vector(vector, (body or {}).get("asserted_score"))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        return store.record_override(
+            engagement_id,
+            host,
+            name,
+            new_severity=severity_for(float(scored["score"])),
+            vector=vector,
+            score=float(scored["score"]),
+            rationale=str((body or {}).get("rationale") or ""),
+            actor=str((body or {}).get("actor") or "operator"),
+        )
+    except ScopeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/{engagement_id}/vulns/overrides")
+def list_overrides(engagement_id: str) -> dict[str, Any]:
+    """Every recorded re-score with its audit trail."""
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return {"overrides": store.list_overrides(engagement_id)}
+
+
+@router.get("/{engagement_id}/vulns/effective")
+def effective_vulns(engagement_id: str) -> dict[str, Any]:
+    """Findings with overrides applied (audit fields attached)."""
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return {"vulns": store.effective_vulns(engagement_id)}
+
+
 @router.get("/{engagement_id}/graph")
 def engagement_graph(engagement_id: str) -> dict[str, Any]:
     return get_store().graph(engagement_id)

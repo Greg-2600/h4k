@@ -261,6 +261,7 @@ sandbox stand-ins required where network/tooling is involved.
 22. **CPE auto-correlate** — banner → CPE → CVE matcher.
 23. **KEV/EPSS enrichment** — CISA KEV flag + EPSS score on vulns.
 24. **CVSS v4 re-score** — override with audit trail.
+  (done: `services/cvss.py` exact v3.1 scoring (published vectors) + v4.0 validated-not-computed (operator-asserted score, documented) + `vuln_overrides` table; override/overrides/effective endpoints; Recon CVSS card; unit + e2e `test_cvss*`.)
 25. **False-positive tuner** — suppress with reason + expiry.
 26. **BloodHound ingest** — SharpHound JSON → graph overlay.
 27. **Privesc suggester** — lin/winPEAS-style checklist, read-only.

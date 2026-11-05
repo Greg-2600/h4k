@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #24 — CVSS v4 re-score with audit trail
+
+`POST /api/engagement/{id}/vulns/override` re-scores one finding with a
+CVSS vector and rationale, recording old→new, actor and timestamp in a
+`vuln_overrides` table — the vuln row itself is never edited, and
+`GET .../vulns/effective` shows findings with overrides applied.
+CVSS v3.1 vectors score exactly per the FIRST spec (Heartbleed 7.5,
+EternalBlue 8.1, Log4Shell 10.0 all reproduce); v4.0 vectors are
+validated but take an operator-asserted score — the macro-vector tables
+are not reproduced from memory. Scope-enforced, like everything else.
+
 ## Backlog #20 — TLS cert inventory
 
 `POST /api/tls/inventory` probes `host[:port]` targets and reports

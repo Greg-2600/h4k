@@ -92,6 +92,21 @@ CREATE TABLE IF NOT EXISTS vulns (
     first_seen    TEXT NOT NULL,
     PRIMARY KEY (engagement_id, host, name)
 );
+-- Severity overrides with audit trail: who rescored what, from what to
+-- what, with which vector, and why. The vulns row itself is never edited.
+CREATE TABLE IF NOT EXISTS vuln_overrides (
+    engagement_id TEXT NOT NULL,
+    host          TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    old_severity  TEXT NOT NULL DEFAULT '',
+    new_severity  TEXT NOT NULL,
+    vector        TEXT NOT NULL DEFAULT '',
+    score         REAL,
+    rationale     TEXT NOT NULL DEFAULT '',
+    actor         TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL,
+    PRIMARY KEY (engagement_id, host, name)
+);
 -- Attempt ledger. Deliberately NOT the credentials table: a failed login is
 -- not a credential, and recording it as one would put a bogus credential edge
 -- in the graph and inflate the credential count.
@@ -490,6 +505,84 @@ class EngagementStore:
             ),
         )
         return int(is_new)
+
+    def record_override(
+        self,
+        engagement_id: str,
+        host: str,
+        name: str,
+        new_severity: str,
+        vector: str = "",
+        score: float | None = None,
+        rationale: str = "",
+        actor: str = "",
+    ) -> dict[str, Any]:
+        """Record a severity override with audit trail (scope-enforced)."""
+        self._require_scope(engagement_id, host)
+        current = self._scalar(
+            "SELECT severity FROM vulns WHERE engagement_id=? AND host=? AND name=?",
+            (engagement_id, host, name),
+        )
+        old = str(current or "unknown")
+        self._write(
+            "INSERT INTO vuln_overrides (engagement_id, host, name, old_severity,"
+            " new_severity, vector, score, rationale, actor, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(engagement_id, host, name) DO UPDATE SET"
+            " old_severity=excluded.old_severity, new_severity=excluded.new_severity,"
+            " vector=excluded.vector, score=excluded.score,"
+            " rationale=excluded.rationale, actor=excluded.actor,"
+            " created_at=excluded.created_at",
+            (
+                engagement_id,
+                host,
+                name,
+                old,
+                new_severity,
+                vector,
+                score,
+                rationale,
+                actor,
+                _now(),
+            ),
+        )
+        return {
+            "host": host,
+            "name": name,
+            "old_severity": old,
+            "new_severity": new_severity,
+            "vector": vector,
+            "score": score,
+            "rationale": rationale,
+            "actor": actor,
+        }
+
+    def list_overrides(self, engagement_id: str) -> list[dict[str, Any]]:
+        rows = self._query(
+            "SELECT * FROM vuln_overrides WHERE engagement_id=?"
+            " ORDER BY created_at DESC, rowid DESC",
+            (engagement_id,),
+        )
+        return [dict(r) for r in rows]
+
+    def effective_vulns(self, engagement_id: str) -> list[dict[str, Any]]:
+        """Vulns with overrides applied (audit fields attached)."""
+        by_key = {(v["host"], v["name"]): dict(v) for v in self.vulns(engagement_id)}
+        for o in self.list_overrides(engagement_id):
+            key = (o["host"], o["name"])
+            if key in by_key:
+                by_key[key]["severity"] = o["new_severity"]
+                by_key[key]["override"] = {
+                    "old_severity": o["old_severity"],
+                    "vector": o["vector"],
+                    "score": o["score"],
+                    "rationale": o["rationale"],
+                    "actor": o["actor"],
+                    "created_at": o["created_at"],
+                }
+        return sorted(
+            by_key.values(), key=lambda v: (v.get("host") or "", v.get("name") or "")
+        )
 
     def _touch(self, engagement_id: str) -> None:
         self._write(

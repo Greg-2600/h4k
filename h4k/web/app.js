@@ -815,6 +815,21 @@ async function runTlsInventory() {
   } catch (e) { $('tls-inv-body').textContent = `tls inventory failed: ${e.message}`; }
 }
 
+async function runCvssRescore() {
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  const body = {
+    host: $('cvss-host').value.trim(), name: $('cvss-name').value.trim(),
+    vector: $('cvss-vector').value.trim(), rationale: $('cvss-why').value.trim(),
+  };
+  if (!body.host || !body.name || !body.vector) { log('cvss needs host, name and vector', 'warn'); return; }
+  try {
+    const res = await apiOrThrow(`/api/engagement/${engId}/vulns/override`, { method: 'POST', body });
+    $('cvss-body').innerHTML = `<div data-testid="cvss-result">${esc(res.old_severity)} → <b>${esc(res.new_severity)}</b> (${esc(String(res.score ?? ''))})<br /><span class="muted">${esc(res.vector)} — ${esc(res.rationale || 'no rationale')}</span></div>`;
+    log(`rescored ${res.name}: ${res.old_severity} → ${res.new_severity}`, 'success');
+  } catch (e) { $('cvss-body').textContent = `re-score failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1363,6 +1378,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'cvss') { setTab('recon'); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
@@ -1538,6 +1554,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-cvss').addEventListener('click', runCvssRescore);
   $('btn-tls-run').addEventListener('click', runTlsFingerprint);
   $('btn-tls-inv').addEventListener('click', runTlsInventory);
   $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
