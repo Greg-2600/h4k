@@ -1131,6 +1131,29 @@ async function auditKubelet() {
   }
 }
 
+async function scanTaint() {
+  const bundle = $('taint-bundle').value.trim();
+  if (!bundle) { log('taint scan needs a pasted bundle', 'warn'); return; }
+  const host = $('taint-host').value.trim() || '127.0.0.1';
+  $('taint-body').textContent = 'scanning taint (offline)…';
+  $('taint-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/source/taint/scan', {
+      method: 'POST',
+      body: { bundle, host, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => `${f.rule_id || 'finding'} (${f.severity || '?'})`).slice(0, 8).join(', ');
+    const state = res.clean ? 'clean' : `${res.finding_count || 0} finding(s)`;
+    $('taint-body').innerHTML = `<div data-testid="taint-findings">${esc(`${state} across ${res.parsed || 0} file(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${(res.skipped || []).length ? ` · ${res.skipped.length} unsupported` : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('taint-status').textContent = state;
+    log(`taint scan done: ${state}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('taint-body').textContent = `taint scan failed: ${e.message}`;
+    log(`taint scan failed: ${e.message}`, 'error');
+  }
+}
+
 async function auditRbac() {
   const documents = [$('rbac-docs').value.trim()].filter(Boolean);
   if (!documents.length) { log('RBAC audit needs pasted YAML', 'warn'); return; }
@@ -1672,6 +1695,7 @@ function runCmd(cmd) {
   else if (cmd === 'rateprobe') setTab('exploit');
   else if (cmd === 'sandiff') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
+  else if (cmd === 'taintsast') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'sarifx') setTab('score');
@@ -1861,6 +1885,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);
+  $('btn-taint-scan').addEventListener('click', scanTaint);
   $('btn-rbac-audit').addEventListener('click', auditRbac);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }

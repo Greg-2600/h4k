@@ -945,6 +945,33 @@ class ContainerFuzzResult(BaseModel):
     status: str = ""
 
 
+# ---- Taint rules pack ----
+class TaintScanRequest(BaseModel):
+    """Taint audit request (offline; pasted sources or explicit file list).
+
+    `bundle` holds sources as `=== path ===` blocks; `files` is the
+    equivalent structured form. `host` labels the engagement ledger.
+    """
+
+    bundle: str = ""
+    files: list[dict[str, str]] = Field(default_factory=list)
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class TaintScanResult(BaseModel):
+    pack: str = "taint-pack"
+    files: int = 0
+    parsed: int = 0
+    skipped: list[str] = []
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    clean: bool = True
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Fuzz sharding ----
 class ShardFuzzRequest(BaseModel):
     """LAB-ONLY: N workers over disjoint mutation slices, one merged registry."""

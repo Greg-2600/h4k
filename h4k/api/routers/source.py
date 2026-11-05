@@ -26,6 +26,8 @@ from schemas import (
     SourceFinding,
     SourceScanRequest,
     SourceScanResult,
+    TaintScanRequest,
+    TaintScanResult,
     TriageRequest,
     TriageResult,
 )
@@ -179,6 +181,54 @@ def sarif_import(req: SarifImportRequest) -> SarifImportResult:
         skipped=result.get("skipped", 0),
         errors=result.get("errors", []),
         tool=result.get("tool", ""),
+    )
+
+
+@router.post("/taint/scan", response_model=TaintScanResult)
+def taint_scan(req: TaintScanRequest) -> TaintScanResult:
+    """Run the taint rules pack over pasted sources (offline).
+
+    `bundle` (=== path === blocks) or `files` — both stay server-side
+    for this call only. `engagement_id` ledgers findings as vulns on
+    the labeled host (scope-enforced). Sandbox returns canned findings.
+    """
+    from services import sandbox as sandbox_mode
+    from services.taint_pack import parse_bundle, sandbox_result, scan_files, to_ledger
+
+    files = list(req.files or [])
+    if req.bundle and req.bundle.strip():
+        files.extend(parse_bundle(req.bundle))
+    if not files:
+        raise HTTPException(status_code=400, detail="bundle or files required")
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = scan_files(files)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, "taint-pack", result.get("findings") or []):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return TaintScanResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
     )
 
 
