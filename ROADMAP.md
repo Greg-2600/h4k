@@ -294,6 +294,7 @@ sandbox stand-ins required where network/tooling is involved.
 49. **Header/cookie session fuzz** — auth-bypass leads.
 50. **JWT tester** — crack + alg-confusion, lab-only.
 51. **Corpus sync** — shared corpus dir across runs.
+  (done: `services/corpus.py` content-addressed store under `<data_dir>/corpus` (dedup, 1 MiB/entry, 500-entry cap with oldest-evict, sha validation, per-item-error batch import); `GET|POST /api/corpus`, `POST /api/corpus/import`, `GET|DELETE /api/corpus/{sha}` (400 bad data/sha, 404 missing); Fuzz-lab Share-seed row + Corpus list + palette; unit + e2e `test_corpus*`.)
 52. **AFL++ persistent runner** — harness + stats.
 53. **Sanitizer diff** — ASan vs UBSan vs MSan compare.
 54. **Crash bisection** — input halve to minimal trigger.

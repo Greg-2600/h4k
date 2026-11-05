@@ -521,6 +521,29 @@ async function launchPassAttack(host, port, service) {
   } catch (e) { log(`password attack failed: ${e.message}`, 'error'); }
 }
 
+async function corpusAdd() {
+  const raw = $('corpus-text').value;
+  if (!raw.trim()) { log('corpus needs seed bytes', 'warn'); return; }
+  const body = { name: $('corpus-name').value.trim() || 'seed', source: 'ui' };
+  if (raw.startsWith('base64:')) body.data_b64 = raw.slice(7).trim();
+  else body.data = raw;
+  try {
+    const res = await api('/api/corpus', { method: 'POST', body });
+    log(`corpus: ${res.deduped ? 'already shared' : 'shared'} ${res.sha.slice(0, 12)}`, 'success');
+    await corpusList();
+  } catch (e) { log(`corpus add failed: ${e.message}`, 'error'); }
+}
+
+async function corpusList() {
+  try {
+    const res = await api('/api/corpus');
+    $('corpus-output').hidden = false;
+    $('corpus-output').textContent = `${res.count || 0} seed(s), ${res.bytes || 0} bytes\n`
+      + (res.entries || []).slice(0, 20).map((e) => `${e.sha.slice(0, 12)} ${e.size}B ${e.name || ''} [${(e.tags || []).join(',')}]`).join('\n').slice(0, 4000);
+    $('corpus-status').textContent = `${res.count || 0} seed(s)`;
+  } catch (e) { log(`corpus list failed: ${e.message}`, 'error'); }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -1502,6 +1525,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'corpus') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1701,6 +1725,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-corpus-add').addEventListener('click', corpusAdd);
+  $('btn-corpus-list').addEventListener('click', corpusList);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());

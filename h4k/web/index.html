@@ -293,6 +293,14 @@
               <button class="btn" id="btn-fz-stop" hidden>Stop</button>
             </div>
             <div class="output" id="fz-output" hidden></div>
+            <div class="row">
+              <input type="text" id="corpus-name" data-testid="corpus-name" value="seed" title="Seed name (content-addressed by hash)" />
+              <input type="text" id="corpus-text" data-testid="corpus-text" class="grow" placeholder="Seed bytes as text (or base64:…)" title="Prefix with base64: for raw bytes" />
+              <button class="btn" id="btn-corpus-add" data-testid="btn-corpus-add">Share seed</button>
+              <button class="btn" id="btn-corpus-list" data-testid="btn-corpus-list">Corpus</button>
+              <span class="muted" id="corpus-status" data-testid="corpus-status"></span>
+            </div>
+            <div class="output" id="corpus-output" data-testid="corpus-output" hidden></div>
           </div>
         </div>
       </section>
@@ -526,6 +534,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="corpus"><span>Exploit: shared fuzz corpus</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
