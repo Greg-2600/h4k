@@ -128,6 +128,7 @@ Engagement (persistent memory + cred propagation, engagement router):
 - `GET /api/engagement/{id}/assets|credentials|graph`, `GET .../graph/canvas` (deterministic x/y layout for the interactive SVG canvas + PNG export)
 - `GET /api/engagement/{id}/propagate/plan` (dry run, spray policy: `max_per_user` + `jitter_max`), `POST /api/engagement/{id}/propagate` (opt-in, lockout ledgered as `locked`)
 - `GET /api/engagement/{id}/hygiene` (read-only reuse/weak/default summary + score)
+- `GET /api/engagement/{id}/timeline` (scan→creds→sessions→objectives chronology, kinds filter)
 - `POST|GET /api/engagement/{id}/crown-jewels`, `DELETE .../crown-jewels/{id}`
 - `GET /api/engagement/{id}/attack-paths` (scored paths to crown jewels)
 - `GET /api/engagement/{id}/attck` (technique mapping + detection guidance)
@@ -182,6 +183,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `timeline.py` | chronological engagement feed (scans/creds/sessions/objectives/flags/watch, scope-filtered, read-only) |
 | `kerberos.py` | AS-REP + Kerberoast via impacket (explicit roast, optional John crack, sandbox canned hashes) |
 | `nse_suggest.py` | curated service → NSE script map (suggest offline, run explicit) |
 | `hygiene.py` | read-only credential hygiene: reuse/weak/default summary + score over verified creds |

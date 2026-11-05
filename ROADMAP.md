@@ -245,6 +245,7 @@ sandbox stand-ins required where network/tooling is involved.
 11. **Session post-exploit recon pack** — sysinfo/getuid/loot timeline.
 12. **Loot vault with redaction** — creds/keys/flags, masked export.
 13. **Engagement timeline view** — scan→creds→sessions→paths chronology.
+  (done: `services/timeline.py` merges scans/creds/sessions/objectives/flags/watch, scope-filtered, kinds filter; `GET /api/engagement/{id}/timeline`; Score Timeline card; unit + e2e `test_timeline*`.)
 14. **PDF client report** — one-click assessment PDF.
 15. **Engagement compare/diff** — vulns/paths across runs.
 16. **JARM/JA3 TLS fingerprints** — C2/malware leads from handshakes.

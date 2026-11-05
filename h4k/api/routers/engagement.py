@@ -238,6 +238,25 @@ def list_credentials(engagement_id: str) -> dict[str, Any]:
     }
 
 
+@router.get("/{engagement_id}/timeline")
+def engagement_timeline(engagement_id: str, kinds: str = "") -> dict[str, Any]:
+    """Chronological engagement feed: scan → creds → sessions → objectives.
+
+    `kinds` optionally filters (comma-separated subset of
+    scan,credential,session,objective,flag,watch). Read-only.
+    """
+    from services.timeline import timeline as build_timeline
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    try:
+        wanted = [k.strip() for k in (kinds or "").split(",") if k.strip()]
+        return build_timeline(store, engagement_id, kinds=wanted or None)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/{engagement_id}/hygiene")
 def credential_hygiene(engagement_id: str) -> dict[str, Any]:
     """Reuse/weak/default summary of verified credentials (read-only)."""

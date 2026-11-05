@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #13 — engagement timeline view
+
+`GET /api/engagement/{id}/timeline` merges every engagement store into one
+chronological feed — scans/fingerprints, verified credential logins,
+sessions opened, crown jewels declared (the objectives behind attack
+paths), flags captured and Lab Watch passes — hosts filtered to the
+engagement scope, with a `kinds` filter. Score Timeline card renders it.
+Attack-path computations stay on-demand (not history); their objectives
+are the timeline's `objective` events.
+
 ## Backlog #10 — lockout-aware spray
 
 Propagation replays now run under a spray policy: at most N attempts per

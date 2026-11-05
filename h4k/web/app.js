@@ -1227,6 +1227,19 @@ function exportCanvasPng() {
   } catch (e) { log(`PNG export failed: ${e.message}`, 'error'); }
 }
 
+async function loadTimeline() {
+  const engId = await currentEngagementId();
+  if (!engId) { $('timeline-body').textContent = 'set an active scope first'; return; }
+  try {
+    const res = await api(`/api/engagement/${engId}/timeline`);
+    const items = res.events || [];
+    $('timeline-body').innerHTML = items.length
+      ? items.map((e) => `<div data-testid="timeline-event"><span class="muted">${esc(e.at || '—')}</span> <b>${esc(e.kind)}</b> — ${esc(e.detail)}</div>`).join('')
+      : 'no events yet — scan, verify a cred, open a session';
+    log(`timeline: ${items.length} event(s)`, 'success');
+  } catch (e) { $('timeline-body').textContent = `timeline failed: ${e.message}`; }
+}
+
 async function renderReportPreview() {
   try {
     const res = await api('/api/session/report?fmt=md');
@@ -1488,6 +1501,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // score
   $('btn-flag-add').addEventListener('click', addFlag);
+  $('btn-timeline').addEventListener('click', loadTimeline);
   $('btn-flag-detect').addEventListener('click', detectFlags);
   $('btn-add-crown').addEventListener('click', addCrownJewel);
   $('btn-attack-paths').addEventListener('click', loadAttackPaths);
