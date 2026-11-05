@@ -635,3 +635,13 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `|| true` (meant for `pip check`) swallowed whole-layer install failures;
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
+
+## Backlog #1 — interactive attack-graph canvas
+
+`GET /api/engagement/{id}/graph/canvas` (`services/graph_canvas.py`) lays out
+the store's asset graph deterministically (hosts on a circle, service
+`host:port` endpoints on a ring around their parent, verified
+credential/pivot labels on a top row) so the Score tab can render a stable
+SVG without a physics engine. The canvas supports drag-pan, wheel-zoom,
+click-for-details and one-click PNG export; same input graph always yields
+identical coordinates, keeping e2e stable. Read-only like `graph` itself.

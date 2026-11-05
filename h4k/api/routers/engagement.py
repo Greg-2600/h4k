@@ -243,6 +243,21 @@ def engagement_graph(engagement_id: str) -> dict[str, Any]:
     return get_store().graph(engagement_id)
 
 
+@router.get("/{engagement_id}/graph/canvas")
+def engagement_graph_canvas(engagement_id: str) -> dict[str, Any]:
+    """Canvas-ready layout of the asset graph (feature 1: interactive canvas).
+
+    Same topology as ``graph`` plus deterministic x/y per node so the UI
+    can render pan/zoom SVG without a physics engine. Read-only.
+    """
+    from services.graph_canvas import layout_graph
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return layout_graph(store.graph(engagement_id))
+
+
 @router.post("/{engagement_id}/crown-jewels")
 def add_crown_jewel(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]:
     """Declare a crown jewel / objective for this engagement."""
