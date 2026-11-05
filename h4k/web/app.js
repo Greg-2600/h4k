@@ -538,6 +538,32 @@ async function sanitizerDiff() {
   }
 }
 
+async function startRateProbe() {
+  const btn = $('btn-rate-start');
+  if (btn) btn.disabled = true;
+  const url = $('rate-url').value.trim();
+  if (!url) { log('rate probe needs a URL', 'warn'); if (btn) btn.disabled = false; return; }
+  $('rate-output').hidden = false;
+  $('rate-output').textContent = 'probing rate limits (politely)…';
+  $('rate-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/rate_fuzz', {
+      method: 'POST',
+      body: { url, requests: parseInt($('rate-n').value, 10) || 50, engagement_id: engId || null },
+    });
+    const waits = (res.honored_waits || []).length;
+    const state = res.clean ? 'throttled, behaved' : `${res.finding_count || 0} finding(s)`;
+    $('rate-output').textContent = `${res.requests || 0} requests · ${res.throttled || 0} throttled · yielded ${waits}x${res.note ? ` · ${res.note}` : ''}${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}\n`
+      + (res.timeline || []).slice(-8).map((t) => `#${t.n} ${t.status ?? '?'} ${t.action || ''}`).join('\n').slice(0, 2000);
+    $('rate-status').textContent = state;
+    log(`rate probe done: ${state}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('rate-output').textContent = `rate probe failed: ${e.message}`;
+    log(`rate probe failed: ${e.message}`, 'error');
+  } finally { if (btn) btn.disabled = false; }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -1555,6 +1581,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'rateprobe') setTab('exploit');
   else if (cmd === 'sandiff') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
@@ -1756,6 +1783,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-rate-start').addEventListener('click', startRateProbe);
   $('btn-sandiff').addEventListener('click', sanitizerDiff);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);

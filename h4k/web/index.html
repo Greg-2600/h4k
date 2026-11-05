@@ -302,6 +302,13 @@
             </div>
             <div class="output" id="fz-output" hidden></div>
             <div class="row">
+              <input type="text" id="rate-url" data-testid="rate-url" class="grow" value="http://127.0.0.1:3138/api/health" title="Endpoint you own to characterize" />
+              <input type="text" id="rate-n" data-testid="rate-n" value="50" title="Requests (1-200)" />
+              <button class="btn" id="btn-rate-start" data-testid="btn-rate-start">Rate probe</button>
+              <span class="muted" id="rate-status" data-testid="rate-status"></span>
+            </div>
+            <div class="output" id="rate-output" data-testid="rate-output" hidden></div>
+            <div class="row">
               <button class="btn" id="btn-sandiff" data-testid="btn-sandiff">Sanitizer diff</button>
               <span class="muted" id="sandiff-status" data-testid="sandiff-status"></span>
             </div>
@@ -541,6 +548,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="rateprobe"><span>Exploit: probe rate limits politely</span></div>
         <div class="cmd-item" data-cmd="sandiff"><span>Exploit: compare sanitizers on a report</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>

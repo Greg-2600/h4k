@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #57 — rate-limit-aware fuzz
+
+`POST /api/rate_fuzz` characterizes one endpoint's throttling with
+bounded polite GETs: every 429 / `Retry-After` (seconds or HTTP-date,
+capped) is honored with exponential backoff plus jitter, decaying on
+clean responses, and each decision lands in a timeline. Zero
+throttles across the run is a MEDIUM finding (no interaction-frequency
+control — brute-forceable, CWE-799, ledgered when an engagement is
+set); honored throttles are INFO documentation, never vulns. Fuzz-lab
+row + palette; sandbox fully canned.
+
 ## Backlog #53 — sanitizer diff
 
 `POST /api/source/sanitizer/diff` classifies one pasted report with

@@ -921,3 +921,34 @@ class ContainerFuzzRequest(BaseModel):
 class ContainerFuzzResult(BaseModel):
     job_id: str = ""
     status: str = ""
+
+
+# ---- Rate-limit-aware fuzz ----
+class RateFuzzRequest(BaseModel):
+    """LAB-ONLY: characterize one endpoint's throttling, politely.
+
+    Bounded plain GETs with a cache-busting nonce; every 429 /
+    Retry-After is honored with backoff + jitter and logged. Only the
+    operator's `url` is ever requested.
+    """
+
+    url: str
+    requests: int = Field(default=50, ge=1, le=200)
+    timeout: float = Field(default=8.0, gt=0, le=30.0)
+    max_backoff: float = Field(default=30.0, gt=0, le=120.0)
+    engagement_id: str | None = None
+
+
+class RateFuzzResult(BaseModel):
+    url: str = ""
+    requests: int = 0
+    throttled: int = 0
+    honored_waits: list[float] = []
+    timeline: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    clean: bool = True
+    note: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
