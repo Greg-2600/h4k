@@ -127,7 +127,7 @@ Host recon/scan:
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
-- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `POST /nikto`, `POST /ssrf/probe` (metadata SSRF pack + ledger), `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /jwt/test` (JWT audit + alg-confusion + ledger), `POST /kubelet/audit` (read-only kubelet exposure audit + ledger), `POST /rbac/audit` (offline K8s RBAC audit + ledger), `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `GET /api/intel/formats` + `POST /api/intel/import` (BYO Shodan/Censys JSON, no keys), `POST /nikto`, `POST /ssrf/probe` (metadata SSRF pack + ledger), `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /jwt/test` (JWT audit + alg-confusion + ledger), `POST /kubelet/audit` (read-only kubelet exposure audit + ledger), `POST /rbac/audit` (offline K8s RBAC audit + ledger), `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /kerberos/asrep`, `POST /kerberos/kerberoast` (explicit roast, optional John crack)
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
   apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb;
@@ -230,6 +230,7 @@ Health/diagnostic:
 | `privesc_suggest.py` | read-only linPEAS-style checklist (10 checks, pass/fail + fix hints, sandbox canned) |
 | `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |
+| `intel_import.py` | BYO Shodan/Censys JSON normalize → scope-checked asset/vuln ledger (no keys) |
 | `ipv6_discovery.py` | IPv6 NDP table + explicit-CIDR nmap -6 sweep, scope-enforced asset ledger, sandbox canned |
 | `zeroconf_map.py` | mDNS/SSDP sweep normalization + scope-enforced asset ledger, sandbox canned |
 | `tls_fingerprint.py` | active TLS handshake inventory (version/cipher/cert) + exact-match watchlist + heuristic C2 leads, sandbox stand-in |
