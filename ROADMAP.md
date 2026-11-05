@@ -297,6 +297,7 @@ sandbox stand-ins required where network/tooling is involved.
 51. **Corpus sync** — shared corpus dir across runs.
 52. **AFL++ persistent runner** — harness + stats.
 53. **Sanitizer diff** — ASan vs UBSan vs MSan compare.
+  (done: `services/sanitizer_diff.py` offline pasted-report classify (incl. MSan uninit flagship) + per-family would-detect matrix from a stated coverage table + blind spots + one confirming rebuild (flags/env/replay); `POST /api/source/sanitizer/diff` (400 empty) sandbox canned; Fuzz-lab row + palette; unit + e2e `test_sanitizer_diff*`.)
 54. **Crash bisection** — input halve to minimal trigger.
 55. **PCAP → seed replay** — deterministic fuzz seeds.
 56. **Stateful fuzz** — login → authed-flow fuzz.
