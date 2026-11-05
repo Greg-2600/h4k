@@ -115,7 +115,7 @@ Host recon/scan:
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
-- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /snmp/sweep` (community + MIB walk, read-only), `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /kerberos/asrep`, `POST /kerberos/kerberoast` (explicit roast, optional John crack)
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
   apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
@@ -184,6 +184,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `snmp_sweep.py` | read-only SNMP community sweep + MIB walk (one GET per community, scope-enforced vuln ledger, sandbox canned) |
 | `pdf_report.py` | one-click assessment PDF: reportlab render of the session report (passwords masked) |
 | `loot_vault.py` | masked loot vault: verified creds + flags + shares, redaction + masked md/json export |
 | `kerberos.py` | AS-REP + Kerberoast via impacket (explicit roast, optional John crack, sandbox canned hashes) |

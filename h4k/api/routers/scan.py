@@ -48,6 +48,8 @@ from schemas import (
     PaginatedJobs,
     Report,
     ScanRequest,
+    SnmpSweepRequest,
+    SnmpSweepResult,
     SqlmapRequest,
     SqlmapResult,
     TsharkRequest,
@@ -3235,6 +3237,62 @@ def lateral_movement(req: LateralRequest) -> dict[str, Any]:
     from services.lateral import LateralMovement
 
     return LateralMovement().discover_network(req.cidr)
+
+
+@router.post("/snmp/sweep", response_model=SnmpSweepResult)
+def snmp_sweep_api(req: SnmpSweepRequest) -> SnmpSweepResult:
+    """SNMP community sweep + optional MIB walk (read-only, opt-in).
+
+    Tries each community once with a sysDescr GET — no wordlists. Accepted
+    communities are ledgered as vuln leads when `engagement_id` is given
+    (scope-enforced, out-of-scope hosts skipped).
+    """
+    from services import sandbox as sandbox_mode
+    from services.snmp_sweep import sandbox_sweep, sweep
+
+    if sandbox_mode.enabled():
+        result = sandbox_sweep(req.target)
+    else:
+        result = sweep(
+            req.target,
+            communities=req.communities,
+            walk=req.walk,
+            timeout=req.timeout,
+        )
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for hit in result.get("working", []):
+            try:
+                ingested += store.record_vuln(
+                    req.engagement_id,
+                    req.target,
+                    {
+                        "name": f"SNMP community '{hit.get('community')}' accepted",
+                        "severity": "medium",
+                        "cwe": "CWE-798",
+                        "module": "snmpwalk",
+                        "reference": hit.get("sys_descr", ""),
+                    },
+                )
+            except ScopeError:
+                skipped.append(req.target)
+    return SnmpSweepResult(
+        **{
+            **result,
+            "target": req.target,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
 
 
 @router.post("/db_interrogate")

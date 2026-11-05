@@ -762,6 +762,25 @@ async function krbRoast(kind) {
   } catch (e) { $('krb-body').textContent = `${kind} failed: ${e.message}`; }
 }
 
+async function runSnmpSweep() {
+  const target = $('snmp-target').value.trim() || $('target').value.trim();
+  if (!target) { log('snmp needs a target', 'warn'); return; }
+  const comms = $('snmp-comms').value.split(',').map((s) => s.trim()).filter(Boolean);
+  $('snmp-body').textContent = 'sweeping communities…';
+  $('snmp-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/snmp/sweep', {
+      method: 'POST',
+      body: { target, communities: comms.length ? comms : null, walk: $('snmp-walk').checked, engagement_id: engId || null },
+    });
+    const names = (res.working || []).map((w) => `${w.community} (${w.sys_descr || 'no descr'})`).join(', ');
+    $('snmp-body').innerHTML = `<div data-testid="snmp-working">${esc(`${res.working_count || 0}/${res.tried || 0} accepted${res.ingested ? ` · ${res.ingested} in ledger` : ''}: ${names || 'none'}`)}</div>`;
+    $('snmp-status').textContent = `${res.working_count || 0} accepted`;
+    log(`snmp sweep: ${res.working_count || 0} accepted`, 'success');
+  } catch (e) { $('snmp-body').textContent = `snmp failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1309,6 +1328,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'snmp') { setTab('recon'); runSnmpSweep(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
@@ -1482,6 +1502,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-snmp-run').addEventListener('click', runSnmpSweep);
   $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
   $('btn-krb-roast').addEventListener('click', () => krbRoast('kerberoast'));
   $('btn-nse-suggest').addEventListener('click', runNseSuggest);

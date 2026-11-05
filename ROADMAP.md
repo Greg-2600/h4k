@@ -251,6 +251,7 @@ sandbox stand-ins required where network/tooling is involved.
 15. **Engagement compare/diff** — vulns/paths across runs.
 16. **JARM/JA3 TLS fingerprints** — C2/malware leads from handshakes.
 17. **SNMP community sweep** — community + MIB walk, opt-in.
+  (done: `services/snmp_sweep.py` — one sysDescr GET per community (no wordlists, no SETs), optional system-MIB walk, accepted communities ledgered as vuln leads; `POST /api/snmp/sweep` sandbox canned; Recon SNMP card + palette; unit + e2e `test_snmp*`.)
 18. **IPv6 discovery** — NDP/arp6 + nmap -6, scope-checked.
 19. **mDNS/SSDP persistent map** — sweeps persist as assets.
 20. **TLS cert inventory** — expiry/weak-cipher/self-signed leads.

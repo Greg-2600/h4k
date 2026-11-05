@@ -491,6 +491,30 @@ class NmapNSEResult(BaseModel):
     tool: dict[str, Any] = {}
 
 
+class SnmpSweepRequest(BaseModel):
+    """SNMP community sweep (read-only GETs only, opt-in)."""
+
+    target: str
+    communities: list[str] | None = None  # defaults to public/private
+    walk: bool = False  # walk the system MIB with the first hit
+    timeout: int = Field(default=10, ge=1, le=60)
+    engagement_id: str | None = None  # ledger accepted communities as vulns
+
+
+class SnmpSweepResult(BaseModel):
+    target: str = ""
+    tried: int = 0
+    working: list[dict[str, Any]] = []
+    working_count: int = 0
+    walked: list[dict[str, Any]] = []
+    walked_count: int = 0
+    attempts: list[dict[str, Any]] = []
+    tools_ok: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+    sandbox: bool = False
+
+
 class KerberosRoastRequest(BaseModel):
     """AS-REP / Kerberos roast request (explicit, opt-in)."""
 

@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #17 — SNMP community sweep
+
+`POST /api/snmp/sweep` tries each operator-supplied community once with a
+sysDescr GET (default public/private — a short list, never a wordlist)
+and optionally walks the system MIB with the first hit. Read-only:
+no SETs, ever. Accepted communities ledger as medium vuln leads
+(scope-enforced). Sandbox returns a canned public hit. Recon SNMP card +
+palette command.
+
 ## Backlog #14 — PDF client report
 
 `GET /api/session/report?fmt=pdf` downloads the assessment as a real PDF
