@@ -636,6 +636,20 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #47 — GraphQL introspection + fuzz
+
+`POST /api/graphql/fuzz` runs a four-probe pack against one explicit
+endpoint: compact `__schema` introspection (parsed to root fields and
+type fields; a working answer is itself a schema-disclosure finding),
+a schema-built depth probe (answered-without-complaint is HIGH;
+depth/complexity errors mean protected; untestable without a schema),
+a batch probe (a full N-query batch answered is MEDIUM), and field
+fuzz (garbage args, oversized strings, malformed bodies — stack
+traces or SQL fragments in `errors` are HIGH). Only the operator's URL
+is ever requested. With `engagement_id` the findings ledger as vulns
+on the URL host (scope-enforced; CWE-200/400/209). Web card GraphQL
+row + palette; sandbox fully canned.
+
 ## Backlog #42 — cloud metadata SSRF pack
 
 `POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,

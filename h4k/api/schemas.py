@@ -652,6 +652,29 @@ class NucleiResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- GraphQL introspection + fuzz ----
+class GraphqlProbeRequest(BaseModel):
+    """GraphQL pack request (opt-in, explicit lab target)."""
+
+    url: str
+    depth: int = Field(default=25, ge=2, le=100)
+    batch: int = Field(default=10, ge=2, le=50)
+    engagement_id: str | None = None
+
+
+class GraphqlProbeResult(BaseModel):
+    url: str = ""
+    gql_schema: dict[str, Any] = {}
+    probes: list[dict[str, Any]] = []
+    probe_count: int = 0
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    clean: bool = True
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Cloud metadata SSRF pack ----
 class SsrfProbeRequest(BaseModel):
     """SSRF metadata probe request (opt-in, explicit lab target)."""
