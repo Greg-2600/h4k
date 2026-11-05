@@ -564,6 +564,40 @@ async function startRateProbe() {
   } finally { if (btn) btn.disabled = false; }
 }
 
+async function importCoverage() {
+  const raw = $('cov-export').value.trim();
+  if (!raw) {
+    // No paste: just refresh the badge from the stored import.
+    try {
+      const cur = await api('/api/coverage');
+      if (cur.badge) $('cov-badge').textContent = cur.badge.label || 'no coverage yet';
+      if (cur.imported) {
+        $('cov-output').hidden = false;
+        $('cov-output').textContent = `${cur.file_count || 0} file(s) · ${cur.badge.label || ''}${cur.heuristic ? ' (heuristic HTML parse)' : ''}`;
+      }
+    } catch (e) { log(`coverage refresh failed: ${e.message}`, 'error'); }
+    return;
+  }
+  $('cov-output').hidden = false;
+  $('cov-output').textContent = 'importing coverage (offline)…';
+  try {
+    const res = await api('/api/coverage/import', {
+      method: 'POST',
+      body: { export: raw, format: $('cov-format').value },
+    });
+    $('cov-badge').textContent = (res.badge && res.badge.label) || 'imported';
+    const files = (res.files || []).slice(0, 8).map((f) => {
+      const pct = f.summary && f.summary.lines ? f.summary.lines.pct : (f.cells || []).find((c) => c.includes('%')) || '?';
+      return `${f.filename}: ${pct}%`;
+    }).join('\n');
+    $('cov-output').textContent = `${res.file_count || 0} file(s) · badge: ${$('cov-badge').textContent}${res.heuristic ? ' (heuristic HTML parse)' : ''}${files ? `\n${files}` : ''}`;
+    log('coverage imported', 'success');
+  } catch (e) {
+    $('cov-output').textContent = `coverage import failed: ${e.message}`;
+    log(`coverage import failed: ${e.message}`, 'error');
+  }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -1581,6 +1615,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'covbadge') setTab('exploit');
   else if (cmd === 'rateprobe') setTab('exploit');
   else if (cmd === 'sandiff') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
@@ -1783,6 +1818,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-cov-import').addEventListener('click', importCoverage);
   $('btn-rate-start').addEventListener('click', startRateProbe);
   $('btn-sandiff').addEventListener('click', sanitizerDiff);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });

@@ -113,6 +113,7 @@ Host recon/scan:
 - `POST /vulnleads`
 - `GET /api/kev/check` + `POST /api/kev/enrich` (bundled snapshot) + `POST /api/kev/refresh` (opt-in live)
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
+- `GET /api/coverage`, `POST /api/coverage/import` (llvm-cov badge)
 - `POST /api/rate_fuzz` (polite throttle probe + ledger)
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
 
@@ -179,6 +180,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
+| `coverage_import.py` | llvm-cov JSON (exact) / HTML (heuristic) import + badge |
 | `ratefuzz.py` | polite 429/Retry-After backoff probe + throttle characterization |
 | `sanitizer_diff.py` | pasted-report ASan/UBSan/MSan coverage compare + one confirming rebuild |
 | `jwt_tester.py` | offline JWT audit + capped HMAC crack + live alg-confusion vs marker, ledgered, sandbox canned |

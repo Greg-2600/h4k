@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #60 — coverage HTML import
+
+`POST /api/coverage/import` ingests a pasted LLVM coverage export:
+`llvm-cov export` JSON is parsed exactly (per-file line/region/
+function/branch summaries + run totals); an HTML index is parsed
+best-effort with a stdlib table reader and stamped `heuristic: true`
+because table layouts drift across LLVM versions. The latest import
+persists under the data dir and `GET /api/coverage` serves it with a
+badge (line/region % + grade). Fuzz lab Import row + live badge +
+palette; sandbox fully canned.
+
 ## Backlog #57 — rate-limit-aware fuzz
 
 `POST /api/rate_fuzz` characterizes one endpoint's throttling with

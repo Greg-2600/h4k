@@ -27,6 +27,8 @@ from schemas import (
     ContainerEscapeResult,
     ContainerFuzzRequest,
     ContainerFuzzResult,
+    CoverageImportRequest,
+    CoverageImportResult,
     DBInterrogateRequest,
     DeepAttackRequest,
     FireTVRequest,
@@ -3593,6 +3595,43 @@ def run_rate_fuzz(req: RateFuzzRequest) -> RateFuzzResult:
             "skipped_out_of_scope": skipped,
         }
     )
+
+
+@router.post("/coverage/import", response_model=CoverageImportResult)
+def coverage_import(req: CoverageImportRequest) -> CoverageImportResult:
+    """Import a pasted llvm-cov export; JSON is exact, HTML best-effort.
+
+    The latest import persists under the data dir and is served back
+    with a badge by `GET /api/coverage`. Sandbox returns canned data.
+    """
+    from services import sandbox as sandbox_mode
+    from services.coverage_import import parse_export, sandbox_result, store_import
+
+    if not (req.export or "").strip():
+        raise HTTPException(
+            status_code=400, detail="export required (paste llvm-cov output)"
+        )
+    try:
+        parsed = parse_export(req.export, req.format)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if sandbox_mode.enabled():
+        return CoverageImportResult(**sandbox_result())
+    return CoverageImportResult(**store_import(parsed, source="paste"))
+
+
+@router.get("/coverage")
+def coverage_get() -> dict[str, Any]:
+    """Latest stored import with badge, or an empty (never imported) state."""
+    from services import sandbox as sandbox_mode
+    from services.coverage_import import load_import, sandbox_result
+
+    if sandbox_mode.enabled():
+        return sandbox_result()
+    stored = load_import()
+    if stored is None:
+        return {"imported": False, "badge": {"label": "no coverage yet"}}
+    return {"imported": True, **stored}
 
 
 @router.get("/nuclei/templates")

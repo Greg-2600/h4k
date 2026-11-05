@@ -306,6 +306,7 @@ sandbox stand-ins required where network/tooling is involved.
 58. **Authenticated fuzz profiles** — cookie/header presets.
 59. **Fuzz sharding** — N workers, merged registry.
 60. **Coverage HTML import** — llvm-cov badge in UI.
+  (done: `services/coverage_import.py` llvm-cov JSON exact parse + HTML best-effort table parse (labeled heuristic) + persistent latest import with line/region badge + grade; `GET /api/coverage`, `POST /api/coverage/import` (400 empty/bad) sandbox canned; Fuzz-lab Import row + badge + palette; unit + e2e `test_coverage_import*`.)
 61. **SARIF import/export** — Semgrep interchange.
 62. **Taint rules pack** — source→sink Python/JS/PHP.
 63. **Secret baseline + allowlist** — noise reduction.

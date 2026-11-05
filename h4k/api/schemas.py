@@ -923,6 +923,26 @@ class ContainerFuzzResult(BaseModel):
     status: str = ""
 
 
+# ---- Coverage import ----
+class CoverageImportRequest(BaseModel):
+    """Import a pasted llvm-cov export (JSON exact, HTML best-effort)."""
+
+    export: str = ""
+    format: str = "auto"  # auto | json | html
+
+
+class CoverageImportResult(BaseModel):
+    imported_at: float = 0.0
+    source: str = "paste"
+    format: str = ""
+    heuristic: bool = False
+    file_count: int = 0
+    totals: dict[str, Any] = {}
+    files: list[dict[str, Any]] = []
+    badge: dict[str, Any] = {}
+    sandbox: bool = False
+
+
 # ---- Rate-limit-aware fuzz ----
 class RateFuzzRequest(BaseModel):
     """LAB-ONLY: characterize one endpoint's throttling, politely.
