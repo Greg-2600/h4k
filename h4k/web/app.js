@@ -707,6 +707,31 @@ function renderToolResult(elId, res, label) {
   log(`${label} done: ${tool.status || (res.success ? 'ok' : 'failed')}`, 'info');
 }
 
+async function runNseSuggest() {
+  const service = $('nse-service').value.trim();
+  if (!service) { log('nse needs a service name', 'warn'); return; }
+  try {
+    const res = await api(`/api/nse/suggest?service=${encodeURIComponent(service)}&product=${encodeURIComponent($('nse-product').value.trim())}`);
+    state.nseScripts = res.script_arg || '';
+    $('nse-body').innerHTML = (res.scripts || []).map((s) => `<div data-testid="nse-suggestion"><b>${esc(s.script)}</b> [${esc(s.category)}] — ${esc(s.reason)}</div>`).join('') || 'no suggestions';
+    $('btn-nse-run').hidden = !(res.scripts || []).length;
+    log(`nse: ${res.count || 0} suggestion(s) for ${res.service}`, 'info');
+  } catch (e) { $('nse-body').textContent = `nse suggest failed: ${e.message}`; }
+}
+
+async function runNse() {
+  const target = $('nse-target').value.trim() || $('target').value.trim();
+  if (!target) { log('nse needs a target', 'warn'); return; }
+  if (!state.nseScripts) { log('suggest scripts first', 'warn'); return; }
+  $('nse-body').textContent = 'nse running…';
+  try {
+    const res = await api('/api/nmap/nse', { method: 'POST', body: { target, scripts: state.nseScripts } });
+    const tool = res.tool || {};
+    $('nse-body').innerHTML = `<div data-testid="nse-result" class="output">${esc((tool.stdout || tool.stderr || JSON.stringify(res)).slice(0, 4000))}</div>`;
+    log(`nse done: ${tool.status || res.target}`, 'info');
+  } catch (e) { $('nse-body').textContent = `nse failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1383,6 +1408,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-nse-suggest').addEventListener('click', runNseSuggest);
+  $('btn-nse-run').addEventListener('click', runNse);
   $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);

@@ -119,6 +119,19 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>NSE scripts</h2><span class="spacer"></span><span class="muted">suggest, then run · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="nse-target" data-testid="nse-target" class="grow" placeholder="192.168.1.13" />
+              <input type="text" id="nse-service" data-testid="nse-service" placeholder="service: ssh" />
+              <input type="text" id="nse-product" data-testid="nse-product" placeholder="product (optional)" />
+              <button class="btn" id="btn-nse-suggest" data-testid="btn-nse-suggest">Suggest</button>
+              <button class="btn danger" id="btn-nse-run" data-testid="btn-nse-run" hidden>Run</button>
+            </div>
+            <div id="nse-body" data-testid="nse-body" class="muted">Pick scripts for a fingerprinted service first — nothing runs until you press Run.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Web assessment</h2><span class="spacer"></span><span class="muted">nikto + gobuster + nuclei · opt-in</span></div>
           <div class="card-body">
             <div class="row">
