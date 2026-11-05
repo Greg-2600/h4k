@@ -284,6 +284,7 @@ sandbox stand-ins required where network/tooling is involved.
 40. **Helm chart SAST** — templating + secret checks.
 41. **Terraform/IaC scan** — Checkov-style offline misconfigs.
 42. **Cloud metadata SSRF pack** — 169.254 probes, opt-in.
+  (done: `services/ssrf_pack.py` 10-payload pack (AWS/GCP/Azure + decimal/octal/hex bypasses) with baseline + marker-differential verdicts, urllib-only; `POST /api/ssrf/probe` (400 bad target, 404 unknown engagement) sandbox canned; Web card SSRF row + palette; unit (incl. live safe/vulnerable stub servers) + e2e `test_ssrf_pack*`.)
 43. **IAM key hygiene** — age/rotation, read-only.
 44. **S3 policy linter** — public/ACL offline eval.
 45. **WebSocket fuzz** — frame mutation + replay.

@@ -905,6 +905,29 @@ async function runGobuster() {
   }
 }
 
+async function runSsrfProbe() {
+  const target = $('web-target').value.trim();
+  if (!target) { log('SSRF probe needs a target', 'warn'); return; }
+  const param = $('ssrf-param').value.trim() || 'url';
+  $('web-body').textContent = 'SSRF probing metadata pack…';
+  $('ssrf-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/ssrf/probe', {
+      method: 'POST',
+      body: { target, param, engagement_id: engId || null },
+    });
+    const names = (res.probes || []).filter((p) => p.verdict === 'VULNERABLE').map((p) => `${p.name}`).join(', ');
+    const state = res.at_risk ? `${res.vulnerable_count || 0} VULNERABLE` : 'no metadata leak';
+    $('web-body').innerHTML = `<div data-testid="ssrf-probes">${esc(`${state} across ${res.probe_count || 0} payload(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('ssrf-status').textContent = state;
+    log(`SSRF probe done: ${state}`, res.at_risk ? 'warn' : 'success');
+  } catch (e) {
+    $('web-body').textContent = `SSRF probe failed: ${e.message}`;
+    log(`SSRF probe failed: ${e.message}`, 'error');
+  }
+}
+
 async function runNuclei() {
   const target = $('web-target').value.trim();
   if (!target) { log('nuclei needs a target', 'warn'); return; }
@@ -1471,6 +1494,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'ssrfprobe') { setTab('recon'); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
@@ -1662,6 +1686,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-nse-run').addEventListener('click', runNse);
   $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-nuclei').addEventListener('click', runNuclei);
+  $('btn-ssrf-probe').addEventListener('click', runSsrfProbe);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);

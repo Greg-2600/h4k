@@ -199,6 +199,12 @@
               <span class="muted" id="nuclei-status" data-testid="nuclei-status"></span>
             </div>
             <div id="web-body" data-testid="web-body" class="muted">Vulnerability scan and content discovery for one web surface you own.</div>
+            <div class="row">
+              <input type="text" id="ssrf-param" data-testid="ssrf-param" value="url" title="Query/body parameter that fetches URLs" />
+              <button class="btn" id="btn-ssrf-probe" data-testid="btn-ssrf-probe">SSRF probe</button>
+              <span class="muted" id="ssrf-status" data-testid="ssrf-status"></span>
+            </div>
+            <div class="muted">Opt-in metadata pack: AWS/GCP/Azure 169.254 payloads + encoding bypasses against the target above.</div>
           </div>
         </div>
       </section>
@@ -513,6 +519,7 @@
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="ssrfprobe"><span>Recon: SSRF metadata pack (opt-in)</span></div>
         <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>

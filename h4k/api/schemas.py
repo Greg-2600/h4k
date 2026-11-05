@@ -652,6 +652,32 @@ class NucleiResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Cloud metadata SSRF pack ----
+class SsrfProbeRequest(BaseModel):
+    """SSRF metadata probe request (opt-in, explicit lab target)."""
+
+    target: str
+    param: str = "url"
+    method: str = "GET"
+    payloads: list[str] | None = None
+    engagement_id: str | None = None
+
+
+class SsrfProbeResult(BaseModel):
+    target: str = ""
+    param: str = "url"
+    method: str = "GET"
+    baseline: dict[str, Any] = {}
+    probes: list[dict[str, Any]] = []
+    probe_count: int = 0
+    vulnerable: list[str] = []
+    vulnerable_count: int = 0
+    at_risk: bool = False
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- K8s RBAC audit ----
 class RbacAuditRequest(BaseModel):
     """K8s RBAC audit request (offline analysis of pasted manifests).
