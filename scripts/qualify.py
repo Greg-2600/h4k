@@ -348,6 +348,45 @@ def stage_engage_flow(eng_id: str, job_id: str, host_addr: str) -> bool:
     return bool(ok)
 
 
+def stage_handoff(eng_id: str) -> bool:
+    import re as _re
+
+    ok = True
+    status, layer = api(
+        "GET", f"/api/engagement/{eng_id}/handoff/navigator", timeout=60
+    )
+    techs = (layer.get("techniques") or []) if isinstance(layer, dict) else []
+    shape = (
+        status == 200
+        and isinstance(layer, dict)
+        and layer.get("domain") == "enterprise-attack"
+        and all(
+            _re.match(r"^T\d{4}(\.\d{3})?$", t.get("techniqueID", "")) for t in techs
+        )
+    )
+    ok &= check("handoff: navigator layer is valid", shape, f"{len(techs)} techniques")
+    status, bundle = api("GET", f"/api/engagement/{eng_id}/handoff/sigma", timeout=60)
+    rules = (bundle.get("rules") or []) if isinstance(bundle, dict) else []
+    yaml_text = (bundle.get("yaml") or "") if isinstance(bundle, dict) else ""
+    ok &= check(
+        "handoff: sigma bundle is consistent",
+        status == 200
+        and len(rules) == (bundle.get("count", -1) if isinstance(bundle, dict) else -1)
+        and (not rules or len(yaml_text) > 100),
+        f"{len(rules)} rules",
+    )
+    status, summary = api(
+        "GET", f"/api/engagement/{eng_id}/handoff/summary", timeout=60
+    )
+    md = (summary.get("markdown") or "") if isinstance(summary, dict) else ""
+    ok &= check(
+        "handoff: defender writeup renders",
+        status == 200 and "Blue-team handoff" in md,
+        f"{len(md)} chars",
+    )
+    return bool(ok)
+
+
 def stage_export(job_id: str) -> bool:
     status, payload = api("GET", f"/api/export/{job_id}?fmt=md", timeout=60)
     content = payload.get("content", "") if isinstance(payload, dict) else ""
@@ -377,6 +416,7 @@ def main() -> int:
     stage_engage_flow(eng_id, job_id, host_addr)
     stage_watch(eng_id, job_id)
     stage_watch_verify(eng_id)
+    stage_handoff(eng_id)
     stage_export(job_id)
     api("POST", "/api/session/scope", {"engagement_id": None}, timeout=30)
     return summary(0)

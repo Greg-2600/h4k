@@ -81,7 +81,7 @@ function setTab(tab) {
   if (tab === 'exploit') { refreshNextMove(); loadCredTargets(); }
   if (tab === 'pivot') { loadShells(); loadCredLedger(); }
   if (tab === 'persist') renderPersist();
-  if (tab === 'score') { refreshFlags(); renderReportPreview(); refreshWatch(); }
+  if (tab === 'score') { refreshFlags(); renderReportPreview(); refreshWatch(); refreshHandoff(); }
 }
 
 function badge(id, n) {
@@ -911,6 +911,31 @@ async function refreshWatch() {
   } catch { status.textContent = 'unavailable'; }
 }
 
+async function refreshHandoff() {
+  const list = $('handoff-list');
+  const status = $('handoff-status');
+  const engId = await currentEngagementId();
+  if (!engId) { list.textContent = 'Navigator layer + Sigma skeletons + defender writeup for this engagement.'; status.textContent = 'no engagement'; return; }
+  try {
+    const layer = await api(`/api/engagement/${engId}/handoff/navigator`);
+    const techs = layer.techniques || [];
+    const rules = await api(`/api/engagement/${engId}/handoff/sigma`).catch(() => ({ count: 0 }));
+    status.textContent = `${techs.length} technique(s) · ${rules.count || 0} rule(s) ready`;
+    list.innerHTML = techs.length
+      ? techs.map((t) => `<div class="watch-line"><b>${esc(t.techniqueID)}</b> ${esc(t.tactic || '')} <span class="muted">×${t.score}</span></div>`).join('')
+      : '<span class="muted">No techniques observed yet — scan and ingest findings first.</span>';
+  } catch { status.textContent = 'unavailable'; }
+}
+
+function downloadText(name, text, type) {
+  const blob = new Blob([text], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
 async function addFlag() {
   const engId = await currentEngagementId();
   if (!engId) { log('set an active scope first', 'warn'); return; }
@@ -1112,6 +1137,34 @@ document.addEventListener('DOMContentLoaded', () => {
       loadScopeSelect();
       refreshStatus(); refreshNextMove();
     } catch (e) { status.textContent = `failed: ${e.message}`; }
+  });
+  // blue-team handoff: defender exports for the active engagement
+  $('btn-handoff-layer').addEventListener('click', async () => {
+    const engId = await currentEngagementId();
+    if (!engId) { log('engage a scope first', 'error'); return; }
+    try {
+      const layer = await api(`/api/engagement/${engId}/handoff/navigator`);
+      downloadText('handoff-layer.json', JSON.stringify(layer, null, 2), 'application/json');
+      log(`navigator layer: ${(layer.techniques || []).length} technique(s)`, 'success');
+    } catch (e) { log(`layer failed: ${e.message}`, 'error'); }
+  });
+  $('btn-handoff-sigma').addEventListener('click', async () => {
+    const engId = await currentEngagementId();
+    if (!engId) { log('engage a scope first', 'error'); return; }
+    try {
+      const bundle = await api(`/api/engagement/${engId}/handoff/sigma`);
+      downloadText('handoff-sigma.yml', bundle.yaml || '', 'text/yaml');
+      log(`sigma bundle: ${bundle.count || 0} experimental rule(s) — tune before use`, 'success');
+    } catch (e) { log(`sigma failed: ${e.message}`, 'error'); }
+  });
+  $('btn-handoff-summary').addEventListener('click', async () => {
+    const engId = await currentEngagementId();
+    if (!engId) { log('engage a scope first', 'error'); return; }
+    try {
+      const res = await api(`/api/engagement/${engId}/handoff/summary`);
+      downloadText('handoff-writeup.md', res.markdown || '', 'text/markdown');
+      log('defender writeup downloaded', 'success');
+    } catch (e) { log(`writeup failed: ${e.message}`, 'error'); }
   });
   // lab watch: estate change history for the active engagement
   $('btn-watch-refresh').addEventListener('click', refreshWatch);

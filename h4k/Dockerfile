@@ -112,7 +112,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
          "opentelemetry-exporter-otlp-proto-http==1.37.0" \
          "semgrep==1.182.0" \
     && python3 -m pip install --break-system-packages --no-cache-dir \
-         pymetasploit3 fastapi uvicorn python-multipart \
+         pymetasploit3 fastapi uvicorn python-multipart pyyaml \
          python-owasp-zap-v2.4 \
          mitm6 \
          responder3 \

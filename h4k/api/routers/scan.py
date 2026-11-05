@@ -630,6 +630,7 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
 
     scope = _session_scope_info()
     watch_changes: list[dict[str, Any]] = []
+    handoff: list[dict[str, Any]] = []
     if scope.get("engagement_id"):
         with suppress(Exception):
             from services.engagement import EngagementStore
@@ -637,6 +638,15 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
             watch_changes = EngagementStore().watch_changes(
                 scope["engagement_id"], limit=10
             )
+        with suppress(Exception):
+            from services.attck import enrich_engagement
+            from services.engagement import EngagementStore as _ES2
+
+            _enr = enrich_engagement(_ES2(), scope["engagement_id"])
+            handoff = [
+                {"id": t.get("id"), "name": t.get("name"), "count": t.get("count", 0)}
+                for t in _enr.get("techniques", [])
+            ]
     report = {
         **meta,
         "scope": scope,
@@ -663,6 +673,7 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
         "exploit_attempts": attempts,
         "autopilot_runs": runs,
         "watch_changes": watch_changes,
+        "handoff_techniques": handoff,
     }
 
     scope_info: Any = report["scope"]
@@ -720,6 +731,20 @@ def session_report(fmt: str = "json") -> dict[str, Any]:
                 lines.append(f"- {ch['created_at']} [{ch['source']}] {ch['summary']}")
         else:
             lines.append("- no changes recorded yet — run a scan or wait for auto-scan")
+        lines.append("")
+        lines.append("## Blue-team handoff")
+        if handoff:
+            for t in handoff:
+                lines.append(
+                    f"- **{t['id']}** {t.get('name') or ''} (×{t.get('count', 0)})"
+                )
+            lines.append(
+                f"- Navigator layer + Sigma bundle: GET /api/engagement/{scope.get('engagement_id')}/handoff/navigator|sigma"
+            )
+        else:
+            lines.append(
+                "- no techniques observed yet — scan and ingest findings first"
+            )
         lines.append("")
         lines.append(
             "> Generated for authorized lab use — verify every target was owned before citing it."

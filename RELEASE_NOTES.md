@@ -605,3 +605,11 @@ scripts), hadolint runs on all three Dockerfiles via a pinned config
 lint. Lab Watch closed the loop (#16): change digest badge, per-engagement
 mode/retention prefs, verify-fix flow, trends view, qualify stage.
 Unit 1367 + e2e 32 green in containers.
+
+## Blue-team handoff (2026-11-04)
+
+Engagements now export defender artifacts: ATT&CK Navigator layer JSON,
+experimental Sigma bundle (one rule per observed technique, evidence-linked,
+marked tune-before-use), and a written defender summary. Score-tab card with
+Layer/Sigma/Writeup downloads; session report carries the observed technique
+list. Strictly evidence-derived — no fabricated telemetry.
