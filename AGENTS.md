@@ -102,6 +102,7 @@ Selenium suite.
 
 Host recon/scan:
 - `POST /scan` `{target, mode, do_dns_recon, do_vuln_scan, try_default_creds, open_sessions, do_attack}`
+- `POST /passattack` `{host, service, profile?, tasks?, wait?}` (parallel tune) + `POST /passattack/{id}/resume` (hydra `-R` checkpoint resume)
 - `GET /jobs` `?active=true` (job monitor: merges **all** job families), `GET /jobs/{id}`
 - `GET /report/{id}`, `POST /scan/{id}/abort`
 - `GET /export/{id}?fmt=json|md`
@@ -188,6 +189,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `hydra_tune.py` | parallel profiles + per-job dirs (wordlists + hydra.restore) for checkpoint resume |
 | `privesc_suggest.py` | read-only linPEAS-style checklist (10 checks, pass/fail + fix hints, sandbox canned) |
 | `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |

@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #30 — Hydra parallel tune + resume
+
+Passattacks ran a fixed `-t 6` and an interrupted run restarted from
+zero. `POST /api/passattack` now takes a `profile`
+(quick/standard/aggressive) with explicit `tasks` (1–64) / `wait`
+overrides, all clamped; wordlists and hydra's own restore file live in
+a per-job dir under `data/hydra/`, and
+`POST /api/passattack/{id}/resume` re-runs the same argv with `-R`.
+The Password-attacks card exposes profile/tasks plus a Resume-last
+button. Sandbox stays hermetic via the canned hydra stand-in.
+
 ## Backlog #27 — privesc suggester
 
 `POST /api/privesc/suggest` runs ten read-only checks in the linPEAS

@@ -98,14 +98,17 @@ class ToolkitRunner:
         """Return list of tools from the given list that are not available."""
         return [t for t in tools if t not in self._available_tools]
 
-    def run_tool(self, tool: str, argv: list[str], timeout: int = 300) -> dict:
+    def run_tool(
+        self, tool: str, argv: list[str], timeout: int = 300, cwd: str | None = None
+    ) -> dict:
         """Run an external tool.
 
         Returns {tool, stdout, stderr, rc, elapsed, timed_out, status}. On a
         timeout we keep whatever partial output the tool produced -- brute
         force tools stream progress continuously and may well have found
         something before the deadline, so discarding stdout on timeout can
-        hide a real result.
+        hide a real result. `cwd` pins the child's working directory (used
+        for hydra restore files, which land in the CWD).
         """
         self.progress(f"[toolkit:{tool}] {' '.join(argv[:6])}…", 0)
         started = time.time()
@@ -136,6 +139,7 @@ class ToolkitRunner:
                 text=True,
                 timeout=timeout,
                 check=False,
+                cwd=cwd,
             )
             return {
                 "tool": tool,

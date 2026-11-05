@@ -1767,6 +1767,9 @@ def pass_attack(req: dict[str, Any], background: BackgroundTasks) -> dict[str, A
         raise HTTPException(status_code=503, detail="msf unavailable")
 
     job_id = uuid.uuid4().hex[:12]
+    from services.hydra_tune import job_dir, resolve as resolve_tune
+
+    tune = resolve_tune(req.get("profile"), req.get("tasks"), req.get("wait"))
     job: dict[str, Any] = {
         "id": job_id,
         "host": host,
@@ -1777,6 +1780,9 @@ def pass_attack(req: dict[str, Any], background: BackgroundTasks) -> dict[str, A
         "message": f"starting {service} password attack on {host}...",
         "found": [],
         "attempts": 0,
+        "tune": tune,
+        "form": req.get("form") if service == "http-form" else None,
+        "job_dir": str(job_dir(job_id)),
         "log": [],
         "error": None,
         "created": datetime.now(UTC).isoformat(),
@@ -1791,8 +1797,10 @@ def pass_attack(req: dict[str, Any], background: BackgroundTasks) -> dict[str, A
         req.get("users"),
         req.get("passwords"),
         req.get("form") if service == "http-form" else None,
+        tune,
+        False,
     )
-    return {"job_id": job_id, "status": "running"}
+    return {"job_id": job_id, "status": "running", "tune": tune}
 
 
 def _run_pass_attack(
@@ -1803,6 +1811,8 @@ def _run_pass_attack(
     users: list[str] | None = None,
     passwords: list[str] | None = None,
     form: dict[str, Any] | None = None,
+    tune: dict[str, Any] | None = None,
+    resume: bool = False,
 ) -> None:
     if job.get("status") == "queued":
         _update(job, status="running", message="password attack starting")
@@ -1817,16 +1827,27 @@ def _run_pass_attack(
     )
     cfg = PASSATTACK_SERVICES[service]
 
+    from services.hydra_tune import (
+        fragment as tune_fragment,
+        job_dir as tune_job_dir,
+        resolve as resolve_tune,
+    )
+
+    tune = tune or job.get("tune") or resolve_tune()
+    job["tune"] = tune
+    workdir = tune_job_dir(job["id"])
+    job["job_dir"] = str(workdir)
+
     userlist = str(_RUNTIME_DATA / "users.txt")
     passlist = str(_RUNTIME_DATA / "passwords.txt")
     if users:
-        with open(userlist + ".run", "w", encoding="utf-8") as fh:
+        with open(workdir / "users.txt", "w", encoding="utf-8") as fh:
             fh.write("\n".join(users))
-        userlist += ".run"
+        userlist = str(workdir / "users.txt")
     if passwords:
-        with open(passlist + ".run", "w", encoding="utf-8") as fh:
+        with open(workdir / "passwords.txt", "w", encoding="utf-8") as fh:
             fh.write("\n".join(passwords))
-        passlist += ".run"
+        passlist = str(workdir / "passwords.txt")
 
     def _count(path: str) -> int:
         try:
@@ -1839,17 +1860,19 @@ def _run_pass_attack(
 
     # no "-o -": hydra treats that as a *file* named "-" and litters the
     # working directory. Without it, hydra prints the hits to stdout, which is
-    # what we parse below.
+    # what we parse below. The job dir keeps wordlists + hydra.restore together
+    # so an interrupted run can resume with -R instead of restarting.
     argv = [
         "hydra",
         "-L",
         userlist,
         "-P",
         passlist,
-        "-t",
-        "6",
+        *tune_fragment(tune),
         "-f",
     ]
+    if resume and (workdir / "hydra.restore").exists():
+        argv += ["-R"]
     if service == "http-form":
         form = form or {}
         path = str(form.get("path", "/index.php"))
@@ -1872,9 +1895,15 @@ def _run_pass_attack(
 
     _logline(
         f"$ hydra {' '.join(argv[6:])} ({n_users} users x {n_pass} passwords = {n_users * n_pass} attempts)"
+        f" [{tune.get('profile', 'standard')}: {tune.get('tasks', 6)} tasks]"
+        + (
+            " [resumed with -R]"
+            if resume and (workdir / "hydra.restore").exists()
+            else ""
+        )
     )
     start = _time.time()
-    result = runner.run_tool("hydra", argv, timeout=900)
+    result = runner.run_tool("hydra", argv, timeout=900, cwd=str(workdir))
     _logline(
         f"hydra rc={result['rc']} elapsed={result['elapsed']}s"
         + (" (timed out)" if result["timed_out"] else "")
@@ -2082,6 +2111,42 @@ def pass_attack_status(job_id: str) -> dict[str, Any]:
     if not job:
         raise HTTPException(status_code=404, detail="password attack job not found")
     return job
+
+
+@router.post("/passattack/{job_id}/resume")
+def pass_attack_resume(job_id: str, background: BackgroundTasks) -> dict[str, Any]:
+    """Resume an interrupted hydra run from its checkpoint (hydra -R).
+
+    Re-runs the same argv in the same job dir, where hydra's restore
+    file lives. No restore file → the run simply restarts.
+    """
+    job = _passattack_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="password attack job not found")
+    if job.get("status") == "running":
+        raise HTTPException(status_code=409, detail="job is still running")
+    from services.hydra_tune import restore_file
+
+    has_checkpoint = restore_file(job["id"]).exists()
+    job["status"] = "running"
+    job["message"] = (
+        "resuming from checkpoint"
+        if has_checkpoint
+        else "restarting (no checkpoint found)"
+    )
+    background.add_task(
+        _run_pass_attack,
+        job,
+        job["host"],
+        job["service"],
+        job["port"],
+        None,
+        None,
+        job.get("form"),
+        job.get("tune"),
+        True,
+    )
+    return {"job_id": job_id, "status": "running", "resumed": has_checkpoint}
 
 
 @router.get("/exploit-candidates")

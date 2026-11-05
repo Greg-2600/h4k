@@ -503,10 +503,14 @@ async function loadCredTargets() {
 
 async function launchPassAttack(host, port, service) {
   try {
-    const res = await api('/api/passattack', { method: 'POST', body: { host: host || undefined, port: port ? parseInt(port, 10) : undefined, service: service || undefined } });
+    const tasks = parseInt(($('pa-tasks') || {}).value || '', 10);
+    const res = await api('/api/passattack', { method: 'POST', body: { host: host || undefined, port: port ? parseInt(port, 10) : undefined, service: service || undefined, profile: ($('pa-profile') || {}).value || 'standard', tasks: Number.isFinite(tasks) ? tasks : undefined } });
     if (!jobIdOf(res)) { log(`password attack refused: ${res.detail || 'error'}`, 'error'); return; }
     log(`password attack ${jobIdOf(res)}`, 'warn');
     const jobId = jobIdOf(res);
+    state.paJob = jobId;
+    const tune = res.tune || {};
+    $('pa-tune-status').textContent = `${tune.profile || 'standard'} · ${tune.tasks || '?'} tasks`;
     if (state.paTimer) clearInterval(state.paTimer);
     state.paTimer = setInterval(async () => {
       try {
@@ -1630,6 +1634,14 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());
+  $('btn-pa-resume').addEventListener('click', async () => {
+    if (!state.paJob) { log('no attack to resume yet', 'warn'); return; }
+    try {
+      const res = await api(`/api/passattack/${state.paJob}/resume`, { method: 'POST', body: {} });
+      log(`password attack resumed (${res.resumed ? 'checkpoint' : 'restart'}): ${res.job_id}`, 'warn');
+      state.paJob = res.job_id;
+    } catch (e) { log(`resume failed: ${e.message}`, 'error'); }
+  });
 
   // pivot
   $('shell-close').addEventListener('click', () => { $('ex-console').hidden = true; state.activeSession = null; });
