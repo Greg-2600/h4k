@@ -647,6 +647,16 @@ control — brute-forceable, CWE-799, ledgered when an engagement is
 set); honored throttles are INFO documentation, never vulns. Fuzz-lab
 row + palette; sandbox fully canned.
 
+## Backlog #59 — fuzz sharding
+
+`POST /api/fuzz/shard` runs the HTTP fuzzer with N workers over
+deterministically dealt disjoint mutation slices (seeded per worker),
+each on its own thread with a `LabFuzzer` pointed at one shared
+locked crash registry — two workers tripping the same bug report one
+crash. Per-worker errors are recorded, never fatal; output is sorted
+by crash id for stable responses. Bounded (8 workers × 2000 inputs).
+Fuzz-lab row + palette; sandbox fully canned.
+
 ## Backlog #53 — sanitizer diff
 
 `POST /api/source/sanitizer/diff` classifies one pasted report with

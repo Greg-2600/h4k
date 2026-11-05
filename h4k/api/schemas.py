@@ -923,6 +923,35 @@ class ContainerFuzzResult(BaseModel):
     status: str = ""
 
 
+# ---- Fuzz sharding ----
+class ShardFuzzRequest(BaseModel):
+    """LAB-ONLY: N workers over disjoint mutation slices, one merged registry."""
+
+    target: str = ""
+    host: str | None = None
+    port: int | None = None
+    scheme: str = "http"
+    workers: int = Field(default=2, ge=1, le=8)
+    iterations: int = Field(default=50, ge=1, le=2000)
+    timeout: float = Field(default=3.0, gt=0, le=30.0)
+    seed: int | None = None
+
+
+class ShardFuzzResult(BaseModel):
+    host: str = ""
+    port: int = 0
+    scheme: str = "http"
+    workers: int = 0
+    per_worker: int = 0
+    iterations: int = 0
+    candidates: list[dict[str, Any]] = []
+    candidate_count: int = 0
+    clean: bool = True
+    worker_stats: list[dict[str, Any]] = []
+    errors: list[str] = []
+    sandbox: bool = False
+
+
 # ---- Rate-limit-aware fuzz ----
 class RateFuzzRequest(BaseModel):
     """LAB-ONLY: characterize one endpoint's throttling, politely.

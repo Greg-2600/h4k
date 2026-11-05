@@ -57,6 +57,8 @@ from schemas import (
     RbacAuditResult,
     Report,
     ScanRequest,
+    ShardFuzzRequest,
+    ShardFuzzResult,
     SqlmapRequest,
     SqlmapResult,
     SsrfProbeRequest,
@@ -3593,6 +3595,38 @@ def run_rate_fuzz(req: RateFuzzRequest) -> RateFuzzResult:
             "skipped_out_of_scope": skipped,
         }
     )
+
+
+@router.post("/fuzz/shard", response_model=ShardFuzzResult)
+def run_shard_fuzz(req: ShardFuzzRequest) -> ShardFuzzResult:
+    """LAB-ONLY: fuzz with N workers over disjoint slices, one merged registry.
+
+    Synchronous and bounded (max 8 workers × 2000 iterations each).
+    Only the operator's target is ever requested. Sandbox returns a
+    canned merged run.
+    """
+    from services import sandbox as sandbox_mode
+    from services.fuzz_shard import run_shard, sandbox_result
+
+    host = (req.host or req.target or "").strip()
+    if not host:
+        raise HTTPException(status_code=400, detail="no target")
+    port = req.port or (443 if req.scheme == "https" else 80)
+    if sandbox_mode.enabled():
+        return ShardFuzzResult(**sandbox_result(host))
+    try:
+        result = run_shard(
+            host,
+            port,
+            scheme=req.scheme,
+            workers=req.workers,
+            iterations=req.iterations,
+            seed=req.seed,
+            timeout=req.timeout,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ShardFuzzResult(**result)
 
 
 @router.get("/nuclei/templates")

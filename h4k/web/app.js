@@ -564,6 +564,34 @@ async function startRateProbe() {
   } finally { if (btn) btn.disabled = false; }
 }
 
+async function startShardFuzz() {
+  const btn = $('btn-sh-start');
+  if (btn) btn.disabled = true;
+  $('sh-output').hidden = false;
+  $('sh-output').textContent = 'sharded fuzzing…';
+  $('sh-status').textContent = '';
+  try {
+    const res = await api('/api/fuzz/shard', {
+      method: 'POST',
+      body: {
+        host: $('sh-host').value.trim() || '127.0.0.1',
+        port: parseInt($('sh-port').value, 10) || 3138,
+        workers: Math.max(1, Math.min(8, parseInt($('sh-workers').value, 10) || 2)),
+        iterations: Math.max(1, Math.min(2000, parseInt($('sh-iters').value, 10) || 40)),
+      },
+    });
+    const cands = res.candidates || [];
+    $('sh-output').textContent = `${res.workers || 0} worker(s) · ${res.iterations || 0} inputs · ${cands.length} distinct crash(es)\n`
+      + (res.worker_stats || []).map((w) => `worker ${w.worker}: ${w.iterations} inputs, ${w.candidates} candidate(s)`).join('\n').slice(0, 2000)
+      + (cands.length ? `\n${cands.slice(0, 5).map((c) => `${c.signal || '?'} via ${c.vector || '?'}`).join('\n')}` : '');
+    $('sh-status').textContent = `${cands.length} crash(es)`;
+    log(`shard fuzz done: ${cands.length} distinct crash(es)`, 'success');
+  } catch (e) {
+    $('sh-output').textContent = `shard fuzz failed: ${e.message}`;
+    log(`shard fuzz failed: ${e.message}`, 'error');
+  } finally { if (btn) btn.disabled = false; }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -1581,6 +1609,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'shardfuzz') setTab('exploit');
   else if (cmd === 'rateprobe') setTab('exploit');
   else if (cmd === 'sandiff') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
@@ -1783,6 +1812,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-sh-start').addEventListener('click', startShardFuzz);
   $('btn-rate-start').addEventListener('click', startRateProbe);
   $('btn-sandiff').addEventListener('click', sanitizerDiff);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });

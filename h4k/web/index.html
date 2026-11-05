@@ -302,6 +302,15 @@
             </div>
             <div class="output" id="fz-output" hidden></div>
             <div class="row">
+              <input type="text" id="sh-host" data-testid="sh-host" value="127.0.0.1" title="Target host you own" />
+              <input type="text" id="sh-port" data-testid="sh-port" value="3138" title="Target port" />
+              <input type="text" id="sh-workers" data-testid="sh-workers" value="2" title="Workers 1-8 (disjoint slices)" />
+              <input type="text" id="sh-iters" data-testid="sh-iters" value="40" title="Iterations per worker" />
+              <button class="btn" id="btn-sh-start" data-testid="btn-sh-start">Shard fuzz</button>
+              <span class="muted" id="sh-status" data-testid="sh-status"></span>
+            </div>
+            <div class="output" id="sh-output" data-testid="sh-output" hidden></div>
+            <div class="row">
               <input type="text" id="rate-url" data-testid="rate-url" class="grow" value="http://127.0.0.1:3138/api/health" title="Endpoint you own to characterize" />
               <input type="text" id="rate-n" data-testid="rate-n" value="50" title="Requests (1-200)" />
               <button class="btn" id="btn-rate-start" data-testid="btn-rate-start">Rate probe</button>
@@ -548,6 +557,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="shardfuzz"><span>Exploit: shard fuzzing (N workers)</span></div>
         <div class="cmd-item" data-cmd="rateprobe"><span>Exploit: probe rate limits politely</span></div>
         <div class="cmd-item" data-cmd="sandiff"><span>Exploit: compare sanitizers on a report</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
