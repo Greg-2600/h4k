@@ -150,6 +150,7 @@ Source analysis (source router):
 - `POST /source/ai`, `POST /source/ai/loop`, `GET /source/ai/models` (Ollama)
 - `POST /source/rules/test`, `GET /rules`, `POST /rules/save`, `DELETE /rules/{id}`, `POST /rules/run`
 - `POST /source/report/merge`, `POST/GET /source/report/md`
+- `POST /source/taint/scan` (offline source→sink taint pack + ledger)
 - `POST /source/sarif/export`, `POST /source/sarif/import` (SARIF interchange)
 - `POST /source/sanitizer/diff` (offline ASan/UBSan/MSan compare)
 - `POST /source/ossfuzz`
@@ -181,6 +182,7 @@ Health/diagnostic:
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
 | `semgrep.py` | real Semgrep engine + test_rule() custom-rule validate |
+| `taint_pack.py` | source→sink taint pack (Python/JS/PHP) + scope-enforced ledger |
 | `sarif_exchange.py` | h4k↔SARIF 2.1.0 interchange (lossless h4k round-trip) |
 | `fuzz_shard.py` | N-worker disjoint-slice coordinator over one locked CrashRegistry |
 | `ratefuzz.py` | polite 429/Retry-After backoff probe + throttle characterization |

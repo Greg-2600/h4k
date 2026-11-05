@@ -310,6 +310,7 @@ sandbox stand-ins required where network/tooling is involved.
 61. **SARIF import/export** — Semgrep interchange.
   (done: `services/sarif_exchange.py` h4k→SARIF 2.1.0 (level map, CWE tags, deduped rules, lossless h4k_severity round-trip) + SARIF→h4k (rule metadata, CWE tags, origin noted, per-result errors); `POST /api/source/sarif/export|import` (400 bad/empty) sandbox canned; Score card + palette + SARIF file download; unit (incl. real Semgrep-shaped fixture) + e2e `test_sarif_exchange*`.)
 62. **Taint rules pack** — source→sink Python/JS/PHP.
+  (done: `services/taint_pack.py` 15-rule data-driven pack (py/js/php sources, sinks, sanitizers) + 6-line windowed source→sink match with sanitizer clearing + one-hit-per-rule-per-file; `POST /api/source/taint/scan` (=== path === bundle or files, 400 empty, 404 unknown engagement) sandbox canned; Container card row + palette; unit (incl. window edge + sanitizer clearing) + e2e `test_taint_pack*`.)
 63. **Secret baseline + allowlist** — noise reduction.
 64. **Reachability filter** — import-graph prunes dead code.
 65. **Rule CI gate** — fail on high-severity SAST.

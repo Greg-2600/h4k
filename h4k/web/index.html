@@ -286,6 +286,13 @@
             </div>
             <textarea id="rbac-docs" data-testid="rbac-docs" rows="3" class="grow" placeholder="Paste Role/ClusterRole/Binding YAML here (offline analysis, nothing contacts a cluster)"></textarea>
             <div id="rbac-body" data-testid="rbac-body" class="muted">Flags * verbs, secret reads, escalate/bind, pod create, and over-broad bindings.</div>
+        <div class="row">
+          <input type="text" id="taint-host" data-testid="taint-host" value="127.0.0.1" title="Host label for the ledger entry (analysis is offline)" />
+          <button class="btn" id="btn-taint-scan" data-testid="btn-taint-scan">Scan taint</button>
+          <span class="muted" id="taint-status" data-testid="taint-status"></span>
+        </div>
+        <textarea id="taint-bundle" data-testid="taint-bundle" rows="3" class="grow" placeholder="Paste sources as === path.py === blocks (offline source→sink taint)"></textarea>
+        <div id="taint-body" data-testid="taint-body" class="muted">Python/JS/PHP source→sink flows: shell, SQL, XSS, LFI, SSTI, pickle.</div>
           </div>
         </div>
         <div class="card">
@@ -574,6 +581,7 @@
         <div class="cmd-item" data-cmd="rateprobe"><span>Exploit: probe rate limits politely</span></div>
         <div class="cmd-item" data-cmd="sandiff"><span>Exploit: compare sanitizers on a report</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
+        <div class="cmd-item" data-cmd="taintsast"><span>Exploit: taint-check pasted sources</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="sarifx"><span>Score: SARIF import/export</span></div>

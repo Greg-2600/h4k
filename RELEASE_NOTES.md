@@ -636,6 +636,19 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #62 — taint rules pack
+
+`POST /api/source/taint/scan` runs a 15-rule source→sink pack over
+pasted Python/JS/PHP (`=== path ===` bundles or explicit file
+lists): shell/command injection, code execution, SQLi, SSTI, unsafe
+deserialization, traversal, XSS, LFI. Matching is an honest
+intra-procedural window — the sink's argument plus five lines up must
+contain a source, and any sanitizer in that window clears the hit;
+one hit per rule per file keeps output reviewable, and every finding
+carries the matched window for instant verification. With
+`engagement_id` the findings ledger as vulns on the labeled host
+(scope-enforced). Container card row + palette; sandbox fully canned.
+
 ## Backlog #61 — SARIF import/export
 
 `POST /api/source/sarif/export` converts pasted h4k findings to
