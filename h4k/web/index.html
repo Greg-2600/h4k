@@ -264,6 +264,25 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Kerberos roast</h2><span class="spacer"></span><span class="muted">asrep + kerberoast → john · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="krb-domain" data-testid="krb-domain" class="grow" placeholder="LAB.LOCAL" />
+              <input type="text" id="krb-dc" data-testid="krb-dc" placeholder="DC ip (optional)" />
+            </div>
+            <div class="row">
+              <input type="text" id="krb-users" data-testid="krb-users" class="grow" placeholder="asrep users, comma-separated" />
+              <button class="btn" id="btn-krb-asrep" data-testid="btn-krb-asrep">AS-REP roast</button>
+            </div>
+            <div class="row">
+              <input type="text" id="krb-user" data-testid="krb-user" placeholder="user" />
+              <input type="password" id="krb-pass" data-testid="krb-pass" placeholder="password" />
+              <button class="btn" id="btn-krb-roast" data-testid="btn-krb-roast">Kerberoast</button>
+            </div>
+            <div id="krb-body" data-testid="krb-body" class="muted">Hashes stay here until you hand them to John — cracking is a separate explicit step.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Route map</h2><span class="spacer"></span><span class="muted">read-only pivot planning</span></div>
           <div class="card-body">
             <div class="row">
@@ -421,6 +440,7 @@
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
