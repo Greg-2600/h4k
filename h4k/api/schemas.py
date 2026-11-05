@@ -652,6 +652,31 @@ class NucleiResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+class RelayRequest(BaseModel):
+    """NTLM relay lab run (explicit targets, opt-in)."""
+
+    targets: list[str] = []
+    socks: bool = False  # open a SOCKS proxy on successful relay
+    dump: bool = False  # dump SAM (off = --no-dump)
+    engagement_id: str | None = None  # scope-checks targets
+    timeout: int = Field(default=600, ge=30, le=1800)
+
+
+class RelayResult(BaseModel):
+    targets: list[str] = []
+    pwned: list[str] = []
+    pwned_count: int = 0
+    authenticated: list[str] = []
+    authenticated_count: int = 0
+    stdout: str = ""
+    stderr: str = ""
+    rc: int | None = None
+    success: bool = False
+    timed_out: bool = False
+    skipped_out_of_scope: list[str] = []
+    sandbox: bool = False
+
+
 # ---- SQLMap ----
 class SqlmapRequest(BaseModel):
     """SQLMap automated SQL injection scan request."""
