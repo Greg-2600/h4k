@@ -425,10 +425,13 @@ def main() -> int:
 
 def stage_chaos() -> bool:
     """Kill msfrpcd inside the runtime container; the supervisor must bring
-    it back and record the restart. Skipped when docker is unavailable."""
+    it back and record the restart. Skipped when docker is unavailable.
+    H4K_QUALIFY_CONTAINER selects the target (defaults to h4k_h4k)."""
+    import os as _os
     import shutil
     import subprocess
 
+    target = _os.environ.get("H4K_QUALIFY_CONTAINER", "h4k_h4k")
     if not shutil.which("docker"):
         return check("chaos: msfrpcd kill recovers", False, "no docker CLI")
     try:
@@ -445,7 +448,7 @@ def stage_chaos() -> bool:
     )
     try:
         subprocess.run(
-            ["docker", "exec", "h4k_h4k", "bash", "-c", kill], timeout=60, check=False
+            ["docker", "exec", target, "bash", "-c", kill], timeout=60, check=False
         )
     except Exception as exc:
         return check("chaos: msfrpcd kill recovers", False, f"kill failed: {exc}")
