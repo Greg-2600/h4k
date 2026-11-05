@@ -269,6 +269,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/privesc_suggest.py` 10 checks (SUID/GTFOBins, caps, sudo, PATH, cron, NFS, groups, shadow, modules) with fix hints, passwordless + writeless; `POST /api/privesc/suggest` sandbox canned; Pivot Checklist button; unit + e2e `test_privesc_suggest*`.)
 28. **XSS catch lab** — token/cookie catch + replay, lab-only.
 29. **SQLmap tamper flow** — dump → ledger, explicit only.
+  (done: `services/sqlmap_flow.py` curated tampers + dump-table parser → flag leads + UNVERIFIED creds; `GET /sqlmap/tampers` + `POST /sqlmap/tamper|dump` with scope-enforced ledger; Exploit SQLMap card + palette; unit + e2e `test_sqlmap*`.)
 30. **Hydra tune + resume** — parallel profile, checkpoint resume.
 31. **ffuf/wpscan pack** — dir + plugin enum, explicit.
 32. **Impacket one-clicks** — secretsdump/GetNPUsers, explicit creds.
