@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #37 — kubelet unauth audit
+
+`POST /api/kubelet/audit` probes one kubelet you own with read-only
+HTTPS GETs only (`/healthz`, anonymous `/pods`, `/metrics`, plus a TCP
+probe for the insecure read-only port 10255) — no exec, no logs, no
+writes, stdlib only. Anonymous `/pods` is CRITICAL, open 10255 HIGH,
+exposed metrics MEDIUM. With `engagement_id` the findings ledger as
+vulns on the audited host (scope-enforced). Sandbox is fully canned.
+Container card Audit-kubelet row + palette.
+
 ## Backlog #27 — privesc suggester
 
 `POST /api/privesc/suggest` runs ten read-only checks in the linPEAS

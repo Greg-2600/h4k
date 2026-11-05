@@ -38,6 +38,8 @@ from schemas import (
     JohnResult,
     KerberosRoastRequest,
     KerberosRoastResult,
+    KubeletAuditRequest,
+    KubeletAuditResult,
     LateralRequest,
     NiktoRequest,
     NiktoResult,
@@ -3250,6 +3252,56 @@ def nuclei_scan_api(req: NucleiRequest) -> NucleiResult:
         **{
             **result,
             "target": req.target,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/kubelet/audit", response_model=KubeletAuditResult)
+def kubelet_audit_api(req: KubeletAuditRequest) -> KubeletAuditResult:
+    """Audit one kubelet for unauth exposure (read-only GETs, explicit).
+
+    `engagement_id` ledgers findings as vulns on the audited host
+    (scope-enforced). Sandbox returns canned findings without opening
+    any socket.
+    """
+    from services import sandbox as sandbox_mode
+    from services.kubelet_audit import KubeletAuditor, sandbox_result, to_ledger
+
+    try:
+        auditor = KubeletAuditor(req.host, req.port)
+        if sandbox_mode.enabled():
+            result = sandbox_result(auditor.host, auditor.port)
+        else:
+            result = auditor.audit()
+    except ValueError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from fastapi import HTTPException
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(
+            result.get("host", ""),
+            result.get("port", 10250),
+            result.get("findings") or [],
+        ):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return KubeletAuditResult(
+        **{
+            **result,
             "ingested": ingested,
             "skipped_out_of_scope": skipped,
         }

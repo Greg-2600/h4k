@@ -258,6 +258,13 @@
               <button class="btn primary" id="btn-cf-start" data-testid="btn-cf-start">Start fuzzing</button>
             </div>
             <div class="output" id="cf-output" data-testid="cf-output" hidden></div>
+            <div class="row">
+              <input type="text" id="kube-host" data-testid="kube-host" value="127.0.0.1" title="Kubelet host to audit (read-only GETs)" />
+              <input type="text" id="kube-port" data-testid="kube-port" value="10250" title="Kubelet HTTPS port" />
+              <button class="btn" id="btn-kube-audit" data-testid="btn-kube-audit">Audit kubelet</button>
+              <span class="muted" id="kube-status" data-testid="kube-status"></span>
+            </div>
+            <div id="kube-body" data-testid="kube-body" class="muted">Read-only: /healthz, /pods, /metrics + read-only-port probe. Nothing is executed.</div>
           </div>
         </div>
         <div class="card">
@@ -505,6 +512,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>
         <div class="cmd-item" data-cmd="theme"><span>Toggle theme</span></div>

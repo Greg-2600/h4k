@@ -277,6 +277,7 @@ sandbox stand-ins required where network/tooling is involved.
 35. **SOCKS-aware scan** — TCP scan via pivot.
 36. **Container image scan** — trivy image → engagement vulns.
 37. **Kubelet unauth audit** — read-only checks.
+  (done: `services/kubelet_audit.py` stdlib HTTPS GET checklist (/healthz, anonymous /pods, /metrics, 10255 read-only-port probe, no exec/writes) + scope-enforced vuln ledger; `POST /api/kubelet/audit` sandbox canned; Container card Audit-kubelet row + palette; unit (incl. canned-transport logic + unreachable) + e2e `test_kubelet_audit*`.)
 38. **Docker socket guard** — detect + policy suggestion.
 39. **K8s RBAC audit** — over-permissive roles flagged.
 40. **Helm chart SAST** — templating + secret checks.
