@@ -3051,14 +3051,63 @@ def privesc_host_audit() -> dict[str, Any]:
 
 @router.post("/nuclei", response_model=NucleiResult)
 def nuclei_scan_api(req: NucleiRequest) -> NucleiResult:
-    """Fast template-based vulnerability scan with nuclei."""
-    from services.nuclei import nuclei_scan
+    """Fast template-based vulnerability scan with nuclei (opt-in).
 
-    return NucleiResult(
-        **nuclei_scan(
-            req.target, templates=req.templates, severity=req.severity, **req.options
+    `offline=True` runs only the bundled templates. `engagement_id` records
+    findings as vulns in that engagement (scope-enforced ledger).
+    """
+    from services import sandbox as sandbox_mode
+    from services.nuclei import nuclei_scan, sandbox_result, to_ledger
+
+    if sandbox_mode.enabled():
+        result = sandbox_result(req.target)
+    else:
+        result = nuclei_scan(
+            req.target,
+            templates=req.templates,
+            severity=req.severity,
+            offline=req.offline,
+            **req.options,
         )
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(req.target, result.get("findings") or []):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return NucleiResult(
+        **{
+            **result,
+            "target": req.target,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
     )
+
+
+@router.get("/nuclei/templates")
+def nuclei_templates() -> dict[str, Any]:
+    """The offline nuclei template bundle (no network fetch)."""
+    from services.nuclei import bundle_dir, bundle_templates
+
+    bdir = bundle_dir()
+    return {
+        "bundle": str(bdir) if bdir else None,
+        "templates": bundle_templates(),
+        "count": len(bundle_templates()),
+        "offline_ready": bdir is not None,
+    }
 
 
 @router.post("/sqlmap", response_model=SqlmapResult)

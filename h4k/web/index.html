@@ -119,13 +119,23 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-head"><h2>Web assessment</h2><span class="spacer"></span><span class="muted">nikto + gobuster · opt-in</span></div>
+          <div class="card-head"><h2>Web assessment</h2><span class="spacer"></span><span class="muted">nikto + gobuster + nuclei · opt-in</span></div>
           <div class="card-body">
             <div class="row">
               <input type="text" id="web-target" data-testid="web-target" class="grow" placeholder="http://192.168.1.13" />
               <input type="text" id="webgob-ext" data-testid="webgob-ext" placeholder="exts: php,html" title="Gobuster extensions (comma-separated)" />
               <button class="btn" id="btn-nikto" data-testid="btn-nikto">Nikto scan</button>
               <button class="btn" id="btn-gobuster" data-testid="btn-gobuster">Gobuster</button>
+            </div>
+            <div class="row">
+              <select id="nuclei-sev" data-testid="nuclei-sev" title="Nuclei severity filter">
+                <option value="">all severities</option>
+                <option value="critical,high" selected>critical,high</option>
+                <option value="critical,high,medium">critical,high,medium</option>
+              </select>
+              <label class="muted"><input type="checkbox" id="nuclei-offline" data-testid="nuclei-offline" checked /> offline bundle</label>
+              <button class="btn" id="btn-nuclei" data-testid="btn-nuclei">Nuclei scan</button>
+              <span class="muted" id="nuclei-status" data-testid="nuclei-status"></span>
             </div>
             <div id="web-body" data-testid="web-body" class="muted">Vulnerability scan and content discovery for one web surface you own.</div>
           </div>
@@ -394,6 +404,7 @@
         <div class="cmd-item" data-cmd="fingerprint"><span>Recon: fingerprint services</span></div>
         <div class="cmd-item" data-cmd="autopilot"><span>Exploit: start autopilot</span></div>
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
+        <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>

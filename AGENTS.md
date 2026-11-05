@@ -114,7 +114,7 @@ Host recon/scan:
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
-- `POST /nmap/nse`, `POST /nikto`, `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /nmap/nse`, `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
   apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
 - `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +
@@ -160,6 +160,7 @@ Health/diagnostic:
 | `creds.py` | default-credential archive matching |
 | `attack.py` | opt-in Metasploit exploit execution (per-module option validation) |
 | `toolkit.py` | opt-in non-Metasploit toolkit (hydra/nikto/sqlmap/...) |
+| `nuclei.py` | opt-in Nuclei CVE-template scan: offline bundle (`data/nuclei-templates`), finding→vuln ledger (`to_ledger`), sandbox stand-in |
 | `discovery.py` | ARP neighbor discovery (arp-scan / cache / msf) |
 | `security.py` | traceroute + exposure -> posture heuristic |
 | `fuzzer.py` | signal-guided HTTP mutation engine + real libFuzzer crash minimizer |

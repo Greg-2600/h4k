@@ -722,6 +722,29 @@ async function runGobuster() {
   }
 }
 
+async function runNuclei() {
+  const target = $('web-target').value.trim();
+  if (!target) { log('nuclei needs a target', 'warn'); return; }
+  const sev = $('nuclei-sev').value.trim();
+  const offline = $('nuclei-offline').checked;
+  $('web-body').textContent = 'nuclei scanning…';
+  $('nuclei-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/nuclei', {
+      method: 'POST',
+      body: { target, severity: sev || null, offline, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => ((f.info || {}).name || f.template || 'finding')).slice(0, 10).join(', ');
+    $('web-body').innerHTML = `<div data-testid="nuclei-findings">${esc(`${res.finding_count || 0} finding(s)${res.offline ? ' (offline bundle)' : ''}${res.ingested ? ` · ${res.ingested} in ledger` : ''}: ${names || 'none'}`)}</div>`;
+    $('nuclei-status').textContent = `${res.finding_count || 0} finding(s)`;
+    log(`nuclei done: ${res.finding_count || 0} finding(s)`, 'success');
+  } catch (e) {
+    $('web-body').textContent = `nuclei failed: ${e.message}`;
+    log(`nuclei failed: ${e.message}`, 'error');
+  }
+}
+
 /* ---------- pivot: Fire TV via adb ---------- */
 
 async function ftvRun(action, extra = {}) {
@@ -1176,6 +1199,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1348,6 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('btn-nikto').addEventListener('click', runNikto);
   $('btn-gobuster').addEventListener('click', runGobuster);
+  $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-cve-refresh').addEventListener('click', async () => {

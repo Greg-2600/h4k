@@ -560,11 +560,16 @@ class FireTVResult(BaseModel):
 
 # ---- Nuclei ----
 class NucleiRequest(BaseModel):
-    """Nuclei template-based vulnerability scan request."""
+    """Nuclei template-based vulnerability scan request (opt-in)."""
 
     target: str
     templates: list[str] | None = None
     severity: str | None = None
+    # offline=True runs only the bundled templates (no network fetch).
+    offline: bool = False
+    # engagement_id opts into the ledger: findings are recorded as vulns
+    # in that engagement (scope-enforced, out-of-scope hosts skipped).
+    engagement_id: str | None = None
     options: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -577,6 +582,9 @@ class NucleiResult(BaseModel):
     rc: int | None = None
     success: bool = False
     timed_out: bool = False
+    offline: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
 
 
 # ---- SQLMap ----

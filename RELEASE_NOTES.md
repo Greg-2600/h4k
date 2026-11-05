@@ -636,7 +636,23 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #2 — Nuclei offline bundle + ledger
+
+`POST /api/nuclei` (opt-in) now takes `offline` (bundled templates only, no
+network fetch) and `engagement_id` (findings recorded as vulns, scope-checked,
+out-of-scope hosts reported not stored). `GET /api/nuclei/templates` exposes
+the 3-template bundle (`h4k/data/nuclei-templates/`: log4shell, struts-rce,
+bluekeep). Sandbox mode returns a canned critical finding so the Recon card +
+palette button and e2e stay hermetic.
+
 ## Backlog #1 — interactive attack-graph canvas
+
+`POST /api/nuclei` (opt-in) now takes `offline` (bundled templates only, no
+network fetch) and `engagement_id` (findings recorded as vulns, scope-checked,
+out-of-scope hosts reported not stored). `GET /api/nuclei/templates` exposes
+the 3-template bundle (`h4k/data/nuclei-templates/`: log4shell, struts-rce,
+bluekeep). Sandbox mode returns a canned critical finding so the Recon card +
+palette button and e2e stay hermetic.
 
 `GET /api/engagement/{id}/graph/canvas` (`services/graph_canvas.py`) lays out
 the store's asset graph deterministically (hosts on a circle, service
