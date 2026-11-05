@@ -974,6 +974,15 @@ credentials: reuse (same pair on N hosts), weak (short/common heuristic,
 labeled as such), default (pair ships in `data/creds.json`), plus a 0–100
 score. Read-only — nothing is sprayed. Pivot ledger card button + findings;
 sandbox-seeded estate shows reuse on its first load.
+## Backlog #5 — scheduled re-scans + diff-alert digest
+
+Watch config gains `interval` (seconds, 0 = off, max 24 h): the auto-scan
+loop runs a recon-only pass for each due engagement and stamps the cadence
+clock; `POST /api/engagement/{id}/rescan` runs the same pass on demand.
+`GET .../watch/digest` renders recent Lab Watch changes as a markdown alert
+digest (🔴 entries with new attack surface first) for handoff/report, with
+`fmt=json` for data. Lab watch card: cadence select, Rescan now, Digest
+download.
 
 ## Backlog #2 — Nuclei offline bundle + ledger
 

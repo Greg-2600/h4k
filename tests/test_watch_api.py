@@ -117,7 +117,12 @@ def test_config_round_trip(client):
         f"/api/engagement/{eng['id']}/watch/config", json={"mode": "all", "retain": 7}
     )
     assert r.status_code == 200, r.text
-    assert r.json() == {"mode": "all", "retain": 7}
+    assert r.json() == {
+        "mode": "all",
+        "retain": 7,
+        "interval": 0,
+        "last_scheduled": None,
+    }
     r = client.post(f"/api/engagement/{eng['id']}/watch/config", json={"mode": "loud"})
     assert r.status_code == 400
     assert client.get("/api/engagement/nope/watch/config").status_code == 404
