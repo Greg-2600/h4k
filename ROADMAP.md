@@ -271,6 +271,7 @@ sandbox stand-ins required where network/tooling is involved.
 29. **SQLmap tamper flow** — dump → ledger, explicit only.
 30. **Hydra tune + resume** — parallel profile, checkpoint resume.
 31. **ffuf/wpscan pack** — dir + plugin enum, explicit.
+  (done: standalone `POST /api/ffuf` (bundled wordlist, FUZZ auto-append, match-code filter) + `POST /api/wpscan` (validated enum set, no-update batch); Web assessment row + palette; unit + e2e `test_ffuf_wpscan*`.)
 32. **Impacket one-clicks** — secretsdump/GetNPUsers, explicit creds.
 33. **NTLM relay lab** — container-only, explicit.
 34. **Chisel/sshuttle pivot** — one-click tunnel + proxied rescan.

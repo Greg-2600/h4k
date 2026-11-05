@@ -117,7 +117,7 @@ Host recon/scan:
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
-- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `POST /nikto`, `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /ffuf` (explicit dir fuzz), `POST /wpscan` (explicit plugin/theme enum), `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /kerberos/asrep`, `POST /kerberos/kerberoast` (explicit roast, optional John crack)
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
   apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
@@ -167,7 +167,7 @@ Health/diagnostic:
 | `cve_lookup.py` | offline curated CVE matcher (+ refresh) |
 | `creds.py` | default-credential archive matching |
 | `attack.py` | opt-in Metasploit exploit execution (per-module option validation) |
-| `toolkit.py` | opt-in non-Metasploit toolkit (hydra/nikto/sqlmap/...) |
+| `toolkit.py` | opt-in non-Metasploit toolkit (hydra/nikto/sqlmap/ffuf/wpscan/...) — standalone ffuf + wpscan endpoints |
 | `nuclei.py` | opt-in Nuclei CVE-template scan: offline bundle (`data/nuclei-templates`), finding→vuln ledger (`to_ledger`), sandbox stand-in |
 | `discovery.py` | ARP neighbor discovery (arp-scan / cache / msf) |
 | `security.py` | traceroute + exposure -> posture heuristic |
@@ -188,6 +188,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `toolkit.py` | opt-in non-Metasploit toolkit (hydra/nikto/sqlmap/ffuf/wpscan/...) — standalone ffuf + wpscan endpoints |
 | `privesc_suggest.py` | read-only linPEAS-style checklist (10 checks, pass/fail + fix hints, sandbox canned) |
 | `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |

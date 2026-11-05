@@ -878,6 +878,34 @@ async function listSuppressions() {
   } catch (e) { $('sup-body').textContent = `list failed: ${e.message}`; }
 }
 
+async function runFfuf() {
+  const target = $('web-target').value.trim();
+  if (!target) { log('ffuf needs a target', 'warn'); return; }
+  $('web-body').textContent = 'ffuf fuzzing…';
+  $('web-extra-status').textContent = '';
+  try {
+    const res = await api('/api/ffuf', { method: 'POST', body: { target } });
+    renderToolResult('web-body', res, 'ffuf');
+    $('web-extra-status').textContent = res.tool ? res.tool.status : '';
+  } catch (e) {
+    $('web-body').textContent = `ffuf failed: ${e.message}`;
+    log(`ffuf failed: ${e.message}`, 'error');
+  }
+}
+
+async function runWpscan() {
+  const target = $('web-target').value.trim();
+  if (!target) { log('wpscan needs a target', 'warn'); return; }
+  $('web-body').textContent = 'wpscan enumerating…';
+  try {
+    const res = await api('/api/wpscan', { method: 'POST', body: { target, enumerate: $('wpscan-enum').value } });
+    renderToolResult('web-body', res, 'wpscan');
+  } catch (e) {
+    $('web-body').textContent = `wpscan failed: ${e.message}`;
+    log(`wpscan failed: ${e.message}`, 'error');
+  }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1426,6 +1454,8 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'ffuf') { setTab('recon'); runFfuf(); }
+  else if (cmd === 'wpscan') { setTab('recon'); runWpscan(); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
@@ -1603,6 +1633,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-ffuf').addEventListener('click', runFfuf);
+  $('btn-wpscan').addEventListener('click', runWpscan);
   $('btn-suppress').addEventListener('click', runSuppress);
   $('btn-sup-list').addEventListener('click', listSuppressions);
   $('btn-kev').addEventListener('click', runKevCheck);

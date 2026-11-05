@@ -582,6 +582,34 @@ class GobusterResult(BaseModel):
     tool: dict[str, Any] = {}
 
 
+class FfufRequest(BaseModel):
+    """Standalone ffuf content fuzzing (explicit, opt-in)."""
+
+    target: str  # base URL with FUZZ keyword, else appended as path
+    wordlist: str | None = None  # defaults to the bundled common list
+    threads: int = Field(default=10, ge=1, le=200)
+    extensions: str | None = None  # e.g. ".php,.html"
+    status_codes: str | None = None  # e.g. "200,301" (match codes)
+
+
+class FfufResult(BaseModel):
+    target: str
+    tool: dict[str, Any] = {}
+
+
+class WpscanRequest(BaseModel):
+    """Standalone WPScan enumeration (explicit, opt-in)."""
+
+    target: str  # WordPress base URL
+    enumerate: str = "vp"  # vp (vuln plugins) | ap (all plugins) | vt | at | u | tt
+    max_timeout: int = Field(default=300, ge=10, le=3600)
+
+
+class WpscanResult(BaseModel):
+    target: str
+    tool: dict[str, Any] = {}
+
+
 class ContainerEscapeResult(BaseModel):
     capabilities: list[str] = []
     dangerous_caps: list[str] = []

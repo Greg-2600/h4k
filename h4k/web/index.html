@@ -180,7 +180,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-head"><h2>Web assessment</h2><span class="spacer"></span><span class="muted">nikto + gobuster + nuclei · opt-in</span></div>
+          <div class="card-head"><h2>Web assessment</h2><span class="spacer"></span><span class="muted">nikto + gobuster + nuclei + ffuf + wpscan · opt-in</span></div>
           <div class="card-body">
             <div class="row">
               <input type="text" id="web-target" data-testid="web-target" class="grow" placeholder="http://192.168.1.13" />
@@ -197,6 +197,17 @@
               <label class="muted"><input type="checkbox" id="nuclei-offline" data-testid="nuclei-offline" checked /> offline bundle</label>
               <button class="btn" id="btn-nuclei" data-testid="btn-nuclei">Nuclei scan</button>
               <span class="muted" id="nuclei-status" data-testid="nuclei-status"></span>
+            </div>
+            <div class="row">
+              <select id="wpscan-enum" data-testid="wpscan-enum" title="WPScan enumeration set">
+                <option value="vp" selected>vuln plugins</option>
+                <option value="ap">all plugins</option>
+                <option value="vt">vuln themes</option>
+                <option value="u">users</option>
+              </select>
+              <button class="btn" id="btn-ffuf" data-testid="btn-ffuf">ffuf fuzz</button>
+              <button class="btn" id="btn-wpscan" data-testid="btn-wpscan">WPScan</button>
+              <span class="muted" id="web-extra-status" data-testid="web-extra-status"></span>
             </div>
             <div id="web-body" data-testid="web-body" class="muted">Vulnerability scan and content discovery for one web surface you own.</div>
           </div>
@@ -499,6 +510,8 @@
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="ffuf"><span>Recon: ffuf content fuzzing</span></div>
+        <div class="cmd-item" data-cmd="wpscan"><span>Recon: WPScan enumeration</span></div>
         <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
         <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
