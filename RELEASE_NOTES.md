@@ -636,6 +636,19 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #41 — Terraform/IaC scan
+
+`POST /api/source/terraform/scan` analyzes pasted Terraform files
+(`=== path ===` blocks) with a brace-counting block parser — a stated
+heuristic, not full HCL — and matches resources against a misconfig
+checklist (world-open security groups with admin-port callout, public
+or unencrypted RDS, S3 without versioning/encryption/logging,
+unencrypted EBS, missing IMDSv2, `Action *` on `Resource *` IAM,
+hardcoded secret variable defaults, unpinned `terraform` versions).
+Checks carry H4K-prefixed IDs in Checkov style (our own catalog, not
+Checkov's). With `engagement_id` the findings ledger as vulns on the
+labeled host (scope-enforced). Container card Scan-IaC row + palette.
+
 ## Backlog #39 — K8s RBAC audit
 
 `POST /api/rbac/audit` analyzes pasted Role/ClusterRole/Binding YAML

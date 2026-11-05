@@ -1025,6 +1025,30 @@ async function auditRbac() {
   }
 }
 
+async function scanTerraform() {
+  const bundle = $('tf-bundle').value.trim();
+  if (!bundle) { log('IaC scan needs a pasted bundle', 'warn'); return; }
+  const stack = $('tf-stack').value.trim() || 'stack';
+  const host = $('tf-host').value.trim() || '127.0.0.1';
+  $('tf-body').textContent = 'scanning IaC (offline)…';
+  $('tf-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/source/terraform/scan', {
+      method: 'POST',
+      body: { stack, bundle, host, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => `${f.title || f.check || 'finding'} (${f.severity || '?'})`).slice(0, 8).join(', ');
+    const state = res.clean ? 'clean' : `${res.finding_count || 0} finding(s)`;
+    $('tf-body').innerHTML = `<div data-testid="tf-findings">${esc(`${stack} ${state} across ${res.resources || 0} resource(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${(res.errors || []).length ? ` · ${res.errors.length} parse note(s)` : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('tf-status').textContent = state;
+    log(`IaC scan done: ${state}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('tf-body').textContent = `IaC scan failed: ${e.message}`;
+    log(`IaC scan failed: ${e.message}`, 'error');
+  }
+}
+
 async function startContainerFuzz() {
   const btn = $('btn-cf-start');
   if (btn) btn.disabled = true;
@@ -1478,6 +1502,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'iacscan') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1665,6 +1690,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);
+  $('btn-tf-scan').addEventListener('click', scanTerraform);
   $('btn-rbac-audit').addEventListener('click', auditRbac);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }

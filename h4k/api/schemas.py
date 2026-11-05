@@ -677,6 +677,33 @@ class RbacAuditResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Terraform/IaC scan ----
+class TerraformScanRequest(BaseModel):
+    """Terraform/IaC scan request (offline bundle analysis, nothing applied).
+
+    `bundle` holds terraform files as `=== path ===` blocks. `host`
+    labels the engagement ledger entry.
+    """
+
+    stack: str = "stack"
+    bundle: str = ""
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class TerraformScanResult(BaseModel):
+    stack: str = ""
+    files: int = 0
+    resources: int = 0
+    errors: list[str] = []
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    clean: bool = True
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Kubelet audit ----
 class KubeletAuditRequest(BaseModel):
     """Kubelet unauth audit request (read-only GETs, explicit target)."""
