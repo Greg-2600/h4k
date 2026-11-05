@@ -107,7 +107,7 @@ Host recon/scan:
 - `GET /export/{id}?fmt=json|md`
 - `GET /api/session/report?fmt=json|md|pdf` (one-click assessment; PDF masks passwords)
 - `GET /neighbors` (ARP)
-- `POST /api/net/tunnel` + `GET|DELETE /api/net/tunnels[/{id}]` (loopback-only) + `POST /api/net/tunnel/scan` (proxied rescan)
+- `POST /api/net/tunnel` + `GET|DELETE /api/net/tunnels[/{id}]` (loopback-only) + `POST /api/net/tunnel/scan` (proxied rescan + fingerprint + optional `engagement_id` ledger)
 - `POST /api/net/ipv6/discover` (NDP table + explicit-CIDR nmap -6, scope-enforced asset ledger)
 - `POST /attack`, `GET /attack/{id}`
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
@@ -190,6 +190,7 @@ Health/diagnostic:
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
 | `pivot_tunnel.py` | loopback-only ssh/chisel tunnels + SOCKS5 proxied TCP scan, sandbox canned |
+| `pivot_scan.py` | SOCKS-aware fingerprint (banner+port → service/product/version) + scope-enforced engagement ledger |
 | `privesc_suggest.py` | read-only linPEAS-style checklist (10 checks, pass/fail + fix hints, sandbox canned) |
 | `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |

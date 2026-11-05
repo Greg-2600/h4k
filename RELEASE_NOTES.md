@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #35 — SOCKS-aware scan
+
+`POST /api/net/tunnel/scan` now fingerprints every open port found
+through the pivot (banner + port → service/product/version heuristics,
+no extra packets) and, when given `engagement_id`, ledgers the
+fingerprinted services into the engagement — scope-enforced, so
+out-of-scope pivot targets are reported and never stored. The Pivot
+card shows fingerprinted service names and the ledger count. Sandbox is
+fully canned.
+
 ## Backlog #34 — chisel/sshuttle pivot
 
 `POST /api/net/tunnel` starts a loopback-only SSH `-D` forward or
