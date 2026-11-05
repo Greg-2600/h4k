@@ -491,6 +491,24 @@ class NmapNSEResult(BaseModel):
     tool: dict[str, Any] = {}
 
 
+class TlsFingerprintRequest(BaseModel):
+    """Active TLS fingerprint of one host you own (opt-in)."""
+
+    target: str
+    ports: list[int] | None = None  # defaults to 443/8443/9443
+    timeout: float = Field(default=10.0, gt=0, le=60.0)
+    watchlist: list[str] | None = None  # known-bad fingerprints (exact match)
+
+
+class TlsFingerprintResult(BaseModel):
+    host: str = ""
+    ports: list[int] = []
+    probes: list[dict[str, Any]] = []
+    fingerprints: list[str] = []
+    lead_count: int = 0
+    sandbox: bool = False
+
+
 class KerberosRoastRequest(BaseModel):
     """AS-REP / Kerberos roast request (explicit, opt-in)."""
 

@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #16 — JARM/JA3 TLS fingerprints
+
+`POST /api/tls/fingerprint` handshakes TLS ports with stdlib `ssl` and
+records version/cipher/certificate per port, hashing the canonical
+inventory into a stable exact-match fingerprint. Operator watchlists hit
+high; self-signed/weak-proto/weak-cipher surface as labeled heuristic
+leads. Scope honesty, D22-style: this is a handshake inventory, not a
+raw-ClientHello JARM implementation — stdlib cannot emit the 10 crafted
+probes, so no fuzzy similarity is claimed. Sandbox returns a canned
+probe. Recon TLS card + palette command.
+
 ## Backlog #14 — PDF client report
 
 `GET /api/session/report?fmt=pdf` downloads the assessment as a real PDF

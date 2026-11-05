@@ -50,6 +50,8 @@ from schemas import (
     ScanRequest,
     SqlmapRequest,
     SqlmapResult,
+    TlsFingerprintRequest,
+    TlsFingerprintResult,
     TsharkRequest,
     TsharkResult,
     VulnLeadsRequest,
@@ -2961,6 +2963,33 @@ def nmap_nse_scan(req: NmapNSERequest) -> NmapNSEResult:
     argv.append(req.target)
     out = ToolkitRunner().run_tool("nmap_nse", argv, timeout=600)
     return NmapNSEResult(target=req.target, tool=out)
+
+
+@router.post("/tls/fingerprint", response_model=TlsFingerprintResult)
+def tls_fingerprint_api(req: TlsFingerprintRequest) -> TlsFingerprintResult:
+    """Active TLS fingerprint of one host you own (opt-in).
+
+    Handshake inventory (version/cipher/cert) + exact-match watchlist and
+    heuristic C2 leads. Sandbox returns a canned fingerprint.
+    """
+    from services import sandbox as sandbox_mode
+    from services.tls_fingerprint import sandbox_scan, scan_host
+
+    if sandbox_mode.enabled():
+        return TlsFingerprintResult(**sandbox_scan(req.target))
+    return TlsFingerprintResult(
+        host=req.target,
+        **{
+            k: v
+            for k, v in scan_host(
+                req.target,
+                ports=req.ports,
+                timeout=req.timeout,
+                watchlist=req.watchlist,
+            ).items()
+            if k != "host"
+        },
+    )
 
 
 @router.get("/nse/suggest")
