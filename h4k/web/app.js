@@ -538,6 +538,30 @@ async function sanitizerDiff() {
   }
 }
 
+async function pcapToSeeds() {
+  const raw = $('pcap-b64').value.trim();
+  if (!raw) { log('PCAP parse needs pasted base64', 'warn'); return; }
+  $('pcap-output').hidden = false;
+  $('pcap-output').textContent = 'parsing pcap (offline)…';
+  $('pcap-status').textContent = '';
+  try {
+    const body = { pcap_b64: raw.startsWith('base64:') ? raw.slice(7).trim() : raw };
+    if ($('pcap-host').value.trim() && $('pcap-port').value.trim()) {
+      body.replay_host = $('pcap-host').value.trim();
+      body.replay_port = parseInt($('pcap-port').value, 10) || 80;
+    }
+    const res = await api('/api/pcap/seeds', { method: 'POST', body });
+    $('pcap-output').textContent = `${res.packets || 0} packets → ${res.seed_count || 0} seed(s) across ${res.flow_count || 0} flow(s) (${res.skipped || 0} skipped)\n`
+      + (res.seeds || []).slice(0, 8).map((s) => `${s.flow} ${s.size}B`).join('\n').slice(0, 2000)
+      + (res.replay ? `\nreplay: ${res.replay.connected ? `sent ${res.replay.sent}, got ${res.replay.received}` : `refused (${res.replay.error || '?'})`}` : '\nreplay: skipped (parse only)');
+    $('pcap-status').textContent = `${res.seed_count || 0} seed(s)`;
+    log('pcap parsed', 'success');
+  } catch (e) {
+    $('pcap-output').textContent = `pcap failed: ${e.message}`;
+    log(`pcap failed: ${e.message}`, 'error');
+  }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -1555,6 +1579,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'pcapseeds') setTab('exploit');
   else if (cmd === 'sandiff') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
@@ -1756,6 +1781,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-pcap-seeds').addEventListener('click', pcapToSeeds);
   $('btn-sandiff').addEventListener('click', sanitizerDiff);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);

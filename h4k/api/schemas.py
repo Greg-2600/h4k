@@ -921,3 +921,29 @@ class ContainerFuzzRequest(BaseModel):
 class ContainerFuzzResult(BaseModel):
     job_id: str = ""
     status: str = ""
+
+
+# ---- PCAP → seed replay ----
+class PcapSeedsRequest(BaseModel):
+    """PCAP → deterministic fuzz seeds (offline parse + optional replay).
+
+    `pcap_b64` (or `base64:…`) is the capture. With `replay_host` +
+    `replay_port`, each flow payload is re-sent verbatim to that lab
+    target (only ever that host).
+    """
+
+    pcap_b64: str = ""
+    replay_host: str | None = None
+    replay_port: int | None = None
+    timeout: float = Field(default=8.0, gt=0, le=30.0)
+
+
+class PcapSeedsResult(BaseModel):
+    packets: int = 0
+    skipped: int = 0
+    flows: list[dict[str, Any]] = []
+    flow_count: int = 0
+    seeds: list[dict[str, Any]] = []
+    seed_count: int = 0
+    replay: dict[str, Any] | None = None
+    sandbox: bool = False
