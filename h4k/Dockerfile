@@ -1,5 +1,5 @@
 # h4k — Metasploit automation lab (school cybersecurity project)
-FROM debian:12-slim
+FROM debian:13-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 # AI triage: any OpenAI-compatible gateway; the opencode relay is keyless
@@ -34,7 +34,7 @@ hydra ncrack john sqlmap \
     ldap-utils samba-common-bin \
     bettercap aircrack-ng sshuttle \
     git \
-    openjdk-17-jre-headless \
+    default-jre-headless \
     golang-go \
     && rm -rf /var/lib/apt/lists/*
 
@@ -47,8 +47,11 @@ RUN CHISEL_VER=$(\
     && gunzip -f /tmp/chisel.gz && mv /tmp/chisel /usr/local/bin/chisel \
     && chmod +x /usr/local/bin/chisel
 
-# impacket (secretsdump, wmiexec, GetNPUsers...) — powershell/AD RPC suite
-RUN python3 -m pip install --break-system-packages --no-cache-dir impacket \
+# impacket (secretsdump, wmiexec, GetNPUsers...) — powershell/AD RPC suite.
+# --ignore-installed: trixie ships system cryptography via apt and pip
+# cannot uninstall it (no RECORD file); shadowing it in break-system-packages
+# mode is intentional here.
+RUN python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed impacket \
   && for s in secretdump secretsdump wmiexec smbexec GetNPUsers getTGT GetADUsers \
              mssqlclient smbclient; do \
        if [ -f "/usr/lib/python3/dist-packages/impacket/examples/${s}.py" ]; then \
@@ -105,7 +108,7 @@ RUN curl https://apt.metasploit.com/metasploit-framework.gpg.key \
 # `semgrep` makes pip backtrack through dozens of 70 MB releases (minutes of
 # wasted build time), and the AD tooling has its own dependency constraints.
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/* \
-    && python3 -m pip install --break-system-packages --no-cache-dir --upgrade pip \
+    && python3 -m pip install --break-system-packages --no-cache-dir --ignore-installed --upgrade pip \
     && python3 -m pip install --break-system-packages --no-cache-dir \
          "opentelemetry-api==1.37.0" \
          "opentelemetry-sdk==1.37.0" \
@@ -120,7 +123,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
          "opentelemetry-api==1.37.0" \
          "opentelemetry-sdk==1.37.0" \
          "opentelemetry-exporter-otlp-proto-http==1.37.0" \
-    && python3 -m pip check || true
+    && python3 -m pip check
 
 # Build-time gate: semgrep must actually start (otel version skew has
 # shipped a broken install before — the ImportError only shows at runtime).
