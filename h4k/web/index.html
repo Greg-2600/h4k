@@ -333,6 +333,20 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>NTLM relay lab</h2><span class="spacer"></span><span class="muted">explicit targets · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="relay-targets" data-testid="relay-targets" class="grow" placeholder="smb://10.10.10.42, comma-separated" />
+            </div>
+            <div class="row">
+              <label class="muted"><input type="checkbox" id="relay-socks" data-testid="relay-socks" /> SOCKS</label>
+              <label class="muted"><input type="checkbox" id="relay-dump" data-testid="relay-dump" /> dump SAM</label>
+              <button class="btn danger" id="btn-relay-run" data-testid="btn-relay-run">Relay</button>
+            </div>
+            <div id="relay-body" data-testid="relay-body" class="muted">Pairs with the poison lab: capture there, relay here.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Route map</h2><span class="spacer"></span><span class="muted">read-only pivot planning</span></div>
           <div class="card-body">
             <div class="row">
@@ -506,6 +520,7 @@
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
+    <div class="cmd-item" data-cmd="relay"><span>Pivot: NTLM relay lab</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>
         <div class="cmd-item" data-cmd="theme"><span>Toggle theme</span></div>
         <div class="cmd-item" data-cmd="clear"><span>Clear log</span></div>

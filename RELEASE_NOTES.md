@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #33 — NTLM relay lab
+
+`POST /api/relay/run` is the relay half to the poison lab's capture
+half: impacket's `ntlmrelayx.py` against explicit targets only (no
+discovery, no spray), with opt-in SOCKS and SAM dump (`--no-dump` by
+default). Targets outside the engagement scope are refused with a 400
+before anything runs — nothing is stored from a relay either way.
+Sandbox returns a canned authenticated session. Pivot relay card.
+
 ## Backlog #27 — privesc suggester
 
 `POST /api/privesc/suggest` runs ten read-only checks in the linPEAS

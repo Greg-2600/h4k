@@ -46,6 +46,8 @@ from schemas import (
     NucleiRequest,
     NucleiResult,
     PaginatedJobs,
+    RelayRequest,
+    RelayResult,
     Report,
     ScanRequest,
     SqlmapRequest,
@@ -3358,6 +3360,58 @@ def lateral_movement(req: LateralRequest) -> dict[str, Any]:
     from services.lateral import LateralMovement
 
     return LateralMovement().discover_network(req.cidr)
+
+
+@router.post("/relay/run", response_model=RelayResult)
+def relay_run(req: RelayRequest) -> RelayResult:
+    """NTLM relay lab: ntlmrelayx against explicit targets (opt-in).
+
+    Targets must be in the engagement scope when `engagement_id` is
+    given; out-of-scope hosts are refused before anything runs. Pair
+    with the poison lab for the capture half. Sandbox is canned.
+    """
+    from urllib.parse import urlsplit
+
+    from services import sandbox as sandbox_mode
+    from services.ntlm_relay import run_relay, sandbox_run
+
+    targets = [
+        str(t or "").strip() for t in (req.targets or []) if str(t or "").strip()
+    ]
+    if not targets:
+        raise HTTPException(status_code=400, detail="at least one target required")
+    hosts = [urlsplit(t if "://" in t else f"smb://{t}").hostname or t for t in targets]
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        kept: list[str] = []
+        for target, host in zip(targets, hosts, strict=True):
+            try:
+                ok = store.in_scope(req.engagement_id, host)
+            except ValueError:
+                ok = False
+            if ok:
+                kept.append(target)
+            else:
+                skipped.append(target)
+        targets = kept
+        if not targets:
+            raise HTTPException(
+                status_code=400,
+                detail=f"all targets out of scope: {', '.join(skipped)}",
+            )
+    if sandbox_mode.enabled():
+        return RelayResult(**sandbox_run(targets))
+    out = run_relay(targets, socks=req.socks, dump=req.dump, timeout=req.timeout)
+    return RelayResult(
+        targets=targets,
+        skipped_out_of_scope=skipped,
+        **{k: v for k, v in out.items() if k != "targets"},
+    )
 
 
 @router.post("/db_interrogate")

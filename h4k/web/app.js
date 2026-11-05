@@ -878,6 +878,23 @@ async function listSuppressions() {
   } catch (e) { $('sup-body').textContent = `list failed: ${e.message}`; }
 }
 
+async function runRelay() {
+  const engId = await currentEngagementId();
+  const raw = $('relay-targets').value.trim();
+  if (!raw) { log('relay needs explicit targets', 'warn'); return; }
+  $('relay-body').textContent = 'relaying… (explicit targets only)';
+  try {
+    const res = await api('/api/relay/run', {
+      method: 'POST',
+      body: { targets: raw.split(',').map((s) => s.trim()).filter(Boolean), socks: $('relay-socks').checked, dump: $('relay-dump').checked, engagement_id: engId || null },
+    });
+    $('relay-body').innerHTML = `<div data-testid="relay-summary">${esc(`${res.pwned_count || 0} pwned, ${res.authenticated_count || 0} authenticated`)}</div>`
+      + (res.pwned || []).slice(0, 5).map((l) => `<div data-testid="relay-pwned">⚡ ${esc(l)}</div>`).join('')
+      + ((res.skipped_out_of_scope || []).length ? `<div class="muted">skipped: ${esc(res.skipped_out_of_scope.join(', '))}</div>` : '');
+    log(`relay: ${res.pwned_count || 0} pwned`, (res.pwned_count || 0) > 0 ? 'warn' : 'success');
+  } catch (e) { $('relay-body').textContent = `relay failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1426,6 +1443,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'relay') { setTab('pivot'); }
   else if (cmd === 'suppress') { setTab('recon'); }
   else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
@@ -1603,6 +1621,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-relay-run').addEventListener('click', runRelay);
   $('btn-suppress').addEventListener('click', runSuppress);
   $('btn-sup-list').addEventListener('click', listSuppressions);
   $('btn-kev').addEventListener('click', runKevCheck);

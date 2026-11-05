@@ -273,6 +273,7 @@ sandbox stand-ins required where network/tooling is involved.
 31. **ffuf/wpscan pack** — dir + plugin enum, explicit.
 32. **Impacket one-clicks** — secretsdump/GetNPUsers, explicit creds.
 33. **NTLM relay lab** — container-only, explicit.
+  (done: `services/ntlm_relay.py` explicit-target ntlmrelayx + optional SOCKS/dump + scope-prefilter (refuses before running); `POST /api/relay/run` sandbox canned; Pivot relay card; unit + e2e `test_ntlm_relay*`/`test_relay_ui`.)
 34. **Chisel/sshuttle pivot** — one-click tunnel + proxied rescan.
 35. **SOCKS-aware scan** — TCP scan via pivot.
 36. **Container image scan** — trivy image → engagement vulns.
