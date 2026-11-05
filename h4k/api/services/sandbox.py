@@ -264,6 +264,44 @@ def seed_engagement(store: Any, name: str = "sandbox lab") -> dict[str, Any]:
     return store.get_engagement(eng["id"]) or eng
 
 
+_HYDRA_TAKES_VALUE = {"-L", "-P", "-t", "-W", "-s", "-o", "-M", "-e", "-m", "-u", "-p"}
+
+
+def _hydra_target(argv: list[str]) -> str:
+    """Best-effort target extraction: first non-flag token that is not a
+    known service name or a flag's value (robust to -R/-W/tune additions)."""
+    skip_next = False
+    for tok in argv[1:]:
+        if skip_next:
+            skip_next = False
+            continue
+        if tok in _HYDRA_TAKES_VALUE:
+            skip_next = True
+            continue
+        if tok.startswith("-") or tok in ("-f", "-R", "-F", "-q"):
+            continue
+        if tok.lower() in (
+            "ssh",
+            "ftp",
+            "telnet",
+            "mysql",
+            "http-get",
+            "http-post-form",
+            "smb",
+            "rdp",
+            "postgres",
+            "mssql",
+            "oracle",
+            "sip",
+        ):
+            continue
+        if "://" in tok or ":" in tok or "." in tok or tok.replace("_", "").isalnum():
+            if "." in tok or ":" in tok or "/" in tok:
+                return tok.split("://")[-1].split("/")[0].split(":")[0]
+            return tok
+    return ""
+
+
 def tool_result(tool: str, argv: list[str]) -> dict[str, Any] | None:
     """Canned result for a tool run, or None if we have no canned output."""
     stdout = ""
@@ -271,7 +309,7 @@ def tool_result(tool: str, argv: list[str]) -> dict[str, Any] | None:
         target = argv[-1]
         stdout = nmap_xml(target)
     elif tool == "hydra":
-        target = argv[-2] if len(argv) >= 2 else ""
+        target = _hydra_target(argv)
         stdout = hydra_output(target)
     else:
         return None

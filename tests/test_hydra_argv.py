@@ -11,9 +11,10 @@ def test_pass_attack_argv_has_no_output_file(monkeypatch):
     seen = {}
 
     class _Runner:
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, cwd=None):
             seen["tool"] = tool
             seen["argv"] = list(argv)
+            seen["cwd"] = cwd
             return {
                 "tool": "hydra",
                 "status": "ok",
@@ -47,3 +48,5 @@ def test_pass_attack_argv_has_no_output_file(monkeypatch):
     assert job["found"]
     assert job["found"][0]["user"] == "root"
     assert job["found"][0]["password"] == "toor"
+    # the run happens in an isolated job dir, not the repo checkout
+    assert seen["cwd"] and "hydra" in seen["cwd"]

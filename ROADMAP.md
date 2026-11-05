@@ -270,6 +270,7 @@ sandbox stand-ins required where network/tooling is involved.
 28. **XSS catch lab** — token/cookie catch + replay, lab-only.
 29. **SQLmap tamper flow** — dump → ledger, explicit only.
 30. **Hydra tune + resume** — parallel profile, checkpoint resume.
+  (done: `services/hydra_tune.py` profiles (quick/standard/aggressive) + clamp + per-job dirs; parallel `tasks`/`wait` on passattack, wordlists + restore file in the job dir; `POST /passattack/{id}/resume` (`-R`); profile/tasks UI + Resume-last button; unit + e2e `test_hydra_tune*`.)
 31. **ffuf/wpscan pack** — dir + plugin enum, explicit.
 32. **Impacket one-clicks** — secretsdump/GetNPUsers, explicit creds.
 33. **NTLM relay lab** — container-only, explicit.

@@ -234,6 +234,16 @@
         <div class="card">
           <div class="card-head"><h2>Password attacks</h2><span class="spacer"></span><span class="muted" id="cred-targets-count">0 targets</span><button class="btn small" id="btn-cred-targets-refresh" title="Reload targets">↻</button><button class="btn danger small" id="btn-launch-passattack">Launch</button></div>
           <div class="card-body">
+            <div class="row">
+              <select id="pa-profile" data-testid="pa-profile" title="Parallel profile">
+                <option value="standard" selected>standard · 16 tasks</option>
+                <option value="quick">quick · 4 tasks</option>
+                <option value="aggressive">aggressive · 32 tasks</option>
+              </select>
+              <input type="text" id="pa-tasks" data-testid="pa-tasks" placeholder="tasks (override)" title="Parallel tasks 1-64, empty = profile default" />
+              <button class="btn" id="btn-pa-resume" data-testid="btn-pa-resume" title="Resume the last finished/interrupted attack from its checkpoint">Resume last</button>
+              <span class="muted" id="pa-tune-status" data-testid="pa-tune-status"></span>
+            </div>
             <div class="tbl-wrap"><table class="tbl">
               <thead><tr><th>Host</th><th>Port</th><th>Service</th><th>Product</th><th></th></tr></thead>
               <tbody id="cred-targets-tbody" data-testid="cred-targets-tbody"></tbody>
