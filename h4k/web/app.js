@@ -566,6 +566,18 @@ async function loadPropagationPlan() {
   } catch (e) { log(`propagation plan failed: ${e.message}`, 'error'); }
 }
 
+async function loadHygiene() {
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  try {
+    const res = await api(`/api/engagement/${engId}/hygiene`);
+    const s = res.summary || {};
+    const rows = (res.findings || []).map((f) => `<div data-testid="hygiene-finding"><b>${esc(f.kind)}</b> ${esc(f.user)} — ${esc(f.detail)} <span class="muted">${esc((f.hosts || []).join(', '))}</span></div>`).join('');
+    $('hygiene-body').innerHTML = `<div data-testid="hygiene-summary">score ${s.score ?? '?'} · ${s.verified_credentials ?? 0} creds · reuse ${s.reuse ?? 0} · weak ${s.weak ?? 0} · default ${s.default ?? 0}</div>${rows || 'no hygiene findings'}`;
+    log(`hygiene: score ${s.score}`, 'success');
+  } catch (e) { log(`hygiene failed: ${e.message}`, 'error'); }
+}
+
 async function executePropagation() {
   const engId = await currentEngagementId();
   if (!engId) return;
@@ -1394,6 +1406,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ex-cmd').addEventListener('click', () => { const v = $('ex-cmd').value.trim(); if (v) { runSessionCmd(v); $('ex-cmd').value = ''; } });
   $('ex-cmd').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const v = e.target.value.trim(); if (v) { runSessionCmd(v); e.target.value = ''; } } });
   $('btn-propagate-plan').addEventListener('click', loadPropagationPlan);
+  $('btn-hygiene').addEventListener('click', loadHygiene);
   $('btn-propagate-run').addEventListener('click', executePropagation);
   $('btn-lateral-map').addEventListener('click', mapLateralRoutes);
   $('btn-db-run').addEventListener('click', runDbInterrogate);
