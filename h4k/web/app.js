@@ -555,13 +555,21 @@ async function loadCredLedger() {
   } catch { /* optional */ }
 }
 
+function sprayPolicy() {
+  const mu = parseInt((($('spray-max-user') || {}).value || '25'), 10) || 25;
+  const ji = parseFloat((($('spray-jitter') || {}).value || '0')) || 0;
+  return { max_per_user: mu, jitter_max: ji };
+}
+
 async function loadPropagationPlan() {
   const engId = await currentEngagementId();
   if (!engId) { log('set an active scope first', 'warn'); return; }
   try {
-    const plan = await api(`/api/engagement/${engId}/propagate/plan`);
+    const pol = sprayPolicy();
+    const plan = await api(`/api/engagement/${engId}/propagate/plan?max_per_user=${pol.max_per_user}&jitter_max=${pol.jitter_max}`);
     const pairs = plan.pairs || [];
-    $('prop-body').innerHTML = pairs.length ? pairs.map((p) => `<div>${esc(p.user)} @ ${esc(p.host)}:${esc(p.port)} (${esc(p.service)})</div>`).join('') : 'no replay pairs';
+    const held = `held: ${plan.held_locked || 0} locked, ${plan.held_capped || 0} over cap`;
+    $('prop-body').innerHTML = pairs.length ? pairs.map((p) => `<div>${esc(p.user)} @ ${esc(p.host)}:${esc(p.port)} (${esc(p.service)})</div>`).join('') + `<div class="muted">${esc(held)}</div>` : 'no replay pairs';
     $('btn-propagate-run').hidden = pairs.length === 0;
   } catch (e) { log(`propagation plan failed: ${e.message}`, 'error'); }
 }
@@ -584,7 +592,8 @@ async function executePropagation() {
   $('prop-results').hidden = false;
   $('prop-results').textContent = 'executing…';
   try {
-    const res = await api(`/api/engagement/${engId}/propagate`, { method: 'POST', body: { open_sessions: false } });
+    const pol = sprayPolicy();
+    const res = await api(`/api/engagement/${engId}/propagate`, { method: 'POST', body: { open_sessions: false, max_per_user: pol.max_per_user, jitter_max: pol.jitter_max } });
     $('prop-results').textContent = JSON.stringify(res, null, 2).slice(0, 4000);
     log(`propagation: ${(res.logins || []).length} attempt(s)`, 'success');
     loadCredLedger(); loadShells(); refreshStatus();

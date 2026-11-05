@@ -126,7 +126,7 @@ Engagement (persistent memory + cred propagation, engagement router):
 - `POST /api/engagement/parse-scope`
 - `POST /api/engagement/{id}/ingest` (raw report or `{job_id}`) → asset graph
 - `GET /api/engagement/{id}/assets|credentials|graph`, `GET .../graph/canvas` (deterministic x/y layout for the interactive SVG canvas + PNG export)
-- `GET /api/engagement/{id}/propagate/plan` (dry run), `POST /api/engagement/{id}/propagate` (opt-in)
+- `GET /api/engagement/{id}/propagate/plan` (dry run, spray policy: `max_per_user` + `jitter_max`), `POST /api/engagement/{id}/propagate` (opt-in, lockout ledgered as `locked`)
 - `GET /api/engagement/{id}/hygiene` (read-only reuse/weak/default summary + score)
 - `POST|GET /api/engagement/{id}/crown-jewels`, `DELETE .../crown-jewels/{id}`
 - `GET /api/engagement/{id}/attack-paths` (scored paths to crown jewels)
@@ -187,6 +187,7 @@ Health/diagnostic:
 | `hygiene.py` | read-only credential hygiene: reuse/weak/default summary + score over verified creds |
 | `graph_canvas.py` | deterministic canvas layout for the asset graph (hosts circle, services ring, creds top row; powers the interactive SVG + PNG export) |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |
+| `spray_guard.py` | lockout-aware spray policy: per-user cap, jitter, locked-user ledger stop |
 | `attack_paths.py` | crown jewels -> scored, evidence-backed attack paths |
 | `flag_paths.py` | foothold -> captured-flag chains (one objective per flag host) |
 | `attck.py` | MITRE ATT&CK technique mapping + defender detection guidance |

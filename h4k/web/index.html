@@ -254,11 +254,13 @@
             <div id="creds-ledger"></div>
             <div class="empty" id="creds-empty">No verified credentials yet.</div>
             <div class="row">
-              <button class="btn" id="btn-propagate-plan">Propagation plan</button>
+              <button class="btn" id="btn-propagate-plan" data-testid="btn-propagate-plan">Propagation plan</button>
               <button class="btn danger" id="btn-propagate-run" hidden>Execute</button>
+              <input type="text" id="spray-max-user" data-testid="spray-max-user" value="25" title="Max attempts per user" />
+              <input type="text" id="spray-jitter" data-testid="spray-jitter" value="0" title="Jitter seconds between attempts (0 = off)" />
               <button class="btn" id="btn-hygiene" data-testid="btn-hygiene">Hygiene report</button>
             </div>
-            <div id="prop-body" class="muted"></div>
+            <div id="prop-body" data-testid="prop-body" class="muted"></div>
             <div id="hygiene-body" data-testid="hygiene-body" class="muted"></div>
             <div class="output" id="prop-results" hidden></div>
           </div>

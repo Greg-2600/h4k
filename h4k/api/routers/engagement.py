@@ -576,7 +576,9 @@ def handoff_summary(engagement_id: str) -> dict[str, Any]:
 
 
 @router.get("/{engagement_id}/propagate/plan")
-def propagation_plan(engagement_id: str) -> dict[str, Any]:
+def propagation_plan(
+    engagement_id: str, max_per_user: int = 25, jitter_max: float = 0.0
+) -> dict[str, Any]:
     """Dry run: blast radius before authorizing anything. No network calls."""
     store = get_store()
     if not store.get_engagement(engagement_id):
@@ -584,7 +586,9 @@ def propagation_plan(engagement_id: str) -> dict[str, Any]:
     msf = _msf()
     if msf is None:
         raise HTTPException(status_code=503, detail="metasploit client unavailable")
-    return PropagationService(msf, store).plan(engagement_id)
+    return PropagationService(msf, store).plan(
+        engagement_id, max_per_user=max_per_user, jitter_max=jitter_max
+    )
 
 
 @router.post("/{engagement_id}/propagate")
@@ -598,4 +602,10 @@ def propagate(engagement_id: str, req: PropagateRequest) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail="metasploit client unavailable")
     svc = PropagationService(msf, store)
     cap = max(1, min(req.max_attempts, MAX_ATTEMPTS))
-    return svc.run(engagement_id, open_sessions=req.open_sessions, max_attempts=cap)
+    return svc.run(
+        engagement_id,
+        open_sessions=req.open_sessions,
+        max_attempts=cap,
+        max_per_user=req.max_per_user,
+        jitter_max=req.jitter_max,
+    )

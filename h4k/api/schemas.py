@@ -401,6 +401,8 @@ class PropagateRequest(BaseModel):
 
     open_sessions: bool = False
     max_attempts: int = 500
+    max_per_user: int = 25
+    jitter_max: float = 0.0
 
 
 # ---- CTF / lab toolkit schemas -------------------------------------------

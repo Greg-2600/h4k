@@ -241,6 +241,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/kerberos.py` impacket GetNPUsers/GetUserSPNs + hash extract + optional `JohnRunner` crack; `POST /api/kerberos/asrep|kerberoast` (sandbox canned hashes, crack skipped); Pivot roast card + palette; unit + e2e `test_krb*`/`test_kerberos`.)
 9. **LLMNR/NBT-NS poison lab** — container-only listener + capture.
 10. **Lockout-aware spray** — jitter, per-user cap, ledger stop.
+  (done: `services/spray_guard.py` + `PropagationService` policy (per-user cap, jitter, `locked` ledger state, locked users never retried); plan/run surface policy + held stats; Pivot ledger inputs; unit + e2e `test_spray*`.)
 11. **Session post-exploit recon pack** — sysinfo/getuid/loot timeline.
 12. **Loot vault with redaction** — creds/keys/flags, masked export.
 13. **Engagement timeline view** — scan→creds→sessions→paths chronology.
