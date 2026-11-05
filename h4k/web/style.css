@@ -128,6 +128,8 @@ input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accen
 .shellrow .mono, .credrow .mono { font-family: var(--mono); }
 
 /* console + output */
+.graph-canvas { width: 100%; border: 1px solid #333; border-radius: 8px; background: #0b0e14; }
+.canvas-node { cursor: pointer; }
 .console { border: 1px solid var(--border); border-radius: var(--r); }
 .console-head { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 .output { font-family: var(--mono); font-size: 12px; background: #000; color: #c9e8d4; border-radius: var(--r); padding: 10px; max-height: 320px; overflow-y: auto; white-space: pre-wrap; }

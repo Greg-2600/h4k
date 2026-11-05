@@ -219,3 +219,211 @@ item is a self-contained, live-demonstrable increment on the current release.
 4. **AI root-cause + patch** via the local opencode relay (Tier 1/3), noting the ethics gate.
 
 **h4k**, out.
+
+## Backlog — 200 candidate features (prioritized 1–200)
+
+Ordered by **demo wow × real value ÷ effort**. P1–30 next, 31–100 high-value,
+101–160 depth, 161–200 stretch/research. All opt-in where aggressive (D5/D24);
+sandbox stand-ins required where network/tooling is involved.
+
+1. **Interactive attack-graph canvas** — clickable pan/zoom nodes, PNG export.
+  (done: `services/graph_canvas.py` + `GET /api/engagement/{id}/graph/canvas` returns deterministic x/y + legend; Score-tab SVG with drag-pan, wheel-zoom, click details, PNG export; unit + e2e `test_graph_canvas`.)
+2. **Nuclei template runner** — opt-in CVE templates, offline bundle + ledger.
+3. **DAST spider + auth crawl** — depth-bounded, scope-checked link/form map.
+4. **Credential hygiene report** — reuse/weak/default summary per engagement.
+5. **Scheduled re-scans + diff alerts** — cadence per engagement, MD digest.
+6. **NSE vuln suggest-and-run** — service → script map, explicit run only.
+7. **SMB share enumerator** — shares/ACLs, read-only, into asset graph.
+8. **Kerberos roast helpers** — AS-REP/kerberoast → John, explicit only.
+9. **LLMNR/NBT-NS poison lab** — container-only listener + capture.
+10. **Lockout-aware spray** — jitter, per-user cap, ledger stop.
+11. **Session post-exploit recon pack** — sysinfo/getuid/loot timeline.
+12. **Loot vault with redaction** — creds/keys/flags, masked export.
+13. **Engagement timeline view** — scan→creds→sessions→paths chronology.
+14. **PDF client report** — one-click assessment PDF.
+15. **Engagement compare/diff** — vulns/paths across runs.
+16. **JARM/JA3 TLS fingerprints** — C2/malware leads from handshakes.
+17. **SNMP community sweep** — community + MIB walk, opt-in.
+18. **IPv6 discovery** — NDP/arp6 + nmap -6, scope-checked.
+19. **mDNS/SSDP persistent map** — sweeps persist as assets.
+20. **TLS cert inventory** — expiry/weak-cipher/self-signed leads.
+21. **Shodan/Censys BYO import** — JSON → leads, no key in repo.
+22. **CPE auto-correlate** — banner → CPE → CVE matcher.
+23. **KEV/EPSS enrichment** — CISA KEV flag + EPSS score on vulns.
+24. **CVSS v4 re-score** — override with audit trail.
+25. **False-positive tuner** — suppress with reason + expiry.
+26. **BloodHound ingest** — SharpHound JSON → graph overlay.
+27. **Privesc suggester** — lin/winPEAS-style checklist, read-only.
+28. **XSS catch lab** — token/cookie catch + replay, lab-only.
+29. **SQLmap tamper flow** — dump → ledger, explicit only.
+30. **Hydra tune + resume** — parallel profile, checkpoint resume.
+31. **ffuf/wpscan pack** — dir + plugin enum, explicit.
+32. **Impacket one-clicks** — secretsdump/GetNPUsers, explicit creds.
+33. **NTLM relay lab** — container-only, explicit.
+34. **Chisel/sshuttle pivot** — one-click tunnel + proxied rescan.
+35. **SOCKS-aware scan** — TCP scan via pivot.
+36. **Container image scan** — trivy image → engagement vulns.
+37. **Kubelet unauth audit** — read-only checks.
+38. **Docker socket guard** — detect + policy suggestion.
+39. **K8s RBAC audit** — over-permissive roles flagged.
+40. **Helm chart SAST** — templating + secret checks.
+41. **Terraform/IaC scan** — Checkov-style offline misconfigs.
+42. **Cloud metadata SSRF pack** — 169.254 probes, opt-in.
+43. **IAM key hygiene** — age/rotation, read-only.
+44. **S3 policy linter** — public/ACL offline eval.
+45. **WebSocket fuzz** — frame mutation + replay.
+46. **gRPC enumerator + fuzz** — reflection + payload shapes.
+47. **GraphQL introspection + fuzz** — field/depth probes.
+48. **OpenAPI import → fuzz** — spec-driven targets.
+49. **Header/cookie session fuzz** — auth-bypass leads.
+50. **JWT tester** — crack + alg-confusion, lab-only.
+51. **Corpus sync** — shared corpus dir across runs.
+52. **AFL++ persistent runner** — harness + stats.
+53. **Sanitizer diff** — ASan vs UBSan vs MSan compare.
+54. **Crash bisection** — input halve to minimal trigger.
+55. **PCAP → seed replay** — deterministic fuzz seeds.
+56. **Stateful fuzz** — login → authed-flow fuzz.
+57. **Rate-limit-aware fuzz** — 429 backoff + jitter.
+58. **Authenticated fuzz profiles** — cookie/header presets.
+59. **Fuzz sharding** — N workers, merged registry.
+60. **Coverage HTML import** — llvm-cov badge in UI.
+61. **SARIF import/export** — Semgrep interchange.
+62. **Taint rules pack** — source→sink Python/JS/PHP.
+63. **Secret baseline + allowlist** — noise reduction.
+64. **Reachability filter** — import-graph prunes dead code.
+65. **Rule CI gate** — fail on high-severity SAST.
+66. **Delta SAST** — diff-only findings per PR.
+67. **Inline suppress** — NOSAST with expiry + owner.
+68. **Multi-lang pack** — Go/Rust/Ruby/PHP/C# rules.
+69. **Vuln-lib taint** — vuln dep → sink path.
+70. **VEX statements** — not-affected with justification.
+71. **Typosquat heuristics** — malicious-package signals.
+72. **Provenance ingest** — SLSA/build-info.
+73. **License policy gate** — deny/warn rules.
+74. **SBOM diff** — new deps/CVEs per commit.
+75. **Pin bot** — suggest pinned upgrades.
+76. **OS package audit** — dpkg/rpm/apk → CVE.
+77. **Base-image freshness** — age/EOL + slim suggest.
+78. **Rotation planner** — found secret → rotate steps.
+79. **Patch diff verifier** — before/after re-fuzz proof.
+80. **PoC capture** — headless exploit-flow recording.
+81. **Disclosure tracker** — 90-day timeline + reminders.
+82. **CVSS vector builder** — pick metrics → score.
+83. **CWE browser** — offline dictionary + suggest.
+84. **Exploit-DB mirror search** — offline index.
+85. **MSF module delta** — new modules since update.
+86. **AI patch-rank** — 3 candidates + tradeoffs.
+87. **AI test-gen** — regression-test skeleton for patch.
+88. **AI false-positive judge** — why-not-exploitable explainer.
+89. **AI NL query** — read-only graph questions.
+90. **AI cost badge** — tokens/sec + fallback reason.
+91. **Prompt guard** — strip secrets before LLM send.
+92. **Air-gapped model bundle** — quantized import.
+93. **Model eval harness** — accuracy on fixtures.
+94. **Similar-bug search** — embed + nearest findings.
+95. **Command palette** — Ctrl-K ops.
+96. **D3FEND map** — countermeasure per technique.
+97. **Deception planner** — honeypot/canary suggest.
+98. **Purple replay** — attack → detection check.
+99. **Tabletop generator** — scenario MD from engagement.
+100. **CEF/LEEF export** — syslog SIEM handoff.
+101. **STIX bundle export** — portable threat intel.
+102. **MISP push** — opt-in event create.
+103. **TheHive case** — opt-in case create.
+104. **Ticket sync** — finding → Jira/Linear issue.
+105. **Webhook dispatcher** — finding/lead → URL.
+106. **SLA tracker** — ageing + burndown.
+107. **Risk accept flow** — accept with expiry + signer.
+108. **Compliance crosswalk** — CIS/NIST/PCI map.
+109. **Exec dashboard** — risk trend + exposure score.
+110. **Portfolio view** — multi-engagement rollup.
+111. **Role views** — operator/viewer/auditor.
+112. **Audit log** — immutable op log + export.
+113. **Backup/restore** — encrypted bundle.
+114. **Evidence locker** — pcap/logs with hash chain.
+115. **Custody export** — hash + signer.
+116. **Offline field kit** — export → air-gapped import.
+117. **QR share** — link + scope fingerprint.
+118. **Mobile triage** — small-screen finding triage.
+119. **Themes** — dark/light/high-contrast.
+120. **i18n skeleton** — en + second lang.
+121. **Keyboard-first** — shortcuts + focus traps.
+122. **Screen-reader pass** — ARIA + live regions.
+123. **Bulk actions** — tag/suppress/assign N findings.
+124. **Tags + saved filters** — my-RCE, my-XSS.
+125. **Finding comments** — per-finding threads.
+126. **Assign + due dates** — owner + SLA.
+127. **Kanban fix board** — todo/doing/done.
+128. **Verify-fix retest** — one-click finding rescan.
+129. **Flaky detector** — appears/disappears flag.
+130. **Confidence stats** — verified/lead/suppressed.
+131. **Retention prefs** — prune pcaps/corpus per engagement.
+132. **Quota + GC** — cap fuzz artifacts.
+133. **API rate-limit** — token bucket per route.
+134. **API keys** — scoped tokens.
+135. **OIDC login** — lab SSO.
+136. **Sandbox profiles** — seccomp/apparmor per job.
+137. **Resource caps** — CPU/mem/timeout per job.
+138. **Fair-share queue** — priority + preempt.
+139. **Remote workers** — nmap/fuzz agents.
+140. **Wireguard testbed** — mesh VPN spin-up.
+141. **Traffic shaper** — slow/lossy target sim.
+142. **DNS sinkhole lab** — malicious-domain replay.
+143. **PCAP scrubber** — strip payloads, keep flows.
+144. **NetFlow ingest** — flow → assets.
+145. **Zeek ingest** — logs → assets.
+146. **Suricata EVE ingest** — alerts as leads.
+147. **Sigma-hit import** — telemetry → findings.
+148. **YARA runner** — over loot/samples.
+149. **AV sample scan** — ClamAV + metadata.
+150. **Ghidra headless list** — functions/imports only.
+151. **capa tags** — capability tags for binaries.
+152. **Firmware unpack** — binwalk → SBOM + secrets.
+153. **Wardrive import** — BLE/WiFi survey map.
+154. **SDR helper** — rtl_sdr capture + metadata.
+155. **RFID lab notes** — tag-dump ingest.
+156. **USB audit** — authorized peripherals.
+157. **IoT cred pack** — printer/cam defaults expansion.
+158. **OT banner read** — modbus/s7, read-only.
+159. **BACnet/MQTT inventory** — passive subscribe.
+160. **CoAP/UPnP probes** — scope-checked.
+161. **SIP enumerate** — extensions, opt-in.
+162. **Kerbrute user-enum** — opt-in, lab-only.
+163. **BloodHound CE wrapper** — collector run.
+164. **ADCS audit** — ESC1-8 checks, read-only.
+165. **Hound path render** — shortest-path overlay.
+166. **Spray charter** — policy infer + safe list.
+167. **Hash timeline** — crack → propagate suggest.
+168. **Ticket-forge detector** — lab-only signals.
+169. **DCSync audit** — replication rights, read-only.
+170. **PtH lab** — explicit, lab-only.
+171. **LAPS audit** — rotation + exposure.
+172. **GPO linter** — offline XML checks.
+173. **Sysmon deploy helper** — lab-only.
+174. **Velociraptor pack** — collector artifacts.
+175. **Osquery import** — fleet inventory.
+176. **Wazuh ingest** — agent status.
+177. **Nikto→Nuclei dedup** — one finding per vuln.
+178. **WhatWeb→CVE link** — tech → CVE auto-link.
+179. **Wappalyzer import** — JSON → tech stack.
+180. **Headers score** — Lighthouse-style security headers.
+181. **Cookie auditor** — Secure/HttpOnly/SameSite.
+182. **CORS tester** — origin-reflection, lab-only.
+183. **SSRF allowlist tester** — metadata + internal.
+184. **SSTI probes** — Jinja/Twig, lab-only.
+185. **XXE probes** — oob-safe, lab-only.
+186. **Deser gadget index** — hints, no payloads.
+187. **SSRF→RCE chain** — config-write → pipeline, lab.
+188. **Logic checklist** — IDOR/race/price templates.
+189. **Rate-limit map** — 429 probe matrix.
+190. **Batching abuse check** — GraphQL batching.
+191. **Cache deception check** — path-confusion.
+192. **Host-header check** — poisoning, lab-only.
+193. **Takeover lead** — CNAME → unclaimed.
+194. **Hijack lead** — broken-link target.
+195. **JS harvester** — secrets + sourcemaps.
+196. **Dictionary editor** — custom fuzz payload sets.
+197. **Payload encoder** — b64/url/hex/jwt client-side.
+198. **Regex tester** — live highlight for rules.
+199. **Nightly autopilot** — cron + webhook recon.
+200. **Demo seeder v2** — one-click 5-min talk seed.

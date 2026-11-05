@@ -335,6 +335,14 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Attack-graph canvas</h2><span class="spacer"></span><button class="btn" id="btn-graph-canvas" data-testid="load-canvas">Render canvas</button> <button class="btn" id="btn-canvas-zoom-in" data-testid="canvas-zoom-in">+</button> <button class="btn" id="btn-canvas-zoom-out" data-testid="canvas-zoom-out">−</button> <button class="btn" id="btn-canvas-reset" data-testid="canvas-reset">Reset</button> <button class="btn" id="btn-canvas-png" data-testid="canvas-png">PNG</button></div>
+          <div class="card-body">
+            <div id="canvas-legend" data-testid="canvas-legend" class="muted">Hosts + verified pivots, laid out deterministically.</div>
+            <svg id="graph-canvas" data-testid="graph-canvas" width="800" height="360" viewBox="0 0 800 600" role="img" aria-label="Engagement attack graph" class="graph-canvas"></svg>
+            <div id="canvas-detail" data-testid="canvas-detail" class="muted">Click a node for details.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Lab watch</h2><span class="spacer"></span><span class="pill" id="watch-new" data-testid="watch-new" hidden></span><span class="muted" id="watch-status" data-testid="watch-status">no snapshots yet</span><select id="watch-mode" data-testid="watch-mode" title="Which changes count as new"><option value="all">all changes</option><option value="notable" selected>notable only</option><option value="off">off</option></select><button class="btn" id="btn-watch-verify" data-testid="watch-verify" title="Snapshot the freshest finished scan and diff it">Verify now</button> <button class="btn" id="btn-watch-trends" data-testid="watch-trends" title="First-seen / last-seen per host">Trends</button> <button class="btn" id="btn-watch-baseline" data-testid="watch-baseline" title="Snapshot the current estate from the latest finished scan">Snapshot now</button> <button class="btn" id="btn-watch-refresh" data-testid="watch-refresh" title="Reload changes">↻</button></div>
           <div class="card-body">
             <div id="watch-trends" data-testid="watch-trends-list" hidden></div>

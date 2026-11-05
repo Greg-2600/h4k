@@ -1054,6 +1054,89 @@ async function loadAttck() {
   } catch (e) { log(`attck failed: ${e.message}`, 'error'); }
 }
 
+const canvasView = { x: 0, y: 0, w: 800, h: 600 };
+let canvasData = null;
+
+function canvasColor(type) {
+  if (type === 'host') return '#4da3ff';
+  if (type === 'service') return '#9fe870';
+  if (type === 'pivot') return '#ef476f';
+  return '#ffd166';
+}
+
+function applyCanvasView() {
+  const svg = $('graph-canvas');
+  if (svg) svg.setAttribute('viewBox', `${canvasView.x} ${canvasView.y} ${canvasView.w} ${canvasView.h}`);
+}
+
+function canvasZoom(factor) {
+  const cx = canvasView.x + canvasView.w / 2;
+  const cy = canvasView.y + canvasView.h / 2;
+  canvasView.w = Math.min(2400, Math.max(200, canvasView.w * factor));
+  canvasView.h = canvasView.w * 0.75;
+  canvasView.x = cx - canvasView.w / 2;
+  canvasView.y = cy - canvasView.h / 2;
+  applyCanvasView();
+}
+
+function renderCanvasSvg(payload) {
+  const svg = $('graph-canvas');
+  if (!svg) return;
+  canvasData = payload;
+  const nodes = payload.nodes || [];
+  const edges = payload.edges || [];
+  const byId = {};
+  nodes.forEach((n) => { byId[n.id] = n; });
+  const edgeLines = edges.map((e) => {
+    const a = byId[e.source];
+    const b = byId[e.target];
+    if (!a || !b) return '';
+    const col = e.type === 'pivot' ? '#ef476f' : e.type === 'credential' ? '#ffd166' : '#3a4356';
+    return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="${e.type === 'service' ? 1 : 2}" opacity="0.8" />`;
+  }).join('');
+  const nodeEls = nodes.map((n) => {
+    const col = canvasColor(n.type);
+    const r = n.type === 'host' ? 16 : 10;
+    return `<g data-canvas-node="${escA(n.id)}" class="canvas-node"><circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${col}" fill-opacity="0.25" stroke="${col}" stroke-width="2" /><text x="${n.x}" y="${n.y + r + 12}" text-anchor="middle" font-size="11" fill="#c9d4e3">${esc(n.label || n.id)}</text></g>`;
+  }).join('');
+  svg.innerHTML = `${edgeLines}${nodeEls}`;
+  const legend = $('canvas-legend');
+  if (legend) legend.textContent = `legend: ${(payload.legend || []).map((l) => l.label).join(' · ')} — ${nodes.length} nodes, ${edges.length} edges. Drag to pan, wheel to zoom.`;
+}
+
+async function loadGraphCanvas() {
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  try {
+    const res = await api(`/api/engagement/${engId}/graph/canvas`);
+    renderCanvasSvg(res);
+    log(`canvas: ${(res.nodes || []).length} nodes`, 'success');
+  } catch (e) { log(`canvas failed: ${e.message}`, 'error'); }
+}
+
+function exportCanvasPng() {
+  const svg = $('graph-canvas');
+  if (!svg) return;
+  try {
+    const data = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([data], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = 800; c.height = 600;
+      c.getContext('2d').drawImage(img, 0, 0, 800, 600);
+      URL.revokeObjectURL(url);
+      const a = document.createElement('a');
+      a.download = 'h4k-graph.png';
+      a.href = c.toDataURL('image/png');
+      a.click();
+      log('canvas PNG exported', 'success');
+    };
+    img.src = url;
+  } catch (e) { log(`PNG export failed: ${e.message}`, 'error'); }
+}
+
 async function renderReportPreview() {
   try {
     const res = await api('/api/session/report?fmt=md');
@@ -1311,6 +1394,31 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-add-crown').addEventListener('click', addCrownJewel);
   $('btn-attack-paths').addEventListener('click', loadAttackPaths);
   $('btn-flag-paths').addEventListener('click', loadFlagPaths);
+  $('btn-graph-canvas').addEventListener('click', loadGraphCanvas);
+  $('btn-canvas-zoom-in').addEventListener('click', () => canvasZoom(0.8));
+  $('btn-canvas-zoom-out').addEventListener('click', () => canvasZoom(1.25));
+  $('btn-canvas-reset').addEventListener('click', () => { canvasView.x = 0; canvasView.y = 0; canvasView.w = 800; canvasView.h = 600; applyCanvasView(); });
+  $('btn-canvas-png').addEventListener('click', exportCanvasPng);
+  const _svg = $('graph-canvas');
+  if (_svg) {
+    let pan = null;
+    _svg.addEventListener('pointerdown', (e) => { pan = { x: e.clientX, y: e.clientY, vx: canvasView.x, vy: canvasView.y }; _svg.setPointerCapture(e.pointerId); });
+    _svg.addEventListener('pointermove', (e) => {
+      if (!pan) return;
+      const scale = canvasView.w / _svg.clientWidth;
+      canvasView.x = pan.vx - (e.clientX - pan.x) * scale;
+      canvasView.y = pan.vy - (e.clientY - pan.y) * scale;
+      applyCanvasView();
+    });
+    _svg.addEventListener('pointerup', () => { pan = null; });
+    _svg.addEventListener('wheel', (e) => { e.preventDefault(); canvasZoom(e.deltaY > 0 ? 1.1 : 0.9); }, { passive: false });
+    _svg.addEventListener('click', (e) => {
+      const g = e.target.closest('[data-canvas-node]');
+      if (!g || !canvasData) return;
+      const n = (canvasData.nodes || []).find((v) => v.id === g.dataset.canvasNode);
+      if (n) $('canvas-detail').textContent = `${n.label || n.id} · type=${n.type}${n.parent ? ` · parent=${n.parent}` : ''}${n.os ? ` · os=${n.os}` : ''} @ (${n.x}, ${n.y})`;
+    });
+  }
   $('btn-attck').addEventListener('click', loadAttck);
   $('btn-session-report').addEventListener('click', downloadSessionReport);
 
