@@ -37,5 +37,33 @@ def test_port_open_reports_open():
 
 
 def test_relaunch_without_binary_returns_false(monkeypatch):
-    monkeypatch.setattr(main_module.shutil, "which", lambda _n: None)
+    monkeypatch.setattr("services.supervisor.shutil.which", lambda _n: None)
     assert main_module._relaunch_msfrpcd("127.0.0.1", 55553, "x") is False
+
+
+def test_health_reports_supervised_services(monkeypatch, tmp_path):
+    from contextlib import asynccontextmanager
+
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setenv("H4K_REFRESH_CVE", "0")
+    monkeypatch.setenv("H4K_DATA_DIR", str(tmp_path))
+    import app_state
+    import main as main_module
+
+    class FakeMsf:
+        pass
+
+    app_state.msf_client = FakeMsf()
+
+    @asynccontextmanager
+    async def _noop(_app):
+        yield
+
+    main_module.app.router.lifespan_context = _noop
+    client = TestClient(main_module.app)
+    r = client.get("/api/health")
+    assert r.status_code == 200
+    body = r.json()
+    assert "msf" in body and "services" in body
+    assert isinstance(body["services"], dict)

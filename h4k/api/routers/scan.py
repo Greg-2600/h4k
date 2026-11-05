@@ -3535,9 +3535,15 @@ def health() -> dict[str, Any]:
         with suppress(Exception):
             msf_info = msf.client.core.version
             msf_ok = bool(msf_info)
+    services: dict[str, Any] = {}
+    with suppress(Exception):
+        from services import supervisor as supervisor_mod
+
+        services = supervisor_mod.supervisor.status().get("services", {})
     return {
         "status": "ok",
         "msf": {"reachable": msf_ok, "version": msf_info},
+        "services": services,
         "jobs": len(JOBS),
         "active_jobs": sum(1 for j in _all_jobs() if j["status"] in ACTIVE_STATUSES),
         "cache_entries": len(_scan_cache),

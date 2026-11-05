@@ -4,9 +4,6 @@ import asyncio
 import hashlib
 import logging
 import os
-import shutil
-import socket
-import subprocess
 import sys
 import time
 import uuid as _uuid
@@ -158,44 +155,15 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 
 
 def _msf_port_open(host: str, port: int, timeout: float = 3.0) -> bool:
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
+    from services import supervisor as supervisor_mod
+
+    return supervisor_mod.tcp_open(host, port, timeout=timeout)
 
 
 def _relaunch_msfrpcd(host: str, port: int, password: str) -> bool:
-    exe = shutil.which("msfrpcd")
-    if not exe:
-        return False
-    try:
-        os.makedirs("/var/log/h4k", exist_ok=True)
-        # fd intentionally inherited by the daemon process (stays open in child)
-        logfile = open("/var/log/h4k/msfrpcd-watchdog.log", "ab")  # noqa: SIM115
-        subprocess.Popen(  # nosec B603 - fixed argv, no shell
-            [
-                exe,
-                "-a",
-                host,
-                "-p",
-                str(port),
-                "-U",
-                "msf",
-                "-P",
-                password,
-                "-S",
-                "true",
-                "-f",
-            ],
-            stdout=logfile,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        return True
-    except OSError as exc:
-        logging.getLogger("h4k").warning("msfrpcd relaunch failed: %s", exc)
-        return False
+    from services import supervisor as supervisor_mod
+
+    return supervisor_mod.relaunch_msfrpcd(host, port, password)
 
 
 @asynccontextmanager
@@ -277,27 +245,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         _cve_task = asyncio.create_task(_weekly_cve_refresh())
 
-    # msfrpcd watchdog: the entrypoint starts the daemon once at boot with
-    # no supervisor afterwards. If it dies later the UI shows "msf down"
-    # until someone restarts the container. Re-launch it here when the
-    # port goes quiet (best-effort, container-local only).
-    _msf_task = None
-    if not sandbox_enabled() and shutil.which("msfrpcd"):
-        _msf_interval = int(os.environ.get("H4K_MSF_WATCHDOG_INTERVAL", "60"))
+    # Supervisor: the entrypoint starts every daemon once at boot with no
+    # supervisor afterwards. Probe postgres/msfrpcd/tor/auto-scan on a
+    # cadence and restart what's down within budget (container-local only).
+    _sup_task = None
+    if not sandbox_enabled():
+        from services import supervisor as supervisor_mod
 
-        async def _msf_watchdog() -> None:
+        _sup_interval = int(
+            os.environ.get(
+                "H4K_SUPERVISOR_INTERVAL",
+                os.environ.get("H4K_MSF_WATCHDOG_INTERVAL", "60"),
+            )
+        )
+
+        async def _supervisor_loop() -> None:
             while True:
                 try:
-                    if not await asyncio.to_thread(_msf_port_open, host, port):
-                        logging.getLogger("h4k").warning(
-                            "msfrpcd %s:%s unreachable - relaunching", host, port
-                        )
-                        await asyncio.to_thread(_relaunch_msfrpcd, host, port, password)
+                    await asyncio.to_thread(supervisor_mod.supervisor.tick)
                 except Exception as exc:  # pragma: no cover - defensive
-                    logging.getLogger("h4k").warning("msf watchdog failed: %s", exc)
-                await asyncio.sleep(_msf_interval)
+                    logging.getLogger("h4k").warning("supervisor failed: %s", exc)
+                await asyncio.sleep(_sup_interval)
 
-        _msf_task = asyncio.create_task(_msf_watchdog())
+        _sup_task = asyncio.create_task(_supervisor_loop())
     try:
         yield
     finally:
@@ -306,8 +276,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             _task.cancel()
         if _cve_task is not None:
             _cve_task.cancel()
-        if _msf_task is not None:
-            _msf_task.cancel()
+        if _sup_task is not None:
+            _sup_task.cancel()
 
 
 app = FastAPI(

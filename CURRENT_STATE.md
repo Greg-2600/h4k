@@ -57,6 +57,7 @@ and layers modern analysis on top:
   diffs it (new/vanished hosts, opened/closed services, changed banners,
   new/cleared CVE matches); Score tab card + session/merged reports.
 - **Blue-team handoff** — Navigator layer + Sigma bundle + defender writeup per engagement.
+- **Self-healing stack** — supervisor restarts postgres/msfrpcd/tor/auto-scan within budget; health + ops rail show per-service state.
 - **Auto-update** — periodic refresh of semgrep/osv-scanner/trivy + CVE/creds.
 
 **Every aggressive action is off by default and opt-in.** This is a lab tool for

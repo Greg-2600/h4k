@@ -65,6 +65,7 @@ One line per service: what it does, what it touches, and how to test it.
 | `merged_report.py` | merge scan+SAST+SCA+fuzz+triage+watch | none | pure |
 | `watch.py` | canonicalize + diff estate snapshots | none | pure (`canonicalize`, `diff_snapshots`) |
 | `blue_team.py` | Navigator layer + Sigma bundle + defender writeup | none | pure (canned enriched engagement) |
+| `supervisor.py` | liveness probes + restarts w/ per-service backoff | local subprocess only | injectable clock + fake specs |
 
 ## CTF / lab
 

@@ -418,8 +418,60 @@ def main() -> int:
     stage_watch_verify(eng_id)
     stage_handoff(eng_id)
     stage_export(job_id)
+    stage_chaos()
     api("POST", "/api/session/scope", {"engagement_id": None}, timeout=30)
     return summary(0)
+
+
+def stage_chaos() -> bool:
+    """Kill msfrpcd inside the runtime container; the supervisor must bring
+    it back and record the restart. Skipped when docker is unavailable."""
+    import shutil
+    import subprocess
+
+    if not shutil.which("docker"):
+        return check("chaos: msfrpcd kill recovers", False, "no docker CLI")
+    try:
+        status, before = api("GET", "/api/health", timeout=30)
+    except Exception as exc:
+        return check(
+            "chaos: msfrpcd kill recovers", False, f"health unreachable: {exc}"
+        )
+    n0 = ((before.get("services") or {}).get("msfrpcd") or {}).get("restarts_total", 0)
+    kill = (
+        "for p in /proc/[0-9]*; do "
+        'cmd=$(tr "\\0" " " < "$p/cmdline" 2>/dev/null); '
+        'case "$cmd" in *msfrpcd*) kill -9 "${p#/proc/}";; esac; done; exit 0'
+    )
+    try:
+        subprocess.run(
+            ["docker", "exec", "h4k_h4k", "bash", "-c", kill], timeout=60, check=False
+        )
+    except Exception as exc:
+        return check("chaos: msfrpcd kill recovers", False, f"kill failed: {exc}")
+    deadline = time.time() + 300
+    recovered = False
+    restarts = n0
+    while time.time() < deadline:
+        time.sleep(10)
+        try:
+            status, now = api("GET", "/api/health", timeout=30)
+        except Exception:
+            continue
+        if status != 200:
+            continue
+        msf = (now.get("msf") or {}).get("reachable", False)
+        restarts = ((now.get("services") or {}).get("msfrpcd") or {}).get(
+            "restarts_total", n0
+        )
+        if msf and restarts > n0:
+            recovered = True
+            break
+    return check(
+        "chaos: msfrpcd kill recovers via supervisor",
+        recovered,
+        f"restarts {n0} -> {restarts}",
+    )
 
 
 def summary(code: int) -> int:

@@ -141,10 +141,19 @@ function setPill(id, text, level) {
 }
 
 async function refreshStatus() {
+  let daemonLine = '';
   try {
     const h = await api('/api/health');
     const msfUp = !!(h.msf && h.msf.reachable);
     setPill('msf-status', msfUp ? 'msf up' : 'msf down', msfUp ? 'online' : 'offline');
+    const svc = (h.services) || {};
+    const parts = Object.keys(svc).sort().map((n) => {
+      const s = svc[n] || {};
+      const mark = s.up ? '✓' : (s.degraded ? '!' : '✗');
+      const rest = s.restarts_total ? ` (r${s.restarts_total})` : '';
+      return `${esc(n)} ${mark}${rest}`;
+    });
+    if (parts.length) daemonLine = parts.join(' · ');
   } catch { setPill('msf-status', 'msf ?', 'offline'); }
   try {
     const c = await api('/api/capabilities');
@@ -203,7 +212,8 @@ async function refreshStatus() {
     rs.innerHTML =
       `<div>scope <b>${esc(engId ? engId.slice(0, 8) : 'none')}</b></div>` +
       `<div>hosts <b>${hosts}</b> · services <b>${services}</b> · vulns <b>${vulns}</b></div>` +
-      `<div>shells <b>${shells}</b> · creds <b>${creds}</b> · flags <b>${flags}</b></div>`;
+      `<div>shells <b>${shells}</b> · creds <b>${creds}</b> · flags <b>${flags}</b></div>` +
+      (daemonLine ? `<div data-testid="rail-services">daemons ${daemonLine}</div>` : '');
   }
   const rsc = $('rail-scope');
   if (rsc) rsc.textContent = engId ? engId.slice(0, 8) : 'no scope';
