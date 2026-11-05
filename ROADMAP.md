@@ -274,7 +274,9 @@ sandbox stand-ins required where network/tooling is involved.
 32. **Impacket one-clicks** — secretsdump/GetNPUsers, explicit creds.
 33. **NTLM relay lab** — container-only, explicit.
 34. **Chisel/sshuttle pivot** — one-click tunnel + proxied rescan.
+  (done: `services/pivot_tunnel.py` loopback-only tunnels + stdlib SOCKS5 proxied TCP scan + banner grab; registry with liveness; `POST /net/tunnel|scan`, `GET|DELETE /net/tunnels`; Pivot card; unit (incl. real SOCKS stub) + e2e `test_tunnel*`.)
 35. **SOCKS-aware scan** — TCP scan via pivot.
+  (done: `services/pivot_scan.py` banner+port fingerprint → service/product/version + scope-enforced ledger into the engagement; `POST /net/tunnel/scan` gains fingerprint + optional `engagement_id` ledger; Pivot card shows fingerprinted services + ledger count; unit + e2e `test_socks_scan*`.)
 36. **Container image scan** — trivy image → engagement vulns.
 37. **Kubelet unauth audit** — read-only checks.
 38. **Docker socket guard** — detect + policy suggestion.

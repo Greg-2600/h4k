@@ -188,3 +188,129 @@ def net_ipv6_discover(body: dict[str, Any]) -> dict[str, Any]:
             except (ScopeError, ValueError):
                 skipped.append(n["ip"])
     return {**result, "recorded": recorded, "skipped_out_of_scope": skipped}
+
+
+@router.post("/tunnel")
+def net_tunnel_start(body: dict[str, Any]) -> dict[str, Any]:
+    """One-click pivot tunnel: SSH dynamic forward or chisel server, loopback-only.
+
+    Sandbox returns a canned tunnel without spawning anything.
+    """
+    from services import sandbox as sandbox_mode
+    from services.pivot_tunnel import list_tunnels, sandbox_tunnels, start_tunnel
+
+    if sandbox_mode.enabled():
+        return sandbox_tunnels()
+    kind = str((body or {}).get("kind") or "ssh").strip().lower()
+    try:
+        port = int((body or {}).get("port") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="port must be an integer") from None
+    try:
+        out = start_tunnel(
+            kind,
+            port=port,
+            target=str((body or {}).get("target") or ""),
+            ssh_host=str((body or {}).get("ssh_host") or ""),
+            ssh_user=str((body or {}).get("ssh_user") or ""),
+            ssh_port=int((body or {}).get("ssh_port") or 22),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not out.get("success"):
+        raise HTTPException(status_code=502, detail=out.get("error", "tunnel failed"))
+    out["tunnels"] = list_tunnels()["tunnels"]
+    return out
+
+
+@router.get("/tunnels")
+def net_tunnels() -> dict[str, Any]:
+    """Tracked tunnels with liveness."""
+    from services import sandbox as sandbox_mode
+    from services.pivot_tunnel import list_tunnels, sandbox_tunnels
+
+    if sandbox_mode.enabled():
+        return sandbox_tunnels()
+    return list_tunnels()
+
+
+@router.delete("/tunnels/{tunnel_id}")
+def net_tunnel_stop(tunnel_id: str) -> dict[str, Any]:
+    """Stop a tracked tunnel and forget it."""
+    from services.pivot_tunnel import stop_tunnel
+
+    out = stop_tunnel(tunnel_id)
+    if not out.get("stopped"):
+        raise HTTPException(status_code=404, detail=out.get("error", "unknown tunnel"))
+    return out
+
+
+@router.post("/tunnel/scan")
+def net_tunnel_scan(body: dict[str, Any]) -> dict[str, Any]:
+    """Proxied rescan: TCP connect + banner grab through a SOCKS proxy.
+
+    Give `tunnel_id` (uses its listen port) or an explicit `proxy`
+    `host:port`. Every open port is fingerprinted (banner + port →
+    service/product/version heuristics, no extra packets). Pass
+    `engagement_id` to ledger the fingerprinted services into the
+    engagement — scope-enforced, out-of-scope hosts are reported and
+    never stored. Sandbox returns a canned scan.
+    """
+    from services import sandbox as sandbox_mode
+    from services.pivot_scan import fingerprint_scan, ledger_scan
+    from services.pivot_tunnel import list_tunnels, proxied_scan, sandbox_scan
+
+    target = str((body or {}).get("target") or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="target required")
+    if sandbox_mode.enabled():
+        result = fingerprint_scan(sandbox_scan(target))
+    else:
+        ports = (body or {}).get("ports") or [22, 80, 443, 445, 3389, 8080, 8443]
+        try:
+            ports = [int(p) for p in ports][:64]
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400, detail="ports must be integers"
+            ) from None
+        proxy = str((body or {}).get("proxy") or "").strip()
+        tunnel_id = str((body or {}).get("tunnel_id") or "").strip()
+        if tunnel_id and not proxy:
+            found = [
+                t
+                for t in list_tunnels()["tunnels"]
+                if t["id"] == tunnel_id and t.get("alive")
+            ]
+            if not found:
+                raise HTTPException(
+                    status_code=404, detail="tunnel not found or not alive"
+                )
+            proxy = str(found[0].get("listen") or "")
+        if not proxy or ":" not in proxy:
+            raise HTTPException(
+                status_code=400, detail="proxy host:port (or a live tunnel_id) required"
+            )
+        host, _, port_s = proxy.rpartition(":")
+        try:
+            result = fingerprint_scan(
+                proxied_scan(host or "127.0.0.1", int(port_s), target, ports)
+            )
+        except ValueError:
+            raise HTTPException(status_code=400, detail="bad proxy port") from None
+        except OSError as exc:
+            raise HTTPException(
+                status_code=502, detail=f"proxy unreachable: {exc}"
+            ) from exc
+    engagement_id = str((body or {}).get("engagement_id") or "").strip() or None
+    recorded = 0
+    skipped: list[str] = []
+    if engagement_id:
+        from routers.engagement import get_store
+
+        store = get_store()
+        if not store.get_engagement(engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        out = ledger_scan(store, engagement_id, target, result)
+        recorded = int(out.get("recorded", 0))
+        skipped = list(out.get("skipped_out_of_scope", []))
+    return {**result, "recorded": recorded, "skipped_out_of_scope": skipped}

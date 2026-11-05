@@ -878,6 +878,54 @@ async function listSuppressions() {
   } catch (e) { $('sup-body').textContent = `list failed: ${e.message}`; }
 }
 
+async function tunStart() {
+  const parts = $('tun-target').value.trim().split('@');
+  const body = { kind: $('tun-kind').value, port: parseInt($('tun-port').value, 10) || 0 };
+  if ($('tun-kind').value === 'ssh') {
+    if (parts.length !== 2 || !parts[1]) { log('ssh tunnel needs user@host', 'warn'); return; }
+    body.ssh_user = parts[0]; body.ssh_host = parts[1];
+  }
+  $('tun-body').textContent = 'starting tunnel…';
+  try {
+    const res = await api('/api/net/tunnel', { method: 'POST', body });
+    const first = (res.tunnels || [])[0] || res;
+    const listen = first.listen || res.listen || '';
+    state.tunnel = { id: first.id, listen };
+    $('tun-status').textContent = `${first.kind || res.kind || '?'} :${String(listen).split(':').pop()} (pid ${first.pid ?? res.pid ?? '?'})`;
+    log(`tunnel up: ${listen}`, 'success');
+  } catch (e) { $('tun-body').textContent = `tunnel failed: ${e.message}`; }
+}
+
+async function tunStop() {
+  if (!state.tunnel) { log('no tunnel tracked', 'warn'); return; }
+  try {
+    await api(`/api/net/tunnels/${state.tunnel.id}`, { method: 'DELETE' });
+    state.tunnel = null;
+    $('tun-status').textContent = 'tunnel stopped';
+  } catch (e) { log(`tunnel stop failed: ${e.message}`, 'error'); }
+}
+
+async function tunScan() {
+  const target = $('tun-scan-target').value.trim();
+  if (!target) { log('proxied scan needs a target', 'warn'); return; }
+  const body = { target };
+  if (state.tunnel) body.tunnel_id = state.tunnel.id;
+  const engId = await currentEngagementId();
+  if (engId) body.engagement_id = engId;
+  $('tun-body').textContent = 'scanning through tunnel…';
+  try {
+    const res = await api('/api/net/tunnel/scan', { method: 'POST', body });
+    const rows = (res.results || []).filter((r) => r.open).map((r) => {
+      const svc = [r.service, r.product, r.version].filter(Boolean).join(' ').trim();
+      return `<div data-testid="tun-open"><b>${r.port}</b> ${esc(svc || r.banner || 'open')}</div>`;
+    }).join('');
+    const ledger = res.recorded ? ` · ledgered ${res.recorded}` : '';
+    const skipped = (res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : '';
+    $('tun-body').innerHTML = `<div data-testid="tun-summary">${esc(`${res.open_count || 0} open (${res.fingerprinted || 0} fingerprinted) via ${res.proxy || ''}${ledger}${skipped}`)}</div>${rows || 'nothing open'}`;
+    log(`proxied scan: ${res.open_count || 0} open`, 'success');
+  } catch (e) { $('tun-body').textContent = `proxied scan failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1434,6 +1482,7 @@ function runCmd(cmd) {
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
+  else if (cmd === 'tunnel') setTab('pivot');
   else if (cmd === 'score') setTab('score');
   else if (cmd === 'theme') toggleTheme();
   else if (cmd === 'clear') { $('activity-log').innerHTML = ''; }
@@ -1603,6 +1652,9 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-tun-start').addEventListener('click', tunStart);
+  $('btn-tun-stop').addEventListener('click', tunStop);
+  $('btn-tun-scan').addEventListener('click', tunScan);
   $('btn-suppress').addEventListener('click', runSuppress);
   $('btn-sup-list').addEventListener('click', listSuppressions);
   $('btn-kev').addEventListener('click', runKevCheck);
