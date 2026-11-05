@@ -30,7 +30,9 @@ short fuzz, engagement ingest, crown jewels, attack paths, markdown export),
 asserting each step. Tears the stack down afterwards; exit nonzero on any
 failure. Stdlib only, so it runs anywhere with a docker CLI. Also runs in CI
 (`qualify.yml`: on demand, weekly, and on PRs touching runtime code) as a
-non-required signal.
+non-required signal. The final chaos stage SIGKILLs msfrpcd in the runtime
+container and requires the supervisor to bring it back (restarts_total must
+increase) before teardown.
 
 ---
 

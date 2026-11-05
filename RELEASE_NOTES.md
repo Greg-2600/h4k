@@ -613,3 +613,13 @@ experimental Sigma bundle (one rule per observed technique, evidence-linked,
 marked tune-before-use), and a written defender summary. Score-tab card with
 Layer/Sigma/Writeup downloads; session report carries the observed technique
 list. Strictly evidence-derived — no fabricated telemetry.
+
+## Self-healing stack (2026-11-04)
+
+The msfrpcd watchdog is now a real supervisor: postgres, msfrpcd, tor, and
+the auto-scan thread are probed on a cadence (H4K_SUPERVISOR_INTERVAL, 60s
+default) and restarted within a per-service budget (3 per 10 min, then
+degraded instead of hot-looping). /api/health reports per-service state and
+restart counts; the ops rail shows daemon status. Qualify ends with a chaos
+stage: SIGKILL msfrpcd in the runtime container and require recovery with a
+recorded restart before teardown.
