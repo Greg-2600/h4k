@@ -107,6 +107,7 @@ Host recon/scan:
 - `GET /export/{id}?fmt=json|md`
 - `GET /api/session/report?fmt=json|md|pdf` (one-click assessment; PDF masks passwords)
 - `GET /neighbors` (ARP)
+- `POST /api/net/tunnel` + `GET|DELETE /api/net/tunnels[/{id}]` (loopback-only) + `POST /api/net/tunnel/scan` (proxied rescan)
 - `POST /api/net/ipv6/discover` (NDP table + explicit-CIDR nmap -6, scope-enforced asset ledger)
 - `POST /attack`, `GET /attack/{id}`
 - `POST /deepattack` (hydra/nikto/sqlmap/smb/dns toolkit)
@@ -131,7 +132,7 @@ Engagement (persistent memory + cred propagation, engagement router):
 - `POST /api/engagement/{id}/ingest` (raw report or `{job_id}`) → asset graph
 - `GET /api/engagement/{id}/assets|credentials|graph`, `GET .../graph/canvas` (deterministic x/y layout for the interactive SVG canvas + PNG export)
 - `GET /api/engagement/{id}/propagate/plan` (dry run, spray policy: `max_per_user` + `jitter_max`), `POST /api/engagement/{id}/propagate` (opt-in, lockout ledgered as `locked`)
-- `GET /api/engagement/{id}/hygiene` (read-only reuse/weak/default summary + score)
+- `POST /api/engagement/{id}/hygiene` (read-only reuse/weak/default summary + score)
 - `POST /api/engagement/{id}/vulns/suppress` (reason + expiry, audit-trailed) + `DELETE .../vulns/suppress` + `GET .../vulns/suppressions|effective`
 - `GET /api/engagement/{id}/vault` (masked loot: creds/flags/shares, `reveal=true` unmasks) + `GET .../vault/export` (md/json handoff)
 - `POST|GET /api/engagement/{id}/crown-jewels`, `DELETE .../crown-jewels/{id}`
@@ -188,6 +189,7 @@ Health/diagnostic:
 | `ingest.py` | source ingest (zip/tar/tgz or git clone), zip-slip-safe |
 | `updater.py` | periodic tool/rule/data auto-refresh |
 | `engagement.py` | persistent engagement store (scope-enforced asset graph + crown jewels) |
+| `pivot_tunnel.py` | loopback-only ssh/chisel tunnels + SOCKS5 proxied TCP scan, sandbox canned |
 | `privesc_suggest.py` | read-only linPEAS-style checklist (10 checks, pass/fail + fix hints, sandbox canned) |
 | `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |

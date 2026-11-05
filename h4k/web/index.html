@@ -333,6 +333,27 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>Pivot tunnel + proxied scan</h2><span class="spacer"></span><span class="muted">chisel/sshuttle · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <select id="tun-kind" data-testid="tun-kind" title="Tunnel type">
+                <option value="ssh" selected>ssh -D (SOCKS)</option>
+                <option value="chisel">chisel server</option>
+              </select>
+              <input type="text" id="tun-target" data-testid="tun-target" class="grow" placeholder="ssh user@host (for -D) — target goes below" />
+              <input type="text" id="tun-port" data-testid="tun-port" value="1080" title="Local listen port (0 = auto)" />
+              <button class="btn primary" id="btn-tun-start" data-testid="btn-tun-start">Start tunnel</button>
+              <button class="btn" id="btn-tun-stop" data-testid="btn-tun-stop" title="Stop the active tunnel">Stop</button>
+            </div>
+            <div class="row">
+              <input type="text" id="tun-scan-target" data-testid="tun-scan-target" class="grow" placeholder="scan through tunnel: 10.10.20.5" />
+              <button class="btn" id="btn-tun-scan" data-testid="btn-tun-scan">Proxied scan</button>
+              <span class="muted" id="tun-status" data-testid="tun-status"></span>
+            </div>
+            <div id="tun-body" data-testid="tun-body" class="muted">Tunnel binds loopback only. Scan the far side through it.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Route map</h2><span class="spacer"></span><span class="muted">read-only pivot planning</span></div>
           <div class="card-body">
             <div class="row">
@@ -506,6 +527,7 @@
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
+    <div class="cmd-item" data-cmd="tunnel"><span>Pivot: tunnel + proxied scan</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>
         <div class="cmd-item" data-cmd="theme"><span>Toggle theme</span></div>
         <div class="cmd-item" data-cmd="clear"><span>Clear log</span></div>

@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #34 — chisel/sshuttle pivot
+
+`POST /api/net/tunnel` starts a loopback-only SSH `-D` forward or
+chisel server and tracks it in a registry with liveness;
+`POST /api/net/tunnel/scan` TCP-scans a target *through* the SOCKS
+proxy with a stdlib SOCKS5 handshake (no new deps) plus a banner grab
+per open port. `DELETE /api/net/tunnels/{id}` kills and forgets.
+Sandbox is fully canned. Pivot card holds the tunnel lifecycle and the
+proxied scan in one place.
+
 ## Backlog #27 — privesc suggester
 
 `POST /api/privesc/suggest` runs ten read-only checks in the linPEAS
