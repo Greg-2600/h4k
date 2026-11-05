@@ -291,6 +291,7 @@ sandbox stand-ins required where network/tooling is involved.
 46. **gRPC enumerator + fuzz** — reflection + payload shapes.
 47. **GraphQL introspection + fuzz** — field/depth probes.
 48. **OpenAPI import → fuzz** — spec-driven targets.
+  (done: `services/openapi_fuzz.py` pasted JSON/YAML import (OpenAPI 3 + Swagger 2.0, tolerant $ref) → concrete requests → deterministic round-robin field mutations (oversize/null/type-swap/format/sqli/traversal/…) with 5xx/error-text/timeout signals + scope-enforced ledger; `POST /api/openapi_fuzz` job + poll + abort (400 bad spec/base, 404 unknown job) sandbox canned; Fuzz-lab API row + palette; unit (incl. live marker-reactive stub) + e2e `test_openapi_fuzz*`. Also fixed shared urllib-5xx swallowing in `ssrf_pack` (HTTPError body now read).)
 49. **Header/cookie session fuzz** — auth-bypass leads.
 50. **JWT tester** — crack + alg-confusion, lab-only.
 51. **Corpus sync** — shared corpus dir across runs.

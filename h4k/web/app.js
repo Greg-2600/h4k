@@ -553,6 +553,65 @@ async function startFuzzing() {
   } catch (e) { log(`fuzz failed: ${e.message}`, 'error'); if (btn) btn.disabled = false; }
 }
 
+async function startOapiFuzz() {
+  const btn = $('btn-oapi-start');
+  if (btn) btn.disabled = true;
+  $('btn-oapi-stop').hidden = false;
+  $('oapi-output').hidden = false;
+  $('oapi-output').textContent = 'fuzzing API…';
+  const specRaw = $('oapi-spec').value.trim();
+  if (!specRaw) { log('API fuzz needs a pasted spec', 'warn'); if (btn) btn.disabled = false; return; }
+  let spec = null;
+  try {
+    spec = JSON.parse(specRaw);
+  } catch {
+    $('oapi-output').textContent = 'spec must be JSON (YAML is accepted by the API, not the form)';
+    log('API fuzz needs JSON in the form', 'warn');
+    if (btn) btn.disabled = false;
+    return;
+  }
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/openapi_fuzz', {
+      method: 'POST',
+      body: {
+        base_url: $('oapi-base').value.trim() || 'http://127.0.0.1:3138',
+        spec,
+        iterations: parseInt($('oapi-iters').value, 10) || 20,
+        engagement_id: engId || null,
+      },
+    });
+    if (!jobIdOf(res)) { log(`API fuzz refused: ${res.detail || 'error'}`, 'error'); if (btn) btn.disabled = false; return; }
+    const jobId = jobIdOf(res);
+    log(`API fuzz ${jobId}`, 'info');
+    if (state.oapiTimer) clearInterval(state.oapiTimer);
+    state.oapiTimer = setInterval(async () => {
+      try {
+        const st = await api(`/api/openapi_fuzz/${jobId}`);
+        const cands = st.candidates || [];
+        $('oapi-output').textContent = st.status === 'done'
+          ? `${st.targets || 0} target(s) · ${cands.length} candidate(s)${st.ingested ? ` · ${st.ingested} in ledger` : ''}${(st.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}\n`
+            + cands.map((c) => `${c.mutation} on ${c.target}: ${c.evidence || ''}`).join('\n').slice(0, 4000)
+          : 'fuzzing API…';
+        if (isDone(st.status)) {
+          clearInterval(state.oapiTimer); state.oapiTimer = null;
+          if (btn) btn.disabled = false;
+          $('btn-oapi-stop').hidden = true;
+          log(`API fuzz done: ${cands.length} candidate(s)`, 'success');
+        }
+      } catch (e) { log(`API fuzz poll: ${e.message}`, 'error'); }
+    }, 2000);
+  } catch (e) { log(`API fuzz failed: ${e.message}`, 'error'); if (btn) btn.disabled = false; }
+}
+
+async function stopOapiFuzz() {
+  $('btn-oapi-stop').hidden = true;
+  if (state.oapiTimer) { clearInterval(state.oapiTimer); state.oapiTimer = null; }
+  const btn = $('btn-oapi-start');
+  if (btn) btn.disabled = false;
+  log('API fuzz stop requested', 'warn');
+}
+
 /* ---------- 4. pivot ---------- */
 
 async function loadCredLedger() {
@@ -1502,6 +1561,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'oapifuzz') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1701,6 +1761,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-oapi-start').addEventListener('click', startOapiFuzz);
+  $('btn-oapi-stop').addEventListener('click', stopOapiFuzz);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());

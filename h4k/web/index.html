@@ -293,6 +293,14 @@
               <button class="btn" id="btn-fz-stop" hidden>Stop</button>
             </div>
             <div class="output" id="fz-output" hidden></div>
+            <div class="row">
+              <input type="text" id="oapi-base" data-testid="oapi-base" value="http://127.0.0.1:3138" title="Lab API base URL you own (only host ever requested)" />
+              <input type="text" id="oapi-iters" data-testid="oapi-iters" value="20" title="Iterations (1-200)" />
+              <button class="btn" id="btn-oapi-start" data-testid="btn-oapi-start">Fuzz API</button>
+              <button class="btn" id="btn-oapi-stop" data-testid="btn-oapi-stop" hidden>Stop</button>
+            </div>
+            <textarea id="oapi-spec" data-testid="oapi-spec" rows="3" class="grow" placeholder='Paste OpenAPI JSON/YAML here (offline parse, never fetched)'></textarea>
+            <div class="output" id="oapi-output" data-testid="oapi-output" hidden></div>
           </div>
         </div>
       </section>
@@ -526,6 +534,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="oapifuzz"><span>Exploit: fuzz an API from its spec</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
