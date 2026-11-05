@@ -636,6 +636,21 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #46 — gRPC enumerator + fuzz
+
+`POST /api/grpc_fuzz` starts a background job: reflection
+`list_services` first (hand-rolled HTTP/2 — cleartext h2c
+prior-knowledge or TLS with ALPN `h2` — with service names
+string-scanned from raw bytes and labeled `heuristic: true`, never
+claimed as a proto decode), then unary framing fuzz at the chosen or
+first method (oversize length, truncated, compressed-flag lies,
+empty/garbage/double/huge messages, post-headers RST). GOAWAY, RST,
+drops, timeouts and non-zero `grpc-status` land as candidates.
+`GET /api/grpc_fuzz/{id}` polls, `POST …/abort` stops. Reflection
+itself ledgers (CWE-200) alongside fuzz signals (CWE-20) on the target
+host when `engagement_id` is set (scope-enforced). Fuzz-lab gRPC row +
+palette; sandbox fully canned.
+
 ## Backlog #42 — cloud metadata SSRF pack
 
 `POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,

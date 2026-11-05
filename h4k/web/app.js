@@ -553,6 +553,57 @@ async function startFuzzing() {
   } catch (e) { log(`fuzz failed: ${e.message}`, 'error'); if (btn) btn.disabled = false; }
 }
 
+async function startGrpcFuzz() {
+  const btn = $('btn-grpc-start');
+  if (btn) btn.disabled = true;
+  $('btn-grpc-stop').hidden = false;
+  $('grpc-output').hidden = false;
+  $('grpc-output').textContent = 'fuzzing gRPC…';
+  try {
+    const engId = await currentEngagementId();
+    const [host, portRaw] = $('grpc-target').value.trim().split(':');
+    const res = await api('/api/grpc_fuzz', {
+      method: 'POST',
+      body: {
+        host: (host || '127.0.0.1').trim(),
+        port: parseInt(portRaw, 10) || 50051,
+        method: $('grpc-method').value.trim(),
+        iterations: parseInt($('grpc-iters').value, 10) || 16,
+        engagement_id: engId || null,
+      },
+    });
+    if (!jobIdOf(res)) { log(`grpc fuzz refused: ${res.detail || 'error'}`, 'error'); if (btn) btn.disabled = false; return; }
+    const jobId = jobIdOf(res);
+    log(`grpc fuzz ${jobId}`, 'info');
+    if (state.grpcTimer) clearInterval(state.grpcTimer);
+    state.grpcTimer = setInterval(async () => {
+      try {
+        const st = await api(`/api/grpc_fuzz/${jobId}`);
+        const cands = st.candidates || [];
+        const svcs = (st.services || []).slice(0, 6).join(', ');
+        $('grpc-output').textContent = st.status === 'done'
+          ? `${st.service_count || 0} service(s)${svcs ? `: ${svcs}` : ''} · ${cands.length} candidate(s)${st.ingested ? ` · ${st.ingested} in ledger` : ''}${(st.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}\n`
+            + cands.map((c) => `${c.mutation} → ${c.signal}: ${c.evidence || ''}`).join('\n').slice(0, 4000)
+          : 'fuzzing gRPC…';
+        if (isDone(st.status)) {
+          clearInterval(state.grpcTimer); state.grpcTimer = null;
+          if (btn) btn.disabled = false;
+          $('btn-grpc-stop').hidden = true;
+          log(`grpc fuzz done: ${cands.length} candidate(s)`, 'success');
+        }
+      } catch (e) { log(`grpc fuzz poll: ${e.message}`, 'error'); }
+    }, 2000);
+  } catch (e) { log(`grpc fuzz failed: ${e.message}`, 'error'); if (btn) btn.disabled = false; }
+}
+
+async function stopGrpcFuzz() {
+  $('btn-grpc-stop').hidden = true;
+  if (state.grpcTimer) { clearInterval(state.grpcTimer); state.grpcTimer = null; }
+  const btn = $('btn-grpc-start');
+  if (btn) btn.disabled = false;
+  log('grpc fuzz stop requested', 'warn');
+}
+
 /* ---------- 4. pivot ---------- */
 
 async function loadCredLedger() {
@@ -1502,6 +1553,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'grpcfuzz') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
@@ -1701,6 +1753,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-grpc-start').addEventListener('click', startGrpcFuzz);
+  $('btn-grpc-stop').addEventListener('click', stopGrpcFuzz);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());

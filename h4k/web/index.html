@@ -293,6 +293,14 @@
               <button class="btn" id="btn-fz-stop" hidden>Stop</button>
             </div>
             <div class="output" id="fz-output" hidden></div>
+            <div class="row">
+              <input type="text" id="grpc-target" data-testid="grpc-target" value="127.0.0.1:50051" title="gRPC endpoint you own (host:port)" />
+              <input type="text" id="grpc-method" data-testid="grpc-method" placeholder="/pkg.Service/Method (empty = reflect)" title="Method to fuzz; empty runs reflection first" />
+              <input type="text" id="grpc-iters" data-testid="grpc-iters" value="16" title="Iterations (1-200)" />
+              <button class="btn" id="btn-grpc-start" data-testid="btn-grpc-start">Fuzz gRPC</button>
+              <button class="btn" id="btn-grpc-stop" data-testid="btn-grpc-stop" hidden>Stop</button>
+            </div>
+            <div class="output" id="grpc-output" data-testid="grpc-output" hidden></div>
           </div>
         </div>
       </section>
@@ -526,6 +534,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="grpcfuzz"><span>Exploit: fuzz a gRPC endpoint (reflect + fuzz)</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
