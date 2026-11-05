@@ -1071,6 +1071,35 @@ async function scanFlagsFor(text) {
   } catch { /* best-effort */ }
 }
 
+async function loadVault() {
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  const reveal = $('vault-reveal').checked;
+  try {
+    const res = await api(`/api/engagement/${engId}/vault?reveal=${reveal}`);
+    const items = res.items || [];
+    $('vault-body').innerHTML = items.length
+      ? `<div data-testid="vault-count">${res.count} item(s)${res.revealed ? ' · UNMASKED' : ' · masked'}</div>` + items.map((item) => {
+        if (item.type === 'credential') return `<div data-testid="vault-item">cred <b>${esc(item.user)}</b> (${esc(item.service || 'any')}) on ${esc((item.hosts || []).join(', '))} — <span class="mono">${esc(item.password)}</span></div>`;
+        if (item.type === 'flag') return `<div data-testid="vault-item">flag <span class="mono">${esc(item.value)}</span> on ${esc(item.host || '?')}</div>`;
+        return `<div data-testid="vault-item">share \\\\${esc(item.host)}\\${esc(item.share)} (${esc(item.access || '?')})</div>`;
+      }).join('')
+      : 'vault empty — verify a cred, capture a flag, enumerate shares';
+    log(`vault: ${res.count || 0} item(s)${reveal ? ' UNMASKED' : ''}`, reveal ? 'warn' : 'success');
+  } catch (e) { $('vault-body').textContent = `vault failed: ${e.message}`; }
+}
+
+async function downloadVaultMd() {
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  const reveal = $('vault-reveal').checked;
+  try {
+    const res = await api(`/api/engagement/${engId}/vault/export?fmt=md&reveal=${reveal}`);
+    downloadText('h4k-vault.md', res.content || '', 'text/markdown');
+    log('vault export downloaded', 'success');
+  } catch (e) { log(`vault export failed: ${e.message}`, 'error'); }
+}
+
 async function loadCrowns() {
   const engId = await currentEngagementId();
   if (!engId) return [];
@@ -1488,6 +1517,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // score
   $('btn-flag-add').addEventListener('click', addFlag);
+  $('btn-vault').addEventListener('click', loadVault);
+  $('btn-vault-md').addEventListener('click', downloadVaultMd);
   $('btn-flag-detect').addEventListener('click', detectFlags);
   $('btn-add-crown').addEventListener('click', addCrownJewel);
   $('btn-attack-paths').addEventListener('click', loadAttackPaths);

@@ -636,6 +636,16 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #12 — loot vault with redaction
+
+`GET /api/engagement/{id}/vault` rolls verified credentials, captured
+flags and enumerated shares into one loot view that is masked by default
+(passwords → `••••` hints, flags → wrapper shape only) and unmasks only
+with explicit `reveal=true`; `GET .../vault/export` downloads the masked
+(or, if asked, unmasked) `.md`/`.json` for handoff. Score vault card is
+masked-first with a reveal checkbox and MD export. SSH key material stays
+out: no collector banks it, so the vault never fabricates it.
+
 ## Backlog #10 — lockout-aware spray
 
 Propagation replays now run under a spray policy: at most N attempts per

@@ -238,6 +238,41 @@ def list_credentials(engagement_id: str) -> dict[str, Any]:
     }
 
 
+@router.get("/{engagement_id}/vault")
+def loot_vault(engagement_id: str, reveal: bool = False) -> dict[str, Any]:
+    """Masked loot vault: verified creds, flags, shares. reveal=true unmasks."""
+    from services.loot_vault import vault_summary
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    try:
+        return vault_summary(store, engagement_id, reveal=reveal)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{engagement_id}/vault/export")
+def loot_vault_export(
+    engagement_id: str, fmt: str = "md", reveal: bool = False
+) -> dict[str, Any]:
+    """Masked vault export for handoff/reporting (json or markdown)."""
+    from services.loot_vault import vault_markdown, vault_summary
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    try:
+        if fmt.lower() in ("json",):
+            return vault_summary(store, engagement_id, reveal=reveal)
+        return {
+            "fmt": "md",
+            "content": vault_markdown(store, engagement_id, reveal=reveal),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/{engagement_id}/hygiene")
 def credential_hygiene(engagement_id: str) -> dict[str, Any]:
     """Reuse/weak/default summary of verified credentials (read-only)."""

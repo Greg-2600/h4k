@@ -244,6 +244,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/spray_guard.py` + `PropagationService` policy (per-user cap, jitter, `locked` ledger state, locked users never retried); plan/run surface policy + held stats; Pivot ledger inputs; unit + e2e `test_spray*`.)
 11. **Session post-exploit recon pack** — sysinfo/getuid/loot timeline.
 12. **Loot vault with redaction** — creds/keys/flags, masked export.
+  (done: `services/loot_vault.py` masked rollup + md/json export, reveal-gated; `GET /api/engagement/{id}/vault|vault/export`; Score vault card masked-first + reveal checkbox + MD export; unit + e2e `test_loot_vault`/`test_vault_ui`.)
 13. **Engagement timeline view** — scan→creds→sessions→paths chronology.
 14. **PDF client report** — one-click assessment PDF.
 15. **Engagement compare/diff** — vulns/paths across runs.
