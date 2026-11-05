@@ -302,6 +302,15 @@
             </div>
             <div class="output" id="fz-output" hidden></div>
             <div class="row">
+              <input type="text" id="st-login" data-testid="st-login" value="http://127.0.0.1:3138/login" title="Login URL you own (fresh session per iteration)" />
+              <input type="text" id="st-creds" data-testid="st-creds" value='{"user":"u","pass":"p"}' title="Login JSON body" />
+              <input type="text" id="st-session" data-testid="st-session" placeholder="token (JSON field)" title="JSON field promoted to Bearer (cookies always kept)" />
+              <button class="btn" id="btn-st-start" data-testid="btn-st-start">Stateful fuzz</button>
+              <span class="muted" id="st-status" data-testid="st-status"></span>
+            </div>
+            <textarea id="st-flow" data-testid="st-flow" rows="2" class="grow" placeholder='Flow JSON: [{"method":"POST","url":"http://h/items","fields":["body:name","query:q"]}]'></textarea>
+            <div class="output" id="st-output" data-testid="st-output" hidden></div>
+            <div class="row">
               <button class="btn" id="btn-sandiff" data-testid="btn-sandiff">Sanitizer diff</button>
               <span class="muted" id="sandiff-status" data-testid="sandiff-status"></span>
             </div>
@@ -541,6 +550,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="stfuzz"><span>Exploit: stateful login → fuzz</span></div>
         <div class="cmd-item" data-cmd="sandiff"><span>Exploit: compare sanitizers on a report</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>

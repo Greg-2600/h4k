@@ -301,6 +301,7 @@ sandbox stand-ins required where network/tooling is involved.
 54. **Crash bisection** — input halve to minimal trigger.
 55. **PCAP → seed replay** — deterministic fuzz seeds.
 56. **Stateful fuzz** — login → authed-flow fuzz.
+  (done: `services/stateful_fuzz.py` per-iteration login (cookies + JSON-token harvest), round-robin step×field×mutation replay with session attached, 5xx/error-text/timeout signals (session-loss noted, never ledgered) + scope-enforced ledger; `POST /api/stateful_fuzz` (400 bad login/flow, 404 unknown engagement) sandbox canned; Fuzz-lab row + palette; unit (incl. live login + authed stub) + e2e `test_stateful_fuzz*`.)
 57. **Rate-limit-aware fuzz** — 429 backoff + jitter.
 58. **Authenticated fuzz profiles** — cookie/header presets.
 59. **Fuzz sharding** — N workers, merged registry.

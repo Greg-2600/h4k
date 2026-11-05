@@ -538,6 +538,49 @@ async function sanitizerDiff() {
   }
 }
 
+async function startStatefulFuzz() {
+  const btn = $('btn-st-start');
+  if (btn) btn.disabled = true;
+  $('st-output').hidden = false;
+  $('st-output').textContent = 'stateful fuzzing (login → fuzz)…';
+  $('st-status').textContent = '';
+  let flow = null;
+  try {
+    flow = JSON.parse($('st-flow').value.trim() || '[]');
+  } catch {
+    $('st-output').textContent = 'flow must be valid JSON';
+    if (btn) btn.disabled = false;
+    return;
+  }
+  let creds = {};
+  try {
+    creds = JSON.parse($('st-creds').value.trim() || '{}');
+  } catch {
+    $('st-output').textContent = 'login body must be valid JSON';
+    if (btn) btn.disabled = false;
+    return;
+  }
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/stateful_fuzz', {
+      method: 'POST',
+      body: {
+        login_url: $('st-login').value.trim(), login_body: creds,
+        session_json_field: $('st-session').value.trim() || "",
+        flow, iterations: 30, engagement_id: engId || null,
+      },
+    });
+    const cands = res.candidates || [];
+    $('st-output').textContent = `${res.logins || 0} logins · ${cands.length} candidate(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}\n`
+      + cands.map((c) => `${c.mutation} on ${c.step}: ${c.evidence || ''}`).join('\n').slice(0, 4000);
+    $('st-status').textContent = `${cands.length} candidate(s)`;
+    log(`stateful fuzz done: ${cands.length} candidate(s)`, 'success');
+  } catch (e) {
+    $('st-output').textContent = `stateful fuzz failed: ${e.message}`;
+    log(`stateful fuzz failed: ${e.message}`, 'error');
+  } finally { if (btn) btn.disabled = false; }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -1555,6 +1598,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'stfuzz') setTab('exploit');
   else if (cmd === 'sandiff') setTab('exploit');
   else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
@@ -1756,6 +1800,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ap-start').addEventListener('click', startAutopilot);
   $('btn-ap-stop').addEventListener('click', stopAutopilot);
   $('btn-fz-start').addEventListener('click', startFuzzing);
+  $('btn-st-start').addEventListener('click', startStatefulFuzz);
   $('btn-sandiff').addEventListener('click', sanitizerDiff);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
