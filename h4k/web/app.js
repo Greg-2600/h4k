@@ -1002,6 +1002,29 @@ async function auditKubelet() {
   }
 }
 
+async function auditRbac() {
+  const documents = [$('rbac-docs').value.trim()].filter(Boolean);
+  if (!documents.length) { log('RBAC audit needs pasted YAML', 'warn'); return; }
+  const host = $('rbac-host').value.trim() || '127.0.0.1';
+  $('rbac-body').textContent = 'auditing RBAC (offline)…';
+  $('rbac-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/rbac/audit', {
+      method: 'POST',
+      body: { documents, host, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => `${f.title || f.role || 'finding'} (${f.severity || '?'})`).slice(0, 8).join(', ');
+    const state = res.risky ? 'no over-permissive grants' : `${res.finding_count || 0} finding(s)`;
+    $('rbac-body').innerHTML = `<div data-testid="rbac-findings">${esc(`${state} across ${res.parsed || 0} manifest(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${(res.errors || []).length ? ` · ${res.errors.length} parse note(s)` : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('rbac-status').textContent = state;
+    log(`RBAC audit done: ${state}`, res.risky ? 'success' : 'warn');
+  } catch (e) {
+    $('rbac-body').textContent = `RBAC audit failed: ${e.message}`;
+    log(`RBAC audit failed: ${e.message}`, 'error');
+  }
+}
+
 async function startContainerFuzz() {
   const btn = $('btn-cf-start');
   if (btn) btn.disabled = true;
@@ -1455,6 +1478,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'rbacaudit') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'score') setTab('score');
@@ -1641,6 +1665,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);
+  $('btn-rbac-audit').addEventListener('click', auditRbac);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }
     catch (e) { log(`cve refresh failed: ${e.message}`, 'error'); }

@@ -265,6 +265,13 @@
               <span class="muted" id="kube-status" data-testid="kube-status"></span>
             </div>
             <div id="kube-body" data-testid="kube-body" class="muted">Read-only: /healthz, /pods, /metrics + read-only-port probe. Nothing is executed.</div>
+            <div class="row">
+              <input type="text" id="rbac-host" data-testid="rbac-host" value="127.0.0.1" title="Host label for the ledger entry (analysis is offline)" />
+              <button class="btn" id="btn-rbac-audit" data-testid="btn-rbac-audit">Audit RBAC</button>
+              <span class="muted" id="rbac-status" data-testid="rbac-status"></span>
+            </div>
+            <textarea id="rbac-docs" data-testid="rbac-docs" rows="3" class="grow" placeholder="Paste Role/ClusterRole/Binding YAML here (offline analysis, nothing contacts a cluster)"></textarea>
+            <div id="rbac-body" data-testid="rbac-body" class="muted">Flags * verbs, secret reads, escalate/bind, pod create, and over-broad bindings.</div>
           </div>
         </div>
         <div class="card">
@@ -512,6 +519,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>

@@ -280,6 +280,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/kubelet_audit.py` stdlib HTTPS GET checklist (/healthz, anonymous /pods, /metrics, 10255 read-only-port probe, no exec/writes) + scope-enforced vuln ledger; `POST /api/kubelet/audit` sandbox canned; Container card Audit-kubelet row + palette; unit (incl. canned-transport logic + unreachable) + e2e `test_kubelet_audit*`.)
 38. **Docker socket guard** — detect + policy suggestion.
 39. **K8s RBAC audit** — over-permissive roles flagged.
+  (done: `services/rbac_audit.py` offline `safe_load_all` manifest audit (* verbs/resources, escalate/bind/impersonate, secret read, pod create, authenticated/unauthenticated + cluster-admin bindings) + scope-enforced vuln ledger; `POST /api/rbac/audit` (400 empty docs) sandbox canned; Container card Audit-RBAC row + palette; unit + e2e `test_rbac_audit*`.)
 40. **Helm chart SAST** — templating + secret checks.
 41. **Terraform/IaC scan** — Checkov-style offline misconfigs.
 42. **Cloud metadata SSRF pack** — 169.254 probes, opt-in.
