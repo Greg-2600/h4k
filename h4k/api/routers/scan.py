@@ -2872,6 +2872,26 @@ def vuln_leads(req: VulnLeadsRequest) -> dict[str, Any]:
     return {"target": req.target, "leads": leads, "count": len(leads)}
 
 
+@router.get("/cpe/correlate")
+def cpe_correlate(
+    service: str = "", product: str = "", version: str = "", vendor: str = ""
+) -> dict[str, Any]:
+    """Banner → CPE 2.3 → CVE matches (offline, read-only).
+
+    Canonicalizes the fingerprinted product (vendor inference included)
+    and reuses the banner-aware matcher, so the CVE list is identical to
+    a scan correlation for the same banner.
+    """
+    from services.cpe import correlate
+
+    return correlate(
+        service=service or None,
+        product=product or None,
+        version=version or None,
+        vendor=vendor or None,
+    )
+
+
 def _target_matches_svc(rec: dict[str, Any], target: str) -> bool:
     import ipaddress
 

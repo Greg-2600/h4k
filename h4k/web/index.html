@@ -136,6 +136,18 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>CPE correlate</h2><span class="spacer"></span><span class="muted">banner → CPE → CVE · offline</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="cpe-service" data-testid="cpe-service" placeholder="service: ssh" />
+              <input type="text" id="cpe-product" data-testid="cpe-product" class="grow" placeholder="product: OpenSSH" />
+              <input type="text" id="cpe-version" data-testid="cpe-version" placeholder="version: 7.4" />
+              <button class="btn" id="btn-cpe" data-testid="btn-cpe">Correlate</button>
+            </div>
+            <div id="cpe-body" data-testid="cpe-body" class="muted">Canonical vendor/product/version plus banner-aware CVE matches.</div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>TLS fingerprint</h2><span class="spacer"></span><span class="muted">handshake inventory + C2 leads · opt-in</span></div>
           <div class="card-body">
             <div class="row">
@@ -470,6 +482,7 @@
         <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="cpe"><span>Recon: CPE correlate banner → CVE</span></div>
         <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>

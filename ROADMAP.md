@@ -259,6 +259,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/cert_inventory.py` multi-host inventory + 30-day expiry/self-signed/weak leads + scope-enforced vuln ledger; `POST /api/tls/inventory` sandbox canned; TLS card inventory row; unit + e2e `test_cert*`.)
 21. **Shodan/Censys BYO import** — JSON → leads, no key in repo.
 22. **CPE auto-correlate** — banner → CPE → CVE matcher.
+  (done: `services/cpe.py` vendor inference + CPE 2.3 strings reusing the banner-aware matcher (no new false positives); `GET /api/cpe/correlate`; Recon CPE card + palette; unit + e2e `test_cpe*`.)
 23. **KEV/EPSS enrichment** — CISA KEV flag + EPSS score on vulns.
 24. **CVSS v4 re-score** — override with audit trail.
 25. **False-positive tuner** — suppress with reason + expiry.
