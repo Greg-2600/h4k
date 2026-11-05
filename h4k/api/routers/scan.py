@@ -44,6 +44,8 @@ from schemas import (
     NucleiRequest,
     NucleiResult,
     PaginatedJobs,
+    PoisonLabRequest,
+    PoisonLabResult,
     Report,
     ScanRequest,
     SqlmapRequest,
@@ -3169,6 +3171,28 @@ def lateral_movement(req: LateralRequest) -> dict[str, Any]:
     from services.lateral import LateralMovement
 
     return LateralMovement().discover_network(req.cidr)
+
+
+@router.post("/poisonlab/listen", response_model=PoisonLabResult)
+def poisonlab_listen(req: PoisonLabRequest) -> PoisonLabResult:
+    """LLMNR/NBT-NS lab listener: passive analyze by default.
+
+    Poisoning needs `poison=true` **and** `confirm_lab=true` on a
+    lab/container interface, otherwise it is refused with a reason.
+    """
+    from services import sandbox as sandbox_mode
+    from services.poison_lab import PoisonLab, sandbox_listen
+
+    if sandbox_mode.enabled():
+        return PoisonLabResult(**sandbox_listen(req.interface))
+    return PoisonLabResult(
+        **PoisonLab().listen(
+            req.interface,
+            duration=req.duration,
+            poison=req.poison,
+            confirm_lab=req.confirm_lab,
+        )
+    )
 
 
 @router.post("/db_interrogate")

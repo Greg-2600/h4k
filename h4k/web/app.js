@@ -732,6 +732,27 @@ async function runNse() {
   } catch (e) { $('nse-body').textContent = `nse failed: ${e.message}`; }
 }
 
+async function plabRun() {
+  const body = {
+    interface: $('plab-iface').value.trim() || 'lo',
+    duration: parseInt($('plab-dur').value, 10) || 120,
+    poison: $('plab-poison').checked,
+    confirm_lab: $('plab-confirm').checked,
+  };
+  $('plab-body').textContent = 'listening…';
+  try {
+    const res = await api('/api/poisonlab/listen', { method: 'POST', body });
+    if (res.refused) {
+      $('plab-body').textContent = `refused: ${res.error || 'not a lab interface'}`;
+      log(`poison lab refused: ${res.error}`, 'warn');
+      return;
+    }
+    const hashes = res.hashes || [];
+    $('plab-body').innerHTML = `<div data-testid="plab-hashes">${esc(`${res.mode} on ${res.interface}: ${hashes.length} hash(es)${hashes.length ? `: ${hashes.slice(0, 2).join(' ').slice(0, 200)}` : ''}`)}</div>`;
+    log(`poison lab: ${res.mode}, ${hashes.length} hash(es)`, 'success');
+  } catch (e) { $('plab-body').textContent = `poison lab failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1236,6 +1257,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'poisonlab') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
@@ -1408,6 +1430,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-plab-run').addEventListener('click', plabRun);
   $('btn-nse-suggest').addEventListener('click', runNseSuggest);
   $('btn-nse-run').addEventListener('click', runNse);
   $('btn-gobuster').addEventListener('click', runGobuster);

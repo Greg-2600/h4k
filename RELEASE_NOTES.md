@@ -636,6 +636,15 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #9 — LLMNR/NBT-NS poison lab
+
+`POST /api/poisonlab/listen` is the safe lab counterpart to raw Responder:
+analyze mode (`-A`, answers nothing) by default, NTLM hash capture parsing,
+and poisoning only with `poison=true` **and** `confirm_lab=true` on a
+lab/container NIC (`lo`, `docker*`, `br-*`, `veth*`, …; `H4K_POISONLAB_ALLOW`
+override documents itself in the refusal). Anything else is refused with a
+reason. Sandbox returns a canned capture. Pivot card + palette.
+
 ## Backlog #6 — NSE vuln suggest-and-run
 
 `GET /api/nse/suggest?service=&product=` maps a fingerprinted service to

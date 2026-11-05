@@ -239,6 +239,7 @@ sandbox stand-ins required where network/tooling is involved.
 7. **SMB share enumerator** — shares/ACLs, read-only, into asset graph.
 8. **Kerberos roast helpers** — AS-REP/kerberoast → John, explicit only.
 9. **LLMNR/NBT-NS poison lab** — container-only listener + capture.
+  (done: `services/poison_lab.py` analyze-default (`-A`) + gated poison (confirm_lab + lab-NIC allowlist + `H4K_POISONLAB_ALLOW` override) + NTLM hash capture; `POST /api/poisonlab/listen` sandbox canned; Pivot card + palette; unit + e2e `test_poison_lab*`.)
 10. **Lockout-aware spray** — jitter, per-user cap, ledger stop.
 11. **Session post-exploit recon pack** — sysinfo/getuid/loot timeline.
 12. **Loot vault with redaction** — creds/keys/flags, masked export.

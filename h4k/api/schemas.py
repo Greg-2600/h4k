@@ -489,6 +489,29 @@ class NmapNSEResult(BaseModel):
     tool: dict[str, Any] = {}
 
 
+class PoisonLabRequest(BaseModel):
+    """LLMNR/NBT-NS poison-lab listener (passive default, opt-in poison)."""
+
+    interface: str = "lo"
+    duration: int = Field(default=120, ge=10, le=1800)
+    poison: bool = False  # analyze mode unless explicitly set
+    confirm_lab: bool = False  # second confirmation for poisoning
+
+
+class PoisonLabResult(BaseModel):
+    interface: str = ""
+    mode: str = "analyze"
+    hashes: list[str] = []
+    hash_count: int = 0
+    refused: bool = False
+    error: str | None = None
+    stdout: str = ""
+    stderr: str = ""
+    rc: int | None = None
+    success: bool = False
+    timed_out: bool = False
+
+
 class NiktoRequest(BaseModel):
     """Standalone nikto web vulnerability scan."""
 
