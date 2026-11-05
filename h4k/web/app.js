@@ -980,6 +980,27 @@ async function detectContainerSurfaces() {
   }
 }
 
+async function guardDocker() {
+  const host = $('dock-host').value.trim() || '127.0.0.1';
+  $('dock-body').textContent = 'inspecting runtime (read-only)…';
+  $('dock-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/docker/guard', {
+      method: 'POST',
+      body: { host, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => `${f.check || 'finding'} (${f.severity || '?'})`).join(', ');
+    const state = res.guarded ? 'guarded' : `${res.finding_count || 0} finding(s)`;
+    $('dock-body').innerHTML = `<div data-testid="dock-findings">${esc(`${state}${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('dock-status').textContent = state;
+    log(`docker guard done: ${state}`, res.guarded ? 'success' : 'warn');
+  } catch (e) {
+    $('dock-body').textContent = `docker guard failed: ${e.message}`;
+    log(`docker guard failed: ${e.message}`, 'error');
+  }
+}
+
 async function startContainerFuzz() {
   const btn = $('btn-cf-start');
   if (btn) btn.disabled = true;
@@ -1433,6 +1454,7 @@ function runCmd(cmd) {
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
   else if (cmd === 'firetv') setTab('pivot');
   else if (cmd === 'cfuzz') setTab('exploit');
+  else if (cmd === 'dockguard') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'score') setTab('score');
   else if (cmd === 'theme') toggleTheme();
@@ -1617,6 +1639,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-cf-detect').addEventListener('click', detectContainerSurfaces);
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
+  $('btn-dock-guard').addEventListener('click', guardDocker);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }
     catch (e) { log(`cve refresh failed: ${e.message}`, 'error'); }

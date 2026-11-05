@@ -636,6 +636,17 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #38 — docker socket guard
+
+`POST /api/docker/guard` inspects the local runtime read-only —
+well-known socket paths (present? a socket? world-writable?),
+operator `docker`-group membership (root-equivalent), and an
+unauthenticated `DOCKER_HOST=tcp://` env — and pairs every finding
+with a concrete hardening policy (drop the mount, proxy the socket,
+leave the group, TLS the daemon). With `engagement_id` the findings
+ledger as vulns on the labeled host (scope-enforced). Sandbox is fully
+canned. Container card Socket-guard row + palette.
+
 ## Backlog #27 — privesc suggester
 
 `POST /api/privesc/suggest` runs ten read-only checks in the linPEAS

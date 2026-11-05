@@ -258,6 +258,12 @@
               <button class="btn primary" id="btn-cf-start" data-testid="btn-cf-start">Start fuzzing</button>
             </div>
             <div class="output" id="cf-output" data-testid="cf-output" hidden></div>
+            <div class="row">
+              <input type="text" id="dock-host" data-testid="dock-host" value="127.0.0.1" title="Host label for the ledger entry (detection runs where the API runs)" />
+              <button class="btn" id="btn-dock-guard" data-testid="btn-dock-guard">Socket guard</button>
+              <span class="muted" id="dock-status" data-testid="dock-status"></span>
+            </div>
+            <div id="dock-body" data-testid="dock-body" class="muted">Read-only: socket paths, docker-group membership, DOCKER_HOST. Each finding ships a fix.</div>
           </div>
         </div>
         <div class="card">
@@ -505,6 +511,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="dockguard"><span>Exploit: docker socket guard</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>
         <div class="cmd-item" data-cmd="theme"><span>Toggle theme</span></div>

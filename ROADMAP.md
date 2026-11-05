@@ -278,6 +278,7 @@ sandbox stand-ins required where network/tooling is involved.
 36. **Container image scan** — trivy image → engagement vulns.
 37. **Kubelet unauth audit** — read-only checks.
 38. **Docker socket guard** — detect + policy suggestion.
+  (done: `services/docker_guard.py` read-only local inspect (socket stat/world-writable, docker-group membership, DOCKER_HOST tcp) with per-finding hardening policy + scope-enforced vuln ledger; `POST /api/docker/guard` sandbox canned; Container card Socket-guard row + palette; unit + e2e `test_docker_guard*`.)
 39. **K8s RBAC audit** — over-permissive roles flagged.
 40. **Helm chart SAST** — templating + secret checks.
 41. **Terraform/IaC scan** — Checkov-style offline misconfigs.

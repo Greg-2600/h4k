@@ -28,6 +28,8 @@ from schemas import (
     ContainerFuzzResult,
     DBInterrogateRequest,
     DeepAttackRequest,
+    DockerGuardRequest,
+    DockerGuardResult,
     FireTVRequest,
     FireTVResult,
     FuzzRequest,
@@ -3250,6 +3252,45 @@ def nuclei_scan_api(req: NucleiRequest) -> NucleiResult:
         **{
             **result,
             "target": req.target,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/docker/guard", response_model=DockerGuardResult)
+def docker_guard_api(req: DockerGuardRequest) -> DockerGuardResult:
+    """Inspect the local runtime for docker-socket exposure (read-only).
+
+    `host` labels the ledger entry — detection always runs where the API
+    runs. `engagement_id` ledgers findings as vulns on that host
+    (scope-enforced). Sandbox returns canned findings.
+    """
+    from services import sandbox as sandbox_mode
+    from services.docker_guard import detect, sandbox_result, to_ledger
+
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    result = sandbox_result() if sandbox_mode.enabled() else detect()
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from fastapi import HTTPException
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, result.get("findings") or []):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return DockerGuardResult(
+        **{
+            **result,
+            "host": host,
             "ingested": ingested,
             "skipped_out_of_scope": skipped,
         }

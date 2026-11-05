@@ -652,6 +652,31 @@ class NucleiResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Docker socket guard ----
+class DockerGuardRequest(BaseModel):
+    """Docker socket guard request (read-only local inspection).
+
+    `host` labels the engagement ledger entry — detection always runs
+    where the API runs.
+    """
+
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class DockerGuardResult(BaseModel):
+    host: str = ""
+    sockets: list[dict[str, Any]] = []
+    docker_group_member: bool = False
+    docker_host: str = ""
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    guarded: bool = True
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- SQLMap ----
 class SqlmapRequest(BaseModel):
     """SQLMap automated SQL injection scan request."""
