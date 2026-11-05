@@ -263,6 +263,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/kev.py` + `h4k/data/kev.json` (37 real KEV+EPSS entries, sources+date stamped) + check/enrich/refresh endpoints; Recon KEV card with opt-in refresh; unit (incl. keep-table-on-failure) + e2e `test_kev*`.)
 24. **CVSS v4 re-score** — override with audit trail.
 25. **False-positive tuner** — suppress with reason + expiry.
+  (done: `vuln_suppressions` table (migration-safe) + suppress/unsuppress/list/effective endpoints (out-of-scope refused, expired rows inert); Recon Suppress-finding card + list; unit + e2e `test_suppress*`.)
 26. **BloodHound ingest** — SharpHound JSON → graph overlay.
 27. **Privesc suggester** — lin/winPEAS-style checklist, read-only.
 28. **XSS catch lab** — token/cookie catch + replay, lab-only.
