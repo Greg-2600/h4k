@@ -115,6 +115,7 @@ Host recon/scan:
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
 - `POST /api/fuzz/shard` (N workers, merged registry)
 - `POST /api/rate_fuzz` (polite throttle probe + ledger)
+- `POST /api/stateful_fuzz` (login → authed-flow fuzz + ledger)
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
 
 CTF / lab toolkit (opt-in, each explicit):
@@ -192,6 +193,7 @@ Health/diagnostic:
 | `sarif_exchange.py` | h4k↔SARIF 2.1.0 interchange (lossless h4k round-trip) |
 | `fuzz_shard.py` | N-worker disjoint-slice coordinator over one locked CrashRegistry |
 | `ratefuzz.py` | polite 429/Retry-After backoff probe + throttle characterization |
+| `stateful_fuzz.py` | login → authed-flow fuzz with session harvest + ledger |
 | `sanitizer_diff.py` | pasted-report ASan/UBSan/MSan coverage compare + one confirming rebuild |
 | `jwt_tester.py` | offline JWT audit + capped HMAC crack + live alg-confusion vs marker, ledgered, sandbox canned |
 | `ssrf_pack.py` | opt-in metadata SSRF probe pack (AWS/GCP/Azure + encoding bypasses) + scope-enforced ledger, sandbox canned |

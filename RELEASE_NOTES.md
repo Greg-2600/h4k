@@ -718,6 +718,18 @@ locked crash registry — two workers tripping the same bug report one
 crash. Per-worker errors are recorded, never fatal; output is sorted
 by crash id for stable responses. Bounded (8 workers × 2000 inputs).
 Fuzz-lab row + palette; sandbox fully canned.
+## Backlog #56 — stateful fuzz
+
+`POST /api/stateful_fuzz` logs in fresh every iteration with the
+operator's credentials (all `Set-Cookies` kept, one optional JSON
+field promoted to a Bearer token), then replays one mutated flow step
+with the session attached — round-robin over steps, fields and
+mutations, fully deterministic. 5xx, leaked error text and timeouts
+land as candidates; a lost session marker is reported per candidate
+but never ledgered as a bug. With `engagement_id` the crash signals
+ledger as vulns on the flow host (scope-enforced; CWE-20). Fuzz-lab
+row (login URL + creds JSON + session field + flow JSON) + palette;
+sandbox fully canned.
 
 ## Backlog #53 — sanitizer diff
 
