@@ -636,6 +636,19 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #61 — SARIF import/export
+
+`POST /api/source/sarif/export` converts pasted h4k findings to
+SARIF 2.1.0 (severities mapped to levels, CWEs in rule properties,
+deduped rule descriptors, original h4k severities stashed in
+`h4k_severity` so h4k→SARIF→h4k is lossless despite SARIF's coarser
+levels — a real format limitation, fixed honestly). `POST
+/api/source/sarif/import` reads outside SARIF (tested against a
+realistic Semgrep `--sarif` shape): rule metadata and CWE tags
+resolve per run, the producing tool is noted never relabeled,
+malformed results are reported per index never silently dropped. Score
+card with file download + palette; sandbox fully canned.
+
 ## Backlog #57 — rate-limit-aware fuzz
 
 `POST /api/rate_fuzz` characterizes one endpoint's throttling with

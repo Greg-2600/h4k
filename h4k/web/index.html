@@ -514,6 +514,19 @@
           <div class="card-head"><h2>Report</h2><span class="spacer"></span><button class="btn" id="btn-session-report">Download MD</button> <button class="btn primary" id="btn-session-pdf" data-testid="btn-session-pdf">Download PDF</button></div>
           <div class="card-body"><div class="output" id="report-preview" data-testid="report-preview">Press Download MD to fill.</div></div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>SARIF interchange</h2><span class="spacer"></span><span class="muted">import · export</span></div>
+          <div class="card-body">
+            <div class="row">
+              <button class="btn" id="btn-sarif-import" data-testid="btn-sarif-import">Import SARIF</button>
+              <button class="btn" id="btn-sarif-export" data-testid="btn-sarif-export">Export SARIF</button>
+              <span class="muted" id="sarif-status" data-testid="sarif-status"></span>
+            </div>
+            <textarea id="sarif-paste" data-testid="sarif-paste" rows="3" class="grow" placeholder='Paste SARIF JSON to import, or h4k findings JSON [{"rule_id":…}] to export'></textarea>
+            <div class="output" id="sarif-output" data-testid="sarif-output" hidden></div>
+            <div class="muted">Semgrep --sarif in, GitHub-ready SARIF out. Offline both ways.</div>
+          </div>
+        </div>
       </section>
 
       <aside class="rail" id="ops-rail">
@@ -563,6 +576,7 @@
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
+        <div class="cmd-item" data-cmd="sarifx"><span>Score: SARIF import/export</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>
         <div class="cmd-item" data-cmd="theme"><span>Toggle theme</span></div>
         <div class="cmd-item" data-cmd="clear"><span>Clear log</span></div>

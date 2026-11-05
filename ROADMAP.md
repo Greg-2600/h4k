@@ -308,6 +308,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/fuzz_shard.py` coordinator (deterministic disjoint slices, seeded per worker, shared locked `CrashRegistry`, per-worker errors never fatal, stable sorted output) + `POST /api/fuzz/shard` (400 no target) sandbox canned; Fuzz-lab row + palette; unit (incl. live RST stub proving cross-worker dedup to 1) + e2e `test_fuzz_shard*`.)
 60. **Coverage HTML import** — llvm-cov badge in UI.
 61. **SARIF import/export** — Semgrep interchange.
+  (done: `services/sarif_exchange.py` h4k→SARIF 2.1.0 (level map, CWE tags, deduped rules, lossless h4k_severity round-trip) + SARIF→h4k (rule metadata, CWE tags, origin noted, per-result errors); `POST /api/source/sarif/export|import` (400 bad/empty) sandbox canned; Score card + palette + SARIF file download; unit (incl. real Semgrep-shaped fixture) + e2e `test_sarif_exchange*`.)
 62. **Taint rules pack** — source→sink Python/JS/PHP.
 63. **Secret baseline + allowlist** — noise reduction.
 64. **Reachability filter** — import-graph prunes dead code.
