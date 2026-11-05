@@ -229,6 +229,7 @@ sandbox stand-ins required where network/tooling is involved.
 1. **Interactive attack-graph canvas** — clickable pan/zoom nodes, PNG export.
   (done: `services/graph_canvas.py` + `GET /api/engagement/{id}/graph/canvas` returns deterministic x/y + legend; Score-tab SVG with drag-pan, wheel-zoom, click details, PNG export; unit + e2e `test_graph_canvas`.)
 2. **Nuclei template runner** — opt-in CVE templates, offline bundle + ledger.
+  (done: `h4k/data/nuclei-templates/` ships 3 CVE templates; `POST /api/nuclei` gains `offline` + `engagement_id` ledger ingest with scope enforcement; `GET /api/nuclei/templates` exposes the bundle; sandbox canned finding; Recon card + palette button; unit + e2e `test_nuclei_*`.)
 3. **DAST spider + auth crawl** — depth-bounded, scope-checked link/form map.
 4. **Credential hygiene report** — reuse/weak/default summary per engagement.
 5. **Scheduled re-scans + diff alerts** — cadence per engagement, MD digest.

@@ -1,0 +1,22 @@
+id: h4k-bluekeep
+info:
+  name: RDP BlueKeep (CVE-2019-0708)
+  author: h4k
+  severity: critical
+  description: BlueKeep RDP probe marker (offline bundle template).
+  reference:
+    - https://nvd.nist.gov/vuln/detail/CVE-2019-0708
+  metadata:
+    cve: CVE-2019-0708
+    cwe: CWE-119
+network:
+  - inputs:
+      - data: "h4k-bluekeep-probe"
+    host:
+      - "{{Hostname}}"
+    port: "3389"
+    matchers:
+      - type: word
+        words:
+          - "h4k-bluekeep-probe"
+        condition: or
