@@ -636,6 +636,18 @@ existing impacket precedent). Also unmasked a latent hazard: the trailing
 `pip check` is clean so it now fails loudly, plus curl retries on every
 network fetch and a pinned trivy tarball instead of install.sh.
 
+## Backlog #55 — PCAP → seed replay
+
+`POST /api/pcap/seeds` parses a pasted base64 PCAP with a hand-rolled
+reader (no new dependencies) — either endianness, nano/microsecond
+stamps, 802.1Q, IPv4/TCP only — groups packets into directed flows
+and reassembles payloads in sequence order (retransmit dupes dropped,
+non-first fragments skipped, stated caps). Each flow payload becomes
+a deterministic base64 seed (same bytes in, same seeds out); with
+`replay_host`/`replay_port` the first flow is re-sent verbatim over
+TCP to that lab host only and the response excerpt recorded. Fuzz-lab
+row + palette; sandbox fully canned (shape validated even there).
+
 ## Backlog #53 — sanitizer diff
 
 `POST /api/source/sanitizer/diff` classifies one pasted report with

@@ -302,6 +302,14 @@
             </div>
             <div class="output" id="fz-output" hidden></div>
             <div class="row">
+              <input type="text" id="pcap-host" data-testid="pcap-host" value="127.0.0.1" title="Replay target (plain TCP, your lab host only; empty = parse only)" />
+              <input type="text" id="pcap-port" data-testid="pcap-port" value="80" title="Replay port (empty = parse only)" />
+              <button class="btn" id="btn-pcap-seeds" data-testid="btn-pcap-seeds">PCAP → seeds</button>
+              <span class="muted" id="pcap-status" data-testid="pcap-status"></span>
+            </div>
+            <textarea id="pcap-b64" data-testid="pcap-b64" rows="3" class="grow" placeholder="Paste pcap base64 here (offline parse, nothing uploaded)"></textarea>
+            <div class="output" id="pcap-output" data-testid="pcap-output" hidden></div>
+            <div class="row">
               <button class="btn" id="btn-sandiff" data-testid="btn-sandiff">Sanitizer diff</button>
               <span class="muted" id="sandiff-status" data-testid="sandiff-status"></span>
             </div>
@@ -541,6 +549,7 @@
         <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
         <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
         <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="pcapseeds"><span>Exploit: turn a PCAP into fuzz seeds</span></div>
         <div class="cmd-item" data-cmd="sandiff"><span>Exploit: compare sanitizers on a report</span></div>
         <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>

@@ -300,6 +300,7 @@ sandbox stand-ins required where network/tooling is involved.
   (done: `services/sanitizer_diff.py` offline pasted-report classify (incl. MSan uninit flagship) + per-family would-detect matrix from a stated coverage table + blind spots + one confirming rebuild (flags/env/replay); `POST /api/source/sanitizer/diff` (400 empty) sandbox canned; Fuzz-lab row + palette; unit + e2e `test_sanitizer_diff*`.)
 54. **Crash bisection** — input halve to minimal trigger.
 55. **PCAP → seed replay** — deterministic fuzz seeds.
+  (done: `services/pcap_seeds.py` hand-rolled pcap reader (either endianness, nano/micro, 802.1Q, IPv4/TCP, seq-sorted reassembly with overlap drop + fragment skip) → per-flow base64 seeds (dedup-able, deterministic) + verbatim TCP replay of the first flow; `POST /api/pcap/seeds` (400 bad/empty pcap, validated even in sandbox) sandbox canned; Fuzz-lab row + palette; unit (incl. crafted out-of-order/dup/UDP/fragment pcap + live echo replay) + e2e `test_pcap_seeds*`.)
 56. **Stateful fuzz** — login → authed-flow fuzz.
 57. **Rate-limit-aware fuzz** — 429 backoff + jitter.
 58. **Authenticated fuzz profiles** — cookie/header presets.

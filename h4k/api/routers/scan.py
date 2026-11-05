@@ -51,6 +51,8 @@ from schemas import (
     NucleiRequest,
     NucleiResult,
     PaginatedJobs,
+    PcapSeedsRequest,
+    PcapSeedsResult,
     RbacAuditRequest,
     RbacAuditResult,
     Report,
@@ -3534,6 +3536,56 @@ def jwt_test_api(req: JwtTestRequest) -> JwtTestResult:
             "skipped_out_of_scope": skipped,
         }
     )
+
+
+@router.post("/pcap/seeds", response_model=PcapSeedsResult)
+def pcap_seeds_api(req: PcapSeedsRequest) -> PcapSeedsResult:
+    """Parse a pasted PCAP into deterministic per-flow fuzz seeds.
+
+    Offline parse first; with `replay_host` + `replay_port` each flow
+    payload is re-sent verbatim to that lab host only (plain TCP).
+    Sandbox returns canned flows without parsing anything.
+    """
+    from services import sandbox as sandbox_mode
+    from services.pcap_seeds import load_source, parse_pcap, replay_flow, sandbox_parse
+
+    if not (req.pcap_b64 or "").strip():
+        raise HTTPException(status_code=400, detail="pcap_b64 required (paste base64)")
+    try:
+        raw = load_source(req.pcap_b64)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if sandbox_mode.enabled():
+        try:
+            parse_pcap(raw)  # validate shape; the payload stays canned
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return PcapSeedsResult(**sandbox_parse())
+    try:
+        result = parse_pcap(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    replay: dict[str, Any] | None = None
+    if req.replay_host and req.replay_port:
+        host = req.replay_host.strip()
+        try:
+            first = next((s for s in result["seeds"]), None)
+            if first is None:
+                replay = {"connected": False, "error": "no flow payload to replay"}
+            else:
+                import base64 as b64lib
+
+                replay = replay_flow(
+                    host,
+                    int(req.replay_port),
+                    b64lib.b64decode(first["seed_b64"]),
+                    timeout=req.timeout,
+                )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except OSError as exc:
+            replay = {"connected": False, "error": str(exc)[:160]}
+    return PcapSeedsResult(**{**result, "replay": replay})
 
 
 @router.get("/nuclei/templates")
