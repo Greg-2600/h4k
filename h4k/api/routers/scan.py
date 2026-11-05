@@ -2872,6 +2872,35 @@ def vuln_leads(req: VulnLeadsRequest) -> dict[str, Any]:
     return {"target": req.target, "leads": leads, "count": len(leads)}
 
 
+@router.get("/kev/check")
+def kev_check(cve: str = "") -> dict[str, Any]:
+    """KEV flag + EPSS for one CVE id (bundled snapshot, exact match)."""
+    from services.kev import enrich
+
+    if not cve.strip():
+        raise HTTPException(status_code=400, detail="cve required")
+    return enrich(cve)
+
+
+@router.post("/kev/enrich")
+def kev_enrich(body: dict[str, Any]) -> dict[str, Any]:
+    """Batch KEV/EPSS enrichment for a CVE list (bundled snapshot)."""
+    from services.kev import enrich_many
+
+    cves = (body or {}).get("cves") or []
+    if not isinstance(cves, list):
+        raise HTTPException(status_code=400, detail="cves must be a list")
+    return enrich_many([str(c) for c in cves])
+
+
+@router.post("/kev/refresh")
+def kev_refresh() -> dict[str, Any]:
+    """Best-effort live refresh of the KEV/EPSS table (opt-in network)."""
+    from services.kev import refresh
+
+    return refresh()
+
+
 def _target_matches_svc(rec: dict[str, Any], target: str) -> bool:
     import ipaddress
 

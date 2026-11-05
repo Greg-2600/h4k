@@ -1,0 +1,487 @@
+{
+ "catalog_date": "2026-11-05",
+ "cves": {
+  "CVE-2026-31431": {
+   "kev": true,
+   "vendor": "Linux",
+   "product": "Kernel",
+   "due_date": "2026-05-15",
+   "ransomware_use": "Unknown",
+   "notes": "Linux Kernel contains an incorrect resource transfer between spheres vulnerability that could allow for privilege escalation.",
+   "epss": {
+    "score": "0.981140000",
+    "percentile": "0.999120000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2021-43798": {
+   "kev": true,
+   "vendor": "Grafana Labs",
+   "product": "Grafana",
+   "due_date": "2025-10-30",
+   "ransomware_use": "Unknown",
+   "notes": "Grafana contains a path traversal vulnerability that could allow access to local files.",
+   "epss": {
+    "score": "0.885030000",
+    "percentile": "0.997720000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2025-32463": {
+   "kev": true,
+   "vendor": "Sudo",
+   "product": "Sudo",
+   "due_date": "2025-10-20",
+   "ransomware_use": "Unknown",
+   "notes": "Sudo contains an inclusion of functionality from untrusted control sphere vulnerability. This vulnerability could allow local attacker to leverage sudo\u2019s -R (--chroot) option to run arbitrary commands",
+   "epss": {
+    "score": "0.563000000",
+    "percentile": "0.990540000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2017-3506": {
+   "kev": true,
+   "vendor": "Oracle",
+   "product": "WebLogic Server",
+   "due_date": "2024-06-24",
+   "ransomware_use": "Unknown",
+   "notes": "Oracle WebLogic Server, a product within the Fusion Middleware suite, contains an OS command injection vulnerability that allows an attacker to execute arbitrary code via a specially crafted HTTP requ",
+   "epss": {
+    "score": "0.959910000",
+    "percentile": "0.998750000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2024-21762": {
+   "kev": true,
+   "vendor": "Fortinet",
+   "product": "FortiOS",
+   "due_date": "2024-02-16",
+   "ransomware_use": "Known",
+   "notes": "Fortinet FortiOS contains an out-of-bound write vulnerability that allows a remote unauthenticated attacker to execute code or commands via specially crafted HTTP requests.",
+   "epss": {
+    "score": "0.845890000",
+    "percentile": "0.997040000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2023-34362": {
+   "kev": true,
+   "vendor": "Progress",
+   "product": "MOVEit Transfer",
+   "due_date": "2023-06-23",
+   "ransomware_use": "Known",
+   "notes": "Progress MOVEit Transfer contains a SQL injection vulnerability that could allow an unauthenticated attacker to gain unauthorized access to MOVEit Transfer's database. Depending on the database engine",
+   "epss": {
+    "score": "0.999340000",
+    "percentile": "0.999700000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2023-27350": {
+   "kev": true,
+   "vendor": "PaperCut",
+   "product": "MF/NG",
+   "due_date": "2023-05-12",
+   "ransomware_use": "Known",
+   "notes": "PaperCut MF/NG contains an improper access control vulnerability within the SetupCompleted class that allows authentication bypass and code execution in the context of system.",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "0.999940000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2017-7494": {
+   "kev": true,
+   "vendor": "Samba",
+   "product": "Samba",
+   "due_date": "2023-04-20",
+   "ransomware_use": "Known",
+   "notes": "Samba contains a remote code execution vulnerability, allowing a malicious client to upload a shared library to a writable share and then cause the server to load and execute it.",
+   "epss": {
+    "score": "0.994480000",
+    "percentile": "0.999420000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2021-4034": {
+   "kev": true,
+   "vendor": "Red Hat",
+   "product": "Polkit",
+   "due_date": "2022-07-18",
+   "ransomware_use": "Known",
+   "notes": "The Red Hat polkit pkexec utility contains an out-of-bounds read and write vulnerability that allows for privilege escalation with administrative rights.",
+   "epss": {
+    "score": "0.949210000",
+    "percentile": "0.998600000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2022-1388": {
+   "kev": true,
+   "vendor": "F5",
+   "product": "BIG-IP",
+   "due_date": "2022-05-31",
+   "ransomware_use": "Known",
+   "notes": "F5 BIG-IP contains a missing authentication in critical function vulnerability which can allow for remote code execution, creation or deletion of files, or disabling services.",
+   "epss": {
+    "score": "0.999540000",
+    "percentile": "0.999740000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2014-0160": {
+   "kev": true,
+   "vendor": "OpenSSL",
+   "product": "OpenSSL",
+   "due_date": "2022-05-25",
+   "ransomware_use": "Unknown",
+   "notes": "The TLS and DTLS implementations in OpenSSL do not properly handle Heartbeat Extension packets, which allows remote attackers to obtain sensitive information.",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "0.999970000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2021-3156": {
+   "kev": true,
+   "vendor": "Sudo",
+   "product": "Sudo",
+   "due_date": "2022-04-27",
+   "ransomware_use": "Unknown",
+   "notes": "Sudo contains an off-by-one error that can result in a heap-based buffer overflow, which allows for privilege escalation.",
+   "epss": {
+    "score": "0.999620000",
+    "percentile": "0.999750000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2022-22965": {
+   "kev": true,
+   "vendor": "VMware",
+   "product": "Spring Framework",
+   "due_date": "2022-04-25",
+   "ransomware_use": "Unknown",
+   "notes": "Spring MVC or Spring WebFlux application running on JDK 9+ may be vulnerable to remote code execution (RCE) via data binding.",
+   "epss": {
+    "score": "0.996380000",
+    "percentile": "0.999490000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2019-15107": {
+   "kev": true,
+   "vendor": "Webmin",
+   "product": "Webmin",
+   "due_date": "2022-04-15",
+   "ransomware_use": "Known",
+   "notes": "An issue was discovered in Webmin. The parameter old in password_change.cgi contains a command injection vulnerability.",
+   "epss": {
+    "score": "0.997100000",
+    "percentile": "0.999520000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2012-1823": {
+   "kev": true,
+   "vendor": "PHP",
+   "product": "PHP",
+   "due_date": "2022-04-15",
+   "ransomware_use": "Unknown",
+   "notes": "sapi/cgi/cgi_main.c in PHP, when configured as a CGI script, does not properly handle query strings, which allows remote attackers to execute arbitrary code.",
+   "epss": {
+    "score": "0.999980000",
+    "percentile": "0.999900000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2019-11581": {
+   "kev": true,
+   "vendor": "Atlassian",
+   "product": "Jira Server and Data Center",
+   "due_date": "2022-09-07",
+   "ransomware_use": "Unknown",
+   "notes": "Atlassian Jira Server and Data Center contain a server-side template injection vulnerability which can allow for remote code execution.",
+   "epss": {
+    "score": "0.846210000",
+    "percentile": "0.997050000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2020-1938": {
+   "kev": true,
+   "vendor": "Apache",
+   "product": "Tomcat",
+   "due_date": "2022-03-17",
+   "ransomware_use": "Unknown",
+   "notes": "Apache Tomcat treats Apache JServ Protocol (AJP) connections as having higher trust than, for example, a similar HTTP connection. If such connections are available to an attacker, they can be exploite",
+   "epss": {
+    "score": "0.992700000",
+    "percentile": "0.999360000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2016-5195": {
+   "kev": true,
+   "vendor": "Linux",
+   "product": "Kernel",
+   "due_date": "2022-03-24",
+   "ransomware_use": "Unknown",
+   "notes": "Race condition in mm/gup.c in the Linux kernel allows local users to escalate privileges.",
+   "epss": {
+    "score": "0.835240000",
+    "percentile": "0.996860000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2020-0796": {
+   "kev": true,
+   "vendor": "Microsoft",
+   "product": "SMBv3",
+   "due_date": "2022-08-10",
+   "ransomware_use": "Known",
+   "notes": "A remote code execution vulnerability exists in the way that the Microsoft Server Message Block 3.1.1 (SMBv3) protocol handles certain requests. An attacker who successfully exploited the vulnerabilit",
+   "epss": {
+    "score": "0.998100000",
+    "percentile": "0.999580000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2017-0144": {
+   "kev": true,
+   "vendor": "Microsoft",
+   "product": "SMBv1",
+   "due_date": "2022-08-10",
+   "ransomware_use": "Known",
+   "notes": "The SMBv1 server in multiple Microsoft Windows versions allows remote attackers to execute arbitrary code via crafted packets.",
+   "epss": {
+    "score": "0.992300000",
+    "percentile": "0.999350000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2014-6271": {
+   "kev": true,
+   "vendor": "GNU",
+   "product": "Bourne-Again Shell (Bash)",
+   "due_date": "2022-07-28",
+   "ransomware_use": "Unknown",
+   "notes": "GNU Bash through 4.3 processes trailing strings after function definitions in the values of environment variables, which allows remote attackers to execute code.",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "0.999930000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2017-12149": {
+   "kev": true,
+   "vendor": "Red Hat",
+   "product": "JBoss Application Server",
+   "due_date": "2022-06-10",
+   "ransomware_use": "Known",
+   "notes": "The JBoss Application Server, shipped with Red Hat Enterprise Application Platform 5.2, allows an attacker to execute arbitrary code via crafted serialized data.",
+   "epss": {
+    "score": "0.907130000",
+    "percentile": "0.998050000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2021-44228": {
+   "kev": true,
+   "vendor": "Apache",
+   "product": "Log4j2",
+   "due_date": "2021-12-24",
+   "ransomware_use": "Known",
+   "notes": "Apache Log4j2 contains a vulnerability where JNDI features do not protect against attacker-controlled JNDI-related endpoints, allowing for remote code execution.",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "1.000000000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2021-41773": {
+   "kev": true,
+   "vendor": "Apache",
+   "product": "HTTP Server",
+   "due_date": "2021-11-17",
+   "ransomware_use": "Known",
+   "notes": "Apache HTTP Server contains a path traversal vulnerability that allows an attacker to perform remote code execution if files outside directories configured by Alias-like directives are not under defau",
+   "epss": {
+    "score": "0.999920000",
+    "percentile": "0.999860000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2017-5638": {
+   "kev": true,
+   "vendor": "Apache",
+   "product": "Struts",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Known",
+   "notes": "Apache Struts Jakarta Multipart parser allows for malicious file upload using the Content-Type value, leading to remote code execution.",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "0.999950000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2021-26084": {
+   "kev": true,
+   "vendor": "Atlassian",
+   "product": "Confluence Server and Data Center",
+   "due_date": "2021-11-17",
+   "ransomware_use": "Known",
+   "notes": "Atlassian Confluence Server and Data Server contain an Object-Graph Navigation Language (OGNL) injection vulnerability that may allow an unauthenticated attacker to execute code.",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "0.999930000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2019-3396": {
+   "kev": true,
+   "vendor": "Atlassian",
+   "product": "Confluence Server and Data Server",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Known",
+   "notes": "Atlassian Confluence Server and Data Center contain a server-side template injection vulnerability that may allow an attacker to achieve path traversal and remote code execution.",
+   "epss": {
+    "score": "0.999130000",
+    "percentile": "0.999670000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2020-3452": {
+   "kev": true,
+   "vendor": "Cisco",
+   "product": "Adaptive Security Appliance (ASA) and Firepower Threat Defense (FTD)",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Unknown",
+   "notes": "Cisco Adaptive Security Appliance (ASA) and Firepower Threat Defense (FTD) contain an improper input validation vulnerability when HTTP requests process URLs.  An attacker could exploit this vulnerabi",
+   "epss": {
+    "score": "0.999920000",
+    "percentile": "0.999860000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2019-19781": {
+   "kev": true,
+   "vendor": "Citrix",
+   "product": "Application Delivery Controller (ADC), Gateway, and SD-WAN WANOP Appliance",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Known",
+   "notes": "Citrix ADC, Citrix Gateway, and multiple Citrix SD-WAN WANOP appliance models contain an unspecified vulnerability that could allow an unauthenticated attacker to perform code execution.",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "0.999980000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2018-7600": {
+   "kev": true,
+   "vendor": "Drupal",
+   "product": "Drupal Core",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Known",
+   "notes": "Drupal Core contains a remote code execution vulnerability that could allow an attacker to exploit multiple attack vectors on a Drupal site, resulting in complete site compromise.",
+   "epss": {
+    "score": "0.999910000",
+    "percentile": "0.999850000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2020-5902": {
+   "kev": true,
+   "vendor": "F5",
+   "product": "BIG-IP",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Known",
+   "notes": "F5 BIG-IP Traffic Management User Interface (TMUI) contains a remote code execution vulnerability in undisclosed pages.",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "1.000000000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2019-0708": {
+   "kev": true,
+   "vendor": "Microsoft",
+   "product": "Remote Desktop Services",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Known",
+   "notes": "Microsoft Remote Desktop Services, formerly known as Terminal Service, contains an unspecified vulnerability that allows an unauthenticated attacker to connect to the target system using RDP and send ",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "0.999990000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2021-34527": {
+   "kev": true,
+   "vendor": "Microsoft",
+   "product": "Windows",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Known",
+   "notes": "Microsoft Windows Print Spooler contains an unspecified vulnerability due to the Windows Print Spooler service improperly performing privileged file operations. Successful exploitation allows an attac",
+   "epss": {
+    "score": "0.997920000",
+    "percentile": "0.999560000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2020-1472": {
+   "kev": true,
+   "vendor": "Microsoft",
+   "product": "Netlogon",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Known",
+   "notes": "Microsoft's Netlogon Remote Protocol (MS-NRPC) contains a privilege escalation vulnerability when an attacker establishes a vulnerable Netlogon secure channel connection to a domain controller. An att",
+   "epss": {
+    "score": "0.993890000",
+    "percentile": "0.999400000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2020-14882": {
+   "kev": true,
+   "vendor": "Oracle",
+   "product": "WebLogic Server",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Unknown",
+   "notes": "Oracle WebLogic Server contains an unspecified vulnerability, which is assessed to allow for remote code execution, based on this vulnerability being related to CVE-2020-14750.",
+   "epss": {
+    "score": "0.999970000",
+    "percentile": "0.999890000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2019-11510": {
+   "kev": true,
+   "vendor": "Ivanti",
+   "product": "Pulse Connect Secure",
+   "due_date": "2022-05-03",
+   "ransomware_use": "Known",
+   "notes": "Ivanti Pulse Connect Secure contains an arbitrary file read vulnerability that allows an unauthenticated remote attacker with network access via HTTPS to send a specially crafted URI.",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "0.999950000",
+    "date": "2026-11-05"
+   }
+  },
+  "CVE-2021-21985": {
+   "kev": true,
+   "vendor": "VMware",
+   "product": "vCenter Server",
+   "due_date": "2021-11-17",
+   "ransomware_use": "Known",
+   "notes": "VMware vSphere Client contains an improper input validation vulnerability in the Virtual SAN Health Check plug-in, which is enabled by default in vCenter Server, which allows for remote code execution",
+   "epss": {
+    "score": "0.999990000",
+    "percentile": "0.999930000",
+    "date": "2026-11-05"
+   }
+  }
+ },
+ "source": "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv + https://api.first.org/data/v1/epss"
+}

@@ -815,6 +815,28 @@ async function runTlsInventory() {
   } catch (e) { $('tls-inv-body').textContent = `tls inventory failed: ${e.message}`; }
 }
 
+async function runKevCheck() {
+  const raw = $('kev-cves').value.trim();
+  if (!raw) { log('kev needs CVE ids', 'warn'); return; }
+  const cves = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  $('kev-body').textContent = 'checking…';
+  try {
+    const res = await api('/api/kev/enrich', { method: 'POST', body: { cves } });
+    $('kev-body').innerHTML = (res.results || []).map((r) => `<div data-testid="kev-result"><b>${esc(r.cve)}</b> ${r.kev ? '🔴 KEV' : '—'}${r.epss && r.epss.score ? ` EPSS ${esc(r.epss.score)}` : ''}<span class="muted"> due ${esc(r.due_date || '—')}</span></div>`).join('') || 'no results';
+    log(`kev: ${res.kev_count || 0}/${res.count || 0} known-exploited`, 'success');
+  } catch (e) { $('kev-body').textContent = `kev failed: ${e.message}`; }
+}
+
+async function runKevRefresh() {
+  $('kev-body').textContent = 'refreshing KEV catalog…';
+  try {
+    const res = await api('/api/kev/refresh', { method: 'POST', body: {} });
+    if (res.error) log(`kev refresh failed (kept bundled table): ${res.error}`, 'warn');
+    else log(`kev refreshed: ${res.after} entries`, 'success');
+    runKevCheck();
+  } catch (e) { $('kev-body').textContent = `kev refresh failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1363,6 +1385,7 @@ function runCmd(cmd) {
   else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
   else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
   else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
+  else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
   else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
   else if (cmd === 'kerberos') { setTab('pivot'); }
   else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
@@ -1538,6 +1561,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
   });
   $('btn-nikto').addEventListener('click', runNikto);
+  $('btn-kev').addEventListener('click', runKevCheck);
+  $('btn-kev-refresh').addEventListener('click', runKevRefresh);
   $('btn-tls-run').addEventListener('click', runTlsFingerprint);
   $('btn-tls-inv').addEventListener('click', runTlsInventory);
   $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
