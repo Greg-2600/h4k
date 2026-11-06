@@ -25,6 +25,8 @@ from schemas import (
     SarifExportRequest,
     SarifImportRequest,
     SarifImportResult,
+    SastDeltaRequest,
+    SastDeltaResult,
     ScaResult,
     SecretsScanRequest,
     SecretsScanResult,
@@ -352,6 +354,30 @@ def ci_gate(req: CiGateRequest) -> CiGateResult:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return CiGateResult(**result)
+
+
+@router.post("/sast/delta", response_model=SastDeltaResult)
+def sast_delta(req: SastDeltaRequest) -> SastDeltaResult:
+    """Diff-only SAST findings per PR (offline, read-only).
+
+    `baseline` (main) vs `current` (the PR): exact (rule, file, line)
+    matches are unchanged; same rule+file within `move_tolerance`
+    lines is moved (code shifted, not a new vuln); the rest of current
+    is new and the rest of baseline is fixed. Garbage entries are a
+    400, never silent. Sandbox returns a canned diff. Nothing ledgers.
+    """
+    from services import sandbox as sandbox_mode
+    from services.sast_delta import diff_findings, sandbox_result
+
+    if sandbox_mode.enabled():
+        return SastDeltaResult(**sandbox_result())
+    try:
+        result = diff_findings(
+            req.baseline, req.current, move_tolerance=req.move_tolerance
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SastDeltaResult(**result)
 
 
 @router.post("/exploit")

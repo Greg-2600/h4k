@@ -321,6 +321,13 @@
         </div>
         <textarea id="ci-paste" data-testid="ci-paste" rows="3" class="grow" placeholder='Paste h4k findings JSON: [{"rule_id":…,"name":…,"severity":"high",…}]'></textarea>
         <div id="ci-body" data-testid="ci-body" class="muted">Paste findings, pick a threshold — green only when nothing blocking and waivers listed.</div>
+        <div class="row">
+          <button class="btn" id="btn-sast-delta" data-testid="btn-sast-delta">Diff SAST</button>
+          <span class="muted" id="delta-status" data-testid="delta-status"></span>
+        </div>
+        <textarea id="delta-base" data-testid="delta-base" rows="2" class="grow" placeholder='Baseline findings JSON (main): [{…}]'></textarea>
+        <textarea id="delta-cur" data-testid="delta-cur" rows="2" class="grow" placeholder='Current findings JSON (the PR): [{…}]'></textarea>
+        <div id="delta-body" data-testid="delta-body" class="muted">Only what the PR introduces shouts — shifted lines count as moved, not new.</div>
           </div>
         </div>
         <div class="card">
@@ -613,6 +620,7 @@
         <div class="cmd-item" data-cmd="secretscan"><span>Exploit: scan committed secrets</span></div>
         <div class="cmd-item" data-cmd="reachmap"><span>Exploit: map import reachability</span></div>
         <div class="cmd-item" data-cmd="cigate"><span>Exploit: SAST CI gate check</span></div>
+        <div class="cmd-item" data-cmd="sastdelta"><span>Exploit: diff SAST findings per PR</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="sarifx"><span>Score: SARIF import/export</span></div>

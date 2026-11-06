@@ -335,6 +335,29 @@ class CiGateResult(BaseModel):
     sandbox: bool = False
 
 
+# ---- Delta SAST ----
+class SastDeltaRequest(BaseModel):
+    """Diff-only findings per PR (baseline = main, current = the PR)."""
+
+    baseline: list[Any] = Field(default_factory=list)
+    current: list[Any] = Field(default_factory=list)
+    move_tolerance: int = 3
+
+
+class SastDeltaResult(BaseModel):
+    new: list[dict[str, Any]] = []
+    new_count: int = 0
+    fixed: list[dict[str, Any]] = []
+    fixed_count: int = 0
+    moved: list[dict[str, Any]] = []
+    moved_count: int = 0
+    unchanged_count: int = 0
+    baseline_count: int = 0
+    current_count: int = 0
+    move_tolerance: int = 3
+    sandbox: bool = False
+
+
 # ---- SARIF import/export ----
 class SarifExportRequest(BaseModel):
     """Export h4k findings to SARIF 2.1.0 (`findings` are SourceFinding dicts)."""
