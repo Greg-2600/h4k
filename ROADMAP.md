@@ -222,9 +222,10 @@ item is a self-contained, live-demonstrable increment on the current release.
 
 ## Backlog — 100 candidate features (prioritized 1–100, risk → wow → debt)
 
-Ordered by **risk reduction first, demo wow second, with tech-debt paydown
-threaded through**: each open item carries its primary driver — [risk],
-[wow] or [debt]. Items 1–25 are done and merged. Items marked *(in flight:
+Ordered for **WOW factor, reliability, quality, security, and testing
+payoff**: checkable security work first, then testing/reliability
+force-multipliers and demo wow, with tech-debt paydown threaded through.
+Each open item carries its primary driver — [risk], [wow] or [debt]. Items 1–25 are done and merged. Items marked *(in flight:
 PR #N)* have an open PR implementing exactly that scope — work the
 lowest-numbered item that is neither done nor in flight, and never duplicate
 in-flight work. Deliberately cut as out of scope: mobile triage, themes,
@@ -320,28 +321,28 @@ where network/tooling is involved.
 60. **PCAP → seed replay** [wow] — deterministic fuzz seeds. *(was #55; in flight: PR #76)*
 61. **Stateful fuzz + auth profiles** [risk] — login → authed-flow fuzz. *(was #56, #58; in flight: PR #77)*
 62. **Coverage HTML import** [wow] — llvm-cov badge in UI. *(was #60; in flight: PR #81)*
-63. **SAST CI gate + delta + inline suppress** [risk] — fail PRs on new high-severity findings; diff-only results; NOSAST with expiry + owner. *(merges old #65, #66, #67; old #65 done via #87, old #66 done via #88)*
-64. **Multi-lang SAST: Go + Rust** [risk] — core source→sink rules for Go and Rust services. *(merges old #68)*
-65. **Vuln-lib taint + VEX statements** [risk] — vulnerable-dependency → sink paths; not-affected with justification. *(merges old #69, #70)*
-66. **Typosquat heuristics + SLSA provenance ingest** [risk] — malicious-package signals; build-info provenance records. *(merges old #71, #72)*
-67. **Supply-chain policy: license gate + SBOM diff + pin bot** [risk] — deny/warn license rules; new deps/CVEs per commit; suggested pinned upgrades. *(merges old #73, #74, #75)*
-68. **OS package audit + base-image freshness** [risk] — dpkg/rpm/apk → CVE matching; image age/EOL + slim suggestions. *(merges old #76, #77)*
-69. **Rotation planner + patch-diff verifier + PoC capture** [wow] — rotate steps for found secrets; before/after re-fuzz proof; headless exploit-flow recording. *(merges old #78, #79, #80)*
-70. **Disclosure tracker + CVSS builder + CWE browser** [risk] — 90-day disclosure timeline with reminders; pick-a-score vector builder; offline CWE dictionary + suggest. *(merges old #81, #82, #83)*
-71. **Vuln intel: Exploit-DB + MSF delta + tech→CVE** [risk] — offline Exploit-DB mirror search; new modules since update; WhatWeb/Wappalyzer tech → CVE auto-link. *(merges old #84, #85, #178, #179)*
-72. **AI patch-rank + test-gen + false-positive judge** [wow] — 3 patch candidates with tradeoffs; regression-test skeletons; why-not-exploitable explanations. *(merges old #86, #87, #88)*
-73. **AI NL query + similar-bug search** [wow] — read-only natural-language graph questions; embedding search for twin findings. *(merges old #89, #94)*
-74. **Prompt guard + AI cost badge + eval harness** [debt] — strip secrets before LLM send; tokens/sec + fallback reason; accuracy on fixtures. *(merges old #90, #91, #93)*
-75. **Command palette** [wow] — Ctrl-K ops launcher for every card action. *(merges old #95)*
-76. **Purple-team pack: D3FEND map + tabletop + deception + replay** [wow] — countermeasure per technique; scenario generator; honeypot/canary suggest; attack → detection check. *(merges old #96, #97, #98, #99)*
-77. **SIEM/SOAR handoff pack** [risk] — CEF/LEEF syslog export; STIX bundle; MISP push; TheHive case; finding → ticket/webhook dispatch (all opt-in). *(merges old #100, #101, #102, #103, #104, #105)*
-78. **GRC tracking: SLA + risk accept + compliance crosswalk** [risk] — ageing + burndown; accept-with-expiry + signer; CIS/NIST/PCI map. *(merges old #106, #107, #108)*
-79. **Exec dashboard + portfolio + role views** [wow] — risk trend + exposure score; multi-engagement rollup; operator/viewer/auditor. *(merges old #109, #110, #111)*
-80. **Audit log + backup/restore + retention/GC** [debt] — immutable op log + export; encrypted bundles; prune pcaps/corpora per engagement; fuzz-artifact quotas. *(merges old #112, #113, #131, #132)*
-81. **Evidence locker + custody + offline field kit** [risk] — pcap/loot with hash chain; hash + signer export; air-gap import bundle. *(merges old #114, #115, #116)*
-82. **Keyboard-first + screen-reader pass** [debt] — shortcuts + focus traps; ARIA live regions. *(merges old #121, #122)*
-83. **Finding workflow: bulk ops + tags + comments + assign + kanban** [debt] — tag/suppress N findings; saved filters; per-finding threads; owner + due dates; todo/doing/done. *(merges old #123, #124, #125, #126, #127)*
-84. **Verify-fix retest + flaky detector + confidence stats + dedup** [risk] — one-click finding rescan; appears/disappears flagging; verified/lead/suppressed stats; one finding per vuln. *(merges old #128, #129, #130, #177)*
+63. **SAST CI gate + delta + inline suppress** [risk] — fail PRs on new high-severity findings; diff-only results; NOSAST with expiry + owner. *(merges old #65, #66, #67; old #65 done via #87, old #66 done via #88, old #67 in flight: PR #89)*
+64. **Verify-fix retest + flaky detector + coverage-green + dedup** [risk] — one-click finding rescan; appears/disappears flagging; verified/lead/suppressed stats; one finding per vuln; keep the 90% coverage gate green and quarantine flaky e2e (quarantine list + retries, never silent skips). *(merges old #128, #129, #130, #177)*
+65. **Command palette** [wow] — Ctrl-K ops launcher for every card action. *(merges old #95)*
+66. **Multi-lang SAST: Go + Rust** [risk] — core source→sink rules for Go and Rust services. *(merges old #68)*
+67. **Vuln-lib taint + VEX statements** [risk] — vulnerable-dependency → sink paths; not-affected with justification. *(merges old #69, #70)*
+68. **Typosquat heuristics + SLSA provenance ingest** [risk] — malicious-package signals; build-info provenance records. *(merges old #71, #72)*
+69. **Supply-chain policy: license gate + SBOM diff + pin bot** [risk] — deny/warn license rules; new deps/CVEs per commit; suggested pinned upgrades. *(merges old #73, #74, #75)*
+70. **OS package audit + base-image freshness** [risk] — dpkg/rpm/apk → CVE matching; image age/EOL + slim suggestions. *(merges old #76, #77)*
+71. **Rotation planner + patch-diff verifier + PoC capture** [wow] — rotate steps for found secrets; before/after re-fuzz proof; headless exploit-flow recording. *(merges old #78, #79, #80)*
+72. **Disclosure tracker + CVSS builder + CWE browser** [risk] — 90-day disclosure timeline with reminders; pick-a-score vector builder; offline CWE dictionary + suggest. *(merges old #81, #82, #83)*
+73. **Vuln intel: Exploit-DB + MSF delta + tech→CVE** [risk] — offline Exploit-DB mirror search; new modules since update; WhatWeb/Wappalyzer tech → CVE auto-link. *(merges old #84, #85, #178, #179)*
+74. **AI patch-rank + test-gen + false-positive judge** [wow] — 3 patch candidates with tradeoffs; regression-test skeletons; why-not-exploitable explanations. *(merges old #86, #87, #88)*
+75. **AI NL query + similar-bug search** [wow] — read-only natural-language graph questions; embedding search for twin findings. *(merges old #89, #94)*
+76. **Prompt guard + AI cost badge + eval harness** [debt] — strip secrets before LLM send; tokens/sec + fallback reason; accuracy on fixtures. *(merges old #90, #91, #93)*
+77. **Purple-team pack: D3FEND map + tabletop + deception + replay** [wow] — countermeasure per technique; scenario generator; honeypot/canary suggest; attack → detection check. *(merges old #96, #97, #98, #99)*
+78. **SIEM/SOAR handoff pack** [risk] — CEF/LEEF syslog export; STIX bundle; MISP push; TheHive case; finding → ticket/webhook dispatch (all opt-in). *(merges old #100, #101, #102, #103, #104, #105)*
+79. **GRC tracking: SLA + risk accept + compliance crosswalk** [risk] — ageing + burndown; accept-with-expiry + signer; CIS/NIST/PCI map. *(merges old #106, #107, #108)*
+80. **Exec dashboard + portfolio + role views** [wow] — risk trend + exposure score; multi-engagement rollup; operator/viewer/auditor. *(merges old #109, #110, #111)*
+81. **Audit log + backup/restore + retention/GC** [debt] — immutable op log + export; encrypted bundles; prune pcaps/corpora per engagement; fuzz-artifact quotas. *(merges old #112, #113, #131, #132)*
+82. **Evidence locker + custody + offline field kit** [risk] — pcap/loot with hash chain; hash + signer export; air-gap import bundle. *(merges old #114, #115, #116)*
+83. **Keyboard-first + screen-reader pass** [debt] — shortcuts + focus traps; ARIA live regions. *(merges old #121, #122)*
+84. **Finding workflow: bulk ops + tags + comments + assign + kanban** [debt] — tag/suppress N findings; saved filters; per-finding threads; owner + due dates; todo/doing/done. *(merges old #123, #124, #125, #126, #127)*
 85. **API keys + per-route rate limit + OIDC login** [debt] — scoped tokens; token-bucket throttle; lab SSO. *(merges old #133, #134, #135)*
 86. **Sandbox profiles + resource caps + fair-share + remote workers** [debt] — seccomp/apparmor per job; CPU/mem/timeout caps; priority + preempt queue; nmap/fuzz agents. *(merges old #136, #137, #138, #139)*
 87. **Lab traffic kit: Wireguard testbed + shaper + sinkhole + scrubber** [wow] — mesh VPN spin-up; slow/lossy target sim; malicious-domain sinkhole; strip payloads, keep flows. *(merges old #140, #141, #142, #143)*
