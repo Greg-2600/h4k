@@ -31,6 +31,8 @@ from schemas import (
     DeepAttackRequest,
     FireTVRequest,
     FireTVResult,
+    FuzzProfile,
+    FuzzProfileSave,
     FuzzRequest,
     GobusterRequest,
     GobusterResult,
@@ -63,6 +65,8 @@ from schemas import (
     SqlmapResult,
     SsrfProbeRequest,
     SsrfProbeResult,
+    StatefulFuzzRequest,
+    StatefulFuzzResult,
     TlsFingerprintRequest,
     TlsFingerprintResult,
     TlsInventoryRequest,
@@ -3589,6 +3593,122 @@ def run_rate_fuzz(req: RateFuzzRequest) -> RateFuzzResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return RateFuzzResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.get("/fuzz-profiles")
+def fuzz_profiles_list() -> dict[str, Any]:
+    """List saved auth presets (key names only — values never leave the server)."""
+    from services.fuzz_profiles import list_profiles
+
+    return list_profiles()
+
+
+@router.post("/fuzz-profiles", response_model=FuzzProfile)
+def fuzz_profiles_save(req: FuzzProfileSave) -> FuzzProfile:
+    """Create or replace a named auth preset."""
+    from services.fuzz_profiles import save_profile
+
+    try:
+        return FuzzProfile(**save_profile(req.name, req.headers, req.cookies))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/fuzz-profiles/{name}")
+def fuzz_profiles_delete(name: str) -> dict[str, Any]:
+    """Delete a named auth preset."""
+    from services.fuzz_profiles import delete_profile
+
+    try:
+        if not delete_profile(name):
+            raise HTTPException(status_code=404, detail="profile not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"deleted": name}
+
+
+@router.post("/stateful_fuzz", response_model=StatefulFuzzResult)
+def run_stateful_fuzz(req: StatefulFuzzRequest) -> StatefulFuzzResult:
+    """LAB-ONLY: login, then fuzz one authed flow step per iteration.
+
+    Synchronous and bounded (default 30 iterations). Only the
+    operator's login + flow URLs are ever requested. `engagement_id`
+    ledgers crash signals (not session-loss notes) as vulns on the
+    flow host (scope-enforced). Sandbox returns canned candidates.
+    """
+    from services import sandbox as sandbox_mode
+    from services.stateful_fuzz import fuzz_flow, sandbox_result, to_ledger
+
+    login_url = (req.login_url or "").strip()
+    if not login_url.startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=400, detail="login_url must be an http(s) URL you own"
+        )
+    if not req.flow:
+        raise HTTPException(status_code=400, detail="flow steps required")
+    try:
+        from services.fuzz_profiles import resolve_auth
+
+        auth = resolve_auth(req.profile, req.login_headers, None)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    login_headers = auth["headers"]
+    if sandbox_mode.enabled():
+        first = ""
+        for step in req.flow:
+            if isinstance(step, dict) and str(step.get("url") or "").strip():
+                first = str(step["url"]).strip()
+                break
+        result = sandbox_result(first or req.login_url)
+        host = urllib.parse.urlsplit(result.get("url", "")).hostname or "127.0.0.1"
+    else:
+        try:
+            result = fuzz_flow(
+                req.login_url,
+                login_body=req.login_body,
+                login_headers=login_headers,
+                login_method=req.login_method,
+                session_json_field=req.session_json_field or "",
+                authed_marker=req.authed_marker or "",
+                steps=req.flow,
+                iterations=req.iterations,
+                timeout=req.timeout,
+                preset_cookies=auth["cookies"],
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        host = ""
+        for step in req.flow:
+            if isinstance(step, dict) and step.get("url"):
+                host = urllib.parse.urlsplit(str(step["url"])).hostname or ""
+                if host:
+                    break
+        host = host or "127.0.0.1"
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, host, result.get("candidates") or []):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+            except ValueError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return StatefulFuzzResult(
         **{
             **result,
             "ingested": ingested,

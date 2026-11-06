@@ -1137,3 +1137,56 @@ class RateFuzzResult(BaseModel):
     sandbox: bool = False
     ingested: int = 0
     skipped_out_of_scope: list[str] = []
+
+
+# ---- Stateful fuzz ----
+class StatefulFuzzRequest(BaseModel):
+    """LAB-ONLY: login, then fuzz one authed flow step per iteration.
+
+    `login_body` holds the lab credentials; `session_json_field`
+    promotes one JSON field (e.g. `token`) to a Bearer token alongside
+    all Set-Cookies. `flow` steps name query or `body:` fields to
+    mutate. Only the operator's URLs are ever requested.
+    """
+
+    login_url: str
+    login_method: str = "POST"
+    login_body: dict[str, Any] = Field(default_factory=dict)
+    login_headers: dict[str, str] = Field(default_factory=dict)
+    session_json_field: str | None = None
+    authed_marker: str | None = None
+    flow: list[dict[str, Any]] = []
+    iterations: int = Field(default=30, ge=1, le=200)
+    timeout: float = Field(default=8.0, gt=0, le=30.0)
+    profile: str | None = None
+    engagement_id: str | None = None
+
+
+class StatefulFuzzResult(BaseModel):
+    steps: int = 0
+    logins: int = 0
+    iterations: int = 0
+    candidates: list[dict[str, Any]] = []
+    candidate_count: int = 0
+    clean: bool = True
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
+# ---- Authenticated fuzz profiles ----
+class FuzzProfileSave(BaseModel):
+    """Save a named auth preset (headers + cookies, values stay server-side)."""
+
+    name: str
+    headers: dict[str, str] = Field(default_factory=dict)
+    cookies: dict[str, str] = Field(default_factory=dict)
+
+
+class FuzzProfile(BaseModel):
+    name: str = ""
+    headers: list[str] = []
+    cookies: list[str] = []
+    header_count: int = 0
+    cookie_count: int = 0
+    updated: float = 0.0
