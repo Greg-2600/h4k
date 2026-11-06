@@ -157,6 +157,7 @@ Source analysis (source router):
 - `POST /source/sanitizer/diff` (offline ASan/UBSan/MSan compare)
 - `POST /source/ci/gate` (SAST CI gate: threshold + audited ignores)
 - `POST /source/sast/delta` (diff-only SAST findings per PR: new/fixed/moved)
+- `POST /source/suppress/match` (NOSAST with expiry + owner: suppressed/active/expired)
 - `POST /source/ossfuzz`
 
 Updater:
@@ -189,6 +190,7 @@ Health/diagnostic:
 | `reachability.py` | import-graph dead-code triage (py/JS/php) + entry guessing |
 | `ci_gate.py` | SAST CI gate: threshold + audited ignore list |
 | `sast_delta.py` | diff-only SAST per PR: new/fixed/moved + tolerance |
+| `suppress.py` | NOSAST directives with owner/expiry: suppressed/active/expired |
 | `secret_baseline.py` | committed-secret scan with baseline diff + allowlist |
 | `taint_pack.py` | source→sink taint pack (Python/JS/PHP) + scope-enforced ledger |
 | `sarif_exchange.py` | h4k↔SARIF 2.1.0 interchange (lossless h4k round-trip) |
