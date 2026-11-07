@@ -1849,39 +1849,20 @@ function togglePalette(show) {
 
 function runCmd(cmd) {
   togglePalette(false);
-  if (cmd === 'scan') { setTab('discover'); launchScan(); }
-  else if (cmd === 'neighbors') { setTab('discover'); launchNeighbors(); }
-  else if (cmd === 'neighbors6') { setTab('discover'); launchNeighbors6(); }
-  else if (cmd === 'fingerprint') { setTab('recon'); startFingerprint(); }
-  else if (cmd === 'autopilot') { setTab('exploit'); startAutopilot(); }
-  else if (cmd === 'nikto') { setTab('recon'); runNikto(); }
-  else if (cmd === 'gobuster') { setTab('recon'); runGobuster(); }
-  else if (cmd === 'ssrfprobe') { setTab('recon'); }
-  else if (cmd === 'jwttest') { setTab('recon'); }
-  else if (cmd === 'suppress') { setTab('recon'); }
-  else if (cmd === 'kev') { setTab('recon'); runKevCheck(); }
-  else if (cmd === 'tls') { setTab('recon'); runTlsFingerprint(); }
-  else if (cmd === 'kerberos') { setTab('pivot'); }
-  else if (cmd === 'nuclei') { setTab('recon'); runNuclei(); }
-  else if (cmd === 'firetv') setTab('pivot');
-  else if (cmd === 'cfuzz') setTab('exploit');
-  else if (cmd === 'shardfuzz') setTab('exploit');
-  else if (cmd === 'rateprobe') setTab('exploit');
-  else if (cmd === 'sandiff') setTab('exploit');
-  else if (cmd === 'rbacaudit') setTab('exploit');
-  else if (cmd === 'taintsast') setTab('exploit');
-  else if (cmd === 'secretscan') setTab('exploit');
-  else if (cmd === 'reachmap') setTab('exploit');
-  else if (cmd === 'cigate') setTab('exploit');
-  else if (cmd === 'sastdelta') setTab('exploit');
-  else if (cmd === 'nosast') setTab('exploit');
-  else if (cmd === 'verifyfix') setTab('exploit');
-  else if (cmd === 'kubeaudit') setTab('exploit');
+  // Every card action is one palette entry: the item names its tab and its
+  // button, so the palette literally clicks the same handler as the button
+  // (same guards, same validation — a launcher, not a parallel code path).
+  const item = document.querySelector(`.cmd-item[data-cmd="${cmd}"]`);
+  if (item && item.dataset.btn) {
+    if (item.dataset.tab) setTab(item.dataset.tab);
+    const btn = document.getElementById(item.dataset.btn);
+    if (btn) { btn.click(); return; }
+  }
+  if (cmd === 'theme') toggleTheme();
+  else if (cmd === 'clear') { $('activity-log').innerHTML = ''; }
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'sarifx') setTab('score');
   else if (cmd === 'score') setTab('score');
-  else if (cmd === 'theme') toggleTheme();
-  else if (cmd === 'clear') { $('activity-log').innerHTML = ''; }
 }
 
 function toggleTheme() {
@@ -2163,7 +2144,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('cmd-input').addEventListener('input', (e) => {
     const q = e.target.value.toLowerCase();
     document.querySelectorAll('.cmd-item').forEach((item) => {
-      item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
+      const hay = `${item.textContent} ${item.dataset.cmd || ''}`.toLowerCase();
+      item.style.display = hay.includes(q) ? '' : 'none';
     });
   });
   $('cmd-input').addEventListener('keydown', (e) => {
