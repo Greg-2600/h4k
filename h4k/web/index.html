@@ -610,34 +610,78 @@
     <div class="palette" id="cmd-palette" data-testid="cmd-palette" hidden>
       <input type="text" id="cmd-input" class="cmd-input" data-testid="cmd-input" placeholder="Type a command…" autocomplete="off" />
       <div id="cmd-results">
-        <div class="cmd-item" data-cmd="scan"><span>Discover: launch scan</span></div>
-        <div class="cmd-item" data-cmd="neighbors"><span>Discover: find neighbors</span></div>
-        <div class="cmd-item" data-cmd="neighbors6"><span>Discover: IPv6 neighbors</span></div>
-        <div class="cmd-item" data-cmd="fingerprint"><span>Recon: fingerprint services</span></div>
-        <div class="cmd-item" data-cmd="autopilot"><span>Exploit: start autopilot</span></div>
-        <div class="cmd-item" data-cmd="nikto"><span>Recon: nikto web scan</span></div>
-        <div class="cmd-item" data-cmd="nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
-        <div class="cmd-item" data-cmd="gobuster"><span>Recon: gobuster content discovery</span></div>
-        <div class="cmd-item" data-cmd="ssrfprobe"><span>Recon: SSRF metadata pack (opt-in)</span></div>
-        <div class="cmd-item" data-cmd="jwttest"><span>Recon: JWT audit + alg-confusion</span></div>
-        <div class="cmd-item" data-cmd="suppress"><span>Recon: suppress a finding</span></div>
-        <div class="cmd-item" data-cmd="kev"><span>Recon: KEV/EPSS check</span></div>
-        <div class="cmd-item" data-cmd="tls"><span>Recon: TLS fingerprint + C2 leads</span></div>
-        <div class="cmd-item" data-cmd="kerberos"><span>Pivot: Kerberos roast helpers</span></div>
-        <div class="cmd-item" data-cmd="firetv"><span>Pivot: Fire TV tools</span></div>
-        <div class="cmd-item" data-cmd="cfuzz"><span>Exploit: fuzz a container surface</span></div>
-        <div class="cmd-item" data-cmd="shardfuzz"><span>Exploit: shard fuzzing (N workers)</span></div>
-        <div class="cmd-item" data-cmd="rateprobe"><span>Exploit: probe rate limits politely</span></div>
-        <div class="cmd-item" data-cmd="sandiff"><span>Exploit: compare sanitizers on a report</span></div>
-        <div class="cmd-item" data-cmd="rbacaudit"><span>Exploit: audit K8s RBAC grants</span></div>
-        <div class="cmd-item" data-cmd="taintsast"><span>Exploit: taint-check pasted sources</span></div>
-        <div class="cmd-item" data-cmd="secretscan"><span>Exploit: scan committed secrets</span></div>
-        <div class="cmd-item" data-cmd="reachmap"><span>Exploit: map import reachability</span></div>
-        <div class="cmd-item" data-cmd="cigate"><span>Exploit: SAST CI gate check</span></div>
-        <div class="cmd-item" data-cmd="sastdelta"><span>Exploit: diff SAST findings per PR</span></div>
-        <div class="cmd-item" data-cmd="nosast"><span>Exploit: match NOSAST waivers</span></div>
-        <div class="cmd-item" data-cmd="verifyfix"><span>Exploit: verify a fix held</span></div>
-        <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
+        <div class="cmd-item" data-cmd="scan" data-tab="discover" data-btn="btn-scan"><span>Discover: launch scan</span></div>
+        <div class="cmd-item" data-cmd="neighbors" data-tab="discover" data-btn="btn-neighbors"><span>Discover: find neighbors</span></div>
+        <div class="cmd-item" data-cmd="neighbors6" data-tab="discover" data-btn="btn-neighbors6"><span>Discover: IPv6 neighbors</span></div>
+        <div class="cmd-item" data-cmd="fingerprint" data-tab="recon" data-btn="btn-fingerprint"><span>Recon: fingerprint services</span></div>
+        <div class="cmd-item" data-cmd="autopilot" data-tab="exploit" data-btn="btn-ap-start"><span>Exploit: start autopilot</span></div>
+        <div class="cmd-item" data-cmd="nikto" data-tab="recon" data-btn="btn-nikto"><span>Recon: nikto web scan</span></div>
+        <div class="cmd-item" data-cmd="nuclei" data-tab="recon" data-btn="btn-nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
+        <div class="cmd-item" data-cmd="gobuster" data-tab="recon" data-btn="btn-gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="ssrfprobe" data-tab="recon" data-btn="btn-ssrf-probe"><span>Recon: SSRF metadata pack (opt-in)</span></div>
+        <div class="cmd-item" data-cmd="jwttest" data-tab="recon" data-btn="btn-jwt-test"><span>Recon: JWT audit + alg-confusion</span></div>
+        <div class="cmd-item" data-cmd="suppress" data-tab="recon" data-btn="btn-suppress"><span>Recon: suppress a finding</span></div>
+        <div class="cmd-item" data-cmd="kev" data-tab="recon" data-btn="btn-kev"><span>Recon: KEV/EPSS check</span></div>
+        <div class="cmd-item" data-cmd="tls" data-tab="recon" data-btn="btn-tls-run"><span>Recon: TLS fingerprint + C2 leads</span></div>
+        <div class="cmd-item" data-cmd="cfuzz" data-tab="exploit" data-btn="btn-cf-start"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="shardfuzz" data-tab="exploit" data-btn="btn-sh-start"><span>Exploit: shard fuzzing (N workers)</span></div>
+        <div class="cmd-item" data-cmd="rateprobe" data-tab="exploit" data-btn="btn-rate-start"><span>Exploit: probe rate limits politely</span></div>
+        <div class="cmd-item" data-cmd="sandiff" data-tab="exploit" data-btn="btn-sandiff"><span>Exploit: compare sanitizers on a report</span></div>
+        <div class="cmd-item" data-cmd="rbacaudit" data-tab="exploit" data-btn="btn-rbac-audit"><span>Exploit: audit K8s RBAC grants</span></div>
+        <div class="cmd-item" data-cmd="taintsast" data-tab="exploit" data-btn="btn-taint-scan"><span>Exploit: taint-check pasted sources</span></div>
+        <div class="cmd-item" data-cmd="secretscan" data-tab="exploit" data-btn="btn-sec-scan"><span>Exploit: scan committed secrets</span></div>
+        <div class="cmd-item" data-cmd="reachmap" data-tab="exploit" data-btn="btn-reach"><span>Exploit: map import reachability</span></div>
+        <div class="cmd-item" data-cmd="cigate" data-tab="exploit" data-btn="btn-ci-gate"><span>Exploit: SAST CI gate check</span></div>
+        <div class="cmd-item" data-cmd="sastdelta" data-tab="exploit" data-btn="btn-sast-delta"><span>Exploit: diff SAST findings per PR</span></div>
+        <div class="cmd-item" data-cmd="nosast" data-tab="exploit" data-btn="btn-nosast"><span>Exploit: match NOSAST waivers</span></div>
+        <div class="cmd-item" data-cmd="verifyfix" data-tab="exploit" data-btn="btn-verify"><span>Exploit: verify a fix held</span></div>
+        <div class="cmd-item" data-cmd="kubeaudit" data-tab="exploit" data-btn="btn-kube-audit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
+        <div class="cmd-item" data-cmd="full-scan" data-tab="recon" data-btn="btn-full-scan"><span>Recon: Full port scan</span></div>
+        <div class="cmd-item" data-cmd="cve-refresh" data-tab="recon" data-btn="btn-cve-refresh"><span>Recon: Update CVEs</span></div>
+        <div class="cmd-item" data-cmd="nse-suggest" data-tab="recon" data-btn="btn-nse-suggest"><span>Recon: Suggest</span></div>
+        <div class="cmd-item" data-cmd="nse-run" data-tab="recon" data-btn="btn-nse-run"><span>Recon: Run</span></div>
+        <div class="cmd-item" data-cmd="tls-inv" data-tab="recon" data-btn="btn-tls-inv"><span>Recon: Cert inventory</span></div>
+        <div class="cmd-item" data-cmd="kev-refresh" data-tab="recon" data-btn="btn-kev-refresh"><span>Recon: Refresh</span></div>
+        <div class="cmd-item" data-cmd="sup-list" data-tab="recon" data-btn="btn-sup-list"><span>Recon: List</span></div>
+        <div class="cmd-item" data-cmd="refresh-next" data-tab="exploit" data-btn="btn-refresh-next"><span>Exploit: refresh next move</span></div>
+        <div class="cmd-item" data-cmd="cred-targets-refresh" data-tab="exploit" data-btn="btn-cred-targets-refresh"><span>Exploit: refresh targets</span></div>
+        <div class="cmd-item" data-cmd="launch-passattack" data-tab="exploit" data-btn="btn-launch-passattack"><span>Exploit: Launch</span></div>
+        <div class="cmd-item" data-cmd="cf-detect" data-tab="exploit" data-btn="btn-cf-detect"><span>Exploit: Detect</span></div>
+        <div class="cmd-item" data-cmd="fz-start" data-tab="exploit" data-btn="btn-fz-start"><span>Exploit: Start fuzzing</span></div>
+        <div class="cmd-item" data-cmd="propagate-plan" data-tab="pivot" data-btn="btn-propagate-plan"><span>Pivot: Propagation plan</span></div>
+        <div class="cmd-item" data-cmd="propagate-run" data-tab="pivot" data-btn="btn-propagate-run"><span>Pivot: Execute</span></div>
+        <div class="cmd-item" data-cmd="hygiene" data-tab="pivot" data-btn="btn-hygiene"><span>Pivot: Hygiene report</span></div>
+        <div class="cmd-item" data-cmd="krb-asrep" data-tab="pivot" data-btn="btn-krb-asrep"><span>Pivot: AS-REP roast</span></div>
+        <div class="cmd-item" data-cmd="krb-roast" data-tab="pivot" data-btn="btn-krb-roast"><span>Pivot: Kerberoast</span></div>
+        <div class="cmd-item" data-cmd="lateral-map" data-tab="pivot" data-btn="btn-lateral-map"><span>Pivot: Map routes</span></div>
+        <div class="cmd-item" data-cmd="db-run" data-tab="pivot" data-btn="btn-db-run"><span>Pivot: Enumerate APIs &amp; secrets</span></div>
+        <div class="cmd-item" data-cmd="escape-run" data-tab="pivot" data-btn="btn-escape-run"><span>Pivot: Escape check</span></div>
+        <div class="cmd-item" data-cmd="trylocalroot-run" data-tab="pivot" data-btn="btn-trylocalroot-run"><span>Pivot: tryLocalRoot_go_bro</span></div>
+        <div class="cmd-item" data-cmd="privesc-suggest" data-tab="pivot" data-btn="btn-privesc-suggest"><span>Pivot: Checklist</span></div>
+        <div class="cmd-item" data-cmd="ftv-recon" data-tab="pivot" data-btn="btn-ftv-recon"><span>Pivot: Recon</span></div>
+        <div class="cmd-item" data-cmd="ftv-pair" data-tab="pivot" data-btn="btn-ftv-pair"><span>Pivot: Pair</span></div>
+        <div class="cmd-item" data-cmd="ftv-state" data-tab="pivot" data-btn="btn-ftv-state"><span>Pivot: State</span></div>
+        <div class="cmd-item" data-cmd="ftv-apps" data-tab="pivot" data-btn="btn-ftv-apps"><span>Pivot: Apps</span></div>
+        <div class="cmd-item" data-cmd="ftv-shot" data-tab="pivot" data-btn="btn-ftv-shot"><span>Pivot: Screenshot</span></div>
+        <div class="cmd-item" data-cmd="flag-detect" data-tab="score" data-btn="btn-flag-detect"><span>Score: Scan output</span></div>
+        <div class="cmd-item" data-cmd="vault" data-tab="score" data-btn="btn-vault"><span>Score: Load vault</span></div>
+        <div class="cmd-item" data-cmd="vault-md" data-tab="score" data-btn="btn-vault-md"><span>Score: Export MD</span></div>
+        <div class="cmd-item" data-cmd="attack-paths" data-tab="score" data-btn="btn-attack-paths"><span>Score: Compute paths</span></div>
+        <div class="cmd-item" data-cmd="flag-paths" data-tab="score" data-btn="btn-flag-paths"><span>Score: Flag paths</span></div>
+        <div class="cmd-item" data-cmd="graph-canvas" data-tab="score" data-btn="btn-graph-canvas"><span>Score: Render canvas</span></div>
+        <div class="cmd-item" data-cmd="canvas-png" data-tab="score" data-btn="btn-canvas-png"><span>Score: PNG</span></div>
+        <div class="cmd-item" data-cmd="watch-verify" data-tab="score" data-btn="btn-watch-verify"><span>Score: Verify now</span></div>
+        <div class="cmd-item" data-cmd="watch-trends" data-tab="score" data-btn="btn-watch-trends"><span>Score: Trends</span></div>
+        <div class="cmd-item" data-cmd="watch-baseline" data-tab="score" data-btn="btn-watch-baseline"><span>Score: Snapshot now</span></div>
+        <div class="cmd-item" data-cmd="watch-refresh" data-tab="score" data-btn="btn-watch-refresh"><span>Score: refresh watch</span></div>
+        <div class="cmd-item" data-cmd="attck" data-tab="score" data-btn="btn-attck"><span>Score: Load</span></div>
+        <div class="cmd-item" data-cmd="handoff-layer" data-tab="score" data-btn="btn-handoff-layer"><span>Score: Layer</span></div>
+        <div class="cmd-item" data-cmd="handoff-sigma" data-tab="score" data-btn="btn-handoff-sigma"><span>Score: Sigma</span></div>
+        <div class="cmd-item" data-cmd="handoff-summary" data-tab="score" data-btn="btn-handoff-summary"><span>Score: Writeup</span></div>
+        <div class="cmd-item" data-cmd="session-report" data-tab="score" data-btn="btn-session-report"><span>Score: Download MD</span></div>
+        <div class="cmd-item" data-cmd="session-pdf" data-tab="score" data-btn="btn-session-pdf"><span>Score: Download PDF</span></div>
+        <div class="cmd-item" data-cmd="sarif-import" data-tab="score" data-btn="btn-sarif-import"><span>Score: Import SARIF</span></div>
+        <div class="cmd-item" data-cmd="sarif-export" data-tab="score" data-btn="btn-sarif-export"><span>Score: Export SARIF</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="sarifx"><span>Score: SARIF import/export</span></div>
         <div class="cmd-item" data-cmd="score"><span>Go: score (flags)</span></div>

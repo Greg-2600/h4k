@@ -1,5 +1,20 @@
 # h4k — Release Notes
 
+## Backlog #65 — command palette
+
+Ctrl-K now launches every card action: `runCmd` dispatches generically —
+each palette entry names its tab and button (`data-tab` + `data-btn`), so
+selecting one clicks the real card handler with all its guards and
+validation, instead of a parallel code path that only switched tabs (most
+entries never ran anything). All 89 card buttons audited: every run/query
+action has an entry; toggles, stops, resets, deletes, demo seeders,
+form-openers and deliberate multi-field submits are excluded on purpose
+(documented in the test). Filter matches labels and command ids. The
+contract is enforced going forward by `tests/test_palette.py` (every entry
+resolves, every runnable button reachable, every command handled) plus
+e2e `test_palette_ui*` (Ctrl-K open, filter, Enter runs KEV check and TLS
+inventory for real).
+
 ## Backlog #67 — inline suppress
 
 `POST /api/source/suppress/match` matches pasted h4k findings against NOSAST
