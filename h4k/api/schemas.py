@@ -378,6 +378,31 @@ class SuppressMatchResult(BaseModel):
     sandbox: bool = False
 
 
+# ---- Verify-fix retest ----
+class VerifyFixRequest(BaseModel):
+    """Retest baseline against a rescan (+ optional older snapshots)."""
+
+    baseline: list[Any] = Field(default_factory=list)
+    current: list[Any] = Field(default_factory=list)
+    history: list[Any] = Field(default_factory=list)
+
+
+class VerifyFixResult(BaseModel):
+    persists: list[dict[str, Any]] = []
+    persists_count: int = 0
+    fixed: list[dict[str, Any]] = []
+    fixed_count: int = 0
+    new: list[dict[str, Any]] = []
+    new_count: int = 0
+    flaky: list[dict[str, Any]] = []
+    flaky_count: int = 0
+    suppressed_count: int = 0
+    duplicates_dropped: int = 0
+    baseline_count: int = 0
+    current_count: int = 0
+    sandbox: bool = False
+
+
 # ---- SARIF import/export ----
 class SarifExportRequest(BaseModel):
     """Export h4k findings to SARIF 2.1.0 (`findings` are SourceFinding dicts)."""

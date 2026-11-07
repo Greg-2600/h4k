@@ -21,14 +21,45 @@ def pytest_collection_modifyitems(config, items):
     """Selenium E2E is opt-in: it needs a browser and starts a real API.
 
     `make test` stays fast and hermetic; `make e2e` (or H4K_E2E=1 pytest)
-    runs the browser suite.
+    runs the browser suite. Quarantined flakes (tests/e2e/quarantine.txt)
+    are skipped with their quarantine reason — never silently dropped.
     """
     if os.environ.get("H4K_E2E") == "1":
+        quarantined = load_quarantine(
+            os.environ.get(
+                "H4K_QUARANTINE_FILE", str(REPO / "tests" / "e2e" / "quarantine.txt")
+            )
+        )
+        for item in items:
+            if item.nodeid in quarantined:
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="quarantined flake (tests/e2e/quarantine.txt)"
+                    )
+                )
         return
     skip_e2e = pytest.mark.skip(reason="Selenium E2E disabled (set H4K_E2E=1)")
     for item in items:
         if "e2e" in item.path.parts:
             item.add_marker(skip_e2e)
+
+
+def load_quarantine(path: str | Path) -> set[str]:
+    """Parse the quarantine list: one pytest node id per line.
+
+    `#` comments and blank lines are ignored. A missing file means
+    nothing is quarantined — an empty quarantine is a healthy sign,
+    not a gap in the mechanism.
+    """
+    try:
+        text = Path(path).read_text()
+    except OSError:
+        return set()
+    return {
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    }
 
 
 # shared fixture: fake the pipeline's subprocess boundary (msfconsole, dig...)

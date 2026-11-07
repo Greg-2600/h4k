@@ -1295,6 +1295,38 @@ async function suppressMatch() {
     log(`NOSAST match failed: ${e.message}`, 'error');
   }
 }
+async function verifyFix() {
+  const rawBase = $('verify-base').value.trim();
+  const rawCur = $('verify-cur').value.trim();
+  if (!rawBase || !rawCur) { log('Verify-fix needs baseline + rescan findings JSON', 'warn'); return; }
+  let baseline = null;
+  let current = null;
+  try {
+    baseline = JSON.parse(rawBase);
+    current = JSON.parse(rawCur);
+    if (!Array.isArray(baseline) || !Array.isArray(current)) throw new Error('not lists');
+  } catch {
+    $('verify-body').textContent = 'baseline and rescan must both be JSON lists';
+    log('Verify-fix needs JSON lists', 'warn');
+    return;
+  }
+  $('verify-body').textContent = 'retesting the fix (offline)…';
+  $('verify-status').textContent = '';
+  try {
+    const res = await api('/api/source/verify/fix', {
+      method: 'POST',
+      body: { baseline, current },
+    });
+    const fixed = (res.fixed || []).map((f) => f.rule_id || 'finding').slice(0, 8).join(', ');
+    const state = (res.persists_count || 0) ? `OPEN · ${res.persists_count} still present` : `FIXED · ${res.fixed_count || 0} gone`;
+    $('verify-body').innerHTML = `<div data-testid="verify-findings">${esc(`${state} (${res.new_count || 0} new · ${res.flaky_count || 0} flaky · ${res.duplicates_dropped || 0} dupes dropped)${fixed ? ` · fixed: ${fixed}` : ''}`)}</div>`;
+    $('verify-status').textContent = state;
+    log(`Verify-fix done: ${state}`, res.persists_count ? 'error' : 'success');
+  } catch (e) {
+    $('verify-body').textContent = `Verify-fix failed: ${e.message}`;
+    log(`Verify-fix failed: ${e.message}`, 'error');
+  }
+}
 
 async function auditRbac() {
   const documents = [$('rbac-docs').value.trim()].filter(Boolean);
@@ -1843,6 +1875,7 @@ function runCmd(cmd) {
   else if (cmd === 'cigate') setTab('exploit');
   else if (cmd === 'sastdelta') setTab('exploit');
   else if (cmd === 'nosast') setTab('exploit');
+  else if (cmd === 'verifyfix') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'sarifx') setTab('score');
@@ -2038,6 +2071,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-ci-gate').addEventListener('click', ciGate);
   $('btn-sast-delta').addEventListener('click', sastDelta);
   $('btn-nosast').addEventListener('click', suppressMatch);
+  $('btn-verify').addEventListener('click', verifyFix);
   $('btn-rbac-audit').addEventListener('click', auditRbac);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }

@@ -1,0 +1,9 @@
+# Flaky-e2e quarantine list: one pytest node id per line.
+#
+# A quarantined test is SKIPPED with its quarantine reason — never silently
+# dropped, never counted as passing. To quarantine:
+#   1. append the full node id below with a `# reason + date` comment,
+#   2. file or link the fix,
+#   3. remove the line once the fix lands and the test is green.
+#
+# Empty right now: no known flakes. Keep it that way.
