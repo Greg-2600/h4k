@@ -328,6 +328,13 @@
         <textarea id="delta-base" data-testid="delta-base" rows="2" class="grow" placeholder='Baseline findings JSON (main): [{…}]'></textarea>
         <textarea id="delta-cur" data-testid="delta-cur" rows="2" class="grow" placeholder='Current findings JSON (the PR): [{…}]'></textarea>
         <div id="delta-body" data-testid="delta-body" class="muted">Only what the PR introduces shouts — shifted lines count as moved, not new.</div>
+        <div class="row">
+          <button class="btn" id="btn-nosast" data-testid="btn-nosast">NOSAST match</button>
+          <span class="muted" id="nosast-status" data-testid="nosast-status"></span>
+        </div>
+        <textarea id="nosast-bundle" data-testid="nosast-bundle" rows="2" class="grow" placeholder='Sources as === path === blocks (NOSAST directives live in comments)'></textarea>
+        <textarea id="nosast-paste" data-testid="nosast-paste" rows="2" class="grow" placeholder='Findings JSON: [{…}]'></textarea>
+        <div id="nosast-body" data-testid="nosast-body" class="muted">Waivers with owners and expiries — expired ones shout instead of vanishing.</div>
           </div>
         </div>
         <div class="card">
@@ -621,6 +628,7 @@
         <div class="cmd-item" data-cmd="reachmap"><span>Exploit: map import reachability</span></div>
         <div class="cmd-item" data-cmd="cigate"><span>Exploit: SAST CI gate check</span></div>
         <div class="cmd-item" data-cmd="sastdelta"><span>Exploit: diff SAST findings per PR</span></div>
+        <div class="cmd-item" data-cmd="nosast"><span>Exploit: match NOSAST waivers</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="sarifx"><span>Score: SARIF import/export</span></div>

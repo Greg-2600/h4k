@@ -358,6 +358,26 @@ class SastDeltaResult(BaseModel):
     sandbox: bool = False
 
 
+# ---- Inline suppress ----
+class SuppressMatchRequest(BaseModel):
+    """NOSAST with expiry + owner (offline; pasted sources or file list)."""
+
+    bundle: str = ""
+    files: list[dict[str, Any]] = Field(default_factory=list)
+    findings: list[Any] = Field(default_factory=list)
+
+
+class SuppressMatchResult(BaseModel):
+    suppressed: list[dict[str, Any]] = []
+    suppressed_count: int = 0
+    active: list[dict[str, Any]] = []
+    active_count: int = 0
+    expired: list[dict[str, Any]] = []
+    expired_count: int = 0
+    directives: int = 0
+    sandbox: bool = False
+
+
 # ---- SARIF import/export ----
 class SarifExportRequest(BaseModel):
     """Export h4k findings to SARIF 2.1.0 (`findings` are SourceFinding dicts)."""

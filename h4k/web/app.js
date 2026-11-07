@@ -1265,6 +1265,37 @@ async function sastDelta() {
   }
 }
 
+async function suppressMatch() {
+  const bundle = $('nosast-bundle').value.trim();
+  const raw = $('nosast-paste').value.trim();
+  if (!bundle || !raw) { log('NOSAST match needs sources + findings JSON', 'warn'); return; }
+  let findings = null;
+  try {
+    findings = JSON.parse(raw);
+    if (!Array.isArray(findings)) throw new Error('not a list');
+  } catch {
+    $('nosast-body').textContent = 'findings must be a JSON list';
+    log('NOSAST match needs a findings JSON list', 'warn');
+    return;
+  }
+  $('nosast-body').textContent = 'matching waivers (offline)…';
+  $('nosast-status').textContent = '';
+  try {
+    const res = await api('/api/source/suppress/match', {
+      method: 'POST',
+      body: { bundle, findings },
+    });
+    const names = (res.suppressed || []).map((f) => `${f.rule_id || 'finding'}`).slice(0, 8).join(', ');
+    const state = (res.suppressed_count || 0) ? `WAIVED · ${res.suppressed_count} suppressed` : `ACTIVE · ${res.active_count || 0} standing`;
+    $('nosast-body').innerHTML = `<div data-testid="nosast-findings">${esc(`${state} (${res.directives || 0} directive(s) · ${res.expired_count || 0} expired)${names ? ` · waived: ${names}` : ''}`)}</div>`;
+    $('nosast-status').textContent = state;
+    log(`NOSAST match done: ${state}`, res.expired_count ? 'warn' : 'success');
+  } catch (e) {
+    $('nosast-body').textContent = `NOSAST match failed: ${e.message}`;
+    log(`NOSAST match failed: ${e.message}`, 'error');
+  }
+}
+
 async function auditRbac() {
   const documents = [$('rbac-docs').value.trim()].filter(Boolean);
   if (!documents.length) { log('RBAC audit needs pasted YAML', 'warn'); return; }
@@ -1811,6 +1842,7 @@ function runCmd(cmd) {
   else if (cmd === 'reachmap') setTab('exploit');
   else if (cmd === 'cigate') setTab('exploit');
   else if (cmd === 'sastdelta') setTab('exploit');
+  else if (cmd === 'nosast') setTab('exploit');
   else if (cmd === 'kubeaudit') setTab('exploit');
   else if (cmd === 'persist') setTab('persist');
   else if (cmd === 'sarifx') setTab('score');
@@ -2005,6 +2037,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-reach').addEventListener('click', reachability);
   $('btn-ci-gate').addEventListener('click', ciGate);
   $('btn-sast-delta').addEventListener('click', sastDelta);
+  $('btn-nosast').addEventListener('click', suppressMatch);
   $('btn-rbac-audit').addEventListener('click', auditRbac);
   $('btn-cve-refresh').addEventListener('click', async () => {
     try { await api('/api/cves/refresh', { method: 'POST' }); log('cve refresh started', 'info'); loadVulns(); }
