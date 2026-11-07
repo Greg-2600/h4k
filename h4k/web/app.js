@@ -656,9 +656,12 @@ async function savePreset() {
   }
   try {
     const res = await api('/api/fuzz-profiles', { method: 'POST', body: { name, headers, cookies } });
-    $('prof-status').textContent = `saved ${res.name}`;
     log(`auth preset saved: ${res.name}`, 'success');
     await listPresets();
+    // Set the confirmation last: listPresets() reports the row count into
+    // the same status line, which used to clobber "saved X" within
+    // milliseconds (the e2e save assertion raced it and lost on warm runs).
+    $('prof-status').textContent = `saved ${res.name}`;
   } catch (e) { log(`preset save failed: ${e.message}`, 'error'); }
 }
 
