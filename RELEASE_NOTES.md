@@ -11,6 +11,21 @@ the line above, Semgrep-style) waives it — bare `NOSAST` covers any rule,
 `expires=` is a 400. Read-only, nothing ledgers. Container card row + palette
 (`nosast`); sources bundle + findings JSON; sandbox returns a canned match.
 
+## Backlog #64 — verify-fix retest + flaky detector + dedup
+
+`POST /api/source/verify/fix` retests a baseline finding list against a
+fresh rescan (plus optional older `history` snapshots): exact
+(rule, file, line) matches persist, missing baseline findings are fixed,
+current-only findings are new — unless an older snapshot had them, in
+which case they reappeared and are flagged flaky, never silently passed.
+Duplicate findings collapse to one with the dropped count stated;
+suppressed findings tally separately. Read-only, nothing ledgers;
+malformed entries are a 400. Container card row + palette (`verifyfix`).
+Flaky e2e now has a real quarantine: `tests/e2e/quarantine.txt` (one node
+id per line, `#` comments) auto-skips listed tests with their quarantine
+reason; empty means no known flakes. Sandbox returns a canned
+verification (1 persists, 1 fixed, 1 flaky).
+
 ## Backlog #66 — delta SAST
 
 `POST /api/source/sast/delta` diffs pasted h4k findings, baseline (main) vs

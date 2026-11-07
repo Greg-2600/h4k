@@ -40,6 +40,8 @@ from schemas import (
     TaintScanResult,
     TriageRequest,
     TriageResult,
+    VerifyFixRequest,
+    VerifyFixResult,
 )
 from services import (
     ai as ai_service,
@@ -407,6 +409,29 @@ def suppress_match(req: SuppressMatchRequest) -> SuppressMatchResult:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return SuppressMatchResult(**result)
+
+
+@router.post("/verify/fix", response_model=VerifyFixResult)
+def verify_fix(req: VerifyFixRequest) -> VerifyFixResult:
+    """Retest baseline against a rescan (offline, read-only).
+
+    Exact (rule, file, line) matches persist; missing baseline
+    findings are fixed; current-only findings are new unless an older
+    snapshot in `history` had them — then they reappeared and are
+    flagged flaky. Duplicate findings collapse to one, stated.
+    Garbage entries are a 400, never silent. Sandbox returns a canned
+    verification. Nothing ledgers.
+    """
+    from services import sandbox as sandbox_mode
+    from services.verify_fix import sandbox_result, verify
+
+    if sandbox_mode.enabled():
+        return VerifyFixResult(**sandbox_result())
+    try:
+        result = verify(req.baseline, req.current, history=req.history)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return VerifyFixResult(**result)
 
 
 @router.post("/exploit")

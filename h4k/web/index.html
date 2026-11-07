@@ -335,6 +335,13 @@
         <textarea id="nosast-bundle" data-testid="nosast-bundle" rows="2" class="grow" placeholder='Sources as === path === blocks (NOSAST directives live in comments)'></textarea>
         <textarea id="nosast-paste" data-testid="nosast-paste" rows="2" class="grow" placeholder='Findings JSON: [{…}]'></textarea>
         <div id="nosast-body" data-testid="nosast-body" class="muted">Waivers with owners and expiries — expired ones shout instead of vanishing.</div>
+        <div class="row">
+          <button class="btn" id="btn-verify" data-testid="btn-verify">Verify fix</button>
+          <span class="muted" id="verify-status" data-testid="verify-status"></span>
+        </div>
+        <textarea id="verify-base" data-testid="verify-base" rows="2" class="grow" placeholder='Baseline findings JSON (before the fix): [{…}]'></textarea>
+        <textarea id="verify-cur" data-testid="verify-cur" rows="2" class="grow" placeholder='Rescan findings JSON (after the fix): [{…}]'></textarea>
+        <div id="verify-body" data-testid="verify-body" class="muted">Retest the fix — persists, fixed, new, and reappeared flakes, one row each.</div>
           </div>
         </div>
         <div class="card">
@@ -629,6 +636,7 @@
         <div class="cmd-item" data-cmd="cigate"><span>Exploit: SAST CI gate check</span></div>
         <div class="cmd-item" data-cmd="sastdelta"><span>Exploit: diff SAST findings per PR</span></div>
         <div class="cmd-item" data-cmd="nosast"><span>Exploit: match NOSAST waivers</span></div>
+        <div class="cmd-item" data-cmd="verifyfix"><span>Exploit: verify a fix held</span></div>
         <div class="cmd-item" data-cmd="kubeaudit"><span>Exploit: audit kubelet exposure (read-only)</span></div>
         <div class="cmd-item" data-cmd="persist"><span>Go: persist (hold the win)</span></div>
         <div class="cmd-item" data-cmd="sarifx"><span>Score: SARIF import/export</span></div>

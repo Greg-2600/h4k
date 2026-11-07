@@ -323,6 +323,7 @@ where network/tooling is involved.
 62. **Coverage HTML import** [wow] — llvm-cov badge in UI. *(was #60; in flight: PR #81)*
 63. **SAST CI gate + delta + inline suppress** [risk] — fail PRs on new high-severity findings; diff-only results; NOSAST with expiry + owner. *(merges old #65, #66, #67; old #65 done via #87, old #66 done via #88, old #67 in flight: PR #89)*
 64. **Verify-fix retest + flaky detector + coverage-green + dedup** [risk] — one-click finding rescan; appears/disappears flagging; verified/lead/suppressed stats; one finding per vuln; keep the 90% coverage gate green and quarantine flaky e2e (quarantine list + retries, never silent skips). *(merges old #128, #129, #130, #177)*
+  (done: `services/verify_fix.py` baseline-vs-rescan (+ history) retest with exact-match persists/fixed/new + reappeared-flaky flag + dedup + suppressed tally; `POST /api/source/verify/fix` (400 bad entries) sandbox canned; `tests/e2e/quarantine.txt` + conftest auto-skip with reason; Container card row + palette; unit + e2e `test_verify_fix*`.)
 65. **Command palette** [wow] — Ctrl-K ops launcher for every card action. *(merges old #95)*
 66. **Multi-lang SAST: Go + Rust** [risk] — core source→sink rules for Go and Rust services. *(merges old #68)*
 67. **Vuln-lib taint + VEX statements** [risk] — vulnerable-dependency → sink paths; not-affected with justification. *(merges old #69, #70)*
