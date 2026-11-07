@@ -4,13 +4,22 @@ from __future__ import annotations
 
 from typing import Any
 
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
 
 from .helpers import click, fill, go_to, wait_text, wait_visible
 
 
 def _output_text(page: Any) -> str:
     return page.find_element(By.CSS_SELECTOR, '[data-testid="prof-output"]').text
+
+
+def _click_delete(page: Any) -> bool:
+    # The rows re-render on every list refresh, so a row found a moment
+    # ago may already be detached — re-find until the click lands.
+    page.find_element(By.CSS_SELECTOR, '[data-profdel="uitest"]').click()
+    return True
 
 
 def test_preset_save_list_delete(page: Any, seeded: dict[str, Any]) -> None:
@@ -30,7 +39,9 @@ def test_preset_save_list_delete(page: Any, seeded: dict[str, Any]) -> None:
     fill(page, "st-profile", "uitest")
     click(page, "btn-prof-list")
     wait_text(page, "prof-output", "uitest", timeout=60)
-    page.find_element(By.CSS_SELECTOR, '[data-profdel="uitest"]').click()
+    WebDriverWait(page, 30, ignored_exceptions=(StaleElementReferenceException,)).until(
+        _click_delete
+    )
     for _ in range(60):
         import time
 
