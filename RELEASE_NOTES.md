@@ -1,5 +1,16 @@
 # h4k — Release Notes
 
+## Backlog #67 — inline suppress
+
+`POST /api/source/suppress/match` matches pasted h4k findings against NOSAST
+directives parsed from source comments: a directive on the finding's line (or
+the line above, Semgrep-style) waives it — bare `NOSAST` covers any rule,
+`NOSAST: rule-id` names rules. Directives carry `owner=` and
+`expires=YYYY-MM-DD`; expired waivers stop applying and are listed in
+`expired` so a lapsed waiver never vanishes quietly, and a malformed
+`expires=` is a 400. Read-only, nothing ledgers. Container card row + palette
+(`nosast`); sources bundle + findings JSON; sandbox returns a canned match.
+
 ## Backlog #66 — delta SAST
 
 `POST /api/source/sast/delta` diffs pasted h4k findings, baseline (main) vs

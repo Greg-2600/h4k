@@ -34,6 +34,8 @@ from schemas import (
     SourceFinding,
     SourceScanRequest,
     SourceScanResult,
+    SuppressMatchRequest,
+    SuppressMatchResult,
     TaintScanRequest,
     TaintScanResult,
     TriageRequest,
@@ -378,6 +380,33 @@ def sast_delta(req: SastDeltaRequest) -> SastDeltaResult:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return SastDeltaResult(**result)
+
+
+@router.post("/suppress/match", response_model=SuppressMatchResult)
+def suppress_match(req: SuppressMatchRequest) -> SuppressMatchResult:
+    """NOSAST with expiry + owner (offline, read-only).
+
+    `bundle` (=== path === blocks) or `files` hold the sources;
+    `findings` are matched against NOSAST directives on the finding's
+    line or the line above. Expired waivers stop applying and are
+    reported; malformed directives/entries are a 400, never silent.
+    Sandbox returns a canned match. Nothing ledgers.
+    """
+    from services import sandbox as sandbox_mode
+    from services.suppress import match_suppressions, parse_bundle, sandbox_result
+
+    if sandbox_mode.enabled():
+        return SuppressMatchResult(**sandbox_result())
+    files = list(req.files or [])
+    if req.bundle and req.bundle.strip():
+        files.extend(parse_bundle(req.bundle))
+    if not files:
+        raise HTTPException(status_code=400, detail="bundle or files required")
+    try:
+        result = match_suppressions(files, req.findings)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SuppressMatchResult(**result)
 
 
 @router.post("/exploit")
