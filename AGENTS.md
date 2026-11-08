@@ -115,7 +115,9 @@ Host recon/scan:
 - `POST /fuzz`, `GET /fuzz/{id}`, `POST /fuzz/minimize`
 - `POST /api/fuzz/shard` (N workers, merged registry)
 - `POST /api/rate_fuzz` (polite throttle probe + ledger)
+- `POST /api/stateful_fuzz` (login → authed-flow fuzz + ledger)
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
+- `GET|POST /api/fuzz-profiles`, `DELETE /api/fuzz-profiles/{name}` (auth presets; values never listed)
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
@@ -184,6 +186,7 @@ Health/diagnostic:
 | `security.py` | traceroute + exposure -> posture heuristic |
 | `fuzzer.py` | signal-guided HTTP mutation engine + real libFuzzer crash minimizer |
 | `container_fuzz.py` | Docker API / kubelet / containerd-framing / HTTP surface fuzzing (job-based) + read-only surface inventory |
+| `fuzz_profiles.py` | named auth presets for fuzz runs (values stay server-side) |
 | `crashes.py` | crash fingerprinting + dedup (N crashes -> M distinct bugs) |
 | `vulnleads.py` | EOL/beta/old version flagging |
 | `sast.py` | regex heuristics (+ Semgrep merge) SAST |
@@ -198,6 +201,7 @@ Health/diagnostic:
 | `sarif_exchange.py` | h4k↔SARIF 2.1.0 interchange (lossless h4k round-trip) |
 | `fuzz_shard.py` | N-worker disjoint-slice coordinator over one locked CrashRegistry |
 | `ratefuzz.py` | polite 429/Retry-After backoff probe + throttle characterization |
+| `stateful_fuzz.py` | login → authed-flow fuzz with session harvest + ledger |
 | `sanitizer_diff.py` | pasted-report ASan/UBSan/MSan coverage compare + one confirming rebuild |
 | `jwt_tester.py` | offline JWT audit + capped HMAC crack + live alg-confusion vs marker, ledgered, sandbox canned |
 | `ssrf_pack.py` | opt-in metadata SSRF probe pack (AWS/GCP/Azure + encoding bypasses) + scope-enforced ledger, sandbox canned |
