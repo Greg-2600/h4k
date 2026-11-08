@@ -1091,6 +1091,29 @@ class TaintScanResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Multi-lang SAST (Go + Rust) ----
+class MultilangScanRequest(BaseModel):
+    """Go+Rust source→sink audit (offline; pasted sources or file list)."""
+
+    bundle: str = ""
+    files: list[dict[str, str]] = Field(default_factory=list)
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class MultilangScanResult(BaseModel):
+    pack: str = "multilang-sast"
+    files: int = 0
+    parsed: int = 0
+    skipped: list[str] = []
+    findings: list[dict[str, Any]] = []
+    finding_count: int = 0
+    clean: bool = True
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Secret baseline + allowlist ----
 class SecretsScanRequest(BaseModel):
     """Secret scan with baseline + allowlist noise reduction (offline).

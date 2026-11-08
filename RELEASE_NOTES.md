@@ -1,5 +1,19 @@
 # h4k — Release Notes
 
+## Backlog #66 — multi-lang SAST: Go + Rust
+
+`POST /api/source/sast/multilang` runs a 10-rule source→sink pack over
+pasted Go and Rust (6 Go: `os/exec` command building, `database/sql`
+string queries, `template.HTML` escape bypass, `os` path opens,
+`net/http` client SSRF, `gob`/`yaml.Unmarshal` decoding; 4 Rust:
+`Command` building, `sqlx`/`query!` interpolation, `std::fs` path opens,
+`reqwest`/`hyper` SSRF) with the same honest windowed matching as the
+Python/JS/PHP pack — source within 6 lines of the sink, sanitizer
+(placeholders, `bind`, `filepath.Clean`, `Url::parse`) clears the hit,
+one hit per rule per file. `engagement_id` ledgers findings as vulns on
+the labeled host (scope-enforced). Container card row + palette
+(`mlsast`); sandbox returns a canned Go+Rust pair.
+
 ## Backlog #65 — command palette
 
 Ctrl-K now launches every card action: `runCmd` dispatches generically —
