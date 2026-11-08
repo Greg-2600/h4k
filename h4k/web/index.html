@@ -294,6 +294,13 @@
         <textarea id="taint-bundle" data-testid="taint-bundle" rows="3" class="grow" placeholder="Paste sources as === path.py === blocks (offline source→sink taint)"></textarea>
         <div id="taint-body" data-testid="taint-body" class="muted">Python/JS/PHP source→sink flows: shell, SQL, XSS, LFI, SSTI, pickle.</div>
         <div class="row">
+          <input type="text" id="ml-host" data-testid="ml-host" value="127.0.0.1" title="Host label for the ledger entry (analysis is offline)" />
+          <button class="btn" id="btn-ml-scan" data-testid="btn-ml-scan">Scan Go+Rust</button>
+          <span class="muted" id="ml-status" data-testid="ml-status"></span>
+        </div>
+        <textarea id="ml-bundle" data-testid="ml-bundle" rows="3" class="grow" placeholder="Paste sources as === main.go === / === db.rs === blocks (offline source→sink)"></textarea>
+        <div id="ml-body" data-testid="ml-body" class="muted">Go/Rust source→sink flows: shell, SQL, template-escape, traversal, SSRF, gob.</div>
+        <div class="row">
           <input type="text" id="sec-host" data-testid="sec-host" value="127.0.0.1" title="Host label for the ledger entry (analysis is offline)" />
           <input type="text" id="sec-allow" data-testid="sec-allow" class="grow" placeholder="Allowlist regexes, comma-separated (e.g. fixtures,example)" title="Suppress matches; the pattern is recorded per hit" />
           <button class="btn" id="btn-sec-scan" data-testid="btn-sec-scan">Scan secrets</button>
@@ -653,6 +660,7 @@
         <div class="cmd-item" data-cmd="sandiff" data-tab="exploit" data-btn="btn-sandiff"><span>Exploit: compare sanitizers on a report</span></div>
         <div class="cmd-item" data-cmd="rbacaudit" data-tab="exploit" data-btn="btn-rbac-audit"><span>Exploit: audit K8s RBAC grants</span></div>
         <div class="cmd-item" data-cmd="taintsast" data-tab="exploit" data-btn="btn-taint-scan"><span>Exploit: taint-check pasted sources</span></div>
+        <div class="cmd-item" data-cmd="mlsast" data-tab="exploit" data-btn="btn-ml-scan"><span>Exploit: taint-check Go+Rust sources</span></div>
         <div class="cmd-item" data-cmd="secretscan" data-tab="exploit" data-btn="btn-sec-scan"><span>Exploit: scan committed secrets</span></div>
         <div class="cmd-item" data-cmd="reachmap" data-tab="exploit" data-btn="btn-reach"><span>Exploit: map import reachability</span></div>
         <div class="cmd-item" data-cmd="cigate" data-tab="exploit" data-btn="btn-ci-gate"><span>Exploit: SAST CI gate check</span></div>

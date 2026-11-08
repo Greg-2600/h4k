@@ -18,6 +18,8 @@ from schemas import (
     CiGateRequest,
     CiGateResult,
     CustomRuleRequest,
+    MultilangScanRequest,
+    MultilangScanResult,
     ReachabilityRequest,
     ReachabilityResult,
     SanitizerDiffRequest,
@@ -298,6 +300,55 @@ def taint_scan(req: TaintScanRequest) -> TaintScanResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return TaintScanResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/sast/multilang", response_model=MultilangScanResult)
+def multilang_scan(req: MultilangScanRequest) -> MultilangScanResult:
+    """Run the Go+Rust source→sink pack over pasted sources (offline).
+
+    `bundle` (=== path === blocks) or `files` — both stay server-side
+    for this call only. `engagement_id` ledgers findings as vulns on
+    the labeled host (scope-enforced). Sandbox returns canned findings.
+    """
+    from services import sandbox as sandbox_mode
+    from services.multilang_sast import sandbox_result, scan_files, to_ledger
+    from services.taint_pack import parse_bundle
+
+    files = list(req.files or [])
+    if req.bundle and req.bundle.strip():
+        files.extend(parse_bundle(req.bundle))
+    if not files:
+        raise HTTPException(status_code=400, detail="bundle or files required")
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = scan_files(files)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, "multilang-sast", result.get("findings") or []):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return MultilangScanResult(
         **{
             **result,
             "ingested": ingested,

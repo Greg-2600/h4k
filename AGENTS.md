@@ -155,6 +155,7 @@ Source analysis (source router):
 - `POST /source/reachability` (import-graph dead-code triage)
 - `POST /source/secrets/scan` (committed secrets + baseline/allowlist)
 - `POST /source/taint/scan` (offline source→sink taint pack + ledger)
+- `POST /source/sast/multilang` (offline Go+Rust source→sink pack + ledger)
 - `POST /source/sarif/export`, `POST /source/sarif/import` (SARIF interchange)
 - `POST /source/sanitizer/diff` (offline ASan/UBSan/MSan compare)
 - `POST /source/ci/gate` (SAST CI gate: threshold + audited ignores)
@@ -198,6 +199,7 @@ Health/diagnostic:
 | `verify_fix.py` | verify-fix retest: persists/fixed/new/reappeared-flaky + dedup |
 | `secret_baseline.py` | committed-secret scan with baseline diff + allowlist |
 | `taint_pack.py` | source→sink taint pack (Python/JS/PHP) + scope-enforced ledger |
+| `multilang_sast.py` | source→sink pack for Go + Rust services + scope-enforced ledger |
 | `sarif_exchange.py` | h4k↔SARIF 2.1.0 interchange (lossless h4k round-trip) |
 | `fuzz_shard.py` | N-worker disjoint-slice coordinator over one locked CrashRegistry |
 | `ratefuzz.py` | polite 429/Retry-After backoff probe + throttle characterization |

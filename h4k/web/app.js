@@ -1240,6 +1240,29 @@ async function scanTaint() {
   }
 }
 
+async function scanMultilang() {
+  const bundle = $('ml-bundle').value.trim();
+  if (!bundle) { log('Go+Rust scan needs a pasted bundle', 'warn'); return; }
+  const host = $('ml-host').value.trim() || '127.0.0.1';
+  $('ml-body').textContent = 'scanning Go+Rust (offline)…';
+  $('ml-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/source/sast/multilang', {
+      method: 'POST',
+      body: { bundle, host, engagement_id: engId || null },
+    });
+    const names = (res.findings || []).map((f) => `${f.rule_id || 'finding'} (${f.severity || '?'})`).slice(0, 8).join(', ');
+    const state = res.clean ? 'clean' : `${res.finding_count || 0} finding(s)`;
+    $('ml-body').innerHTML = `<div data-testid="ml-findings">${esc(`${state} across ${res.parsed || 0} file(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}${(res.skipped_out_of_scope || []).length ? ' · out of scope (not stored)' : ''}${(res.skipped || []).length ? ` · ${res.skipped.length} unsupported` : ''}${names ? `: ${names}` : ''}`)}</div>`;
+    $('ml-status').textContent = state;
+    log(`Go+Rust scan done: ${state}`, res.clean ? 'success' : 'warn');
+  } catch (e) {
+    $('ml-body').textContent = `Go+Rust scan failed: ${e.message}`;
+    log(`Go+Rust scan failed: ${e.message}`, 'error');
+  }
+}
+
 async function scanSecrets() {
   const bundle = $('sec-bundle').value.trim();
   if (!bundle) { log('secret scan needs a pasted bundle', 'warn'); return; }
@@ -2133,6 +2156,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-cf-start').addEventListener('click', startContainerFuzz);
   $('btn-kube-audit').addEventListener('click', auditKubelet);
   $('btn-taint-scan').addEventListener('click', scanTaint);
+  $('btn-ml-scan').addEventListener('click', scanMultilang);
   $('btn-sec-scan').addEventListener('click', scanSecrets);
   $('btn-reach').addEventListener('click', reachability);
   $('btn-ci-gate').addEventListener('click', ciGate);
