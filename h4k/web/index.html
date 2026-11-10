@@ -215,6 +215,23 @@
             </div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>DAST spider</h2><span class="spacer"></span><span class="muted">same-origin crawl + auth · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="spider-target" data-testid="spider-target" class="grow" placeholder="http://192.168.1.13" />
+              <select id="spider-depth" data-testid="spider-depth" title="Crawl depth">
+                <option value="1">depth 1</option>
+                <option value="2" selected>depth 2</option>
+                <option value="3">depth 3</option>
+              </select>
+              <input type="text" id="spider-auth" data-testid="spider-auth" class="grow" placeholder="auth: Bearer TOKEN or session=abc (optional)" />
+              <button class="btn primary" id="btn-spider" data-testid="btn-spider">Crawl</button>
+              <span class="muted" id="spider-status" data-testid="spider-status"></span>
+            </div>
+            <div id="spider-body" data-testid="spider-body" class="muted">Link/form map of one web surface you own. Only the target origin is fetched.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ═══ 3. EXPLOIT: queue, autopilot, creds attacks, fuzz ═══ -->
@@ -646,6 +663,7 @@
         <div class="cmd-item" data-cmd="nikto" data-tab="recon" data-btn="btn-nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei" data-tab="recon" data-btn="btn-nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster" data-tab="recon" data-btn="btn-gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="spider" data-tab="recon" data-btn="btn-spider"><span>Recon: DAST spider crawl (same-origin + auth)</span></div>
         <div class="cmd-item" data-cmd="ssrfprobe" data-tab="recon" data-btn="btn-ssrf-probe"><span>Recon: SSRF metadata pack (opt-in)</span></div>
         <div class="cmd-item" data-cmd="jwttest" data-tab="recon" data-btn="btn-jwt-test"><span>Recon: JWT audit + alg-confusion</span></div>
         <div class="cmd-item" data-cmd="suppress" data-tab="recon" data-btn="btn-suppress"><span>Recon: suppress a finding</span></div>

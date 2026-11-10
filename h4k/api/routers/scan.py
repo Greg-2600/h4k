@@ -61,6 +61,8 @@ from schemas import (
     ScanRequest,
     ShardFuzzRequest,
     ShardFuzzResult,
+    SpiderRequest,
+    SpiderResult,
     SqlmapRequest,
     SqlmapResult,
     SsrfProbeRequest,
@@ -3224,6 +3226,61 @@ def privesc_host_audit() -> dict[str, Any]:
     from services.privesc import host_privesc_audit
 
     return host_privesc_audit()
+
+
+@router.post("/spider", response_model=SpiderResult)
+def spider_crawl_api(req: SpiderRequest) -> SpiderResult:
+    """Depth-bounded same-origin web crawl with optional auth (opt-in).
+
+    Only the target's own host:port is ever fetched; off-origin links are
+    reported as external. `engagement_id` records discovered in-scope hosts
+    in that engagement (scope-enforced ledger).
+    """
+    from urllib.parse import urlparse
+
+    from services import sandbox as sandbox_mode
+    from services.dast_spider import crawl, sandbox_crawl
+
+    if sandbox_mode.enabled():
+        result = sandbox_crawl(req.target)
+    else:
+        result = crawl(
+            req.target,
+            max_depth=req.max_depth,
+            max_pages=req.max_pages,
+            auth_header=req.auth_header,
+            auth_cookie=req.auth_cookie,
+        )
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="engagement not found")
+        hosts = {urlparse(p["url"]).hostname or "" for p in result.get("pages", [])}
+        hosts |= {
+            urlparse(f.get("action", "")).hostname or ""
+            for f in result.get("forms", [])
+        }
+        for host in sorted(h for h in hosts if h):
+            try:
+                store.upsert_asset(req.engagement_id, host)
+                ingested += 1
+            except ScopeError:
+                skipped.append(host)
+    return SpiderResult(
+        **{
+            **result,
+            "target": req.target,
+            "ingested_assets": ingested,
+            "skipped_out_of_scope": sorted(set(skipped)),
+        }
+    )
 
 
 @router.post("/nuclei", response_model=NucleiResult)

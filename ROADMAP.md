@@ -284,7 +284,8 @@ where network/tooling is involved.
   (done: `services/secret_baseline.py` bundle secret scan (7 shapes) + fingerprint baseline diff + audited allowlist suppression + new-only scope-enforced ledger; `POST /api/source/secrets/scan` (=== path === bundle or files, 400 empty/bad-allowlist, 404 unknown engagement) sandbox canned; Container card row + palette; unit + e2e `test_secret_baseline*`.)
 25. **Reachability filter** [risk] — import-graph prunes dead code.
   (done: `services/reachability.py` module graph (py ast + JS/PHP imports, same-dir relative resolution, explicit-or-guessed entries flagged) + reached/unreached split + unresolved list; `POST /api/source/reachability` (400 empty) sandbox canned; Container card row + palette; unit + e2e `test_reachability*`; merged via #85.)
-26. **DAST spider + auth crawl** [risk] — depth-bounded, scope-checked link/form map. *(was #3; in flight: PR #24)*
+26. **DAST spider + auth crawl** [risk] — depth-bounded, scope-checked link/form map. *(was #3)*
+  (done: `services/dast_spider.py` same-origin BFS + auth header/cookie + `POST /spider` with scope-enforced asset ledger; sandbox canned map; DAST spider card + palette cmd; unit + e2e `test_*spider*`.)
 27. **Scheduled re-scans + diff alerts** [risk] — cadence per engagement, MD digest. *(was #5; in flight: PR #26)*
 28. **SMB share enumerator** [risk] — shares/ACLs, read-only, into asset graph. *(was #7; in flight: PR #28)*
 29. **LLMNR/NBT-NS poison lab** [risk] — container-only listener + capture. *(was #9; in flight: PR #30)*
