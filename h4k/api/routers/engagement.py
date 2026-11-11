@@ -164,9 +164,59 @@ def watch_config_set(engagement_id: str, body: dict[str, Any]) -> dict[str, Any]
             engagement_id,
             mode=(body or {}).get("mode"),
             retain=(body or {}).get("retain"),
+            interval=(body or {}).get("interval"),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{engagement_id}/rescan")
+def scheduled_rescan_now(engagement_id: str) -> dict[str, Any]:
+    """Run a recon-only scheduled-style pass for one engagement now.
+
+    Same pass the cadence scheduler runs (recon only, no credentials, no
+    exploitation); records the snapshot and stamps the cadence clock.
+    """
+    import time
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    now = time.time()
+    from services.auto_scan import _run_one_pass
+
+    totals = {"hosts": 0, "services": 0, "vulns": 0}
+    eng = store.get_engagement(engagement_id)
+    for cidr in (eng or {}).get("scope") or []:
+        if not cidr or ":" in cidr:
+            continue
+        summary = _run_one_pass(cidr, engagement_id)
+        for key in totals:
+            totals[key] += int(summary.get(key, 0))
+    store.record_scheduled_pass(engagement_id, now)
+    return {"engagement_id": engagement_id, **totals}
+
+
+@router.get("/{engagement_id}/watch/digest")
+def watch_digest(
+    engagement_id: str, limit: int = 10, fmt: str = "md"
+) -> dict[str, Any]:
+    """Lab Watch changes as a markdown alert digest (`fmt=json` for data)."""
+    from services.rescan import digest_markdown
+
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    if fmt.lower() in ("json",):
+        return {
+            "changes": store.watch_changes(engagement_id, limit=limit),
+            "summary": store.watch_status(engagement_id),
+        }
+    return {
+        "fmt": "md",
+        "content": digest_markdown(store, engagement_id, limit=limit),
+        "summary": store.watch_status(engagement_id),
+    }
 
 
 @router.get("/{engagement_id}/watch/trends")

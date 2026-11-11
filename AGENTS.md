@@ -139,6 +139,8 @@ Engagement (persistent memory + cred propagation, engagement router):
 - `GET /api/engagement/{id}/hygiene` (read-only reuse/weak/default summary + score)
 - `POST /api/engagement/{id}/vulns/suppress` (reason + expiry, audit-trailed) + `DELETE .../vulns/suppress` + `GET .../vulns/suppressions|effective`
 - `GET /api/engagement/{id}/vault` (masked loot: creds/flags/shares, `reveal=true` unmasks) + `GET .../vault/export` (md/json handoff)
+- `GET /api/engagement/{id}/propagate/plan` (dry run), `POST /api/engagement/{id}/propagate` (opt-in)
+- `POST /api/engagement/{id}/rescan` (recon-only scheduled-style pass now), `GET .../watch/digest` (markdown alert digest, `fmt=json` for data), watch `interval` cadence in config
 - `POST|GET /api/engagement/{id}/crown-jewels`, `DELETE .../crown-jewels/{id}`
 - `GET /api/engagement/{id}/attack-paths` (scored paths to crown jewels)
 - `GET /api/engagement/{id}/attck` (technique mapping + detection guidance)
@@ -229,6 +231,7 @@ Health/diagnostic:
 | `kerberos.py` | AS-REP + Kerberoast via impacket (explicit roast, optional John crack, sandbox canned hashes) |
 | `nse_suggest.py` | curated service → NSE script map (suggest offline, run explicit) |
 | `hygiene.py` | read-only credential hygiene: reuse/weak/default summary + score over verified creds |
+| `rescan.py` | per-engagement scheduled recon passes (due-check + digest MD) |
 | `graph_canvas.py` | deterministic canvas layout for the asset graph (hosts circle, services ring, creds top row; powers the interactive SVG + PNG export) |
 | `dast_spider.py` | opt-in lightweight DAST crawl: depth-bounded same-origin BFS, auth header/cookie, form map, scope-enforced asset ledger, sandbox stand-in |
 | `propagate.py` | credential propagation: replay verified creds across in-scope services |

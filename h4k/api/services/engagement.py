@@ -196,6 +196,14 @@ class EngagementStore:
                 conn.execute(
                     "ALTER TABLE engagements ADD COLUMN watch_retain INTEGER NOT NULL DEFAULT 30"
                 )
+            with suppress(Exception):
+                conn.execute(
+                    "ALTER TABLE engagements ADD COLUMN watch_interval INTEGER NOT NULL DEFAULT 0"
+                )
+            with suppress(Exception):
+                conn.execute(
+                    "ALTER TABLE engagements ADD COLUMN watch_last_scheduled REAL"
+                )
         with suppress(OSError):  # non-POSIX / read-only fs
             self.path.chmod(0o600)  # holds verified credentials
 
@@ -1055,7 +1063,8 @@ class EngagementStore:
 
     def get_watch_config(self, engagement_id: str) -> dict[str, Any]:
         rows = self._query(
-            "SELECT watch_mode, watch_retain FROM engagements WHERE id=?",
+            "SELECT watch_mode, watch_retain, watch_interval, watch_last_scheduled"
+            " FROM engagements WHERE id=?",
             (engagement_id,),
         )
         if not rows:
@@ -1068,10 +1077,28 @@ class EngagementStore:
             retain = max(1, min(365, int(retain)))
         except (TypeError, ValueError):
             retain = self.DEFAULT_WATCH_RETAIN
-        return {"mode": mode, "retain": retain}
+        try:
+            interval = max(0, min(86400, int(rows[0]["watch_interval"] or 0)))
+        except (TypeError, ValueError):
+            interval = 0
+        last = rows[0]["watch_last_scheduled"]
+        try:
+            last = float(last) if last else None
+        except (TypeError, ValueError):
+            last = None
+        return {
+            "mode": mode,
+            "retain": retain,
+            "interval": interval,
+            "last_scheduled": last,
+        }
 
     def set_watch_config(
-        self, engagement_id: str, mode: str | None = None, retain: int | None = None
+        self,
+        engagement_id: str,
+        mode: str | None = None,
+        retain: int | None = None,
+        interval: int | None = None,
     ) -> dict[str, Any]:
         if not self.get_engagement(engagement_id):
             raise ValueError("unknown engagement")
@@ -1087,12 +1114,26 @@ class EngagementStore:
                 raise ValueError(
                     "retain must be an integer number of snapshots"
                 ) from exc
+        if interval is not None:
+            try:
+                cfg["interval"] = max(0, min(86400, int(interval)))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "interval must be an integer number of seconds (0 disables)"
+                ) from exc
         self._write(
-            "UPDATE engagements SET watch_mode=?, watch_retain=? WHERE id=?",
-            (cfg["mode"], cfg["retain"], engagement_id),
+            "UPDATE engagements SET watch_mode=?, watch_retain=?, watch_interval=?"
+            " WHERE id=?",
+            (cfg["mode"], cfg["retain"], cfg["interval"], engagement_id),
         )
         self.prune_watch_snapshots(engagement_id, cfg["retain"])
         return cfg
+
+    def record_scheduled_pass(self, engagement_id: str, when: float) -> None:
+        self._write(
+            "UPDATE engagements SET watch_last_scheduled=? WHERE id=?",
+            (float(when), engagement_id),
+        )
 
     def prune_watch_snapshots(self, engagement_id: str, retain: int) -> int:
         before = self._scalar(

@@ -286,7 +286,8 @@ where network/tooling is involved.
   (done: `services/reachability.py` module graph (py ast + JS/PHP imports, same-dir relative resolution, explicit-or-guessed entries flagged) + reached/unreached split + unresolved list; `POST /api/source/reachability` (400 empty) sandbox canned; Container card row + palette; unit + e2e `test_reachability*`; merged via #85.)
 26. **DAST spider + auth crawl** [risk] — depth-bounded, scope-checked link/form map. *(was #3)*
   (done: `services/dast_spider.py` same-origin BFS + auth header/cookie + `POST /spider` with scope-enforced asset ledger; sandbox canned map; DAST spider card + palette cmd; unit + e2e `test_*spider*`.)
-27. **Scheduled re-scans + diff alerts** [risk] — cadence per engagement, MD digest. *(was #5; in flight: PR #26)*
+27. **Scheduled re-scans + diff alerts** [risk] — cadence per engagement, MD digest. *(was #5)*
+  (done: `watch_interval` cadence in watch config + `services/rescan.py` due-check/recon pass/digest MD, auto-scan loop hook, `POST /api/engagement/{id}/rescan` + `GET .../watch/digest`, Lab watch card cadence/Rescan/Digest; unit + e2e `test_rescan*`/`test_watch_digest`.)
 28. **SMB share enumerator** [risk] — shares/ACLs, read-only, into asset graph. *(was #7; in flight: PR #28)*
 29. **LLMNR/NBT-NS poison lab** [risk] — container-only listener + capture. *(was #9; in flight: PR #30)*
 30. **Session post-exploit recon pack** [risk] — sysinfo/getuid/loot timeline. *(was #11; in flight: PR #32)*

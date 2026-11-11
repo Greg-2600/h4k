@@ -101,11 +101,20 @@ def test_unknown_engagement_raises(store):
 
 def test_config_defaults_and_validation(store, eng):
     cfg = store.get_watch_config(eng["id"])
-    assert cfg == {"mode": "notable", "retain": 30}
+    assert cfg == {
+        "mode": "notable",
+        "retain": 30,
+        "interval": 0,
+        "last_scheduled": None,
+    }
     assert store.set_watch_config(eng["id"], mode="all")["mode"] == "all"
     assert store.set_watch_config(eng["id"], retain=5)["retain"] == 5
+    assert store.set_watch_config(eng["id"], interval=3600)["interval"] == 3600
+    assert store.set_watch_config(eng["id"], interval=0)["interval"] == 0
     with pytest.raises(ValueError, match="mode must be"):
         store.set_watch_config(eng["id"], mode="loud")
+    with pytest.raises(ValueError, match="interval must be"):
+        store.set_watch_config(eng["id"], interval="hourly")
     with pytest.raises(ValueError, match="unknown engagement"):
         store.get_watch_config("nope")
 
