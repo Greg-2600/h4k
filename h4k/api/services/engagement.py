@@ -104,6 +104,19 @@ CREATE TABLE IF NOT EXISTS vuln_suppressions (
     created_at    TEXT NOT NULL,
     PRIMARY KEY (engagement_id, host, name)
 );
+-- SMB share inventory (read-only enumeration). Separate from `services`
+-- because shares are not ports; the asset-graph payload includes them so
+-- the operator sees shares alongside hosts and services.
+CREATE TABLE IF NOT EXISTS shares (
+    engagement_id TEXT NOT NULL,
+    host          TEXT NOT NULL,
+    share         TEXT NOT NULL,
+    type          TEXT NOT NULL DEFAULT '',
+    comment       TEXT NOT NULL DEFAULT '',
+    access        TEXT NOT NULL DEFAULT '',
+    first_seen    TEXT NOT NULL,
+    PRIMARY KEY (engagement_id, host, share)
+);
 -- Attempt ledger. Deliberately NOT the credentials table: a failed login is
 -- not a credential, and recording it as one would put a bogus credential edge
 -- in the graph and inflate the credential count.
@@ -573,6 +586,42 @@ class EngagementStore:
         )
         return [dict(r) for r in rows]
 
+    def record_share(self, engagement_id: str, host: str, share: dict[str, Any]) -> int:
+        """Record one enumerated SMB share (scope-enforced, read-only data)."""
+        self._require_scope(engagement_id, host)
+        name = str(share.get("name") or "").strip()
+        if not name:
+            return 0
+        is_new = not self._exists(
+            "SELECT 1 FROM shares WHERE engagement_id=? AND host=? AND share=?",
+            (engagement_id, host, name),
+        )
+        self._write(
+            "INSERT INTO shares (engagement_id, host, share, type, comment,"
+            " access, first_seen) VALUES (?,?,?,?,?,?,?)"
+            " ON CONFLICT(engagement_id, host, share) DO UPDATE SET"
+            " comment=COALESCE(excluded.comment, shares.comment),"
+            " access=COALESCE(excluded.access, shares.access)",
+            (
+                engagement_id,
+                host,
+                name,
+                str(share.get("type") or ""),
+                str(share.get("comment") or ""),
+                str(share.get("access") or ""),
+                _now(),
+            ),
+        )
+        return int(is_new)
+
+    def shares(self, engagement_id: str) -> list[dict[str, Any]]:
+        rows = self._query(
+            "SELECT host, share, type, comment, access, first_seen FROM shares"
+            " WHERE engagement_id=? ORDER BY host, share",
+            (engagement_id,),
+        )
+        return [dict(r) for r in rows]
+
     def suppressed_keys(
         self, engagement_id: str, now: str | None = None
     ) -> set[tuple[str, str]]:
@@ -844,7 +893,12 @@ class EngagementStore:
                         "verified": True,
                     }
                 )
-        return {"nodes": nodes, "edges": edges, "summary": self.summary(engagement_id)}
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "shares": self.shares(engagement_id),
+            "summary": self.summary(engagement_id),
+        }
 
     # ---- crown jewels / attack objectives ---------------------------------
 
