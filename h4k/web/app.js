@@ -1033,6 +1033,19 @@ async function listSuppressions() {
       ? items.map((s) => `<div data-testid="sup-item"><b>${esc(s.name)}</b> on ${esc(s.host)} — ${esc(s.reason)} <span class="muted">until ${esc(s.expires_at || '—')}</span></div>`).join('')
       : 'no suppressions recorded';
   } catch (e) { $('sup-body').textContent = `list failed: ${e.message}`; }
+async function runSmbEnum() {
+  const target = $('smb-target').value.trim() || $('target').value.trim();
+  if (!target) { log('smb needs a target', 'warn'); return; }
+  $('smb-body').textContent = 'enumerating shares…';
+  $('smb-status').textContent = '';
+  try {
+    const engId = await currentEngagementId();
+    const res = await api('/api/smb/shares', { method: 'POST', body: { target, engagement_id: engId || null } });
+    const names = (res.shares || []).map((s) => `${s.name}${s.access ? ` (${s.access})` : ''}`).join(', ');
+    $('smb-body').innerHTML = `<div data-testid="smb-shares">${esc(`${res.count || 0} share(s)${res.ingested ? ` · ${res.ingested} in ledger` : ''}: ${names || 'none'}`)}</div>`;
+    $('smb-status').textContent = `${res.count || 0} share(s)`;
+    log(`smb enum done: ${res.count || 0} share(s)`, 'success');
+  } catch (e) { $('smb-body').textContent = `smb enum failed: ${e.message}`; }
 }
 
 async function runNikto() {
@@ -2208,6 +2221,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-krb-roast').addEventListener('click', () => krbRoast('kerberoast'));
   $('btn-nse-suggest').addEventListener('click', runNseSuggest);
   $('btn-nse-run').addEventListener('click', runNse);
+  $('btn-smb-enum').addEventListener('click', runSmbEnum);
   $('btn-gobuster').addEventListener('click', runGobuster);
   $('btn-nuclei').addEventListener('click', runNuclei);
   $('btn-ssrf-probe').addEventListener('click', runSsrfProbe);

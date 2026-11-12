@@ -966,6 +966,13 @@ curated NSE scripts (16 services; unknown falls back to the generic
 `vuln,default` sweep rather than inventing names). Running stays explicit
 via `POST /api/nmap/nse` — nothing fires on suggest. Recon NSE card:
 Suggest → per-script list → Run. Sandbox refuses to spawn nmap and says so.
+## Backlog #7 — SMB share enumerator
+
+`POST /api/smb/shares` (opt-in, null session default) parses `smbclient -L`
+and `smbmap` output into structured shares with access flags. With
+`engagement_id`, shares are recorded per host in a scope-enforced `shares`
+table, readable via `GET .../shares` and included in the asset-graph payload
+so shares sit alongside hosts and services. Sandbox returns 3 canned shares.
 
 ## Backlog #4 — credential hygiene report
 

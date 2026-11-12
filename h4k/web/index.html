@@ -177,6 +177,14 @@
               <button class="btn" id="btn-sup-list" data-testid="btn-sup-list">List</button>
             </div>
             <div id="sup-body" data-testid="sup-body" class="muted">Suppressions hide findings until expiry — they never delete evidence.</div>
+          <div class="card-head"><h2>SMB shares</h2><span class="spacer"></span><span class="muted">read-only enum · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <input type="text" id="smb-target" data-testid="smb-target" class="grow" placeholder="192.168.1.13" />
+              <button class="btn primary" id="btn-smb-enum" data-testid="btn-smb-enum">Enumerate</button>
+              <span class="muted" id="smb-status" data-testid="smb-status"></span>
+            </div>
+            <div id="smb-body" data-testid="smb-body" class="muted">Null-session share inventory for one host you own.</div>
           </div>
         </div>
         <div class="card">
@@ -663,6 +671,7 @@
         <div class="cmd-item" data-cmd="nikto" data-tab="recon" data-btn="btn-nikto"><span>Recon: nikto web scan</span></div>
         <div class="cmd-item" data-cmd="nuclei" data-tab="recon" data-btn="btn-nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster" data-tab="recon" data-btn="btn-gobuster"><span>Recon: gobuster content discovery</span></div>
+        <div class="cmd-item" data-cmd="smb" data-tab="recon" data-btn="btn-smb-enum"><span>Recon: enumerate SMB shares (read-only)</span></div>
         <div class="cmd-item" data-cmd="spider" data-tab="recon" data-btn="btn-spider"><span>Recon: DAST spider crawl (same-origin + auth)</span></div>
         <div class="cmd-item" data-cmd="ssrfprobe" data-tab="recon" data-btn="btn-ssrf-probe"><span>Recon: SSRF metadata pack (opt-in)</span></div>
         <div class="cmd-item" data-cmd="jwttest" data-tab="recon" data-btn="btn-jwt-test"><span>Recon: JWT audit + alg-confusion</span></div>
