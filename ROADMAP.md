@@ -321,7 +321,8 @@ where network/tooling is involved.
 58. **AFL++ persistent runner** [wow] — harness + stats. *(was #52; in flight: PR #73)*
 59. **Crash bisection** [wow] — input halve to minimal trigger. *(was #54; in flight: PR #75)*
 60. **PCAP → seed replay** [wow] — deterministic fuzz seeds. *(was #55; in flight: PR #76)*
-61. **Stateful fuzz + auth profiles** [risk] — login → authed-flow fuzz. *(was #56, #58; in flight: PR #77)*
+61. **Stateful fuzz + auth profiles** [risk] — login → authed-flow fuzz. *(was #56, #58)*
+  (done: `services/stateful_fuzz.py` per-iteration login (cookies + JSON-token harvest) + round-robin step x field x mutation replay with session attached + `services/fuzz_profiles.py` JSON-backed named presets (masked list, fail-closed unknown names); `POST /api/stateful_fuzz` + `GET|POST|DELETE /api/fuzz-profiles` (400/404) sandbox canned; Fuzz-lab rows (login + flow + preset attach) + palette (`stfuzz`, `authprof`); unit `test_stateful_fuzz*` + `test_fuzz_profiles*` + e2e `test_stateful_fuzz_ui`/`test_fuzz_profiles_ui`; merged via #77.)
 62. **Coverage HTML import** [wow] — llvm-cov badge in UI. *(was #60; in flight: PR #81)*
 63. **SAST CI gate + delta + inline suppress** [risk] — fail PRs on new high-severity findings; diff-only results; NOSAST with expiry + owner. *(merges old #65, #66, #67; old #65 done via #87, old #66 done via #88, old #67 done via #89)*
   (done: threshold CI gate + SAST diff + NOSAST waivers with expiry/owner; `POST /api/source/ci/gate|sast/delta|suppress/match` sandbox canned; Container card rows + palette; unit + e2e `test_ci_gate*`, `test_sast_delta*`, `test_suppress*`.)
@@ -330,6 +331,7 @@ where network/tooling is involved.
 65. **Command palette** [wow] — Ctrl-K ops launcher for every card action. *(merges old #95)*
   (done: palette `runCmd` dispatches generically via `data-tab` + `data-btn` (clicks the real card handler — same guards, no parallel path); all 89 card buttons audited — every run action has an entry, non-launchable toggles/resets/deletes/demo-seeders/form-openers excluded and documented; filter matches label and command id; unit `test_palette.py` enforces the contract going forward + e2e `test_palette_ui*`.)
 66. **Multi-lang SAST: Go + Rust** [risk] — core source→sink rules for Go and Rust services. *(merges old #68)*
+  (done: `services/multilang_sast.py` 10-rule pack (6 Go: exec/sql/template.HTML/traversal/SSRF/gob-yaml; 4 Rust: Command/sqlx/fs/reqwest) with 6-line windowed source→sink match + sanitizer clearing + one-hit-per-rule-per-file; `POST /api/source/sast/multilang` (=== path === bundle or files, 400 empty, 404 unknown engagement) scope-enforced ledger, sandbox canned; Container card row + palette (`mlsast`); unit + e2e `test_multilang*`; merged via #93.)
   (done: `services/multilang_sast.py` 10-rule pack (6 Go: exec/sql/template.HTML/traversal/SSRF/gob-yaml; 4 Rust: Command/sqlx/fs/reqwest) with 6-line windowed matching + sanitizer clearing + one-hit-per-rule-per-file; `POST /api/source/sast/multilang` (=== path === bundle or files, 400 empty/bad, 404 unknown engagement) sandbox canned; Container card row + palette; unit (incl. window edge + sanitizer clearing) + e2e `test_multilang*`.)
 67. **Vuln-lib taint + VEX statements** [risk] — vulnerable-dependency → sink paths; not-affected with justification. *(merges old #69, #70)*
 68. **Typosquat heuristics + SLSA provenance ingest** [risk] — malicious-package signals; build-info provenance records. *(merges old #71, #72)*
