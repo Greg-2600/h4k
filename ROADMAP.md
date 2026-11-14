@@ -288,7 +288,8 @@ where network/tooling is involved.
   (done: `services/dast_spider.py` same-origin BFS + auth header/cookie + `POST /spider` with scope-enforced asset ledger; sandbox canned map; DAST spider card + palette cmd; unit + e2e `test_*spider*`.)
 27. **Scheduled re-scans + diff alerts** [risk] — cadence per engagement, MD digest. *(was #5)*
   (done: `watch_interval` cadence in watch config + `services/rescan.py` due-check/recon pass/digest MD, auto-scan loop hook, `POST /api/engagement/{id}/rescan` + `GET .../watch/digest`, Lab watch card cadence/Rescan/Digest; unit + e2e `test_rescan*`/`test_watch_digest`.)
-28. **SMB share enumerator** [risk] — shares/ACLs, read-only, into asset graph. *(was #7; in flight: PR #28)*
+28. **SMB share enumerator** [risk] — shares/ACLs, read-only, into asset graph. *(was #7)*
+  (done: `services/smb_shares.py` smbclient/smbmap parse + `POST /smb/shares` (null session default) with scope-enforced share ledger (`shares` table, `GET .../shares`, included in graph payload); Recon SMB card + palette; unit + e2e `test_smb*`.)
 29. **LLMNR/NBT-NS poison lab** [risk] — container-only listener + capture. *(was #9; in flight: PR #30)*
 30. **Session post-exploit recon pack** [risk] — sysinfo/getuid/loot timeline. *(was #11; in flight: PR #32)*
 31. **Engagement timeline view** [risk] — scan→creds→sessions→paths chronology. *(was #13; in flight: PR #34)*

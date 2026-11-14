@@ -129,6 +129,7 @@ CTF / lab toolkit (opt-in, each explicit):
 - `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +
   docker-group tries + host audit, read-only, no password)
 - `POST /api/privesc/suggest` (10-check read-only checklist, sandbox canned)
+- `POST /smb/shares` (read-only share inventory, null session default) + `GET /api/engagement/{id}/shares` (ledger, also in graph payload)
 
 Engagement (persistent memory + cred propagation, engagement router):
 - `POST /api/engagement` (declare authorized scope), `GET /api/engagement`, `GET|DELETE /api/engagement/{id}`
@@ -230,6 +231,7 @@ Health/diagnostic:
 | `loot_vault.py` | masked loot vault: verified creds + flags + shares, redaction + masked md/json export |
 | `kerberos.py` | AS-REP + Kerberoast via impacket (explicit roast, optional John crack, sandbox canned hashes) |
 | `nse_suggest.py` | curated service → NSE script map (suggest offline, run explicit) |
+| `smb_shares.py` | read-only SMB share inventory (smbclient/smbmap parse, scope-enforced share ledger + graph payload) |
 | `hygiene.py` | read-only credential hygiene: reuse/weak/default summary + score over verified creds |
 | `rescan.py` | per-engagement scheduled recon passes (due-check + digest MD) |
 | `graph_canvas.py` | deterministic canvas layout for the asset graph (hosts circle, services ring, creds top row; powers the interactive SVG + PNG export) |
