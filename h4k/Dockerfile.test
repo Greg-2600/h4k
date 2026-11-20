@@ -4,7 +4,7 @@
 # The sandbox API under test starts inside this same container (see
 # tests/e2e/conftest.py), so no host execution and no dependency on the
 # runtime h4k container.
-FROM python:3.11-slim
+FROM python:3.15-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
