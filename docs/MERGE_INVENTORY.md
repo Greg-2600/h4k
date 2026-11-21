@@ -143,3 +143,29 @@ Two further unique commits should **not** be ported:
    stable.
 6. Run the full suite and sidecar smoke tests at every step; keep
    `backup/pre-sync-20261121` until the port is pushed.
+
+
+---
+
+## Outcome (2026-11-21)
+
+Executed on branch `sync/converge` (origin/main as the base):
+
+- Stage 1: local-only services/routers/sidecars ported; sandbox tool executor
+  renamed `sandbox_exec.py`; untrusted framing, AI budget, approval gate,
+  source budget endpoints and the session finding ledger integrated.
+- Stage 2: the local UI is served as `/ops` (ops.html/ops.js/ops.css) beside
+  origin's dashboard, linked from the nav.
+- Stage 3: objectives unified onto `crown_jewels` (kind/criticality +
+  migration), coverage ledger, `attack_plan.py`, objective/coverage/paths API
+  and session-report sections.
+- Stage 4: sidecars moved onto origin's `h4k-net` bridge with service DNS;
+  adlab reachable at 172.30.0.10; impacket 0.13.1 pinned in the image.
+- Stage 5: full auth layer (roles/OIDC/rate limits) with legacy H4K_API_KEY
+  compatibility.
+
+Verification: image builds, stack healthy (h4k + vulnlab), `/` and `/ops`
+return 200, sandbox reports `mode=sidecar`, telemetry ingests, adlab policy
+read succeeds. Suite: 1806 passed, 3 skipped; the only 3 failures
+(fuzz-shard RST fixture, two privesc host-tool checks) also fail on
+origin/main on macOS and pass on Linux CI.

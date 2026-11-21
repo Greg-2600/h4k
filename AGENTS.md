@@ -32,7 +32,7 @@ HACKING/                 git root
   AGENTS.md              this file — read me first
   h4k/                   the main platform image
     Dockerfile           debian12 + postgres + tor + metasploit + offensive tools
-    docker-compose.yml   h4k + vulnlab (AI provider is env-configured)
+    docker-compose.yml   h4k + vulnlab + sidecar profiles on h4k-net
     entrypoint.sh        boot: postgres -> msfdb -> tor -> msfrpcd -> uvicorn
     api/                 FastAPI app
       main.py            app + lifespan (starts periodic updater)
@@ -40,7 +40,8 @@ HACKING/                 git root
       routers/           scan.py, source.py, update.py, net.py, engagement.py
       services/          ~30 modules (see below)
     data/                cves.json, creds.json, wordlists, custom_rules.json (runtime)
-    web/                 light dashboard UI (index.html, app.js, style.css)
+    web/                 dashboard (index.html/app.js) + operator console
+                         (ops.html/ops.js/ops.css, served at /ops)
     scripts/             DNS recon bash tools
     README.md            main human doc (PHRACK-style)
   vulnlab/               intentionally-vulnerable fuzzing TARGET (separate container)
@@ -77,6 +78,9 @@ cd vulnlab && docker build -t vulnlab . && \
 cd h4k/api && H4K_SANDBOX=1 H4K_DATA_DIR=/tmp/h4k-demo \
   python3 -m uvicorn main:app --port 3137
 ```
+
+**Operator console:** `http://localhost:3137/ops` (findings ledger, approvals,
+noise/AI limits, lab and AD panels). The main dashboard stays at `/`.
 
 **Important:** after `docker build -t h4k .`, you must `docker run` (or `compose
 up`) to start the container — building alone does not leave it running. The API
@@ -239,6 +243,8 @@ Health/diagnostic:
 | `attack_paths.py` | crown jewels -> scored, evidence-backed attack paths |
 | `flag_paths.py` | foothold -> captured-flag chains (one objective per flag host) |
 | `attck.py` | MITRE ATT&CK technique mapping + defender detection guidance |
+| `sandbox_exec.py` | allowlisted tool execution with rlimits (sidecar-aware) |
+| `attack_plan.py` | objective paths, verified-access edges, coverage gaps |
 | `sandbox.py` | deterministic offline stand-ins for nmap/hydra/Metasploit (demo + CI) |
 | `zap.py` | OWASP ZAP headless web-app scanner via REST |
 | `john.py` | John the Ripper hash cracking (multi-format CTF flow) |
@@ -326,6 +332,17 @@ Full documentation in `docs/` (see `docs/index.md`).
   `neighbors.db` and `engagements.db`). Tests and E2E use a temp dir.
 - **nmap XML parsing splits on `"<host "`** — a canned XML must include
   attributes on the `<host>` element or the parser sees no hosts.
+
+## Convergence notes
+
+- `services/sandbox.py` is origin's deterministic lab mode; `sandbox_exec.py`
+  is the tool executor that talks to the sandbox-runner sidecar.
+- Objectives live in `crown_jewels` with `kind`/`criticality`; the coverage
+  ledger is `coverage`. Old databases migrate on first open.
+- `H4K_API_KEY` still works and maps to an admin principal; the richer
+  `H4K_AUTH_ENABLED`/`H4K_API_KEYS`/OIDC path is the production surface.
+- Sidecars use service DNS (`sandbox-runner:9099`, `h4k:3137`,
+  `bloodhound:8080`, `172.30.0.10` for adlab), not 127.0.0.1.
 
 ## Git / workflow
 
