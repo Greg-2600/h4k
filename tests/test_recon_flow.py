@@ -195,7 +195,7 @@ def test_fingerprint_job_runs_and_saves(clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             from routers.scan import _parse_nmap_xml  # noqa: F401
 
             return {
@@ -240,7 +240,7 @@ def _run_passattack_job(clean_db, monkeypatch, stdout):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             return {
                 "tool": "hydra",
                 "stdout": stdout,
@@ -524,7 +524,7 @@ def _run_autopilot_faked(clean_db, monkeypatch, msf):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             if tool == "nmap":
                 return {
                     "stdout": XML,
@@ -679,7 +679,7 @@ def test_passattack_http_form_builds_post_form_spec(clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             seen["argv"] = list(argv)
             return {
                 "tool": "hydra",
@@ -747,7 +747,7 @@ def test_payload_endpoint_renders_via_msfvenom(client, clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             seen["tool"] = tool
             seen["argv"] = list(argv)
             return {
@@ -891,7 +891,7 @@ def test_fingerprint_nmap_uses_service_and_os_detection(clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             seen["argv"] = argv
             return {
                 "tool": "nmap",

@@ -38,3 +38,6 @@ h4k/data/*.run
 
 # live session scratch (never commit)
 ENGAGEMENT_LOG.md
+
+# UI flow screenshots
+artifacts/

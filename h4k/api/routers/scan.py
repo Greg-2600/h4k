@@ -1390,6 +1390,35 @@ def neighbors_scan(background: BackgroundTasks) -> dict[str, Any]:
     return {"job_id": job_id, "status": "running"}
 
 
+def _local_cidr() -> str:
+    """The /24 around this container's first global IPv4 address.
+
+    Discovery used to be pinned to 192.168.1.0/24, which misses bridge
+    networks (172.x), VPNs and lab subnets. Deriving the subnet keeps the
+    button useful anywhere without asking the operator for a CIDR.
+    """
+    import ipaddress
+    import re
+    import subprocess
+
+    try:
+        proc = subprocess.run(  # nosec B603 B607 - fixed argv, no shell
+            ["ip", "-4", "-o", "addr", "show", "scope", "global"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        match = re.search(r"inet (\d+\.\d+\.\d+\.\d+/\d+)", proc.stdout)
+        if match:
+            net = ipaddress.ip_network(match.group(1), strict=False)
+            # A /16 bridge would be 65k ARP probes; /24 is the useful unit.
+            return str(ipaddress.ip_network(f"{net.network_address}/24", strict=False))
+    except Exception:  # pragma: no cover - platform fallback
+        pass
+    return "192.168.1.0/24"
+
+
 def _run_neighbor_discovery(job: dict[str, Any], msf: MsfClient) -> None:
     if job.get("status") == "queued":
         _update(job, status="running", message="discovering neighbors")
@@ -1397,7 +1426,7 @@ def _run_neighbor_discovery(job: dict[str, Any], msf: MsfClient) -> None:
         from services.discovery import NeighborFinder
 
         finder = NeighborFinder(msf)
-        default_cidr = "192.168.1.0/24"
+        default_cidr = _local_cidr()
 
         def _progress(msg: str, pct: float) -> None:
             _update(job, message=msg, progress=pct)
@@ -1501,6 +1530,7 @@ def neighbors_fingerprint(
     Accepts {"ip": "x.x.x.x"} to fingerprint a single host.
     """
     body = req or {}
+    full = bool(body.get("full"))
     ip_filter = (body.get("ip") or "").strip() or None
     if ip_filter:
         stored = _load_neighbor_hosts().get(ip_filter, {})
@@ -1526,11 +1556,13 @@ def neighbors_fingerprint(
     }
     _fingerprint_jobs[job_id] = job
     logger.info("[fingerprint %s] starting: %d host(s)", job_id, len(neighbor_hosts))
-    background.add_task(_run_fingerprint, job, list(neighbor_hosts.values()))
+    background.add_task(_run_fingerprint, job, list(neighbor_hosts.values()), full)
     return {"job_id": job_id, "status": "running"}
 
 
-def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> None:
+def _run_fingerprint(
+    job: dict[str, Any], neighbors: list[dict[str, Any]], full: bool = False
+) -> None:
     if job.get("status") == "queued":
         _update(job, status="running", message="fingerprint starting")
     logger.info("_run_fingerprint starting with %d neighbors", len(neighbors))
@@ -1553,6 +1585,11 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
         for i, ip in enumerate(ips):
             if job.get("status") == "abort_requested":
                 break
+            ports = (
+                "-p-"
+                if full
+                else "22,80,443,445,3389,8080,8443,21,23,25,53,110,143,3306,5432,5900,6379,9200"
+            )
             argv = [
                 "nmap",
                 "-sS",
@@ -1560,17 +1597,32 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
                 "-O",
                 "-T4",
                 "-Pn",
-                "-p",
-                "22,80,443,445,3389,8080,8443,21,23,25,53,110,143,3306,5432,5900,6379,9200",
+                ports if full else "-p",
+                *([] if full else [ports]),
                 "--max-retries",
                 "1",
                 "--host-timeout",
-                "30s",
+                "300s" if full else "30s",
                 "-oX",
                 "-",
                 ip,
             ]
-            result = runner.run_tool("nmap", argv, timeout=150)
+            result = runner.run_tool(
+                "nmap",
+                argv,
+                timeout=600 if full else 150,
+                internal=True,
+                full_output=True,
+            )
+            logger.info(
+                "[fp] %s full=%s status=%s rc=%s stdout=%d stderr=%s",
+                ip,
+                full,
+                result.get("status"),
+                result.get("rc"),
+                len(result.get("stdout") or ""),
+                (result.get("stderr") or "")[:160],
+            )
             parsed = (
                 _parse_nmap_xml(result["stdout"]) if result["status"] == "ok" else []
             )
