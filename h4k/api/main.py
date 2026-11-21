@@ -24,15 +24,15 @@ from routers import (
     auth as auth_router,
     automation as automation_router,
     bloodhound as bloodhound_router,
+    engagement as engagement_router,
     findings as findings_router,
     lab as lab_router,
+    net as net_router,
     noise as noise_router,
     sandbox as sandbox_router,
-    telemetry as telemetry_router,
-    engagement as engagement_router,
-    net as net_router,
     scan as scan_router,
     source as source_router,
+    telemetry as telemetry_router,
     update as update_router,
 )
 

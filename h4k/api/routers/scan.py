@@ -775,9 +775,20 @@ def session_report(fmt: str = "json") -> Any:
         try:
             from services.findings import FindingStore
 
-            lines.append(FindingStore().report_section(scope.get("engagement_id") or ""))
+            lines.append(
+                FindingStore().report_section(scope.get("engagement_id") or "")
+            )
         except Exception:  # pragma: no cover - reporting must never fail
             lines.append("## Finding ledger\n\nunavailable in this build\n")
+        if scope.get("engagement_id"):
+            try:
+                from services.attack_plan import AttackPathService
+
+                lines.append(AttackPathService().report_section(scope["engagement_id"]))
+            except Exception:  # pragma: no cover - reporting must never fail
+                lines.append(
+                    "## Attack paths & coverage\n\nunavailable in this build\n"
+                )
         lines.append("")
         lines.append(
             "> Generated for authorized lab use — verify every target was owned before citing it."

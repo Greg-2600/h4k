@@ -27,6 +27,17 @@ logger = logging.getLogger("h4k.engagement")
 
 DB_NAME = "engagements.db"
 
+OBJECTIVE_KINDS = ("host", "service", "data", "account")
+CRITICALITIES = ("critical", "high", "medium", "low")
+COVERAGE_OUTCOMES = (
+    "reported",
+    "no_issue_found",
+    "ruled_out",
+    "not_applicable",
+    "needs_follow_up",
+    "not_tested",
+)
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS engagements (
     id          TEXT PRIMARY KEY,
@@ -131,10 +142,26 @@ CREATE TABLE IF NOT EXISTS crown_jewels (
     host          TEXT NOT NULL,
     label         TEXT NOT NULL,
     value         INTEGER NOT NULL DEFAULT 50,
+    kind          TEXT NOT NULL DEFAULT 'host',
+    criticality   TEXT NOT NULL DEFAULT 'high',
     created_at    TEXT NOT NULL,
-    UNIQUE(engagement_id, host)
+    UNIQUE(engagement_id, host, label)
 );
 CREATE INDEX IF NOT EXISTS idx_crown_jewels_eng ON crown_jewels(engagement_id);
+-- Coverage ledger: what was tested, including honest negatives.
+CREATE TABLE IF NOT EXISTS coverage (
+    engagement_id TEXT NOT NULL,
+    host          TEXT NOT NULL,
+    port          INTEGER NOT NULL DEFAULT 0,
+    risk_area     TEXT NOT NULL,
+    outcome       TEXT NOT NULL,
+    reason        TEXT NOT NULL DEFAULT '',
+    evidence_id   TEXT NOT NULL DEFAULT '',
+    worker        TEXT NOT NULL DEFAULT '',
+    updated_at    TEXT NOT NULL,
+    PRIMARY KEY (engagement_id, host, port, risk_area)
+);
+CREATE INDEX IF NOT EXISTS idx_coverage_eng ON coverage(engagement_id);
 -- Lab Watch: versioned estate snapshots + per-pass diffs. Snapshots are
 -- scope-filtered at record time (out-of-scope hosts never enter the series),
 -- so a wide auto-scan cannot poison an engagement's change history.
@@ -153,6 +180,18 @@ CREATE INDEX IF NOT EXISTS idx_watch_eng ON watch_snapshots(engagement_id);
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+_CRITICALITY_VALUE = {"critical": 90, "high": 70, "medium": 40, "low": 20}
+
+
+def _criticality_value(criticality: str) -> int:
+    return _CRITICALITY_VALUE.get(criticality, 70)
+
+
+def _text(value: Any, limit: int = 0) -> str:
+    text = str(value or "")
+    return text[:limit] if limit else text
 
 
 def db_path() -> Path:
@@ -204,6 +243,41 @@ class EngagementStore:
                 conn.execute(
                     "ALTER TABLE engagements ADD COLUMN watch_last_scheduled REAL"
                 )
+            # Objectives migration: crown_jewels gained kind/criticality and
+            # per-label uniqueness. Rebuild once when the columns are absent.
+            jewel_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(crown_jewels)")
+            }
+            if "kind" not in jewel_cols:
+                conn.executescript("""
+                    ALTER TABLE crown_jewels RENAME TO crown_jewels_legacy;
+                    CREATE TABLE crown_jewels (
+                        id            TEXT PRIMARY KEY,
+                        engagement_id TEXT NOT NULL,
+                        host          TEXT NOT NULL,
+                        label         TEXT NOT NULL,
+                        value         INTEGER NOT NULL DEFAULT 50,
+                        kind          TEXT NOT NULL DEFAULT 'host',
+                        criticality   TEXT NOT NULL DEFAULT 'high',
+                        created_at    TEXT NOT NULL,
+                        UNIQUE(engagement_id, host, label)
+                    );
+                    INSERT INTO crown_jewels
+                        (id, engagement_id, host, label, value, kind,
+                         criticality, created_at)
+                    SELECT id, engagement_id, host, label, value, 'host',
+                        CASE
+                            WHEN value >= 80 THEN 'critical'
+                            WHEN value >= 60 THEN 'high'
+                            WHEN value >= 35 THEN 'medium'
+                            ELSE 'low'
+                        END,
+                        created_at
+                    FROM crown_jewels_legacy;
+                    DROP TABLE crown_jewels_legacy;
+                    CREATE INDEX IF NOT EXISTS idx_crown_jewels_eng
+                        ON crown_jewels(engagement_id);
+                    """)
         with suppress(OSError):  # non-POSIX / read-only fs
             self.path.chmod(0o600)  # holds verified credentials
 
@@ -267,6 +341,7 @@ class EngagementStore:
             "DELETE FROM vulns WHERE engagement_id=?",
             "DELETE FROM attempts WHERE engagement_id=?",
             "DELETE FROM crown_jewels WHERE engagement_id=?",
+            "DELETE FROM coverage WHERE engagement_id=?",
         ):
             self._write(sql, (engagement_id,))
         before = self._scalar(
@@ -782,6 +857,20 @@ class EngagementStore:
                 {a["host"] for c in verified for a in c["hosts"]}
                 - {c["hosts"][0]["host"] for c in verified if c["hosts"]}
             ),
+            "objectives": int(
+                self._scalar(
+                    "SELECT COUNT(*) FROM crown_jewels WHERE engagement_id=?",
+                    (engagement_id,),
+                )
+                or 0
+            ),
+            "coverage_entries": int(
+                self._scalar(
+                    "SELECT COUNT(*) FROM coverage WHERE engagement_id=?",
+                    (engagement_id,),
+                )
+                or 0
+            ),
         }
 
     def graph(self, engagement_id: str) -> dict[str, Any]:
@@ -847,6 +936,152 @@ class EngagementStore:
         return {"nodes": nodes, "edges": edges, "summary": self.summary(engagement_id)}
 
     # ---- crown jewels / attack objectives ---------------------------------
+
+    # ---- objectives (the documented, typed view of crown jewels) ----------
+
+    def add_objective(
+        self,
+        engagement_id: str,
+        host: str,
+        *,
+        label: str = "",
+        kind: str = "host",
+        criticality: str = "high",
+    ) -> dict[str, Any]:
+        """Declare an objective. It must be inside the authorized scope."""
+        if not self.get_engagement(engagement_id):
+            raise ValueError("unknown engagement")
+        host = str(host or "").strip()
+        if not host:
+            raise ValueError("objective host is required")
+        self._require_scope(engagement_id, host)
+        kind = str(kind or "host").lower()
+        if kind not in OBJECTIVE_KINDS:
+            raise ValueError(f"kind must be one of {', '.join(OBJECTIVE_KINDS)}")
+        criticality = str(criticality or "high").lower()
+        if criticality not in CRITICALITIES:
+            raise ValueError(f"criticality must be one of {', '.join(CRITICALITIES)}")
+        label = str(label or "").strip() or host
+        self._write(
+            "INSERT INTO crown_jewels "
+            "(id, engagement_id, host, label, value, kind, criticality, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(engagement_id, host, label) DO UPDATE SET "
+            "kind=excluded.kind, criticality=excluded.criticality, "
+            "value=excluded.value",
+            (
+                uuid.uuid4().hex[:12],
+                engagement_id,
+                host,
+                label,
+                _criticality_value(criticality),
+                kind,
+                criticality,
+                _now(),
+            ),
+        )
+        rows = self._query(
+            "SELECT * FROM crown_jewels WHERE engagement_id=? AND host=? AND label=?",
+            (engagement_id, host, label),
+        )
+        return dict(rows[0]) if rows else {}
+
+    def objectives(self, engagement_id: str) -> list[dict[str, Any]]:
+        rows = self._query(
+            "SELECT * FROM crown_jewels WHERE engagement_id=? "
+            "ORDER BY criticality, host, label",
+            (engagement_id,),
+        )
+        return [dict(r) for r in rows]
+
+    def delete_objective(self, engagement_id: str, host: str, label: str = "") -> bool:
+        if label:
+            sql = (
+                "DELETE FROM crown_jewels WHERE engagement_id=? AND host=? AND label=?"
+            )
+            args: tuple[Any, ...] = (engagement_id, host, label)
+            exists_sql = (
+                "SELECT 1 FROM crown_jewels "
+                "WHERE engagement_id=? AND host=? AND label=?"
+            )
+        else:
+            sql = "DELETE FROM crown_jewels WHERE engagement_id=? AND host=?"
+            args = (engagement_id, host)
+            exists_sql = "SELECT 1 FROM crown_jewels WHERE engagement_id=? AND host=?"
+        if not self._exists(exists_sql, args):
+            return False
+        self._write(sql, args)
+        return True
+
+    # ---- coverage ledger ---------------------------------------------------
+
+    def record_coverage(
+        self,
+        engagement_id: str,
+        host: str,
+        risk_area: str,
+        outcome: str,
+        *,
+        port: int = 0,
+        reason: str = "",
+        evidence_id: str = "",
+        worker: str = "",
+    ) -> dict[str, Any]:
+        """Record what was actually tested — including a clean negative."""
+        if not self.get_engagement(engagement_id):
+            raise ValueError("unknown engagement")
+        host = str(host or "").strip()
+        if not host:
+            raise ValueError("coverage host is required")
+        self._require_scope(engagement_id, host)
+        risk_area = str(risk_area or "").strip()
+        if not risk_area:
+            raise ValueError("risk_area is required")
+        outcome = str(outcome or "").lower()
+        if outcome not in COVERAGE_OUTCOMES:
+            raise ValueError(f"outcome must be one of {', '.join(COVERAGE_OUTCOMES)}")
+        port = int(port or 0)
+        self._write(
+            "INSERT INTO coverage "
+            "(engagement_id, host, port, risk_area, outcome, reason, evidence_id, "
+            "worker, updated_at) VALUES (?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(engagement_id, host, port, risk_area) DO UPDATE SET "
+            "outcome=excluded.outcome, reason=excluded.reason, "
+            "evidence_id=excluded.evidence_id, worker=excluded.worker, "
+            "updated_at=excluded.updated_at",
+            (
+                engagement_id,
+                host,
+                port,
+                risk_area,
+                outcome,
+                _text(reason, 2000),
+                _text(evidence_id, 120),
+                _text(worker, 80),
+                _now(),
+            ),
+        )
+        rows = self._query(
+            "SELECT * FROM coverage WHERE engagement_id=? AND host=? AND port=? "
+            "AND risk_area=?",
+            (engagement_id, host, port, risk_area),
+        )
+        return dict(rows[0]) if rows else {}
+
+    def coverage(self, engagement_id: str, host: str = "") -> list[dict[str, Any]]:
+        if host:
+            rows = self._query(
+                "SELECT * FROM coverage WHERE engagement_id=? AND host=? "
+                "ORDER BY host, port, risk_area",
+                (engagement_id, host),
+            )
+        else:
+            rows = self._query(
+                "SELECT * FROM coverage WHERE engagement_id=? "
+                "ORDER BY host, port, risk_area",
+                (engagement_id,),
+            )
+        return [dict(r) for r in rows]
 
     def add_crown_jewel(
         self,

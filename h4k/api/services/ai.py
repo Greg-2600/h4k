@@ -209,7 +209,9 @@ def ai_analyze(
         return {"ok": False, "error": str(exc), "provider": "ollama", "raw": ""}
 
 
-def _call_openai(user_message: str, model: str, system_message: str) -> dict[str, Any]:
+def _call_openai(
+    user_message: str, model: str, system_message: str = SYS_PROMPT
+) -> dict[str, Any]:
     url = os.environ.get("H4K_AI_URL", "https://api.openai.com/v1/chat/completions")
     payload = {
         "model": model,
