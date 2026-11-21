@@ -169,3 +169,18 @@ return 200, sandbox reports `mode=sidecar`, telemetry ingests, adlab policy
 read succeeds. Suite: 1806 passed, 3 skipped; the only 3 failures
 (fuzz-shard RST fixture, two privesc host-tool checks) also fail on
 origin/main on macOS and pass on Linux CI.
+
+
+## Recon-flow follow-up (2026-11-21)
+
+The local recon commit (`dbeff95`) is already converged: origin's
+`services/discovery.py` has the same public functions and the same 60-entry
+OUI table, and origin's scan router provides `/api/neighbors`,
+`/api/neighbors/scan|status|jobs`, `/api/neighbors/fingerprint(+/status|results)`
+and `/api/graph` with the same job shape the local UI polls. The local recon
+UI (Local Network tab, Service Map, full-port-scan flow) is preserved at
+`/ops`. No duplicate backend was added.
+
+Live check on the converged stack: `/api/neighbors`, `/api/graph` and
+`/api/neighbors/jobs` return 200; `POST /api/neighbors/scan` starts a job;
+`/ops` returns 200.
