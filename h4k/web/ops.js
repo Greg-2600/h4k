@@ -105,7 +105,7 @@ function applyPrefs() {
 }
 
 function apiKey() {
-  return localStorage.getItem('h4k-api-key') || '';
+  return sessionStorage.getItem('h4k-api-key') || '';
 }
 
 function apiHeaders() {
@@ -3125,8 +3125,8 @@ async function loadAuthStatus() {
 async function saveApiKey() {
   const value = ($('set-api-key')?.value || '').trim();
   if (!value) { setText('auth-message', 'Paste a key first.'); return; }
-  localStorage.setItem('h4k-api-key', value);
-  setText('auth-message', 'Key stored in this browser only.');
+  sessionStorage.setItem('h4k-api-key', value);
+  setText('auth-message', 'Key stored for this browser tab only.');
   announce('API key saved');
   await testApiKey();
 }
@@ -3147,7 +3147,7 @@ async function testApiKey() {
 }
 
 function clearApiKey() {
-  localStorage.removeItem('h4k-api-key');
+  sessionStorage.removeItem('h4k-api-key');
   const input = $('set-api-key');
   if (input) input.value = '';
   setText('auth-message', 'Key cleared.');
