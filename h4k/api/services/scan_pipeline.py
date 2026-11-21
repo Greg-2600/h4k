@@ -341,7 +341,14 @@ class ScanPipeline:
             timeout=3600,
             check=False,
         )
-        return proc.stdout + proc.stderr
+        output = proc.stdout + proc.stderr
+        logger.info(
+            "db_nmap rc=%s args=%s tail=%s",
+            proc.returncode,
+            argv,
+            output.strip().splitlines()[-3:],
+        )
+        return output
 
     def _collect_hosts_and_services(self, target: str) -> list:
         hosts = []
@@ -385,6 +392,12 @@ class ScanPipeline:
                         )
         except Exception as exc:
             logger.warning("services() failed: %s", exc)
+        logger.info(
+            "collected %d host(s), %d service(s) from workspace %s",
+            len(hosts),
+            sum(len(h.get("services") or []) for h in hosts),
+            ws,
+        )
         return hosts
 
     def _run_aux_scanners(
