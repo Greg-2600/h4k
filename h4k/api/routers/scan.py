@@ -772,6 +772,13 @@ def session_report(fmt: str = "json") -> Any:
                 "- no techniques observed yet — scan and ingest findings first"
             )
         lines.append("")
+        try:
+            from services.findings import FindingStore
+
+            lines.append(FindingStore().report_section(scope.get("engagement_id") or ""))
+        except Exception:  # pragma: no cover - reporting must never fail
+            lines.append("## Finding ledger\n\nunavailable in this build\n")
+        lines.append("")
         lines.append(
             "> Generated for authorized lab use — verify every target was owned before citing it."
         )

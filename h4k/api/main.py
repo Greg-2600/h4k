@@ -19,6 +19,16 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from routers import (
+    ad as ad_router,
+    approvals as approvals_router,
+    auth as auth_router,
+    automation as automation_router,
+    bloodhound as bloodhound_router,
+    findings as findings_router,
+    lab as lab_router,
+    noise as noise_router,
+    sandbox as sandbox_router,
+    telemetry as telemetry_router,
     engagement as engagement_router,
     net as net_router,
     scan as scan_router,
@@ -108,6 +118,12 @@ class _RateLimitStore:
 
 
 _rate_store: _RateLimitStore | None = None
+
+
+def reset_auth_cache() -> None:
+    """Drop cached auth configuration (tests / env reloads)."""
+    global _rate_store
+    _rate_store = None
 
 
 async def _rate_limit_middleware(
@@ -362,6 +378,16 @@ app.include_router(source_router.router, tags=["source"])
 app.include_router(update_router.router, tags=["update"])
 app.include_router(net_router.router, tags=["net"])
 app.include_router(engagement_router.router, tags=["engagement"])
+app.include_router(auth_router.router, tags=["auth"])
+app.include_router(approvals_router.router, tags=["approvals"])
+app.include_router(sandbox_router.router, tags=["sandbox"])
+app.include_router(lab_router.router, tags=["lab"])
+app.include_router(ad_router.router, tags=["ad"])
+app.include_router(bloodhound_router.router, tags=["bloodhound"])
+app.include_router(telemetry_router.router, tags=["telemetry"])
+app.include_router(findings_router.router, tags=["findings"])
+app.include_router(automation_router.router, tags=["automation"])
+app.include_router(noise_router.router, tags=["noise"])
 
 # Serve the plain HTML/JS frontend.
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")

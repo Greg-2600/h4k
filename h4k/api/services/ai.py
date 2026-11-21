@@ -19,6 +19,8 @@ import os
 import urllib.request
 from typing import Any
 
+from services import ai_budget, untrusted
+
 logger = logging.getLogger("h4k.ai")
 
 DEFAULT_OLLAMA = "http://127.0.0.1:11434"
@@ -107,14 +109,45 @@ def _ensure_ollama_model(model: str) -> bool:
         return False
 
 
-def ai_analyze(input_text: str, model_override: str | None = None) -> dict[str, Any]:
+def ai_analyze(
+    input_text: str,
+    model_override: str | None = None,
+    *,
+    instructions: str = "",
+    label: str = "scanner_output",
+    untrusted_input: bool = True,
+    scope: str = "default",
+) -> dict[str, Any]:
     """Call the configured LLM; return {ok, raw, provider, error}.
 
     `model_override` (if provided) overrides the configured model for this call
     (used by the UI model picker); must be a model name Ollama can serve.
+
+    `input_text` is treated as untrusted evidence by default: it is wrapped in a
+    nonce-tagged data block and the system prompt says not to follow anything
+    inside it. Code-owned instructions belong in `instructions`, which stays
+    outside the block. Set `untrusted_input=False` only for data that is itself
+    trusted (e.g. a system-authored template).
     """
     provider = _provider()
     model = model_override or _model()
+    system_message = (
+        untrusted.system_prompt(SYS_PROMPT) if untrusted_input else SYS_PROMPT
+    )
+    user_message = (
+        untrusted.compose(input_text, instructions=instructions, label=label)
+        if untrusted_input
+        else f"{instructions}\n\n{input_text}".strip()
+    )
+    budget = ai_budget.check(scope, system_message + "\n" + user_message)
+    if not budget["allowed"]:
+        return {
+            "ok": False,
+            "error": budget["reason"],
+            "provider": provider,
+            "raw": "",
+            "budget": budget,
+        }
 
     if provider == "openai" or provider == "openai_compatible":
         # a key is only needed for real OpenAI-compatible clouds; local relays
@@ -128,7 +161,14 @@ def ai_analyze(input_text: str, model_override: str | None = None) -> dict[str, 
                 "provider": provider,
                 "raw": "",
             }
-        return _call_openai(input_text, model)
+        result = _call_openai(user_message, model, system_message)
+        if result.get("ok"):
+            ai_budget.record(
+                scope,
+                input_text=system_message + "\n" + user_message,
+                output_text=str(result.get("raw") or ""),
+            )
+        return result
 
     # Default: Ollama.
     if not _probe_ollama():
@@ -143,8 +183,8 @@ def ai_analyze(input_text: str, model_override: str | None = None) -> dict[str, 
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": SYS_PROMPT},
-            {"role": "user", "content": input_text},
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
         ],
         "stream": False,
         "temperature": 0.2,
@@ -159,18 +199,23 @@ def ai_analyze(input_text: str, model_override: str | None = None) -> dict[str, 
         with urllib.request.urlopen(req, timeout=180) as resp:  # nosec B310 fixed URL
             data = json.loads(resp.read().decode())
         content = data.get("message", {}).get("content", "")
+        ai_budget.record(
+            scope,
+            input_text=system_message + "\n" + user_message,
+            output_text=str(content or ""),
+        )
         return {"ok": True, "raw": content, "provider": "ollama", "error": None}
     except Exception as exc:
         return {"ok": False, "error": str(exc), "provider": "ollama", "raw": ""}
 
 
-def _call_openai(input_text: str, model: str) -> dict[str, Any]:
+def _call_openai(user_message: str, model: str, system_message: str) -> dict[str, Any]:
     url = os.environ.get("H4K_AI_URL", "https://api.openai.com/v1/chat/completions")
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": SYS_PROMPT},
-            {"role": "user", "content": input_text},
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
         ],
         "temperature": 0.2,
     }
