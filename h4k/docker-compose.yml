@@ -7,8 +7,12 @@ services:
     # postgres/msfrpcd ports cannot collide with services already running on
     # the host. For LAN-wide ARP discovery use the host-network override:
     #   docker compose -f docker-compose.yml -f docker-compose.host.yml up -d
+    #
+    # The adlab network is joined so the AD sidecar's fixed 172.30.0.10 is
+    # reachable without publishing SMB/LDAP/Kerberos on the host.
     networks:
       - h4k-net
+      - adlab
     ports:
       - "3137:3137"
     volumes:
@@ -20,6 +24,31 @@ services:
       MSF_DB_PORT: "5433"
       TOR_PORT: "9050"
       API_PORT: "3137"
+      # --- access control ---
+      # Set H4K_AUTH_ENABLED=1 to require an API key or OIDC session. Keys are
+      # name:role:key triples (viewer < operator < admin).
+      H4K_AUTH_ENABLED: ${H4K_AUTH_ENABLED:-0}
+      H4K_API_KEYS: ${H4K_API_KEYS:-}
+      H4K_API_KEYS_FILE: ${H4K_API_KEYS_FILE:-}
+      H4K_RATE_LIMIT_ANON: ${H4K_RATE_LIMIT_ANON:-120}
+      H4K_RATE_LIMIT_AUTHED: ${H4K_RATE_LIMIT_AUTHED:-600}
+      H4K_RATE_LIMIT_OPERATOR: ${H4K_RATE_LIMIT_OPERATOR:-1200}
+      H4K_SESSION_SECRET: ${H4K_SESSION_SECRET:-}
+      H4K_OIDC_ISSUER: ${H4K_OIDC_ISSUER:-}
+      H4K_OIDC_CLIENT_ID: ${H4K_OIDC_CLIENT_ID:-}
+      H4K_OIDC_CLIENT_SECRET: ${H4K_OIDC_CLIENT_SECRET:-}
+      H4K_OIDC_REDIRECT_URI: ${H4K_OIDC_REDIRECT_URI:-}
+      # --- sandbox sidecar ---
+      H4K_SANDBOX_URL: ${H4K_SANDBOX_URL:-http://sandbox-runner:9099}
+      H4K_SANDBOX_TOKEN: ${H4K_SANDBOX_TOKEN:-change-me}
+      H4K_SANDBOX_NPROC: ${H4K_SANDBOX_NPROC:-0}
+      # --- nightly autopilot ---
+      H4K_SCHEDULER: ${H4K_SCHEDULER:-0}
+      H4K_SCHEDULER_INTERVAL: ${H4K_SCHEDULER_INTERVAL:-20}
+      # --- BloodHound CE ---
+      H4K_BLOODHOUND_URL: ${H4K_BLOODHOUND_URL:-http://bloodhound:8080}
+      H4K_BLOODHOUND_USER: ${H4K_BLOODHOUND_USER:-}
+      H4K_BLOODHOUND_PASS: ${H4K_BLOODHOUND_PASS:-}
       # AI triage: any OpenAI-compatible gateway. Example (opencode/free-model
       # gateway of your choice):
       #   H4K_AI_PROVIDER: openai_compatible
@@ -30,6 +59,16 @@ services:
       H4K_AI_URL: ${H4K_AI_URL:-}
       H4K_AI_KEY: ${H4K_AI_KEY:-}
       H4K_AI_MODEL: ${H4K_AI_MODEL:-}
+      # Prompt-injection boundary: on by default; set 0 only for debugging.
+      H4K_UNTRUSTED_BOUNDARY: ${H4K_UNTRUSTED_BOUNDARY:-1}
+      # Approval gate for sandbox/toolkit execution: enforce | audit | off.
+      H4K_APPROVAL_MODE: ${H4K_APPROVAL_MODE:-enforce}
+      H4K_APPROVAL_TTL: ${H4K_APPROVAL_TTL:-900}
+      # Target noise: off | quiet | balanced | aggressive.
+      H4K_NOISE_PROFILE: ${H4K_NOISE_PROFILE:-off}
+      # AI budget: 0 = unlimited.
+      H4K_AI_BUDGET_TOKENS: ${H4K_AI_BUDGET_TOKENS:-0}
+      H4K_AI_BUDGET_CALLS: ${H4K_AI_BUDGET_CALLS:-0}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:3137/api/health"]
@@ -56,10 +95,157 @@ services:
       retries: 3
       start_period: 5s
 
+  # ───────────────────────────────────────────────────────────────────────────
+  # Optional lab sidecars. Start one profile at a time:
+  #   docker compose --profile sandbox up -d
+  #   docker compose --profile iotlab up -d
+  #   docker compose --profile adlab up -d
+  #   docker compose --profile telemetry up -d
+  #   docker compose --profile bloodhound up -d
+  # ───────────────────────────────────────────────────────────────────────────
+
+  # Isolated tool execution with rlimits and a per-profile allowlist.
+  sandbox-runner:
+    profiles: ["sandbox"]
+    container_name: h4k_sandbox_runner
+    build: ../sandbox-runner
+    image: h4k-sandbox-runner:latest
+    networks:
+      - h4k-net
+    environment:
+      H4K_SANDBOX_PORT: "9099"
+      H4K_SANDBOX_TOKEN: ${H4K_SANDBOX_TOKEN:-change-me}
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 4g
+    cpus: 2.0
+    restart: unless-stopped
+
+  # Fake MQTT broker, Modbus PLC, CoAP/SSDP/BACnet/SNMP/RTSP/HTTP device.
+  # Target it from h4k as `iotlab` (service DNS) on the h4k-net bridge.
+  iotlab:
+    profiles: ["iotlab"]
+    container_name: h4k_iotlab
+    build: ../iotlab
+    image: h4k-iotlab:latest
+    networks:
+      - h4k-net
+    environment:
+      IOT_MQTT_PORT: ${IOT_MQTT_PORT:-1883}
+      IOT_MODBUS_PORT: ${IOT_MODBUS_PORT:-502}
+      IOT_COAP_PORT: ${IOT_COAP_PORT:-5683}
+      IOT_SSDP_PORT: ${IOT_SSDP_PORT:-1900}
+      IOT_BACNET_PORT: ${IOT_BACNET_PORT:-47808}
+      IOT_SNMP_PORT: ${IOT_SNMP_PORT:-161}
+      IOT_RTSP_PORT: ${IOT_RTSP_PORT:-554}
+      IOT_HTTP_PORT: ${IOT_HTTP_PORT:-8080}
+    pids_limit: 128
+    mem_limit: 256m
+    restart: unless-stopped
+
+  # Tail JSON-lines telemetry and ship it to h4k. Synthetic mode is on by
+  # default so the demo has events without mounting host logs.
+  telemetry-agent:
+    profiles: ["telemetry"]
+    container_name: h4k_telemetry_agent
+    build: ../telemetry-agent
+    image: h4k-telemetry-agent:latest
+    networks:
+      - h4k-net
+    environment:
+      H4K_URL: http://h4k:${API_PORT:-3137}
+      H4K_API_KEY: ${H4K_API_KEY:-}
+      H4K_AGENT_FILES: ${H4K_AGENT_FILES:-}
+      H4K_AGENT_SOURCE: ${H4K_AGENT_SOURCE:-agent}
+      H4K_AGENT_SYNTHETIC: ${H4K_AGENT_SYNTHETIC:-1}
+      H4K_AGENT_INTERVAL: ${H4K_AGENT_INTERVAL:-5}
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    pids_limit: 64
+    mem_limit: 128m
+    restart: unless-stopped
+
+  # A disposable Samba AD DC with intentional misconfigurations.
+  adlab:
+    profiles: ["adlab"]
+    container_name: h4k_adlab
+    build: ../adlab
+    image: h4k-adlab:latest
+    hostname: dc01
+    networks:
+      adlab:
+        ipv4_address: 172.30.0.10
+    environment:
+      REALM: ${AD_REALM:-LAB.H4K}
+      DOMAIN: ${AD_DOMAIN:-LAB}
+      ADMIN_PASS: ${AD_ADMIN_PASS:-H4kLab!2026}
+    volumes:
+      - adlab_data:/var/lib/samba
+    # Samba stores NT ACLs in security.* xattrs; that needs CAP_SYS_ADMIN.
+    cap_add: ["SYS_ADMIN"]
+    pids_limit: 512
+    mem_limit: 1g
+    restart: unless-stopped
+
+  # BloodHound CE (application + PostgreSQL + Neo4j). UI on 127.0.0.1:8081.
+  bloodhound-app-db:
+    profiles: ["bloodhound"]
+    image: postgres:16
+    networks:
+      - h4k-net
+    environment:
+      POSTGRES_USER: bloodhound
+      POSTGRES_PASSWORD: ${BH_DB_PASSWORD:-bloodhound}
+      POSTGRES_DB: bloodhound
+    volumes:
+      - bh_postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  bloodhound-graph-db:
+    profiles: ["bloodhound"]
+    image: neo4j:4.4
+    networks:
+      - h4k-net
+    environment:
+      NEO4J_AUTH: neo4j/${BH_NEO4J_PASSWORD:-bloodhound}
+    volumes:
+      - bh_neo4j:/data
+    restart: unless-stopped
+
+  bloodhound:
+    profiles: ["bloodhound"]
+    image: specterops/bloodhound:latest
+    networks:
+      - h4k-net
+    depends_on:
+      - bloodhound-app-db
+      - bloodhound-graph-db
+    environment:
+      bhe_database_connection: postgresql://bloodhound:${BH_DB_PASSWORD:-bloodhound}@bloodhound-app-db:5432/bloodhound
+      bhe_neo4j_connection: neo4j://neo4j:${BH_NEO4J_PASSWORD:-bloodhound}@bloodhound-graph-db:7687
+      bhe_neo4j_disable_auto_migrate: "false"
+      bhe_enable_text_logger: "true"
+    ports:
+      - "127.0.0.1:${BH_PORT:-8081}:8080"
+    restart: unless-stopped
+
 networks:
   h4k-net:
     name: h4k-net
+  adlab:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
 
 volumes:
   h4k_data:
     name: h4k_data
+  adlab_data:
+  bh_postgres:
+  bh_neo4j:

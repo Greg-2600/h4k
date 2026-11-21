@@ -9,7 +9,14 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from schemas import EngagementRequest, PropagateRequest
-from services.engagement import EngagementStore, ScopeError, parse_scope
+from services.engagement import (
+    COVERAGE_OUTCOMES,
+    CRITICALITIES,
+    OBJECTIVE_KINDS,
+    EngagementStore,
+    ScopeError,
+    parse_scope,
+)
 from services.propagate import MAX_ATTEMPTS, PropagationService
 
 logger = logging.getLogger("h4k.routers.engagement")
@@ -397,6 +404,107 @@ def effective_vulns(
 @router.get("/{engagement_id}/graph")
 def engagement_graph(engagement_id: str) -> dict[str, Any]:
     return get_store().graph(engagement_id)
+
+
+@router.get("/{engagement_id}/objectives")
+def list_objectives(engagement_id: str) -> dict[str, Any]:
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return {
+        "objectives": store.objectives(engagement_id),
+        "kinds": list(OBJECTIVE_KINDS),
+        "criticalities": list(CRITICALITIES),
+    }
+
+
+@router.post("/{engagement_id}/objectives")
+def add_objective(
+    engagement_id: str, body: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    data = body or {}
+    try:
+        return get_store().add_objective(
+            engagement_id,
+            str(data.get("host") or ""),
+            label=str(data.get("label") or ""),
+            kind=str(data.get("kind") or "host"),
+            criticality=str(data.get("criticality") or "high"),
+        )
+    except ScopeError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/{engagement_id}/objectives")
+def delete_objective(
+    engagement_id: str, host: str = "", label: str = ""
+) -> dict[str, Any]:
+    if not get_store().delete_objective(engagement_id, host, label):
+        raise HTTPException(status_code=404, detail="objective not found")
+    return {"status": "deleted", "host": host, "label": label}
+
+
+@router.get("/{engagement_id}/coverage")
+def list_coverage(engagement_id: str, host: str = "") -> dict[str, Any]:
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    return {
+        "coverage": store.coverage(engagement_id, host),
+        "outcomes": list(COVERAGE_OUTCOMES),
+    }
+
+
+@router.post("/{engagement_id}/coverage")
+def record_coverage(
+    engagement_id: str, body: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    data = body or {}
+    try:
+        return get_store().record_coverage(
+            engagement_id,
+            str(data.get("host") or ""),
+            str(data.get("risk_area") or ""),
+            str(data.get("outcome") or ""),
+            port=int(data.get("port") or 0),
+            reason=str(data.get("reason") or ""),
+            evidence_id=str(data.get("evidence_id") or ""),
+            worker=str(data.get("worker") or ""),
+        )
+    except ScopeError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/{engagement_id}/paths")
+def objective_paths(engagement_id: str, from_host: str = "") -> dict[str, Any]:
+    from services.attack_plan import AttackPathService
+
+    starts = [h for h in from_host.split(",") if h.strip()] or None
+    try:
+        return AttackPathService(get_store()).evaluate(engagement_id, starts)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{engagement_id}/paths/report")
+def attack_paths_report(engagement_id: str, fmt: str = "md") -> dict[str, Any]:
+    from services.attack_plan import AttackPathService
+
+    try:
+        service = AttackPathService(get_store())
+        if fmt.lower() == "json":
+            return {"fmt": "json", "report": service.evaluate(engagement_id)}
+        return {
+            "fmt": "md",
+            "content": "# Attack paths & coverage\n\n"
+            + service.report_section(engagement_id),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/{engagement_id}/graph/canvas")

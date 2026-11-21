@@ -15,6 +15,8 @@ sys.path.insert(0, str(API_PKG))
 
 # Tests run offline: don't attempt a network CVE refresh.
 os.environ.setdefault("H4K_REFRESH_CVE", "0")
+# Existing suites predate the approval gate; approval tests opt back in.
+os.environ.setdefault("H4K_APPROVAL_MODE", "off")
 
 
 def pytest_collection_modifyitems(config, items):

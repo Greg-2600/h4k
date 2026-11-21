@@ -11,6 +11,8 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from services import approval
+
 logger = logging.getLogger("h4k.toolkit")
 
 # web content wordlist (dirb ships a 'common' list; gobuster/ffuf use it)
@@ -98,7 +100,9 @@ class ToolkitRunner:
         """Return list of tools from the given list that are not available."""
         return [t for t in tools if t not in self._available_tools]
 
-    def run_tool(self, tool: str, argv: list[str], timeout: int = 300) -> dict:
+    def run_tool(
+        self, tool: str, argv: list[str], timeout: int = 300, approval_id: str = ""
+    ) -> dict:
         """Run an external tool.
 
         Returns {tool, stdout, stderr, rc, elapsed, timed_out, status}. On a
@@ -128,6 +132,36 @@ class ToolkitRunner:
                 "elapsed": round(time.time() - started, 2),
                 "timed_out": False,
                 "status": "sandbox",
+            }
+        try:
+            approval.ApprovalStore().check(
+                [str(a) for a in argv],
+                tool=tool,
+                approval_id=approval_id,
+                context={"toolkit": tool, "timeout": timeout},
+            )
+        except approval.ApprovalRequired as exc:
+            return {
+                "tool": tool,
+                "stdout": "",
+                "stderr": str(exc),
+                "rc": -1,
+                "elapsed": round(time.time() - started, 2),
+                "timed_out": False,
+                "status": "approval_required",
+                "approval_id": exc.request_id,
+                "approval": exc.decision,
+            }
+        except approval.ApprovalDenied as exc:
+            return {
+                "tool": tool,
+                "stdout": "",
+                "stderr": str(exc),
+                "rc": -1,
+                "elapsed": round(time.time() - started, 2),
+                "timed_out": False,
+                "status": "denied",
+                "approval": exc.decision,
             }
         try:
             proc = subprocess.run(  # nosec B603 B607 - fixed argv, no shell

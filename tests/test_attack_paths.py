@@ -80,10 +80,11 @@ def test_crown_jewel_requires_scope(store, eng):
         store.add_crown_jewel(eng["id"], "8.8.8.8", "out of scope")
 
 
-def test_crown_jewel_duplicate_host(store, eng):
+def test_crown_jewel_same_label_is_unique(store, eng):
+    """One host may carry several objectives, but a label is unique."""
     store.add_crown_jewel(eng["id"], "10.0.0.42", "dc")
-    with pytest.raises(ValueError):
-        store.add_crown_jewel(eng["id"], "10.0.0.42", "dc2")
+    store.add_crown_jewel(eng["id"], "10.0.0.42", "dc2")
+    assert len(store.list_crown_jewels(eng["id"])) == 2
 
 
 def test_attack_path_found(store, eng):

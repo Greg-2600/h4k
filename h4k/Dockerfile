@@ -59,6 +59,20 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir --ignore-insta
        fi; \
      done
 
+# Debian's impacket omits the AD example scripts h4k shells out to
+# (GetNPUsers/GetUserSPNs). Pin the 0.13.1 examples and wrap them so the
+# library resolves from the distro install.
+RUN PYLIB=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])') \
+  && mkdir -p /opt/impacket \
+  && for s in GetNPUsers.py GetUserSPNs.py getTGT.py GetADUsers.py secretsdump.py \
+             wmiexec.py smbexec.py; do \
+       curl -sSfL "https://raw.githubusercontent.com/fortra/impacket/impacket_0_13_1/examples/$s" \
+         -o "/opt/impacket/$s"; \
+       printf '#!/bin/sh\nPYTHONPATH=%s exec python3 /opt/impacket/%s "$@"\n' "$PYLIB" "$s" \
+         > "/usr/local/bin/$s"; \
+       chmod 0755 "/usr/local/bin/$s"; \
+     done
+
 # nikto not packaged in Debian; install via git (widely used web vuln scanner)
 RUN git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto \
     && ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto
