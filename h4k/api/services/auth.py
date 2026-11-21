@@ -385,8 +385,9 @@ def load_config(*, refresh: bool = False) -> AuthConfig:
         # Ephemeral secret: sessions do not survive a restart, which is safer
         # than a hard-coded default when the operator forgot to set one.
         secret = _EPHEMERAL_SESSION_SECRET
+    legacy_key = os.environ.get("H4K_API_KEY", "").strip()
     return AuthConfig(
-        enabled=enabled or bool(oidc),
+        enabled=enabled or bool(oidc) or bool(legacy_key),
         keys=_load_keys(path),
         oidc=oidc,
         session_secret=secret,
@@ -692,6 +693,17 @@ def principal_from_request(request: Any, config: AuthConfig) -> Principal:
         return Principal(subject="anonymous", role="admin", method="disabled")
 
     key = str(request.headers.get("x-api-key") or "").strip()
+    legacy = os.environ.get("H4K_API_KEY", "").strip()
+    if legacy:
+        if key and hmac.compare_digest(key, legacy):
+            return Principal(subject="operator", role="admin", method="apikey")
+        if is_public_path(path):
+            return Principal(subject="anonymous", role="viewer", method="anonymous")
+        raise AuthError(
+            401,
+            "missing or invalid API key (X-API-Key header)",
+            challenge="ApiKey",
+        )
     auth_header = str(request.headers.get("authorization") or "")
     if not key and auth_header.lower().startswith("bearer "):
         token = auth_header[7:].strip()
