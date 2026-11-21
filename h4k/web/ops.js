@@ -301,7 +301,14 @@ function clearActivityLog() {
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Safe for text nodes AND attribute values: quotes are escaped too, so a
+  // hostname/service string cannot break out of data-* or title attributes.
+  return String(s ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
 }
 
 // ═══════════════════════════════════════════
@@ -2985,7 +2992,7 @@ function servicesOfHost(ip) {
 
 
 function escAttr(s) {
-  return s.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return escHtml(s);
 }
 
 // ---- fuzzing ----
