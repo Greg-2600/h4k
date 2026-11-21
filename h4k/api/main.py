@@ -398,6 +398,12 @@ async def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
 
 
+@app.get("/ops", include_in_schema=False)
+async def ops_page() -> FileResponse:
+    """Operator console: findings, approvals, limits/noise and lab tooling."""
+    return FileResponse(WEB_DIR / "ops.html")
+
+
 @app.get("/api", include_in_schema=False)
 async def api_landing() -> HTMLResponse:
     """API landing page with links to Swagger UI and ReDoc."""

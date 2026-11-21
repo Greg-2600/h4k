@@ -8,9 +8,9 @@ import re
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[1] / "h4k" / "web"
-HTML = (WEB / "index.html").read_text(encoding="utf-8")
-JS = (WEB / "app.js").read_text(encoding="utf-8")
-CSS = (WEB / "style.css").read_text(encoding="utf-8")
+HTML = (WEB / "ops.html").read_text(encoding="utf-8")
+JS = (WEB / "ops.js").read_text(encoding="utf-8")
+CSS = (WEB / "ops.css").read_text(encoding="utf-8")
 
 
 def test_skip_link_and_focusable_main():

@@ -344,8 +344,8 @@ def test_api_denied_request(client):
 
 def test_ui_contract_ids_exist():
     web = Path(__file__).resolve().parents[1] / "h4k" / "web"
-    html = (web / "index.html").read_text(encoding="utf-8")
-    js = (web / "app.js").read_text(encoding="utf-8")
+    html = (web / "ops.html").read_text(encoding="utf-8")
+    js = (web / "ops.js").read_text(encoding="utf-8")
     for ident in (
         "approvals-card",
         "appr-mode",
