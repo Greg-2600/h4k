@@ -21,7 +21,7 @@ const state = {
   statusTimer: null,
 };
 
-const TABS = ['discover', 'recon', 'exploit', 'pivot', 'persist', 'score'];
+const TABS = ['discover', 'recon', 'exploit', 'pivot', 'persist', 'score', 'ops'];
 
 /* ---------- http ---------- */
 
@@ -82,6 +82,27 @@ function setTab(tab) {
   if (tab === 'pivot') { loadShells(); loadCredLedger(); }
   if (tab === 'persist') renderPersist();
   if (tab === 'score') { refreshFlags(); renderReportPreview(); refreshWatch(); refreshHandoff(); }
+  if (tab === 'ops') loadOpsFrame();
+}
+
+function loadOpsFrame(phase) {
+  const frame = $('ops-frame');
+  if (!frame) return;
+  const want = phase || state.opsPhase || 'fuzz';
+  state.opsPhase = want;
+  const theme = document.documentElement.dataset.theme || 'dark';
+  const base = `/ops?embed=1&phase=${encodeURIComponent(want)}&theme=${encodeURIComponent(theme)}`;
+  if (!frame.dataset.loaded) {
+    frame.src = base;
+    frame.dataset.loaded = '1';
+    frame.addEventListener('load', () => {
+      try { frame.contentWindow.postMessage({ type: 'h4k-phase', phase: state.opsPhase }, location.origin); } catch (_) {}
+    });
+  } else {
+    try { frame.contentWindow.postMessage({ type: 'h4k-phase', phase: want }, location.origin); } catch (_) {}
+  }
+  document.querySelectorAll('#ops-phase-nav [data-ops-phase]')
+    .forEach((b) => b.classList.toggle('active', b.dataset.opsPhase === want));
 }
 
 function badge(id, n) {
@@ -360,9 +381,12 @@ async function loadVulns() {
   } catch (e) { log(`vulns load failed: ${e.message}`, 'error'); }
 }
 
-async function startFingerprint() {
+async function startFingerprint(full = false) {
   try {
-    const res = await api('/api/neighbors/fingerprint', { method: 'POST' });
+    const res = await api('/api/neighbors/fingerprint', {
+      method: 'POST',
+      body: full ? { full: true } : {},
+    });
     if (!jobIdOf(res)) { log(`fingerprint refused: ${res.detail || 'error'}`, 'error'); return; }
     log(`fingerprint ${jobIdOf(res)}`, 'info');
     const jobId = jobIdOf(res);
@@ -2039,6 +2063,10 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch { /* ignore */ }
 
   document.querySelectorAll('.ws-btn').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  const bootParams = new URLSearchParams(location.search);
+  if (bootParams.get('phase')) state.opsPhase = bootParams.get('phase');
+  const bootTab = bootParams.get('tab');
+  if (bootTab && TABS.includes(bootTab)) setTab(bootTab);
 
   $('scope-select').addEventListener('change', async (e) => {
     const engId = e.target.value || null;
@@ -2191,11 +2219,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-empty-fpv').addEventListener('click', startFingerprint);
   $('btn-empty-scope').addEventListener('click', () => setTab('discover'));
   $('btn-empty-exploit').addEventListener('click', () => setTab('exploit'));
-  $('btn-full-scan').addEventListener('click', async () => {
-    try {
-      const res = await api('/api/neighbors/fingerprint', { method: 'POST', body: {} });
-      log(jobIdOf(res) ? `full scan ${jobIdOf(res)}` : `full scan refused: ${res.detail}`, jobIdOf(res) ? 'info' : 'error');
-    } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
+  $('btn-full-scan').addEventListener('click', () => startFingerprint(true));
+  document.querySelectorAll('#ops-phase-nav [data-ops-phase]').forEach((b) => {
+    b.addEventListener('click', () => loadOpsFrame(b.dataset.opsPhase));
   });
   $('btn-nikto').addEventListener('click', runNikto);
   $('btn-suppress').addEventListener('click', runSuppress);
@@ -2411,5 +2437,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadScopeSelect().then(() => { refreshStatus(); refreshNextMove(); });
   state.statusTimer = setInterval(refreshStatus, 8000);
   log('h4k kill-chain console ready — discover → recon → exploit → pivot → persist → score', 'info');
-  setTab('discover');
+  const startTab = new URLSearchParams(location.search).get('tab');
+  setTab(TABS.includes(startTab) ? startTab : 'discover');
 });

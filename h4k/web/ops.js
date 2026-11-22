@@ -2377,6 +2377,25 @@ function acquireToggle() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Embedded in the dashboard Operations workspace: hide the console chrome
+  // and show exactly one phase.
+  const embedParams = new URLSearchParams(location.search);
+  if (embedParams.get('embed') === '1') {
+    document.body.classList.add('embed');
+    const initialPhase = embedParams.get('phase') || 'fuzz';
+    const embedTheme = embedParams.get('theme') || 'dark';
+    // The console initialiser later forces the Assets phase; re-apply the
+    // requested phase after it has finished.
+    setTimeout(() => {
+      document.documentElement.dataset.theme = embedTheme;
+      setPhase(initialPhase);
+    }, 0);
+    window.addEventListener('message', (event) => {
+      if (event.origin !== location.origin) return;
+      if (event.data && event.data.type === 'h4k-phase') setPhase(event.data.phase);
+    });
+  }
+
   // Scope picker: which engagement's CIDRs constrain aggressive actions.
   refreshSessionBadge();
   loadScopeSelect();

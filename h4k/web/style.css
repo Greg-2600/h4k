@@ -187,3 +187,8 @@ input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accen
   .tbl { min-width: 480px; font-size: 12px; }
 }
 .btn.done { border-color: var(--good); color: var(--good); }
+
+
+/* Operations workspace: the console is embedded, one scroll surface. */
+.ops-body { padding: 0; }
+.ops-frame { width: 100%; height: calc(100vh - 210px); border: 0; background: transparent; }

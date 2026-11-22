@@ -86,9 +86,9 @@ def test_html_tags_are_balanced():
 
 
 def test_the_workspace_nav_is_present():
-    """Six kill-chain phases, operator order: Discover → Recon → Exploit → Pivot → Persist → Score."""
+    """Kill-chain phases plus the Operations workspace, in operator order."""
     html = _html()
-    names = ("discover", "recon", "exploit", "pivot", "persist", "score")
+    names = ("discover", "recon", "exploit", "pivot", "persist", "score", "ops")
     for name in names:
         assert f'data-tab="{name}"' in html, f"workspace {name} missing"
     nav = set(re.findall(r'class="ws-btn[^"]*"[^>]*data-tab="([^"]+)"', html))

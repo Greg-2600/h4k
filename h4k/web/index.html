@@ -42,7 +42,7 @@
       <button class="ws-btn" data-tab="pivot" data-testid="nav-pivot">Pivot <span class="ws-count" id="ws-count-pivot"></span></button>
       <button class="ws-btn" data-tab="persist" data-testid="nav-persist">Persist <span class="ws-count" id="ws-count-persist"></span></button>
       <button class="ws-btn" data-tab="score" data-testid="nav-score">Score <span class="ws-count" id="ws-count-score"></span></button>
-      <a class="ws-btn" href="/ops" data-testid="nav-ops" title="Findings, approvals, limits and lab tools">Ops</a>
+      <button class="ws-btn" data-tab="ops" data-testid="nav-ops" title="Fuzzing, labs, AD, telemetry, nightly and reports">Operations</button>
     </nav>
 
     <main class="main">
@@ -631,6 +631,26 @@
         </div>
       </section>
 
+      <!-- OPERATIONS: console phases that are not part of the kill chain -->
+      <section class="ws-panel" id="tab-ops" data-tab="ops">
+        <div class="card">
+          <div class="card-head"><h2>Operations</h2><span class="spacer"></span>
+            <div class="row" id="ops-phase-nav">
+              <button class="btn small active" data-ops-phase="fuzz">Fuzz</button>
+              <button class="btn small" data-ops-phase="lab">Labs</button>
+              <button class="btn small" data-ops-phase="ad">AD</button>
+              <button class="btn small" data-ops-phase="telemetry">Telemetry</button>
+              <button class="btn small" data-ops-phase="nightly">Nightly</button>
+              <button class="btn small" data-ops-phase="report">Report</button>
+              <button class="btn small" data-ops-phase="settings">Settings</button>
+            </div>
+          </div>
+          <div class="card-body ops-body">
+            <iframe id="ops-frame" class="ops-frame" title="Operator console: fuzzing, labs, AD, telemetry, nightly and reports"></iframe>
+          </div>
+        </div>
+      </section>
+
       <aside class="rail" id="ops-rail">
         <div class="card">
           <div class="card-head"><h2>Session</h2><span class="spacer"></span><span class="muted" id="rail-scope" data-testid="rail-scope">no scope</span></div>
@@ -641,6 +661,7 @@
           <div class="card-body"><div id="rail-log" data-testid="rail-log" class="output rail-log"></div></div>
         </div>
       </aside>
+
 
     </main>
 

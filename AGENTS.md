@@ -79,8 +79,9 @@ cd h4k/api && H4K_SANDBOX=1 H4K_DATA_DIR=/tmp/h4k-demo \
   python3 -m uvicorn main:app --port 3137
 ```
 
-**Operator console:** `http://localhost:3137/ops` (findings ledger, approvals,
-noise/AI limits, lab and AD panels). The main dashboard stays at `/`.
+**Operations workspace:** `/` → **Operations** tab (fuzz, labs, AD, telemetry,
+nightly, report/findings/approvals, settings). `/ops` redirects to `/?tab=ops`;
+the old console is embedded (`?embed=1`) and inherits the dashboard theme.
 
 **Important:** after `docker build -t h4k .`, you must `docker run` (or `compose
 up`) to start the container — building alone does not leave it running. The API
