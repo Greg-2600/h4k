@@ -269,7 +269,7 @@ async function launchScan() {
     const scanId = jobIdOf(res);
     log(`scan ${scanId} → ${target}`, 'info');
     if (state.scanTimer) clearInterval(state.scanTimer);
-    state.scanTimer = setInterval(() => pollJob(scanId, async () => {
+    state.scanTimer = setInterval(() => pollJob(scanId, async (j) => {
       $('scan-status').textContent = j.cached ? 'done · cached' : 'done';
       refreshStatus(); refreshNextMove();
     }), 2000);
@@ -282,7 +282,7 @@ async function launchNeighbors() {
     if (!jobIdOf(res)) { log(`neighbors refused: ${res.detail || 'error'}`, 'error'); return; }
     log(`neighbor discovery ${jobIdOf(res)}`, 'info');
     if (state.scanTimer) clearInterval(state.scanTimer);
-    state.scanTimer = setInterval(() => pollJob(jobIdOf(res), async () => {
+    state.scanTimer = setInterval(() => pollJob(jobIdOf(res), async (j) => {
       $('scan-status').textContent = j.cached ? 'done · cached' : 'done';
       refreshStatus(); refreshNextMove();
     }), 2000);
