@@ -945,25 +945,6 @@ async function launchPassAttack() {
           } else {
             playSound('error');
           }
-  refreshSessionBadge();
-  loadScopeSelect();
-
-  // Scope selector: pick the engagement whose CIDRs constrain aggressive actions
-  $('scope-select').addEventListener('change', async (e) => {
-    const engId = e.target.value || null;
-    try {
-      const res = await api('/api/session/scope', { method: 'POST', body: { engagement_id: engId } });
-      if (res.status === 'scoped') {
-        log(`Scope engaged: ${res.name} — actions restricted to ${res.scope.join(', ')}`, 'warn');
-        unlockAchievement('os_intel');
-      } else {
-        log('Scope cleared — actions unrestricted (use only on your own lab)', 'warn');
-      }
-      updateScopeHint();
-      refreshSessionBadge();
-    } catch (err) { log('Scope change failed: ' + err.message, 'error'); }
-  });
-  updateScopeHint();
         }
       } catch (e) {
         clearInterval(paPollTimer); paPollTimer = null;
@@ -2088,7 +2069,11 @@ function updateScanProgressFromJob(job) {
   const stageMap = { running: 'scan', completed: 'attack', failed: 'scan' };
   const stage = job.current_module ? job.current_module.split('/').pop().split('_')[0] : 'scan';
   const pct = job.progress || 0;
-  updateScanProgress({ stage, pct, status: job.status });
+  updateScanProgress({
+    stage,
+    pct,
+    status: job.cached ? `${job.status} · cached` : job.status,
+  });
 
   // Poll server logs for cred attempts
   if (job.log && job.log.length > state.lastLogCount) {
@@ -2392,6 +2377,25 @@ function acquireToggle() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Scope picker: which engagement's CIDRs constrain aggressive actions.
+  refreshSessionBadge();
+  loadScopeSelect();
+  $('scope-select')?.addEventListener('change', async (e) => {
+    const engId = e.target.value || null;
+    try {
+      const res = await api('/api/session/scope', { method: 'POST', body: { engagement_id: engId } });
+      if (res.status === 'scoped') {
+        log(`Scope engaged: ${res.name} — actions restricted to ${res.scope.join(', ')}`, 'warn');
+        unlockAchievement('os_intel');
+      } else {
+        log('Scope cleared — actions unrestricted (use only on your own lab)', 'warn');
+      }
+      updateScopeHint();
+      refreshSessionBadge();
+    } catch (err) { log('Scope change failed: ' + err.message, 'error'); }
+  });
+  updateScopeHint();
+
   // Load saved theme
   const savedTheme = localStorage.getItem('h4k-theme') || 'light';
   setTheme(savedTheme);

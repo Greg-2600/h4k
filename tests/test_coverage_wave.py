@@ -380,7 +380,7 @@ def test_deepattack_flow(client, clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             return {
                 "tool": tool,
                 "stdout": "hi\n",

@@ -160,18 +160,42 @@ def _candidate_actions(
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug("next_move: asset scan failed: %s", exc)
 
-    # fuzzing lab
+    # fuzzing-lab target: prefer a discovered service over a hardcoded host
     fuzzed = fuzzed_targets or set()
-    if "vulnlab" not in fuzzed:
+    fuzz_target = None
+    fuzz_host = None
+    try:
+        for asset in store.assets(engagement_id):
+            for svc in asset.get("services") or []:
+                if not svc.get("port"):
+                    continue
+                host = asset.get("host")
+                name = (svc.get("service") or "").lower()
+                if name in {
+                    "http",
+                    "https",
+                    "rtnt-2",
+                    "unknown",
+                    "",
+                } or "vulnlab" in str(asset.get("hostname") or ""):
+                    fuzz_target = f"{host}:{svc['port']}"
+                    fuzz_host = host
+                    break
+            if fuzz_target:
+                break
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug("next_move: fuzz target lookup failed: %s", exc)
+
+    if fuzz_target and fuzz_target not in fuzzed and fuzz_host not in fuzzed:
         candidates.append(
             {
                 "kind": "fuzz",
                 "priority": 40.0,
-                "host": "127.0.0.1",
-                "title": "Fuzz the vulnlab target (127.0.0.1:8080)",
+                "host": fuzz_host,
+                "title": f"Fuzz {fuzz_target} (crash -> triage loop)",
                 "rationale": "crash -> minimize -> triage -> patch loop has not run",
                 "action": "fuzz",
-                "target": "127.0.0.1:8080",
+                "target": fuzz_target,
             }
         )
 

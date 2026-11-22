@@ -111,10 +111,16 @@ class Flow:
         """Fingerprint after discovery has populated the neighbor store."""
         print("\n[dashboard] / (Recon)")
         self.go("/")
-        self.step("inspect the Recon tab (services are documented as console-only)")
+        self.step("verify the Recon table sees the console's fingerprint data")
         self.click('.ws-btn[data-tab="recon"]')
+        WebDriverWait(self.d, 60).until(
+            lambda d: "3138" in d.find_element(By.CSS_SELECTOR, "#hosts-tbody").text
+        )
+        print(
+            "    dashboard services:",
+            self.d.find_element(By.CSS_SELECTOR, "#hosts-count").text,
+        )
         self.shot("04-dashboard-recon")
-        print("    note: dashboard Recon table stays empty; live services are in /ops")
 
     # -- ops flow --------------------------------------------------------
     def ops(
@@ -123,6 +129,15 @@ class Flow:
         print("\n[ops] /ops")
         self.go("/ops")
         self.shot("05-ops-assets")
+
+        self.step("verify the active scope is visible and selectable")
+        WebDriverWait(self.d, 20).until(
+            lambda d: len(d.find_elements(By.CSS_SELECTOR, "#scope-select option")) > 1
+        )
+        scope = Select(self.d.find_element(By.CSS_SELECTOR, "#scope-select"))
+        selected = scope.first_selected_option.text
+        assert "Selenium UI pass" in selected, selected
+        print(f"    scope picker: {selected}")
 
         self.step("expand Discover and scan the target")
         self.click("#btn-acquire")

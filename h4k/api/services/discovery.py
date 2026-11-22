@@ -220,7 +220,13 @@ class NeighborFinder:
             )
             for line in (proc.stdout or "").splitlines():
                 if "lladdr" in line:
-                    m = re.search(r"([0-9a-f:]+)\s+.*?\s+lladdr\s+([0-9a-f:]+)", line)
+                    # Require a real IPv6 address (contains a colon). The old
+                    # pattern matched the trailing digit of an IPv4 address
+                    # ("172.18.0.1" -> "1") and injected bogus hosts.
+                    m = re.match(
+                        r"([0-9a-fA-F:]*:[0-9a-fA-F:]+)\s+dev\s+\S+\s+lladdr\s+([0-9a-f:]{17})",
+                        line.strip(),
+                    )
                     if m:
                         ip, mac = m.groups()
                         out.append(

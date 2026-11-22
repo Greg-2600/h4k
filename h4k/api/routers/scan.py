@@ -207,11 +207,20 @@ def _save_neighbor_host(
     _eng_ingest_asset(ip, os_=os_guess, vendor=vendor)
 
 
-def _save_neighbor_services(ip: str, services: list[dict[str, Any]]) -> None:
+def _save_neighbor_services(
+    ip: str, services: list[dict[str, Any]], *, complete: bool = False
+) -> None:
+    """Persist services for a host.
+
+    Partial sweeps (common ports, auto-scan, recheck) must merge: deleting by
+    IP would erase open ports found by an earlier full-port fingerprint.
+    Only a complete sweep may replace the whole row set.
+    """
     from datetime import UTC, datetime
 
     conn = _neighbor_db()
-    conn.execute("DELETE FROM discovered_services WHERE ip = ?", (ip,))
+    if complete:
+        conn.execute("DELETE FROM discovered_services WHERE ip = ?", (ip,))
     now = datetime.now(UTC).isoformat()
     for svc in services:
         conn.execute(
@@ -1669,7 +1678,7 @@ def _run_fingerprint(
                 os_guess=entry.get("os"),
             )
             if services:
-                _save_neighbor_services(ip, services)
+                _save_neighbor_services(ip, services, complete=full)
 
         _tick(f"fingerprint complete — {len(all_results)} host(s) with open ports", 100)
         logger.info(
@@ -4687,7 +4696,9 @@ def _run_autopilot(
             "-",
             ip,
         ]
-        result = runner.run_tool("nmap", argv, timeout=15)
+        result = runner.run_tool(
+            "nmap", argv, timeout=15, internal=True, full_output=True
+        )
         parsed = _parse_nmap_xml(result["stdout"]) if result["status"] == "ok" else []
         entry = {}
         for entry in parsed:

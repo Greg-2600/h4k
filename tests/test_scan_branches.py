@@ -354,7 +354,7 @@ def test_autopilot_deep_web_stage(clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             seen.append(tool)
             return dict(
                 outputs.get(
@@ -432,7 +432,7 @@ def test_autopilot_static_map_fallback_for_creds(clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             if tool == "nmap":
                 return {
                     "stdout": NMAP_XML,

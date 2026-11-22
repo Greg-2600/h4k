@@ -270,7 +270,7 @@ async function launchScan() {
     log(`scan ${scanId} → ${target}`, 'info');
     if (state.scanTimer) clearInterval(state.scanTimer);
     state.scanTimer = setInterval(() => pollJob(scanId, async () => {
-      $('scan-status').textContent = 'done';
+      $('scan-status').textContent = j.cached ? 'done · cached' : 'done';
       refreshStatus(); refreshNextMove();
     }), 2000);
   } catch (e) { log(`scan failed: ${e.message}`, 'error'); }
@@ -283,7 +283,7 @@ async function launchNeighbors() {
     log(`neighbor discovery ${jobIdOf(res)}`, 'info');
     if (state.scanTimer) clearInterval(state.scanTimer);
     state.scanTimer = setInterval(() => pollJob(jobIdOf(res), async () => {
-      $('scan-status').textContent = 'done';
+      $('scan-status').textContent = j.cached ? 'done · cached' : 'done';
       refreshStatus(); refreshNextMove();
     }), 2000);
   } catch (e) { log(`neighbors failed: ${e.message}`, 'error'); }
