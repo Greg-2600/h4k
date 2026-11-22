@@ -9,25 +9,22 @@ session report**, plus dashboard Recon verification.
 
 ## Single UI (resolved)
 
-There is now **one page and one navigation**: `/`. The console's non-kill-chain
-phases live in an **Operations** workspace beside Discover/Recon/Exploit/Pivot/
-Persist/Score:
+There is **one page, one navigation, one document**: `/`. The console's
+non-kill-chain phases are native panes in an **Operations** workspace beside
+Discover/Recon/Exploit/Pivot/Persist/Score:
 
 | Operations tab | Contents |
 |---|---|
-| Fuzz | signal-guided fuzzing, crash candidates |
 | Labs | benign traffic kit + IoT/OT probes |
-| AD | domain policy, users, audit, roast/spray |
+| AD | domain policy, users, hygiene audit |
 | Telemetry | ingest summary, detections, simulate/reset |
 | Nightly | schedules and run history |
 | Report | findings ledger, approvals, attack paths, session report |
-| Settings | auth keys and console preferences |
+| Settings | API keys, noise profile, AI budget |
 
-`/ops` is no longer a second app: it **307-redirects** to `/?tab=ops`, and the
-console document is only served as `?embed=1` inside the workspace. The embed
-inherits the dashboard theme and fonts, so it reads as one surface. A future
-native port could drop the internal iframe, but users no longer choose between
-two products.
+Fuzzing stays in the Exploit tab (it always lived there). `/ops` is only a
+**307 redirect** to `/?tab=ops`; `ops.html/js/css` were removed, so there is
+no iframe, no second theme, and no second navigation to keep in sync.
 
 ## Issues found and fixed in this pass
 

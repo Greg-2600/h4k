@@ -476,14 +476,8 @@ async def index() -> FileResponse:
 
 
 @app.get("/ops", include_in_schema=False)
-async def ops_page(request: Request) -> Response:
-    """Legacy console URL.
-
-    The console is embedded in the dashboard's Operations workspace; a direct
-    visit redirects there. ``?embed=1`` serves the fragment the iframe uses.
-    """
-    if request.query_params.get("embed") == "1":
-        return FileResponse(WEB_DIR / "ops.html")
+async def ops_page() -> Response:
+    """Legacy console URL. The console is now native in the dashboard."""
     return RedirectResponse(url="/?tab=ops", status_code=307)
 
 

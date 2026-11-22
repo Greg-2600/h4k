@@ -189,6 +189,23 @@ input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accen
 .btn.done { border-color: var(--good); color: var(--good); }
 
 
-/* Operations workspace: the console is embedded, one scroll surface. */
-.ops-body { padding: 0; }
-.ops-frame { width: 100%; height: calc(100vh - 210px); border: 0; background: transparent; }
+/* Operations workspace (native panes) */
+.ops-pane { display: none; }
+.check-inline { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.ops-pane.active { display: block; }
+.ops-pane .inner-card + .inner-card { margin-top: 8px; }
+.ops-output {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.inner-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--r); }

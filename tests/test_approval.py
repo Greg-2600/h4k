@@ -343,39 +343,13 @@ def test_api_denied_request(client):
 
 
 def test_ui_contract_ids_exist():
+    """Approvals are a native Operations pane."""
     web = Path(__file__).resolve().parents[1] / "h4k" / "web"
-    html = (web / "ops.html").read_text(encoding="utf-8")
-    js = (web / "ops.js").read_text(encoding="utf-8")
-    for ident in (
-        "approvals-card",
-        "appr-mode",
-        "appr-rules-tbody",
-        "appr-rules-empty",
-        "appr-requests-tbody",
-        "appr-requests-empty",
-        "appr-decisions",
-        "appr-output",
-        "appr-name",
-        "appr-match",
-        "appr-pattern",
-        "appr-action",
-        "appr-priority",
-        "appr-check-argv",
-        "btn-appr-add-rule",
-        "btn-appr-refresh",
-        "btn-appr-check",
-    ):
+    html = (web / "index.html").read_text(encoding="utf-8")
+    js = (web / "app.js").read_text(encoding="utf-8")
+    for ident in ("approvals-card", "appr-status", "appr-tbody", "btn-appr-refresh"):
         assert f'id="{ident}"' in html, f"missing #{ident}"
-    for ident in (
-        "appr-mode",
-        "appr-rules-tbody",
-        "appr-requests-tbody",
-        "appr-decisions",
-        "appr-output",
-        "btn-appr-add-rule",
-        "btn-appr-refresh",
-        "btn-appr-check",
-    ):
+    for ident in ("appr-tbody", "btn-appr-refresh", "opsApprove"):
         assert ident in js
 
 
