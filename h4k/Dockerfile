@@ -39,9 +39,9 @@ hydra ncrack john sqlmap \
     && rm -rf /var/lib/apt/lists/*
 
 # chisel (TCP pivoting) — not in Debian apt; grab the release binary
-RUN CHISEL_VER=$(\
-      curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors https://api.github.com/repos/jpillora/chisel/releases/latest \
-      | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
+# Version pinned so a GitHub API rate-limit cannot break the build; the
+# runtime updater still refreshes the binary.
+RUN CHISEL_VER=v1.12.0 \
     && curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors "https://github.com/jpillora/chisel/releases/download/${CHISEL_VER}/chisel_${CHISEL_VER#v}_linux_amd64.gz" \
        -o /tmp/chisel.gz \
     && gunzip -f /tmp/chisel.gz && mv /tmp/chisel /usr/local/bin/chisel \
@@ -79,9 +79,7 @@ RUN git clone --depth 1 https://github.com/sullo/nikto.git /opt/nikto \
 
 # Nuclei — fast template-based vulnerability scanner
 RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/* \
-    && NUCLEI_VER=$(\
-      curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
-      | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
+    && NUCLEI_VER=v3.11.1 \
     && curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors "https://github.com/projectdiscovery/nuclei/releases/download/${NUCLEI_VER}/nuclei_${NUCLEI_VER#v}_linux_amd64.zip" \
        -o /tmp/nuclei.zip \
     && unzip -o /tmp/nuclei.zip -d /usr/local/bin/ \
@@ -147,9 +145,7 @@ RUN semgrep --version
 
 # SCA / supply-chain tools: osv-scanner (Google) validates a repo/SBOM against
 # the OSV vulnerability DB; trivy (Aqua) can emit a CycloneDX SBOM.
-RUN OSV_VER=$(\
-      curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors https://api.github.com/repos/google/osv-scanner/releases/latest \
-      | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
+RUN OSV_VER=v2.7.1 \
     && curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors "https://github.com/google/osv-scanner/releases/download/${OSV_VER}/osv-scanner_linux_amd64" \
        -o /usr/local/bin/osv-scanner \
     && chmod +x /usr/local/bin/osv-scanner
@@ -157,9 +153,7 @@ RUN OSV_VER=$(\
 # periodic updater refreshes it at runtime). The upstream install.sh does
 # its own un-retried download internally, which repeatedly broke no-cache
 # builds on transient build-time DNS failures.
-RUN TRIVY_VER=$(\
-      curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors https://api.github.com/repos/aquasecurity/trivy/releases/latest \
-      | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4) \
+RUN TRIVY_VER=v0.76.2 \
     && curl -sSfL --retry 3 --retry-delay 5 --retry-all-errors \
        "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VER}/trivy_${TRIVY_VER#v}_Linux-64bit.tar.gz" \
        -o /tmp/trivy.tar.gz \

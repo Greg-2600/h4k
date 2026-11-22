@@ -11,7 +11,7 @@ def test_pass_attack_argv_has_no_output_file(monkeypatch):
     seen = {}
 
     class _Runner:
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             seen["tool"] = tool
             seen["argv"] = list(argv)
             return {

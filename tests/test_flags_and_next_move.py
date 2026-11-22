@@ -95,15 +95,23 @@ def test_next_move_unknown_engagement(tmp_path):
     assert result["engagement_id"] == "nope"
 
 
+def _seed_fuzz_target(store, eid):
+    store.upsert_asset(eid, "10.0.0.2", os="linux")
+    store.upsert_service(
+        eid, "10.0.0.2", {"port": 3138, "service": "http", "state": "open"}
+    )
+
+
 def test_next_move_fuzzing_lab_suggested(tmp_path):
     from services.engagement import EngagementStore
     from services.next_move import build_next_move
 
     store = EngagementStore(tmp_path / "e.db")
     eng = store.create_engagement("lab", ["10.0.0.0/24"])
+    _seed_fuzz_target(store, eng["id"])
     result = build_next_move(store, eng["id"], fuzzed_targets=set())
-    kinds = [m["kind"] for m in result["moves"]]
-    assert "fuzz" in kinds
+    fuzz = [m for m in result["moves"] if m["kind"] == "fuzz"]
+    assert fuzz and fuzz[0]["target"] == "10.0.0.2:3138"
 
 
 def test_next_move_fuzzing_not_suggested_when_done(tmp_path):
@@ -112,7 +120,8 @@ def test_next_move_fuzzing_not_suggested_when_done(tmp_path):
 
     store = EngagementStore(tmp_path / "e.db")
     eng = store.create_engagement("lab", ["10.0.0.0/24"])
-    result = build_next_move(store, eng["id"], fuzzed_targets={"vulnlab"})
+    _seed_fuzz_target(store, eng["id"])
+    result = build_next_move(store, eng["id"], fuzzed_targets={"10.0.0.2:3138"})
     kinds = [m["kind"] for m in result["moves"]]
     assert "fuzz" not in kinds
 

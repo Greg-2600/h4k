@@ -399,6 +399,29 @@ let pollInterval = null;
 let neighborJobId = null;
 let neighborPollInterval = null;
 
+function selectScanType(tab) {
+  const type = tab.dataset.type;
+  state.scanType = type;
+  document.querySelectorAll('.st-tab[data-type]').forEach(t => t.classList.toggle('active', t === tab));
+  const targetInput = $('target');
+  const hint = $('target-hint');
+  if (!targetInput) return;
+  if (type === 'neighbors') {
+    targetInput.value = 'All local neighbors';
+    targetInput.readOnly = true;
+    targetInput.style.cursor = 'not-allowed';
+    if (hint) hint.textContent = 'Will scan all hosts found on your local network(s)';
+  } else {
+    targetInput.value = '';
+    targetInput.readOnly = false;
+    targetInput.style.cursor = '';
+    targetInput.placeholder = '192.168.1.13 or 192.168.1.0/24';
+    if (hint) hint.textContent = 'Enter a single IP or CIDR range (e.g. 192.168.1.0/24)';
+  }
+  const btn = $('btn-launch-recon');
+  if (btn) btn.disabled = false;
+}
+
 async function launchScan() {
   const scanType = state.scanType;
   let target;
@@ -420,7 +443,9 @@ async function launchScan() {
   btn.disabled = true;
 
 
-  document.querySelector('[data-obj="host"]').classList.add('active');
+  // Legacy nav highlight: the element was removed in the console redesign.
+  const hostObj = document.querySelector('[data-obj="host"]');
+  if (hostObj) hostObj.classList.add('active');
 
 
   log(`Starting recon on ${target}...`, 'info');
@@ -441,8 +466,9 @@ async function launchScan() {
       }
     });
 
-    if (res.job_id) {
-      scanJobId = res.job_id;
+    const scanId = res.job_id || res.id;
+    if (scanId) {
+      scanJobId = scanId;
       log(`Job ${scanJobId} created`, 'info');
       startScanPolling();
     } else {
@@ -919,25 +945,6 @@ async function launchPassAttack() {
           } else {
             playSound('error');
           }
-  refreshSessionBadge();
-  loadScopeSelect();
-
-  // Scope selector: pick the engagement whose CIDRs constrain aggressive actions
-  $('scope-select').addEventListener('change', async (e) => {
-    const engId = e.target.value || null;
-    try {
-      const res = await api('/api/session/scope', { method: 'POST', body: { engagement_id: engId } });
-      if (res.status === 'scoped') {
-        log(`Scope engaged: ${res.name} — actions restricted to ${res.scope.join(', ')}`, 'warn');
-        unlockAchievement('os_intel');
-      } else {
-        log('Scope cleared — actions unrestricted (use only on your own lab)', 'warn');
-      }
-      updateScopeHint();
-      refreshSessionBadge();
-    } catch (err) { log('Scope change failed: ' + err.message, 'error'); }
-  });
-  updateScopeHint();
         }
       } catch (e) {
         clearInterval(paPollTimer); paPollTimer = null;
@@ -1948,6 +1955,8 @@ function renderFingerprintTable(results) {
 }
 
 async function onFingerprintDone(job) {
+  const fullBtn = $('btn-full-scan');
+  if (fullBtn) { fullBtn.disabled = false; fullBtn.classList.remove('loading'); }
   // same class of fix: a job id must only complete once even if a stale
   // poller still holds its handle
   state.fingerprintDone = state.fingerprintDone || new Set();
@@ -2005,56 +2014,26 @@ async function resolveScanTarget() {
 }
 
 async function startFullScan() {
-  const target = await resolveScanTarget();
-  if (!target) {
-    log('No target yet — starting neighbor discovery for you...', 'info');
-    state.scanType = 'neighbors';
-    await startNeighborDiscovery();
-    return;
-  }
-  state.discoveredTarget = target;
-  log('Starting full port scan...', 'info');
-  logXp(5, '(recon started)');
-
   const btn = $('btn-full-scan');
   if (btn) { btn.disabled = true; btn.classList.add('loading'); }
-
-  $('btn-launch-recon').classList.add('loading');
-  $('btn-launch-recon').disabled = true;
-
-
-
+  log('Starting full-port fingerprint...', 'info');
+  logXp(5, '(recon started)');
   try {
-    const res = await api('/api/scan', {
+    const res = await api('/api/neighbors/fingerprint', {
       method: 'POST',
-      body: {
-        target: state.discoveredTarget,
-        mode: $('mode-select').value,
-        depth: $('depth-select').value,
-        do_dns_recon: false,
-        do_vuln_scan: false,
-        try_default_creds: false,
-        open_sessions: false,
-        do_attack: false,
-      }
+      body: { full: true },
     });
-
-    log(`Scanning ${target}`, 'info');
     if (res.job_id) {
-      scanJobId = res.job_id;
-      log(`Job ${scanJobId} created`, 'info');
-      startScanPolling();
+      state.fingerprintJobId = res.job_id;
+      log(`Full port scan job ${res.job_id} started`, 'info');
+      startFingerprintPolling();
     } else {
-      log('Scan failed: ' + JSON.stringify(res), 'error');
+      log('Full port scan failed: ' + JSON.stringify(res), 'error');
       if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
-      $('btn-launch-recon').classList.remove('loading');
-      $('btn-launch-recon').disabled = false;
     }
   } catch (e) {
-    log('Scan error: ' + e.message, 'error');
+    log('Full port scan error: ' + e.message, 'error');
     if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
-    $('btn-launch-recon').classList.remove('loading');
-    $('btn-launch-recon').disabled = false;
   }
 }
 
@@ -2063,7 +2042,7 @@ async function pollScanProgress() {
   try {
     const res = await api(`/api/jobs/${scanJobId}`);
     updateScanProgressFromJob(res);
-    if (res.status === 'completed' || res.status === 'failed') {
+    if (['done', 'completed', 'error', 'failed'].includes(res.status)) {
       clearInterval(pollInterval);
       onScanComplete(res);
     }
@@ -2078,17 +2057,23 @@ function updateScanProgress(data) {
 
   const stages = ['recon', 'fingerprint', 'scan', 'creds', 'attack'];
   const stageEl = $('sp-stages');
-  stageEl.innerHTML = stages.map(s => {
-    const cls = s === data.stage ? 'active' : (data.pct > stages.indexOf(s) * 20 ? 'done' : '');
-    return `<span class="scan-stage ${cls}">${s}</span>`;
-  }).join('');
+  if (stageEl) {
+    stageEl.innerHTML = stages.map(s => {
+      const cls = s === data.stage ? 'active' : (data.pct > stages.indexOf(s) * 20 ? 'done' : '');
+      return `<span class="scan-stage ${cls}">${s}</span>`;
+    }).join('');
+  }
 }
 
 function updateScanProgressFromJob(job) {
   const stageMap = { running: 'scan', completed: 'attack', failed: 'scan' };
   const stage = job.current_module ? job.current_module.split('/').pop().split('_')[0] : 'scan';
   const pct = job.progress || 0;
-  updateScanProgress({ stage, pct, status: job.status });
+  updateScanProgress({
+    stage,
+    pct,
+    status: job.cached ? `${job.status} · cached` : job.status,
+  });
 
   // Poll server logs for cred attempts
   if (job.log && job.log.length > state.lastLogCount) {
@@ -2392,6 +2377,25 @@ function acquireToggle() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Scope picker: which engagement's CIDRs constrain aggressive actions.
+  refreshSessionBadge();
+  loadScopeSelect();
+  $('scope-select')?.addEventListener('change', async (e) => {
+    const engId = e.target.value || null;
+    try {
+      const res = await api('/api/session/scope', { method: 'POST', body: { engagement_id: engId } });
+      if (res.status === 'scoped') {
+        log(`Scope engaged: ${res.name} — actions restricted to ${res.scope.join(', ')}`, 'warn');
+        unlockAchievement('os_intel');
+      } else {
+        log('Scope cleared — actions unrestricted (use only on your own lab)', 'warn');
+      }
+      updateScopeHint();
+      refreshSessionBadge();
+    } catch (err) { log('Scope change failed: ' + err.message, 'error'); }
+  });
+  updateScopeHint();
+
   // Load saved theme
   const savedTheme = localStorage.getItem('h4k-theme') || 'light';
   setTheme(savedTheme);
@@ -2405,37 +2409,22 @@ document.addEventListener('DOMContentLoaded', () => {
   checkMsfStatus();
   setInterval(checkMsfStatus, 30000);
 
-  // Scan button
-  $('btn-launch-recon').addEventListener('click', launchScan);
-
-  // Target input enter
-  $('target').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && state.scanType === 'ip') launchScan();
+  // Scan button (delegated: the action panel is re-rendered after init)
+  document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('#btn-launch-recon')) launchScan();
   });
 
-  // Scan type tabs
-  document.querySelectorAll('.st-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      const type = tab.dataset.type;
-      state.scanType = type;
-      document.querySelectorAll('.st-tab').forEach(t => t.classList.toggle('active', t === tab));
-      const targetInput = $('target');
-      const hint = $('target-hint');
-      if (type === 'neighbors') {
-        targetInput.value = 'All local neighbors';
-        targetInput.readOnly = true;
-        targetInput.style.cursor = 'not-allowed';
-        hint.textContent = 'Will scan all hosts found on your local network(s)';
-        $('btn-launch-recon').disabled = false;
-      } else {
-        targetInput.value = '';
-        targetInput.readOnly = false;
-        targetInput.style.cursor = '';
-        targetInput.placeholder = '192.168.1.13 or 192.168.1.0/24';
-        hint.textContent = 'Enter a single IP or CIDR range (e.g. 192.168.1.0/24)';
-        $('btn-launch-recon').disabled = false;
-      }
-    });
+  // Target input enter (delegated: the panel is re-rendered)
+  document.addEventListener('keydown', (e) => {
+    if (e.target && e.target.id === 'target' && e.key === 'Enter' && state.scanType === 'ip') {
+      launchScan();
+    }
+  });
+
+  // Scan type tabs (delegated for the same reason)
+  document.addEventListener('click', (e) => {
+    const tab = e.target.closest && e.target.closest('.st-tab[data-type]');
+    if (tab) selectScanType(tab);
   });
 
   // Phase nav
@@ -2581,8 +2570,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tool buttons
   // panel: acquire toggle + tabs
   $('btn-acquire')?.addEventListener('click', acquireToggle);
-  document.querySelectorAll('.ap-tab').forEach(t => {
-    t.addEventListener('click', () => switchPanelTab(t.dataset.aptab));
+  document.addEventListener('click', (e) => {
+    const tab = e.target.closest && e.target.closest('.ap-tab[data-aptab]');
+    if (tab) switchPanelTab(tab.dataset.aptab);
   });
 
   // Neighbor panel action buttons (delegated since panel is built dynamically)

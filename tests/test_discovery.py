@@ -248,9 +248,11 @@ class TestNeighborFinderIpv6:
         finder = NeighborFinder(mock_msf, interface="eth0")
         results = finder._ipv6_neighbor_discovery()
 
-        assert len(results) == 2
-        assert results[0].mac == "00:50:56:ab:cd:ef"
-        assert results[1].mac == "08:00:27:12:34:56"
+        # Only the real IPv6 neighbour is a host; the IPv4 line must not be
+        # sliced into a bogus "1" host by the old regex.
+        assert len(results) == 1
+        assert results[0].ip == "fe80::1"
+        assert results[0].mac == "08:00:27:12:34:56"
 
 
 class TestNeighborFinderSnmp:

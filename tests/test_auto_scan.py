@@ -94,7 +94,7 @@ def test_run_one_pass_is_passive_first(monkeypatch, tmp_path):
     )
 
     class FakeRunner:
-        def run_tool(self, tool, argv, timeout=15):
+        def run_tool(self, tool, argv, timeout=15, **kwargs):
             return {"status": "ok", "stdout": canned_xml, "stderr": "", "rc": 0}
 
     monkeypatch.setattr("services.toolkit.ToolkitRunner", lambda *a, **k: FakeRunner())
@@ -134,7 +134,7 @@ def test_run_one_pass_ingests_into_engagement(monkeypatch, tmp_path):
     )
 
     class FakeRunner:
-        def run_tool(self, tool, argv, timeout=15):
+        def run_tool(self, tool, argv, timeout=15, **kwargs):
             return {"status": "ok", "stdout": canned_xml, "stderr": "", "rc": 0}
 
     monkeypatch.setattr("services.toolkit.ToolkitRunner", lambda *a, **k: FakeRunner())

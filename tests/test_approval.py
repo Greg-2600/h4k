@@ -377,3 +377,23 @@ def test_ui_contract_ids_exist():
         "btn-appr-check",
     ):
         assert ident in js
+
+
+def test_toolkit_full_output_not_truncated(monkeypatch):
+    """XML consumers get the whole stdout; human output keeps the tail cap."""
+    import services.toolkit as toolkit_mod
+
+    class Proc:
+        returncode = 0
+        stdout = "x" * 12000
+        stderr = ""
+
+    monkeypatch.setenv("H4K_APPROVAL_MODE", "off")
+    monkeypatch.setattr(toolkit_mod.subprocess, "run", lambda *a, **k: Proc())
+    runner = toolkit_mod.ToolkitRunner()
+    full = runner.run_tool(
+        "nmap", ["nmap", "--version"], internal=True, full_output=True
+    )
+    assert len(full["stdout"]) == 12000
+    capped = runner.run_tool("nmap", ["nmap", "--version"], internal=True)
+    assert len(capped["stdout"]) == 4000

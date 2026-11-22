@@ -101,7 +101,13 @@ class ToolkitRunner:
         return [t for t in tools if t not in self._available_tools]
 
     def run_tool(
-        self, tool: str, argv: list[str], timeout: int = 300, approval_id: str = ""
+        self,
+        tool: str,
+        argv: list[str],
+        timeout: int = 300,
+        approval_id: str = "",
+        internal: bool = False,
+        full_output: bool = False,
     ) -> dict:
         """Run an external tool.
 
@@ -133,13 +139,17 @@ class ToolkitRunner:
                 "timed_out": False,
                 "status": "sandbox",
             }
+        # Internal, h4k-constructed probes (fingerprinting, NSE suggestions)
+        # are not operator-supplied commands and must not need an approval id;
+        # the gate exists for user-requested toolkit runs.
         try:
-            approval.ApprovalStore().check(
-                [str(a) for a in argv],
-                tool=tool,
-                approval_id=approval_id,
-                context={"toolkit": tool, "timeout": timeout},
-            )
+            if not internal:
+                approval.ApprovalStore().check(
+                    [str(a) for a in argv],
+                    tool=tool,
+                    approval_id=approval_id,
+                    context={"toolkit": tool, "timeout": timeout},
+                )
         except approval.ApprovalRequired as exc:
             return {
                 "tool": tool,
@@ -173,7 +183,11 @@ class ToolkitRunner:
             )
             return {
                 "tool": tool,
-                "stdout": (proc.stdout or "")[-4000:],
+                # XML consumers (nmap -oX) need the whole document; the
+                # 4k tail cap is only for human-facing tool output.
+                "stdout": (
+                    (proc.stdout or "") if full_output else (proc.stdout or "")[-4000:]
+                ),
                 "stderr": (proc.stderr or "")[-2000:],
                 "rc": proc.returncode,
                 "elapsed": round(time.time() - started, 2),

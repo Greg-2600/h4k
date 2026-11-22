@@ -300,7 +300,7 @@ def test_deepattack_marks_running_before_first_tool_finishes(job_stores, monkeyp
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv):
+        def run_tool(self, tool, argv, **kwargs):
             # the monitor polls mid-sweep: this is the state it must observe
             seen.append(scan_router._toolkit_jobs["d1"]["status"])
             return {"tool": tool, "rc": 0, "stdout": ""}
@@ -326,7 +326,7 @@ def test_deepattack_failure_does_not_hang_running(job_stores, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv):
+        def run_tool(self, tool, argv, **kwargs):
             raise RuntimeError("hydra exploded")
 
     import services.toolkit as toolkit_mod

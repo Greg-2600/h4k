@@ -456,7 +456,7 @@ def test_auto_scan_edges(monkeypatch, tmp_path):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=15):
+        def run_tool(self, tool, argv, timeout=15, **kwargs):
             return {"status": "ok", "stdout": "<host></host>"}
 
     monkeypatch.setattr("services.discovery.NeighborFinder", _Finder)
