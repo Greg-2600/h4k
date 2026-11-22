@@ -2075,6 +2075,15 @@ function toggleTheme() {
 
 /* ---------- operations workspace (native) ---------- */
 
+function opsEsc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function opsPretty(value) {
   try { return typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
   catch (_) { return String(value); }
@@ -2258,7 +2267,7 @@ async function opsLoadNightly() {
       { text: (r) => (r.enabled ? 'yes' : 'no') },
       {
         html: (r) =>
-          `<button class="btn small" data-nt-run="${r.id}">Run now</button>`,
+          `<button class="btn small" data-nt-run="${opsEsc(r.id)}">Run now</button>`,
       },
     ]);
     opsText('nt-status', `${schedules.length} schedule(s)`);
@@ -2315,8 +2324,8 @@ async function opsLoadReport() {
       { text: (r) => (r.argv || []).join(' ') },
       {
         html: (r) =>
-          `<button class="btn small" data-appr-ok="${r.id}">Approve</button> ` +
-          `<button class="btn small" data-appr-no="${r.id}">Deny</button>`,
+          `<button class="btn small" data-appr-ok="${opsEsc(r.id)}">Approve</button> ` +
+          `<button class="btn small" data-appr-no="${opsEsc(r.id)}">Deny</button>`,
       },
     ]);
   } catch (e) { opsText('appr-status', e.message); }
@@ -2365,8 +2374,8 @@ async function opsPaths() {
     const body = $('paths-body');
     if (body) {
       const paths = (res.paths || []).slice(0, 5).map((p) =>
-        `<div class="move">${p.hops || 0} hop(s) → ${p.target || p.objective || '?'} ` +
-        `<span class="muted">${(p.nodes || []).join(' → ')}</span></div>`
+        `<div class="move">${opsEsc(p.hops || 0)} hop(s) → ${opsEsc(p.target || p.objective || '?')} ` +
+        `<span class="muted">${opsEsc((p.nodes || []).join(' → '))}</span></div>`
       ).join('');
       body.innerHTML = paths || '<span class="muted">no path to an objective yet</span>';
     }
@@ -2383,7 +2392,7 @@ async function opsLoadSettings() {
       { text: (r) => r.name || '' },
       { text: (r) => r.role || '' },
       {
-        html: (r) => `<button class="btn small" data-key-del="${r.name}">Revoke</button>`,
+        html: (r) => `<button class="btn small" data-key-del="${opsEsc(r.name)}">Revoke</button>`,
       },
     ]);
   } catch (e) { opsText('keys-status', e.message); }
