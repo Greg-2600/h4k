@@ -16,7 +16,7 @@ the immediate horizon.
 | Tests | **1806 passing**, 3 skipped, 3 macOS-only env failures (Linux CI green) |
 | Coverage | **~90%** (CI gate 90%) |
 | Linters | black · ruff · mypy green |
-| Container | **`h4k`** on the `h4k-net` bridge, UI `http://127.0.0.1:3137` (single page; Operations tab) |
+| Container | **`h4k`** on the `h4k-net` bridge, UI `http://127.0.0.1:3137` (single native page; Operations tab) |
 | Local LLM | Ollama reachable at `127.0.0.1:11434` (30 models); default `qwen2.5:latest` |
 | Branch protection | ruleset `main protection`: PR required + `lint-test` + `e2e` green, no force-push |
 | Dependabot | queue clear (actions bumps merged; lodash fixture ignored; debian 13 deferred) |

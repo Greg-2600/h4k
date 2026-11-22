@@ -379,47 +379,20 @@ def test_session_report_includes_finding_ledger(client, monkeypatch, tmp_path):
 
 
 def test_ui_contract_ids_exist():
+    """The native Operations workspace owns the finding-ledger controls."""
     web = Path(__file__).resolve().parents[1] / "h4k" / "web"
-    html = (web / "ops.html").read_text(encoding="utf-8")
-    js = (web / "ops.js").read_text(encoding="utf-8")
+    html = (web / "index.html").read_text(encoding="utf-8")
+    js = (web / "app.js").read_text(encoding="utf-8")
     for ident in (
         "findings-card",
         "fl-summary",
         "fl-tbody",
-        "fl-empty",
-        "fl-select",
         "fl-title",
         "fl-severity",
-        "fl-source",
         "fl-host",
-        "fl-port",
-        "fl-description",
-        "fl-evidence-kind",
-        "fl-evidence-label",
-        "fl-evidence-text",
-        "fl-verdict",
-        "fl-retest-summary",
-        "fl-retest-evidence",
-        "fl-output",
-        "fl-status",
         "btn-fl-create",
-        "btn-fl-add-evidence",
-        "btn-fl-retest",
-        "btn-fl-report",
         "btn-fl-refresh",
     ):
         assert f'id="{ident}"' in html, f"missing #{ident}"
-    for ident in (
-        "fl-summary",
-        "fl-tbody",
-        "fl-empty",
-        "fl-select",
-        "fl-verdict",
-        "fl-output",
-        "fl-status",
-        "btn-fl-create",
-        "btn-fl-retest",
-        "btn-fl-report",
-        "btn-fl-refresh",
-    ):
+    for ident in ("fl-summary", "fl-tbody", "btn-fl-create", "opsFindingCreate"):
         assert ident in js

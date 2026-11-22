@@ -631,13 +631,12 @@
         </div>
       </section>
 
-      <!-- OPERATIONS: console phases that are not part of the kill chain -->
+      <!-- OPERATIONS: phases that are not part of the kill chain -->
       <section class="ws-panel" id="tab-ops" data-tab="ops">
         <div class="card">
           <div class="card-head"><h2>Operations</h2><span class="spacer"></span>
             <div class="row" id="ops-phase-nav">
-              <button class="btn small active" data-ops-phase="fuzz">Fuzz</button>
-              <button class="btn small" data-ops-phase="lab">Labs</button>
+              <button class="btn small active" data-ops-phase="labs">Labs</button>
               <button class="btn small" data-ops-phase="ad">AD</button>
               <button class="btn small" data-ops-phase="telemetry">Telemetry</button>
               <button class="btn small" data-ops-phase="nightly">Nightly</button>
@@ -645,8 +644,174 @@
               <button class="btn small" data-ops-phase="settings">Settings</button>
             </div>
           </div>
-          <div class="card-body ops-body">
-            <iframe id="ops-frame" class="ops-frame" title="Operator console: fuzzing, labs, AD, telemetry, nightly and reports"></iframe>
+          <div class="card-body">
+
+            <!-- LABS -->
+            <div class="ops-pane active" data-ops-pane="labs">
+              <div class="card inner-card">
+                <div class="card-head"><h2>Lab traffic</h2><span class="spacer"></span><span class="muted" id="lt-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <select id="lt-profile" aria-label="Traffic profile"></select>
+                    <input id="lt-target" class="grow" placeholder="lab target host" aria-label="Traffic target">
+                    <input id="lt-count" value="20" aria-label="Packets">
+                    <input id="lt-rate" value="2" aria-label="Rate per second">
+                    <label class="check-inline"><input type="checkbox" id="lt-public"> allow public</label>
+                    <button class="btn primary" id="btn-lt-start">Generate</button>
+                    <button class="btn" id="btn-lt-stop" hidden>Stop</button>
+                  </div>
+                  <pre class="ops-output" id="lt-output">Benign multi-protocol traffic for detector validation.</pre>
+                </div>
+              </div>
+              <div class="card inner-card">
+                <div class="card-head"><h2>IoT / OT probes</h2><span class="spacer"></span><span class="muted" id="iot-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="iot-host" class="grow" placeholder="device host" aria-label="IoT host">
+                    <select id="iot-protocol" aria-label="Protocol"></select>
+                    <input id="iot-port" placeholder="port" aria-label="Port">
+                    <button class="btn primary" id="btn-iot-probe">Probe</button>
+                    <button class="btn" id="btn-iot-discover">Discover</button>
+                  </div>
+                  <pre class="ops-output" id="iot-output">Read-only probes: MQTT, CoAP, Modbus, BACnet, SSDP, RTSP, SNMP.</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- AD -->
+            <div class="ops-pane" data-ops-pane="ad">
+              <div class="card inner-card">
+                <div class="card-head"><h2>Active Directory</h2><span class="spacer"></span><span class="muted" id="ad-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="ad-dc" class="grow" placeholder="DC IP / host" value="172.30.0.10" aria-label="Domain controller">
+                    <input id="ad-domain" placeholder="REALM" value="LAB.H4K" aria-label="Realm">
+                    <input id="ad-user" placeholder="username" value="Administrator" aria-label="Username">
+                    <input id="ad-pass" type="password" placeholder="password" aria-label="Password">
+                  </div>
+                  <div class="row">
+                    <button class="btn primary" id="btn-ad-policy">Read policy</button>
+                    <button class="btn" id="btn-ad-users">List users</button>
+                    <button class="btn" id="btn-ad-audit">Audit</button>
+                  </div>
+                  <pre class="ops-output" id="ad-output">Read-only by default: policy, users and hygiene audit.</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- TELEMETRY -->
+            <div class="ops-pane" data-ops-pane="telemetry">
+              <div class="card inner-card">
+                <div class="card-head"><h2>Telemetry</h2><span class="spacer"></span><span class="muted" id="tel-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <button class="btn primary" id="btn-tel-refresh">Refresh</button>
+                    <button class="btn" id="btn-tel-simulate">Simulate batch</button>
+                    <button class="btn danger" id="btn-tel-reset">Reset ledger</button>
+                  </div>
+                  <pre class="ops-output" id="tel-summary">No summary yet.</pre>
+                  <pre class="ops-output" id="tel-output"></pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- NIGHTLY -->
+            <div class="ops-pane" data-ops-pane="nightly">
+              <div class="card inner-card">
+                <div class="card-head"><h2>Nightly autopilot</h2><span class="spacer"></span><span class="muted" id="nt-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="nt-name" placeholder="schedule name" aria-label="Schedule name">
+                    <input id="nt-cron" value="0 3 * * *" aria-label="Cron">
+                    <input id="nt-tz" value="UTC" aria-label="Timezone">
+                    <button class="btn primary" id="btn-nt-create">Add schedule</button>
+                    <button class="btn" id="btn-nt-refresh">Refresh</button>
+                  </div>
+                  <div class="tbl-wrap"><table class="tbl">
+                    <thead><tr><th>Name</th><th>Cron</th><th>Enabled</th><th></th></tr></thead>
+                    <tbody id="nt-tbody"></tbody>
+                  </table></div>
+                  <pre class="ops-output" id="nt-output"></pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- REPORT -->
+            <div class="ops-pane" data-ops-pane="report">
+              <div class="card inner-card" id="findings-card">
+                <div class="card-head"><h2>Findings ledger</h2><span class="spacer"></span><span class="muted" id="fl-summary">no engagement</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="fl-title" class="grow" placeholder="finding title" aria-label="Finding title">
+                    <select id="fl-severity" aria-label="Severity">
+                      <option>critical</option><option>high</option><option>medium</option><option>low</option><option>info</option>
+                    </select>
+                    <input id="fl-host" placeholder="host" aria-label="Finding host">
+                    <button class="btn primary" id="btn-fl-create">Add finding</button>
+                    <button class="btn" id="btn-fl-refresh">Refresh</button>
+                  </div>
+                  <div class="tbl-wrap"><table class="tbl">
+                    <thead><tr><th>Title</th><th>Host</th><th>Severity</th><th>Status</th></tr></thead>
+                    <tbody id="fl-tbody"></tbody>
+                  </table></div>
+                </div>
+              </div>
+              <div class="card inner-card" id="approvals-card">
+                <div class="card-head"><h2>Approvals</h2><span class="spacer"></span><span class="muted" id="appr-status">pending</span></div>
+                <div class="card-body">
+                  <div class="row"><button class="btn" id="btn-appr-refresh">Refresh</button></div>
+                  <div class="tbl-wrap"><table class="tbl">
+                    <thead><tr><th>Tool</th><th>Argv</th><th></th></tr></thead>
+                    <tbody id="appr-tbody"></tbody>
+                  </table></div>
+                </div>
+              </div>
+              <div class="card inner-card" id="paths-card">
+                <div class="card-head"><h2>Attack paths &amp; coverage</h2><span class="spacer"></span><span class="muted" id="paths-summary">no engagement</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <button class="btn primary" id="btn-paths-run">Evaluate paths</button>
+                    <button class="btn" id="btn-paths-md">Download paths .md</button>
+                    <button class="btn" id="btn-ops-session-report">Session report</button>
+                  </div>
+                  <div class="ops-output" id="paths-body"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SETTINGS -->
+            <div class="ops-pane" data-ops-pane="settings">
+              <div class="card inner-card">
+                <div class="card-head"><h2>API keys</h2><span class="spacer"></span><span class="muted" id="keys-status">auth optional</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="key-name" placeholder="key name" aria-label="Key name">
+                    <select id="key-role" aria-label="Key role"><option>viewer</option><option>operator</option><option>admin</option></select>
+                    <button class="btn primary" id="btn-key-create">Create key</button>
+                    <button class="btn" id="btn-keys-refresh">Refresh</button>
+                  </div>
+                  <div class="tbl-wrap"><table class="tbl">
+                    <thead><tr><th>Name</th><th>Role</th><th></th></tr></thead>
+                    <tbody id="keys-tbody"></tbody>
+                  </table></div>
+                </div>
+              </div>
+              <div class="card inner-card">
+                <div class="card-head"><h2>Limits</h2><span class="spacer"></span><span class="muted" id="noise-status">off</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <select id="noise-profile" aria-label="Noise profile">
+                      <option value="off">off</option><option value="quiet">quiet</option>
+                      <option value="balanced">balanced</option><option value="aggressive">aggressive</option>
+                    </select>
+                    <button class="btn" id="btn-noise-set">Set profile</button>
+                    <button class="btn" id="btn-ai-budget-reset">Reset AI budget</button>
+                  </div>
+                  <pre class="ops-output" id="limits-output"></pre>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
@@ -752,6 +917,28 @@
         <div class="cmd-item" data-cmd="handoff-layer" data-tab="score" data-btn="btn-handoff-layer"><span>Score: Layer</span></div>
         <div class="cmd-item" data-cmd="handoff-sigma" data-tab="score" data-btn="btn-handoff-sigma"><span>Score: Sigma</span></div>
         <div class="cmd-item" data-cmd="handoff-summary" data-tab="score" data-btn="btn-handoff-summary"><span>Score: Writeup</span></div>
+        <div class="cmd-item" data-cmd="ops-traffic" data-tab="ops" data-btn="btn-lt-start"><span>Operations: generate lab traffic</span></div>
+        <div class="cmd-item" data-cmd="ops-iot" data-tab="ops" data-btn="btn-iot-probe"><span>Operations: probe IoT device</span></div>
+        <div class="cmd-item" data-cmd="ops-ad-policy" data-tab="ops" data-btn="btn-ad-policy"><span>Operations: read AD policy</span></div>
+        <div class="cmd-item" data-cmd="ops-ad-users" data-tab="ops" data-btn="btn-ad-users"><span>Operations: list AD users</span></div>
+        <div class="cmd-item" data-cmd="ops-ad-audit" data-tab="ops" data-btn="btn-ad-audit"><span>Operations: audit AD</span></div>
+        <div class="cmd-item" data-cmd="ops-tel-refresh" data-tab="ops" data-btn="btn-tel-refresh"><span>Operations: telemetry summary</span></div>
+        <div class="cmd-item" data-cmd="ops-tel-sim" data-tab="ops" data-btn="btn-tel-simulate"><span>Operations: simulate telemetry</span></div>
+        <div class="cmd-item" data-cmd="ops-nightly" data-tab="ops" data-btn="btn-nt-create"><span>Operations: add nightly schedule</span></div>
+        <div class="cmd-item" data-cmd="ops-finding" data-tab="ops" data-btn="btn-fl-create"><span>Operations: add finding</span></div>
+        <div class="cmd-item" data-cmd="ops-paths" data-tab="ops" data-btn="btn-paths-run"><span>Operations: evaluate attack paths</span></div>
+        <div class="cmd-item" data-cmd="ops-paths-md" data-tab="ops" data-btn="btn-paths-md"><span>Operations: download paths</span></div>
+        <div class="cmd-item" data-cmd="ops-report" data-tab="ops" data-btn="btn-ops-session-report"><span>Operations: session report</span></div>
+        <div class="cmd-item" data-cmd="ops-key" data-tab="ops" data-btn="btn-key-create"><span>Operations: create API key</span></div>
+        <div class="cmd-item" data-cmd="ops-noise" data-tab="ops" data-btn="btn-noise-set"><span>Operations: set noise profile</span></div>
+        <div class="cmd-item" data-cmd="ops-traffic-stop" data-tab="ops" data-btn="btn-lt-stop"><span>Operations: stop lab traffic</span></div>
+        <div class="cmd-item" data-cmd="ops-iot-disc" data-tab="ops" data-btn="btn-iot-discover"><span>Operations: discover IoT devices</span></div>
+        <div class="cmd-item" data-cmd="ops-tel-reset" data-tab="ops" data-btn="btn-tel-reset"><span>Operations: reset telemetry</span></div>
+        <div class="cmd-item" data-cmd="ops-nt-refresh" data-tab="ops" data-btn="btn-nt-refresh"><span>Operations: refresh schedules</span></div>
+        <div class="cmd-item" data-cmd="ops-fl-refresh" data-tab="ops" data-btn="btn-fl-refresh"><span>Operations: refresh findings</span></div>
+        <div class="cmd-item" data-cmd="ops-appr-refresh" data-tab="ops" data-btn="btn-appr-refresh"><span>Operations: refresh approvals</span></div>
+        <div class="cmd-item" data-cmd="ops-keys-refresh" data-tab="ops" data-btn="btn-keys-refresh"><span>Operations: refresh API keys</span></div>
+        <div class="cmd-item" data-cmd="ops-budget" data-tab="ops" data-btn="btn-ai-budget-reset"><span>Operations: reset AI budget</span></div>
         <div class="cmd-item" data-cmd="session-report" data-tab="score" data-btn="btn-session-report"><span>Score: Download MD</span></div>
         <div class="cmd-item" data-cmd="session-pdf" data-tab="score" data-btn="btn-session-pdf"><span>Score: Download PDF</span></div>
         <div class="cmd-item" data-cmd="sarif-import" data-tab="score" data-btn="btn-sarif-import"><span>Score: Import SARIF</span></div>

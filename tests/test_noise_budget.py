@@ -234,31 +234,17 @@ def test_api_noise_and_budget(client):
 
 
 def test_ui_contract_ids_exist():
+    """Noise/AI limits live in the native Settings pane."""
     web = Path(__file__).resolve().parents[1] / "h4k" / "web"
-    html = (web / "ops.html").read_text(encoding="utf-8")
-    js = (web / "ops.js").read_text(encoding="utf-8")
+    html = (web / "index.html").read_text(encoding="utf-8")
+    js = (web / "app.js").read_text(encoding="utf-8")
     for ident in (
-        "limits-card",
-        "noise-chip",
         "noise-profile",
-        "noise-tool",
-        "noise-guidance",
-        "noise-stats",
-        "ai-budget-chip",
-        "ai-budget-stats",
+        "noise-status",
         "btn-noise-set",
         "btn-ai-budget-reset",
-        "btn-limits-refresh",
+        "limits-output",
     ):
         assert f'id="{ident}"' in html, f"missing #{ident}"
-    for ident in (
-        "noise-chip",
-        "noise-profile",
-        "noise-guidance",
-        "noise-stats",
-        "ai-budget-chip",
-        "ai-budget-stats",
-        "btn-noise-set",
-        "btn-ai-budget-reset",
-    ):
+    for ident in ("noise-profile", "btn-noise-set", "opsSetNoise", "opsBudgetReset"):
         assert ident in js

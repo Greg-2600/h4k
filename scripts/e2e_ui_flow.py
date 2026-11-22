@@ -68,20 +68,15 @@ class Flow:
     def text(self, selector: str) -> str:
         return self.d.find_element(By.CSS_SELECTOR, selector).text
 
-    def enter_ops(self, phase: str) -> None:
-        """Open the Operations workspace and switch the embedded phase."""
+    def ops_phase(self, phase: str) -> None:
+        """Open the Operations workspace and show one native pane."""
         self.click('.ws-btn[data-tab="ops"]')
         self.click(f'#ops-phase-nav [data-ops-phase="{phase}"]')
-        self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ops-frame")))
-        frame = self.d.find_element(By.CSS_SELECTOR, "#ops-frame")
-        self.d.switch_to.frame(frame)
-        # The console switches phases through postMessage; wait for the phase.
-        WebDriverWait(self.d, 30).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, f"#phase-{phase}"))
+        WebDriverWait(self.d, 15).until(
+            EC.visibility_of_element_located(
+                (By.CSS_SELECTOR, f'.ops-pane[data-ops-pane="{phase}"]')
+            )
         )
-
-    def leave_ops(self) -> None:
-        self.d.switch_to.default_content()
 
     # -- dashboard: discover + recon -------------------------------------
     def discover(self, target: str, cidr: str) -> None:
@@ -138,9 +133,9 @@ class Flow:
 
     # -- operations: fuzz + report ---------------------------------------
     def fuzz(self, target: str, iterations: int, timeout_s: int) -> None:
-        print("\n[operations] Fuzz")
-        self.enter_ops("fuzz")
-        self.shot("05-ops-fuzz")
+        print("\n[exploit] Fuzz lab")
+        self.click('.ws-btn[data-tab="exploit"]')
+        self.shot("05-fuzz")
         self.fill("#fz-host", target)
         self.fill("#fz-port", "3138")
         self.fill("#fz-iters", str(iterations))
@@ -155,16 +150,14 @@ class Flow:
         )
         print("    status:", self.text("#fz-live"))
         print("    output:", self.text("#fz-output")[:160].replace("\n", " "))
-        self.shot("06-ops-fuzz-done")
-        self.leave_ops()
+        self.shot("06-fuzz-done")
 
     def report(self, download_dir: Path) -> None:
         print("\n[operations] Report")
-        self.enter_ops("report")
+        self.ops_phase("report")
         self.shot("07-ops-report")
         download_dir.mkdir(parents=True, exist_ok=True)
-        self.click("#btn-session-report")
-        self.leave_ops()
+        self.click("#btn-ops-session-report")
         deadline = time.monotonic() + 30
         downloaded: Path | None = None
         while time.monotonic() < deadline and downloaded is None:

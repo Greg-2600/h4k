@@ -40,8 +40,8 @@ HACKING/                 git root
       routers/           scan.py, source.py, update.py, net.py, engagement.py
       services/          ~30 modules (see below)
     data/                cves.json, creds.json, wordlists, custom_rules.json (runtime)
-    web/                 dashboard (index.html/app.js) + operator console
-                         (ops.html/ops.js/ops.css, served at /ops)
+    web/                 dashboard + native Operations panes
+                         (index.html, app.js, style.css)
     scripts/             DNS recon bash tools
     README.md            main human doc (PHRACK-style)
   vulnlab/               intentionally-vulnerable fuzzing TARGET (separate container)
@@ -79,9 +79,9 @@ cd h4k/api && H4K_SANDBOX=1 H4K_DATA_DIR=/tmp/h4k-demo \
   python3 -m uvicorn main:app --port 3137
 ```
 
-**Operations workspace:** `/` → **Operations** tab (fuzz, labs, AD, telemetry,
-nightly, report/findings/approvals, settings). `/ops` redirects to `/?tab=ops`;
-the old console is embedded (`?embed=1`) and inherits the dashboard theme.
+**Operations workspace:** `/` → **Operations** tab (labs, AD, telemetry,
+nightly, report/findings/approvals/paths, settings). Fuzz lives in Exploit.
+`/ops` redirects to `/?tab=ops`; the UI is native (no iframe, no second document).
 
 **Important:** after `docker build -t h4k .`, you must `docker run` (or `compose
 up`) to start the container — building alone does not leave it running. The API

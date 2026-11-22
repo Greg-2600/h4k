@@ -304,38 +304,15 @@ def test_api_paths_from_host_and_ui_ids(client):
     from pathlib import Path
 
     web = Path(__file__).resolve().parents[1] / "h4k" / "web"
-    html = (web / "ops.html").read_text(encoding="utf-8")
-    js = (web / "ops.js").read_text(encoding="utf-8")
+    html = (web / "index.html").read_text(encoding="utf-8")
+    js = (web / "app.js").read_text(encoding="utf-8")
     for ident in (
         "paths-card",
         "paths-summary",
-        "paths-output",
-        "paths-status",
-        "obj-host",
-        "obj-label",
-        "obj-kind",
-        "obj-criticality",
-        "obj-tbody",
-        "obj-empty",
-        "cov-host",
-        "cov-port",
-        "cov-risk",
-        "cov-outcome",
-        "cov-reason",
-        "btn-obj-add",
-        "btn-cov-add",
-        "btn-ap-refresh",
-        "btn-ap-report",
+        "paths-body",
+        "btn-paths-run",
+        "btn-paths-md",
     ):
         assert f'id="{ident}"' in html, f"missing #{ident}"
-    for ident in (
-        "paths-summary",
-        "paths-output",
-        "obj-tbody",
-        "obj-empty",
-        "btn-obj-add",
-        "btn-cov-add",
-        "btn-ap-refresh",
-        "btn-ap-report",
-    ):
+    for ident in ("paths-summary", "paths-body", "btn-paths-run", "opsPaths"):
         assert ident in js
