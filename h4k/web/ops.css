@@ -456,6 +456,7 @@ html, body { margin: 0; height: 100%; font-family: var(--font); font-size: 14px;
 .hint { color: var(--text-muted); font-style: italic; }
 .footer-center { flex: 1; text-align: center; }
 .phase { display: block; }
+.phase[hidden] { display: none; }
 .session-info { padding: 12px; background: var(--bg); border-radius: var(--radius-sm); margin-top: 12px; }
 .target-results { margin-top: 12px; }
 .time { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
@@ -1015,3 +1016,20 @@ dialog::backdrop { background: rgba(6, 10, 18, 0.55); }
   background: var(--accent-light);
   border-left: 2px solid var(--accent);
 }
+
+
+/* Embedded in the dashboard Operations workspace: one phase, no chrome. */
+body.embed .header,
+body.embed .footer { display: none; }
+body.embed .console-main { height: 100vh; }
+body.embed .console { height: 100vh; padding: 0; }
+body.embed .phase { min-height: 100vh; }
+body.embed .app { min-height: 100vh; }
+
+/* Match the surrounding dashboard: same sans/mono stacks, no page chrome. */
+body.embed {
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  background: transparent;
+}
+body.embed .card, body.embed .inner-card { border-radius: 4px; }

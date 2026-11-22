@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from routers import (
     ad as ad_router,
@@ -476,9 +476,15 @@ async def index() -> FileResponse:
 
 
 @app.get("/ops", include_in_schema=False)
-async def ops_page() -> FileResponse:
-    """Operator console: findings, approvals, limits/noise and lab tooling."""
-    return FileResponse(WEB_DIR / "ops.html")
+async def ops_page(request: Request) -> Response:
+    """Legacy console URL.
+
+    The console is embedded in the dashboard's Operations workspace; a direct
+    visit redirects there. ``?embed=1`` serves the fragment the iframe uses.
+    """
+    if request.query_params.get("embed") == "1":
+        return FileResponse(WEB_DIR / "ops.html")
+    return RedirectResponse(url="/?tab=ops", status_code=307)
 
 
 @app.get("/api", include_in_schema=False)

@@ -7,23 +7,27 @@ buggy HTTP parser on `:3138`). Screenshots: `artifacts/ui-flow/`.
 Flow exercised: **scope → scan → discovery → full fingerprint → fuzz →
 session report**, plus dashboard Recon verification.
 
-## The core problem: two products in one app
+## Single UI (resolved)
 
-| | Dashboard (`/`) | Operator console (`/ops`) |
-|---|---|---|
-| Navigation | 6 workspaces: Discover, Recon, Exploit, Pivot, Persist, Score | 9 phases: Assets, Walk, Fuzz, Lab, AD, Telemetry, Nightly, Report, Settings |
-| Discovery | Scan/Neighbors buttons + stepper | "Discover & Scan" + Local Network tab |
-| Services | Recon table | Service Map table |
-| Findings | "Likely vulnerable" card | Findings phase/panel |
-| Report | Score tab | Report phase |
+There is now **one page and one navigation**: `/`. The console's non-kill-chain
+phases live in an **Operations** workspace beside Discover/Recon/Exploit/Pivot/
+Persist/Score:
 
-Both pages mutate the same session but present different entry points and
-different completion semantics. They now share the neighbor store, so the
-data agrees; the navigation still makes the operator choose a page first.
+| Operations tab | Contents |
+|---|---|
+| Fuzz | signal-guided fuzzing, crash candidates |
+| Labs | benign traffic kit + IoT/OT probes |
+| AD | domain policy, users, audit, roast/spray |
+| Telemetry | ingest summary, detections, simulate/reset |
+| Nightly | schedules and run history |
+| Report | findings ledger, approvals, attack paths, session report |
+| Settings | auth keys and console preferences |
 
-**Recommendation:** make the dashboard a read-only overview (scope, live
-counts, next action) that deep-links into the console, and keep all mutation
-in one place. The console already owns the richer flow.
+`/ops` is no longer a second app: it **307-redirects** to `/?tab=ops`, and the
+console document is only served as `?embed=1` inside the workspace. The embed
+inherits the dashboard theme and fonts, so it reads as one surface. A future
+native port could drop the internal iframe, but users no longer choose between
+two products.
 
 ## Issues found and fixed in this pass
 

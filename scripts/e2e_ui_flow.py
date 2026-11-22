@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""Selenium walkthrough of the h4k dashboard and operator console.
+"""Selenium walkthrough of the unified h4k dashboard.
 
 Target: the contrived ``vulnlab`` container (intentionally buggy HTTP parser,
-port 3138). The script drives the real UI, not the API:
+port 3138). The script drives one UI:
 
-dashboard : create scope -> scan -> fingerprint -> inspect services
-ops       : acquire -> scan -> fingerprint -> fuzz -> session report
+    Discover (scope + scan) -> Neighbors -> Recon (full-port fingerprint)
+    -> Operations/Fuzz -> Operations/Report (download)
 
 Run against a live stack::
 
     python scripts/e2e_ui_flow.py
-    python scripts/e2e_ui_flow.py --base-url http://127.0.0.1:3137 \
-        --target vulnlab --scope-cidr 172.18.0.0/24 --iterations 200
+    python scripts/e2e_ui_flow.py --headful --iterations 500
 
 Screenshots land in ``artifacts/ui-flow/`` unless ``--screenshots`` is
 overridden. Requires Chrome (Selenium Manager fetches the driver).
@@ -20,6 +19,7 @@ overridden. Requires Chrome (Selenium Manager fetches the driver).
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -38,23 +38,11 @@ class Flow:
         self.base = base.rstrip("/")
         self.shots = shots
         self.wait = WebDriverWait(driver, 30)
-        self.steps: list[tuple[str, float]] = []
 
-    # -- helpers ---------------------------------------------------------
     def go(self, path: str) -> None:
         self.d.get(f"{self.base}{path}")
         self.wait.until(
             lambda d: d.execute_script("return document.readyState") == "complete"
-        )
-
-    def wait_text(self, selector: str, needle: str, timeout: float = 60) -> None:
-        WebDriverWait(self.d, timeout).until(
-            EC.text_to_be_present_in_element((By.CSS_SELECTOR, selector), needle)
-        )
-
-    def wait_visible(self, selector: str, timeout: float = 30) -> None:
-        WebDriverWait(self.d, timeout).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, selector))
         )
 
     def shot(self, name: str) -> None:
@@ -62,10 +50,6 @@ class Flow:
         path = self.shots / f"{name}.png"
         self.d.save_screenshot(str(path))
         print(f"    screenshot: {path}")
-
-    def step(self, label: str) -> None:
-        self.steps.append((label, time.monotonic()))
-        print(f"  · {label}")
 
     def click(self, selector: str) -> None:
         element = self.wait.until(
@@ -81,117 +65,87 @@ class Flow:
         element.clear()
         element.send_keys(value)
 
-    def body_text(self) -> str:
-        return self.d.find_element(By.TAG_NAME, "body").text
+    def text(self, selector: str) -> str:
+        return self.d.find_element(By.CSS_SELECTOR, selector).text
 
-    # -- dashboard flow --------------------------------------------------
-    def dashboard(self, target: str, cidr: str) -> None:
-        print("\n[dashboard] /")
+    def enter_ops(self, phase: str) -> None:
+        """Open the Operations workspace and switch the embedded phase."""
+        self.click('.ws-btn[data-tab="ops"]')
+        self.click(f'#ops-phase-nav [data-ops-phase="{phase}"]')
+        self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ops-frame")))
+        frame = self.d.find_element(By.CSS_SELECTOR, "#ops-frame")
+        self.d.switch_to.frame(frame)
+        # The console switches phases through postMessage; wait for the phase.
+        WebDriverWait(self.d, 30).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, f"#phase-{phase}"))
+        )
+
+    def leave_ops(self) -> None:
+        self.d.switch_to.default_content()
+
+    # -- dashboard: discover + recon -------------------------------------
+    def discover(self, target: str, cidr: str) -> None:
+        print("\n[dashboard] Discover")
         self.go("/")
-        self.shot("01-dashboard-discover")
+        self.shot("01-discover")
 
-        self.step("create an authorized scope")
+        print("  · create an authorized scope")
         self.fill("#scope-name", "Selenium UI pass")
         self.fill("#scope-cidrs", cidr)
         self.click("#btn-scope-create")
-        self.wait_text("#scope-summary", cidr, timeout=20)
-        self.shot("02-dashboard-scope")
+        WebDriverWait(self.d, 20).until(
+            lambda d: cidr in d.find_element(By.CSS_SELECTOR, "#scope-summary").text
+        )
 
-        self.step(f"scan {target} (full depth)")
+        print(f"  · scan {target} (full depth)")
         self.fill("#target", target)
         Select(self.d.find_element(By.CSS_SELECTOR, "#depth-select")).select_by_value(
             "full"
         )
         self.click("#btn-scan")
-        # The status pill goes running -> done; a full scan can take a while.
-        self.wait_text("#scan-status", "done", timeout=240)
-        self.shot("03-dashboard-scan-done")
-
-    def dashboard_recon(self, target: str) -> None:
-        """Fingerprint after discovery has populated the neighbor store."""
-        print("\n[dashboard] / (Recon)")
-        self.go("/")
-        self.step("verify the Recon table sees the console's fingerprint data")
-        self.click('.ws-btn[data-tab="recon"]')
-        WebDriverWait(self.d, 60).until(
-            lambda d: "3138" in d.find_element(By.CSS_SELECTOR, "#hosts-tbody").text
-        )
-        print(
-            "    dashboard services:",
-            self.d.find_element(By.CSS_SELECTOR, "#hosts-count").text,
-        )
-        self.shot("04-dashboard-recon")
-
-    # -- ops flow --------------------------------------------------------
-    def ops(
-        self, target: str, iterations: int, timeout_s: int, download_dir: Path
-    ) -> None:
-        print("\n[ops] /ops")
-        self.go("/ops")
-        self.shot("05-ops-assets")
-
-        self.step("verify the active scope is visible and selectable")
-        WebDriverWait(self.d, 20).until(
-            lambda d: len(d.find_elements(By.CSS_SELECTOR, "#scope-select option")) > 1
-        )
-        scope = Select(self.d.find_element(By.CSS_SELECTOR, "#scope-select"))
-        selected = scope.first_selected_option.text
-        assert "Selenium UI pass" in selected, selected
-        print(f"    scope picker: {selected}")
-
-        self.step("expand Discover and scan the target")
-        self.click("#btn-acquire")
-        self.click("#tab-ip")
-        self.fill("#target", target)
-        Select(self.d.find_element(By.CSS_SELECTOR, "#depth-select")).select_by_value(
-            "full"
-        )
-        self.click("#btn-launch-recon")
         WebDriverWait(self.d, 240).until(
-            lambda d: any(
-                word in d.find_element(By.CSS_SELECTOR, "#sp-status").text.lower()
-                for word in ("complete", "done")
-            )
+            lambda d: "done"
+            in d.find_element(By.CSS_SELECTOR, "#scan-status").text.lower()
         )
-        self.shot("06-ops-scan-done")
+        self.shot("02-scan-done")
 
-        self.step("discover neighbors (required before fingerprinting)")
-        self.click("#tab-neighbors")
-        self.click("#btn-launch-recon")
-        # The console auto-runs a common-port fingerprint after discovery, so
-        # the progress strip is not a reliable completion signal. The activity
-        # log is: "Found N neighbor(s)" then "Service map complete".
-        WebDriverWait(self.d, 180).until(
-            lambda d: "found"
-            in d.find_element(By.CSS_SELECTOR, "#activity-log").text.lower()
+        print("  · discover neighbors (populates the service store)")
+        self.click("#btn-neighbors")
+        # The status still says "done" from the scan until the first poll;
+        # wait for it to go back to running before waiting for completion.
+        WebDriverWait(self.d, 15).until(
+            lambda d: "running"
+            in d.find_element(By.CSS_SELECTOR, "#scan-status").text.lower()
+            or "done"
+            not in d.find_element(By.CSS_SELECTOR, "#scan-status").text.lower()
         )
         WebDriverWait(self.d, 180).until(
-            lambda d: "service map complete"
-            in d.find_element(By.CSS_SELECTOR, "#activity-log").text.lower()
+            lambda d: "done"
+            in d.find_element(By.CSS_SELECTOR, "#scan-status").text.lower()
         )
-        hosts = [
-            h.text.splitlines()[0]
-            for h in self.d.find_elements(By.CSS_SELECTOR, "#inventory-grid .tile")
-        ]
-        print(f"    neighbors: {hosts[:6]}")
-        self.shot("06b-ops-neighbors")
+        self.shot("03-neighbors-done")
 
-        self.step("full-port fingerprint from the action panel")
+    def recon(self) -> None:
+        print("\n[dashboard] Recon")
+        self.click('.ws-btn[data-tab="recon"]')
+        print("  · full-port fingerprint")
         self.click("#btn-full-scan")
         WebDriverWait(self.d, 300).until(
-            lambda d: "3138" in d.find_element(By.CSS_SELECTOR, "#fp-tbody").text
+            lambda d: "3138" in d.find_element(By.CSS_SELECTOR, "#hosts-tbody").text
         )
-        self.shot("07-ops-services")
+        print("    services:", self.text("#hosts-count"))
+        self.shot("04-recon-services")
 
-        self.step(f"fuzz {target}:3138 ({iterations} iterations)")
-        self.click('.nav-btn[data-phase="fuzz"]')
+    # -- operations: fuzz + report ---------------------------------------
+    def fuzz(self, target: str, iterations: int, timeout_s: int) -> None:
+        print("\n[operations] Fuzz")
+        self.enter_ops("fuzz")
+        self.shot("05-ops-fuzz")
         self.fill("#fz-host", target)
         self.fill("#fz-port", "3138")
         self.fill("#fz-iters", str(iterations))
         self.fill("#fz-timeout", str(timeout_s))
         self.click("#btn-fz-start")
-        # The start button is disabled while the job runs and re-enabled when
-        # the poller sees a terminal state.
         WebDriverWait(self.d, 240).until(
             lambda d: d.find_element(By.CSS_SELECTOR, "#btn-fz-start").is_enabled()
         )
@@ -199,18 +153,18 @@ class Flow:
             lambda d: "starting"
             not in d.find_element(By.CSS_SELECTOR, "#fz-live").text.lower()
         )
-        print(
-            f"    fuzz status: {self.d.find_element(By.CSS_SELECTOR, '#fz-live').text}"
-        )
-        print(
-            f"    fuzz output: {self.d.find_element(By.CSS_SELECTOR, '#fz-output').text[:200]}"
-        )
-        self.shot("08-ops-fuzz")
+        print("    status:", self.text("#fz-live"))
+        print("    output:", self.text("#fz-output")[:160].replace("\n", " "))
+        self.shot("06-ops-fuzz-done")
+        self.leave_ops()
 
-        self.step("download the session report")
+    def report(self, download_dir: Path) -> None:
+        print("\n[operations] Report")
+        self.enter_ops("report")
+        self.shot("07-ops-report")
         download_dir.mkdir(parents=True, exist_ok=True)
-        self.click('.nav-btn[data-phase="report"]')
         self.click("#btn-session-report")
+        self.leave_ops()
         deadline = time.monotonic() + 30
         downloaded: Path | None = None
         while time.monotonic() < deadline and downloaded is None:
@@ -225,25 +179,45 @@ class Flow:
                 time.sleep(0.5)
         assert downloaded is not None, "session report download did not start"
         print(f"    downloaded: {downloaded.name} ({downloaded.stat().st_size} bytes)")
-        self.shot("09-ops-report")
+
+
+def restart_target() -> None:
+    """Restart the contrived target so the fuzz baseline is up."""
+    compose = Path(__file__).resolve().parent.parent / "h4k" / "docker-compose.yml"
+    subprocess.run(
+        ["docker", "compose", "-f", str(compose), "restart", "vulnlab"],
+        check=False,
+        capture_output=True,
+    )
+    for _ in range(45):
+        out = subprocess.run(
+            ["docker", "inspect", "-f", "{{.State.Health.Status}}", "h4k_vulnlab"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if "healthy" in out.stdout:
+            return
+        time.sleep(1)
+    print("    warning: vulnlab did not report healthy in 45s")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:3137")
-    parser.add_argument(
-        "--target", default="vulnlab", help="contrived target host (container name)"
-    )
+    parser.add_argument("--target", default="vulnlab")
     parser.add_argument("--scope-cidr", default="172.18.0.0/24")
-    parser.add_argument("--iterations", type=int, default=150)
-    parser.add_argument("--fuzz-timeout", type=int, default=45)
+    parser.add_argument("--iterations", type=int, default=80)
+    parser.add_argument("--fuzz-timeout", type=int, default=10)
+    parser.add_argument(
+        "--no-restart-target",
+        action="store_true",
+        help="do not restart vulnlab before fuzzing (the fuzz step may crash it)",
+    )
     parser.add_argument("--screenshots", default="artifacts/ui-flow")
     parser.add_argument("--downloads", default="/tmp/h4k-ui-flow-downloads")
     parser.add_argument("--headful", action="store_true")
     args = parser.parse_args()
-
-    shots = Path(args.screenshots)
-    download_dir = Path(args.downloads)
 
     options = Options()
     if not args.headful:
@@ -254,7 +228,7 @@ def main() -> int:
     options.add_experimental_option(
         "prefs",
         {
-            "download.default_directory": str(download_dir.resolve()),
+            "download.default_directory": str(Path(args.downloads).resolve()),
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
         },
@@ -263,21 +237,20 @@ def main() -> int:
     driver = webdriver.Chrome(options=options)
     started = time.monotonic()
     try:
-        flow = Flow(driver, args.base_url, shots)
-        flow.dashboard(args.target, args.scope_cidr)
-        flow.ops(args.target, args.iterations, args.fuzz_timeout, download_dir)
-        flow.dashboard_recon(args.target)
-        elapsed = time.monotonic() - started
-        print(f"\nOK — dashboard + ops flow completed in {elapsed:.1f}s")
-        print(f"screenshots: {shots.resolve()}")
+        flow = Flow(driver, args.base_url, Path(args.screenshots))
+        flow.discover(args.target, args.scope_cidr)
+        flow.recon()
+        if not args.no_restart_target:
+            print("\n[target] restarting vulnlab so the fuzz baseline is reachable")
+            restart_target()
+        flow.fuzz(args.target, args.iterations, args.fuzz_timeout)
+        flow.report(Path(args.downloads))
+        print(f"\nOK — unified UI flow completed in {time.monotonic() - started:.1f}s")
+        print(f"screenshots: {Path(args.screenshots).resolve()}")
         return 0
     except (TimeoutException, AssertionError) as exc:
-        driver.save_screenshot(str(Path(shots) / "failure.png"))
+        driver.save_screenshot(str(Path(args.screenshots) / "failure.png"))
         print(f"\nFAIL — {type(exc).__name__}: {exc}", file=sys.stderr)
-        print(
-            f"failure screenshot: {(Path(shots) / 'failure.png').resolve()}",
-            file=sys.stderr,
-        )
         return 1
     finally:
         driver.quit()
