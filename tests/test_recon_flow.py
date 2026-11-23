@@ -961,7 +961,10 @@ def test_neighbor_services_merge_on_partial_sweeps(clean_db):
     )
     scan._save_neighbor_services(
         "10.0.0.9",
-        [{"port": 80, "proto": "tcp", "service": "http", "state": "closed"}],
+        [
+            {"port": 80, "proto": "tcp", "service": "http", "state": "closed"},
+            {"port": 443, "proto": "tcp", "service": "https", "state": "open"},
+        ],
         complete=False,
     )
     conn = scan._neighbor_db()
@@ -971,7 +974,7 @@ def test_neighbor_services_merge_on_partial_sweeps(clean_db):
             "SELECT port FROM discovered_services WHERE ip='10.0.0.9'"
         ).fetchall()
     }
-    assert 3138 in rows and 80 in rows
+    assert 3138 in rows and 443 in rows and 80 not in rows
 
     scan._save_neighbor_services(
         "10.0.0.9",

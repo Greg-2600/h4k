@@ -411,6 +411,8 @@ class EngagementStore:
                 technology=fp.get("technology") or [],
             )
             for svc in host.get("services") or []:
+                if str(svc.get("state") or "open").lower() != "open":
+                    continue
                 if self.upsert_service(engagement_id, addr, svc):
                     added["services"] += 1
 

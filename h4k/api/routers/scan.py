@@ -222,7 +222,12 @@ def _save_neighbor_services(
     if complete:
         conn.execute("DELETE FROM discovered_services WHERE ip = ?", (ip,))
     now = datetime.now(UTC).isoformat()
+    # Closed/filtered ports are not services. Persisting them polluted the
+    # asset graph and produced "try default credentials" next moves for ports
+    # that are not even listening.
     for svc in services:
+        if str(svc.get("state") or "open").lower() != "open":
+            continue
         conn.execute(
             "INSERT OR REPLACE INTO discovered_services (ip, port, proto, service, version, product, state, scanned_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
