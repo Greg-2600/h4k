@@ -2445,7 +2445,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const bootParams = new URLSearchParams(location.search);
   if (bootParams.get('phase')) state.opsPhase = bootParams.get('phase');
   const bootTab = bootParams.get('tab');
-  if (bootTab && TABS.includes(bootTab)) setTab(bootTab);
+  setTab(bootTab && TABS.includes(bootTab) ? bootTab : 'discover');
 
   $('scope-select').addEventListener('change', async (e) => {
     const engId = e.target.value || null;
@@ -2865,6 +2865,4 @@ document.addEventListener('DOMContentLoaded', () => {
   loadScopeSelect().then(() => { refreshStatus(); refreshNextMove(); });
   state.statusTimer = setInterval(refreshStatus, 8000);
   log('h4k kill-chain console ready — discover → recon → exploit → pivot → persist → score', 'info');
-  const startTab = new URLSearchParams(location.search).get('tab');
-  setTab(TABS.includes(startTab) ? startTab : 'discover');
 });
