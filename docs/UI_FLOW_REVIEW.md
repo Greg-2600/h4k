@@ -43,6 +43,8 @@ no iframe, no second theme, and no second navigation to keep in sync.
 | 11 | Partial sweeps (auto-scan, recheck) deleted all services for a host before inserting | Wiped deep-fingerprint results (e.g. 3138) | Merge on partial sweeps; replace only on complete |
 | 12 | Next-move hardcoded `fuzz 127.0.0.1:8080` | Suggested a target that is not in the engagement | Uses a discovered host/service |
 | 13 | Cached scan reports looked identical to fresh ones | An old empty scan looked like a failure | Status shows `done · cached` |
+| 14 | Creating the same scope repeatedly produced duplicate engagements | Scope picker filled with "Selenium UI pass" | Creator reuses an identical name+scope |
+| 15 | Next-move treated closed ports and h4k's own API as credential targets | "Try default credentials on 172.18.0.1:3137" | Only open login services; control ports and closed ports excluded |
 
 Dashboard Recon now displays the console's fingerprint results (the earlier
 empty table was issue #11 plus a load race), verified by the Selenium flow:
@@ -59,8 +61,8 @@ empty table was issue #11 plus a load race), verified by the Selenium flow:
 4. **Stale report cache** — re-scanning the same target/depth returns the
    cached report; there is a badge now but no way to force a refresh from
    the scan row.
-5. **Weak next moves** — the queue is dominated by default-credential
-   suggestions for every host; severity/exposure ranking would be better.
+5. **Next-move ranking** — still prioritizes default credentials for any
+   open login service; severity/exposure weighting would be better.
 
 ## The Selenium script
 

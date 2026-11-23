@@ -2468,12 +2468,19 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const parsed = await api('/api/engagement/parse-scope', { method: 'POST', body: { text } });
       if (!parsed.scope || !parsed.scope.length) { status.textContent = 'no valid IPs/CIDRs in that text'; return; }
-      const eng = await api('/api/engagement', { method: 'POST', body: { name, scope: parsed.scope } });
+      const wanted = parsed.scope.slice().sort().join(',');
+      const existing = (await api('/api/engagement')).engagements || [];
+      const match = existing.find(
+        (e) => e.name === name && (e.scope || []).slice().sort().join(',') === wanted
+      );
+      const eng = match || await api('/api/engagement', {
+        method: 'POST', body: { name, scope: parsed.scope },
+      });
       if (!eng.id) { status.textContent = `refused: ${eng.detail || 'error'}`; return; }
       await api('/api/session/scope', { method: 'POST', body: { engagement_id: eng.id } });
       state.engagementId = eng.id;
       status.textContent = '';
-      log(`scope engaged: ${eng.name} (${parsed.scope.join(', ')})`, 'info');
+      log(`${match ? 'scope reused' : 'scope engaged'}: ${eng.name} (${parsed.scope.join(', ')})`, 'info');
       loadScopeSelect();
       refreshStatus(); refreshNextMove();
     } catch (e) { status.textContent = `failed: ${e.message}`; }

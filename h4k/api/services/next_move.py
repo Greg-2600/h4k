@@ -22,11 +22,42 @@ actionable.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 logger = logging.getLogger("h4k.next_move")
 
 MAX_MOVES = 8
+
+# Services that actually accept a username/password. HTTP is deliberately
+# excluded: default creds on a web endpoint are path-specific, and treating
+# every http service as a credential target is how h4k's own API (3137) ended
+# up in the next-move queue.
+CRED_SERVICE_HINTS = (
+    "ssh",
+    "ftp",
+    "telnet",
+    "mysql",
+    "postgres",
+    "mssql",
+    "ms-sql",
+    "redis",
+    "mongo",
+    "smb",
+    "netbios",
+    "microsoft-ds",
+    "rdp",
+    "ms-wbt",
+    "winrm",
+    "vnc",
+    "ldap",
+    "smtp",
+    "pop3",
+    "imap",
+)
+
+# Control-plane ports belong to h4k itself, never to a credential target.
+CONTROL_PORTS = {int(os.environ.get("API_PORT", "3137")), 3137}
 
 
 def _candidate_actions(
@@ -104,10 +135,20 @@ def _candidate_actions(
         services = store.services(engagement_id)
         seen_hosts: set[str] = set()
         for svc in services:
+            if str(svc.get("state") or "open").lower() != "open":
+                continue
             name = (svc.get("service") or "").lower()
-            if not any(k in name for k in ("ssh", "ftp", "telnet", "mysql", "http")):
+            if not any(k in name for k in CRED_SERVICE_HINTS):
+                continue
+            try:
+                port = int(svc.get("port") or 0)
+            except (TypeError, ValueError):
+                port = 0
+            if port in CONTROL_PORTS:
                 continue
             host = svc.get("host")
+            if not host or host in {"127.0.0.1", "::1", "localhost"}:
+                continue
             if host in seen_hosts:
                 continue
             has_cred = any(
@@ -137,7 +178,12 @@ def _candidate_actions(
     try:
         for asset in store.assets(engagement_id):
             host = asset.get("host")
-            if not asset.get("services"):
+            open_services = [
+                svc
+                for svc in asset.get("services") or []
+                if str(svc.get("state") or "open").lower() == "open"
+            ]
+            if not open_services:
                 continue
             has_vuln = any(v.get("host") == host for v in store.vulns(engagement_id))
             has_cred = any(
@@ -152,7 +198,7 @@ def _candidate_actions(
                     "kind": "recon",
                     "priority": 30.0,
                     "host": host,
-                    "title": f"Deep-scan {host} ({len(asset.get('services') or [])} services)",
+                    "title": f"Deep-scan {host} ({len(open_services)} services)",
                     "rationale": "host is up but has no findings and no credentials yet",
                     "action": "scan",
                 }
@@ -169,7 +215,16 @@ def _candidate_actions(
             for svc in asset.get("services") or []:
                 if not svc.get("port"):
                     continue
+                if str(svc.get("state") or "open").lower() != "open":
+                    continue
+                try:
+                    if int(svc["port"]) in CONTROL_PORTS:
+                        continue
+                except (TypeError, ValueError):
+                    continue
                 host = asset.get("host")
+                if not host or host in {"127.0.0.1", "::1", "localhost"}:
+                    continue
                 name = (svc.get("service") or "").lower()
                 if name in {
                     "http",
