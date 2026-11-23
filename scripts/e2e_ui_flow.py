@@ -19,9 +19,11 @@ overridden. Requires Chrome (Selenium Manager fetches the driver).
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 from selenium import webdriver
@@ -79,13 +81,13 @@ class Flow:
         )
 
     # -- dashboard: discover + recon -------------------------------------
-    def discover(self, target: str, cidr: str) -> None:
+    def discover(self, target: str, cidr: str, scope_name: str) -> None:
         print("\n[dashboard] Discover")
         self.go("/")
         self.shot("01-discover")
 
         print("  · create an authorized scope")
-        self.fill("#scope-name", "Selenium UI pass")
+        self.fill("#scope-name", scope_name)
         self.fill("#scope-cidrs", cidr)
         self.click("#btn-scope-create")
         WebDriverWait(self.d, 20).until(
@@ -174,6 +176,35 @@ class Flow:
         print(f"    downloaded: {downloaded.name} ({downloaded.stat().st_size} bytes)")
 
 
+def api_json(base: str, method: str, path: str, body=None):
+    data = None if body is None else json.dumps(body).encode()
+    request = urllib.request.Request(
+        base.rstrip("/") + path,
+        data=data,
+        method=method,
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.loads(response.read())
+
+
+def cleanup_scope(base: str, name: str, keep_ids: set[str]) -> None:
+    """Delete a scope this run created (never a pre-existing one)."""
+    engagements = api_json(base, "GET", "/api/engagement").get("engagements", [])
+    removed = []
+    for engagement in engagements:
+        if engagement.get("name") != name or engagement.get("id") in keep_ids:
+            continue
+        api_json(base, "DELETE", f"/api/engagement/{engagement['id']}")
+        removed.append(engagement["id"])
+    if removed:
+        session = api_json(base, "GET", "/api/session")
+        active = (session.get("scope") or {}).get("engagement_id")
+        if active in removed:
+            api_json(base, "POST", "/api/session/scope", {})
+        print(f"    cleaned up scope(s): {', '.join(removed)}")
+
+
 def restart_target() -> None:
     """Restart the contrived target so the fuzz baseline is up."""
     compose = Path(__file__).resolve().parent.parent / "h4k" / "docker-compose.yml"
@@ -199,6 +230,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://127.0.0.1:3137")
     parser.add_argument("--target", default="vulnlab")
+    parser.add_argument("--scope-name", default="Selenium UI pass")
+    parser.add_argument("--keep-scope", action="store_true")
     parser.add_argument("--scope-cidr", default="172.18.0.0/24")
     parser.add_argument("--iterations", type=int, default=80)
     parser.add_argument("--fuzz-timeout", type=int, default=10)
@@ -231,13 +264,19 @@ def main() -> int:
     started = time.monotonic()
     try:
         flow = Flow(driver, args.base_url, Path(args.screenshots))
-        flow.discover(args.target, args.scope_cidr)
+        before = api_json(args.base_url, "GET", "/api/engagement").get(
+            "engagements", []
+        )
+        preexisting = {engagement["id"] for engagement in before}
+        flow.discover(args.target, args.scope_cidr, args.scope_name)
         flow.recon()
         if not args.no_restart_target:
             print("\n[target] restarting vulnlab so the fuzz baseline is reachable")
             restart_target()
         flow.fuzz(args.target, args.iterations, args.fuzz_timeout)
         flow.report(Path(args.downloads))
+        if not args.keep_scope:
+            cleanup_scope(args.base_url, args.scope_name, preexisting)
         print(f"\nOK — unified UI flow completed in {time.monotonic() - started:.1f}s")
         print(f"screenshots: {Path(args.screenshots).resolve()}")
         return 0
