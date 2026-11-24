@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using the metadata from 'CITATION.cff'.
+type: software
+title: h4k
+version: 1.0.0
+date-released: '2026-11-23'
+license: MIT
+repository-code: 'https://github.com/Greg-2600/h4k'
+abstract: >-
+  Containerized security analysis platform for authorized lab testing:
+  recon, MITRE ATT&CK mapping, fuzzing, SAST, SCA, and local AI triage.
+authors:
+  - given-names: Greg
+    family-names: Baker
+    alias: Greg-2600
+    orcid: 'https://orcid.org/0009-0002-3931-8799'
+keywords:
+  - offensive security
+  - MITRE ATT&CK
+  - fuzzing
+  - SAST
+  - SCA
+  - Docker
+  - Metasploit
+  - authorized testing
+  - Python
