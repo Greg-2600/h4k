@@ -260,6 +260,8 @@ make e2e
 [MIT](LICENSE) - with an **ethical-use notice**. Use it only for authorized
 security education and testing.
 
+Cite this software using [CITATION.cff](CITATION.cff).
+
 ## Acknowledgements
 
 Built on [Metasploit Framework](https://www.metasploit.com/), Semgrep,
