@@ -6,16 +6,19 @@ from typing import Any
 
 from services.smb_shares import (
     _merge,
+    enumerate_shares,
     parse_smbclient,
     parse_smbmap,
     sandbox_shares,
 )
+from services.toolkit import ToolkitRunner
 
 
 def test_parse_smbclient_table() -> None:
     out = parse_smbclient(
         "\n".join(
             [
+                "noise before the table is ignored",
                 "\tSharename       Type      Comment",
                 "\t---------       ----      -------",
                 "\tpublic          Disk      lab drop",
@@ -37,6 +40,10 @@ def test_parse_smbmap_rows() -> None:
                 "READ ONLY\tpublic\tlab drop",
                 "NO ACCESS\tC$\tDefault share",
                 "[+] Working on it...",
+                "single-column-line",
+                "READ+WRITE\tbadaccess",
+                "READ ONLY\tshare\tduplicate header",
+                "READ ONLY\tfolder/name\tpath-like name",
             ]
         )
     )
@@ -49,14 +56,139 @@ def test_parse_smbmap_rows() -> None:
 def test_merge_prefers_first_nonempty() -> None:
     merged = _merge(
         [{"name": "public", "type": "Disk", "comment": "", "access": ""}],
-        [{"name": "public", "type": "", "comment": "lab", "access": "READ ONLY"}],
+        [
+            {"name": "public", "type": "", "comment": "lab", "access": "READ ONLY"},
+            {"name": "home", "type": "Disk", "comment": "users", "access": "READ"},
+        ],
     )
     assert merged[0] == {
+        "name": "home",
+        "type": "Disk",
+        "comment": "users",
+        "access": "READ",
+    }
+    assert merged[1] == {
         "name": "public",
         "type": "Disk",
         "comment": "lab",
         "access": "READ ONLY",
     }
+
+
+def test_enumerate_shares_null_session(monkeypatch: Any) -> None:
+    calls: list[tuple[str, list[str], int]] = []
+
+    def fake_run_tool(
+        self: Any, tool: str, argv: list[str], timeout: int = 300
+    ) -> dict[str, Any]:
+        calls.append((tool, argv, timeout))
+        if tool == "smbclient":
+            return {
+                "tool": tool,
+                "status": "ok",
+                "stdout": "\n".join(
+                    [
+                        "\tSharename       Type      Comment",
+                        "\t---------       ----      -------",
+                        "\tpublic          Disk      lab drop",
+                    ]
+                ),
+            }
+        return {
+            "tool": tool,
+            "status": "ok",
+            "stdout": "READ ONLY\tpublic\tlab drop",
+        }
+
+    monkeypatch.setattr(ToolkitRunner, "run_tool", fake_run_tool)
+    result = enumerate_shares("10.0.0.5")
+    assert result["target"] == "10.0.0.5"
+    assert result["success"] is True
+    assert result["count"] == 1
+    assert result["shares"][0]["access"] == "READ ONLY"
+    assert [c[0] for c in calls] == ["smbclient", "smbmap"]
+    assert calls[0][1] == ["smbclient", "-L", "//10.0.0.5", "-N", "-g"]
+    assert calls[1][1] == ["smbmap", "-H", "10.0.0.5", "-u", "anonymous"]
+    assert calls[0][2] == calls[1][2] == 60
+
+
+def test_enumerate_shares_with_credentials(monkeypatch: Any) -> None:
+    calls: list[tuple[str, list[str]]] = []
+
+    def fake_run_tool(
+        self: Any, tool: str, argv: list[str], timeout: int = 300
+    ) -> dict[str, Any]:
+        calls.append((tool, argv))
+        return {"tool": tool, "status": "ok", "stdout": ""}
+
+    monkeypatch.setattr(ToolkitRunner, "run_tool", fake_run_tool)
+    result = enumerate_shares("fileserver", user="alice", password="s3cret")
+    assert result["count"] == 0
+    assert calls[0][1] == [
+        "smbclient",
+        "-L",
+        "//fileserver",
+        "-U",
+        "alice%s3cret",
+        "-g",
+    ]
+    assert calls[1][1] == [
+        "smbmap",
+        "-H",
+        "fileserver",
+        "-u",
+        "alice",
+        "-p",
+        "s3cret",
+    ]
+
+
+def test_enumerate_shares_user_without_password(monkeypatch: Any) -> None:
+    calls: list[tuple[str, list[str]]] = []
+
+    def fake_run_tool(
+        self: Any, tool: str, argv: list[str], timeout: int = 300
+    ) -> dict[str, Any]:
+        calls.append((tool, argv))
+        return {"tool": tool, "status": "ok", "stdout": ""}
+
+    monkeypatch.setattr(ToolkitRunner, "run_tool", fake_run_tool)
+    enumerate_shares("fileserver", user="alice")
+    assert calls[0][1] == ["smbclient", "-L", "//fileserver", "-U", "alice", "-g"]
+    assert calls[1][1] == ["smbmap", "-H", "fileserver", "-u", "alice"]
+
+
+def test_enumerate_shares_partial_tool_failure(monkeypatch: Any) -> None:
+    def fake_run_tool(
+        self: Any, tool: str, argv: list[str], timeout: int = 300
+    ) -> dict[str, Any]:
+        if tool == "smbclient":
+            return {"tool": tool, "status": "error", "stdout": ""}
+        return {
+            "tool": tool,
+            "status": "ok",
+            "stdout": "READ ONLY\tpublic\tlab drop",
+        }
+
+    monkeypatch.setattr(ToolkitRunner, "run_tool", fake_run_tool)
+    result = enumerate_shares("10.0.0.5")
+    assert result["success"] is True
+    assert [s["name"] for s in result["shares"]] == ["public"]
+    assert [t["status"] for t in result["tools"]] == ["error", "ok"]
+
+
+def test_enumerate_shares_total_failure(monkeypatch: Any) -> None:
+    def fake_run_tool(
+        self: Any, tool: str, argv: list[str], timeout: int = 300
+    ) -> dict[str, Any]:
+        return {"tool": tool, "status": "error", "stdout": ""}
+
+    monkeypatch.setattr(ToolkitRunner, "run_tool", fake_run_tool)
+    result = enumerate_shares("10.0.0.5")
+    assert result["success"] is False
+    assert result["shares"] == []
+    assert result["count"] == 0
+    assert len(result["tools"]) == 2
 
 
 def test_sandbox_shares_deterministic() -> None:
