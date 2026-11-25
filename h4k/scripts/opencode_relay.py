@@ -44,7 +44,7 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args) -> None:
         pass
 
-    def do_GET(self) -> None:  # noqa: N802 - stdlib naming
+    def do_GET(self) -> None:
         body = json.dumps({"status": "ok", "relay": "opencode"}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -52,7 +52,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_POST(self) -> None:  # noqa: N802 - stdlib naming
+    def do_POST(self) -> None:
         try:
             n = int(self.headers.get("Content-Length") or 0)
             raw = self.rfile.read(n) if n else b""

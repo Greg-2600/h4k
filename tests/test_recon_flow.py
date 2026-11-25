@@ -195,7 +195,7 @@ def test_fingerprint_job_runs_and_saves(clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             from routers.scan import _parse_nmap_xml  # noqa: F401
 
             return {
@@ -240,7 +240,7 @@ def _run_passattack_job(clean_db, monkeypatch, stdout):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             return {
                 "tool": "hydra",
                 "stdout": stdout,
@@ -524,7 +524,7 @@ def _run_autopilot_faked(clean_db, monkeypatch, msf):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             if tool == "nmap":
                 return {
                     "stdout": XML,
@@ -679,7 +679,7 @@ def test_passattack_http_form_builds_post_form_spec(clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             seen["argv"] = list(argv)
             return {
                 "tool": "hydra",
@@ -747,7 +747,7 @@ def test_payload_endpoint_renders_via_msfvenom(client, clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             seen["tool"] = tool
             seen["argv"] = list(argv)
             return {
@@ -891,7 +891,7 @@ def test_fingerprint_nmap_uses_service_and_os_detection(clean_db, monkeypatch):
         def __init__(self, progress=None):
             pass
 
-        def run_tool(self, tool, argv, timeout=300):
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
             seen["argv"] = argv
             return {
                 "tool": "nmap",
@@ -918,3 +918,93 @@ def test_fingerprint_nmap_uses_service_and_os_detection(clean_db, monkeypatch):
     assert "-sV" in seen["argv"]
     assert "-O" in seen["argv"]
     assert clean_db._load_neighbor_hosts()["192.168.1.10"]["os"] == "Linux"
+
+
+# ---------- full-port fingerprint + service merge + local subnet ----------
+
+
+def test_fingerprint_full_uses_all_ports(clean_db, monkeypatch):
+    """Full mode must pass -p- and a longer host timeout to nmap."""
+    from routers.scan import _ensure_session_row, _run_fingerprint
+
+    _ensure_session_row()
+    seen = {}
+
+    class FakeRunner:
+        def __init__(self, progress=None):
+            pass
+
+        def run_tool(self, tool, argv, timeout=300, **kwargs):
+            seen["argv"] = argv
+            seen["kwargs"] = kwargs
+            return {"status": "ok", "rc": 0, "stdout": "<host ", "stderr": ""}
+
+    import services.toolkit as toolkit_mod
+
+    monkeypatch.setattr(toolkit_mod, "ToolkitRunner", FakeRunner)
+    _run_fingerprint(
+        {"id": "full", "status": "running", "log": []}, [{"ip": "10.0.0.5"}], True
+    )
+    assert "-p-" in seen["argv"]
+    assert "300s" in seen["argv"]
+    assert seen["kwargs"].get("internal") is True
+    assert seen["kwargs"].get("full_output") is True
+
+
+def test_neighbor_services_merge_on_partial_sweeps(clean_db):
+    """A common-port sweep must not erase deeper open ports."""
+    scan = clean_db
+    scan._save_neighbor_services(
+        "10.0.0.9",
+        [{"port": 3138, "proto": "tcp", "service": "http", "state": "open"}],
+        complete=True,
+    )
+    scan._save_neighbor_services(
+        "10.0.0.9",
+        [
+            {"port": 80, "proto": "tcp", "service": "http", "state": "closed"},
+            {"port": 443, "proto": "tcp", "service": "https", "state": "open"},
+        ],
+        complete=False,
+    )
+    conn = scan._neighbor_db()
+    rows = {
+        r[0]
+        for r in conn.execute(
+            "SELECT port FROM discovered_services WHERE ip='10.0.0.9'"
+        ).fetchall()
+    }
+    assert 3138 in rows and 443 in rows and 80 not in rows
+
+    scan._save_neighbor_services(
+        "10.0.0.9",
+        [{"port": 80, "proto": "tcp", "service": "http", "state": "open"}],
+        complete=True,
+    )
+    rows = {
+        r[0]
+        for r in scan._neighbor_db()
+        .execute("SELECT port FROM discovered_services WHERE ip='10.0.0.9'")
+        .fetchall()
+    }
+    assert rows == {80}
+
+
+def test_local_cidr_derives_a_24(monkeypatch):
+    from routers.scan import _local_cidr
+
+    class Proc:
+        stdout = "2: eth0    inet 172.18.0.5/16 brd 172.18.255.255 scope global eth0"
+
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: Proc())
+    assert _local_cidr() == "172.18.0.0/24"
+
+
+def test_local_cidr_falls_back(monkeypatch):
+    from routers.scan import _local_cidr
+
+    def _boom(*a, **k):
+        raise FileNotFoundError
+
+    monkeypatch.setattr("subprocess.run", _boom)
+    assert _local_cidr() == "192.168.1.0/24"

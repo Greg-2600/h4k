@@ -11,6 +11,7 @@ report - all from one container.
 [![CI](https://github.com/Greg-2600/h4k/actions/workflows/ci.yml/badge.svg)](https://github.com/Greg-2600/h4k/actions)
 ![tests: 1367](https://img.shields.io/badge/tests-1367_passing-90%25_coverage-brightgreen)
 ![lint: green](https://img.shields.io/badge/lint-black%20%7C%20ruff%20%7C%20mypy%20%7C%20bandit-brightgreen)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24489255.svg)](https://doi.org/10.5281/zenodo.24489255)
 
 </div>
 
@@ -259,6 +260,8 @@ make e2e
 
 [MIT](LICENSE) - with an **ethical-use notice**. Use it only for authorized
 security education and testing.
+
+Cite this software using [CITATION.cff](CITATION.cff). DOI: [10.5281/zenodo.24489256](https://doi.org/10.5281/zenodo.24489256).
 
 ## Acknowledgements
 

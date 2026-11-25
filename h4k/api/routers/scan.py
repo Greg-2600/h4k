@@ -27,6 +27,9 @@ from schemas import (
     ContainerEscapeResult,
     ContainerFuzzRequest,
     ContainerFuzzResult,
+    CorpusAddRequest,
+    CorpusEntry,
+    CorpusImportRequest,
     DBInterrogateRequest,
     DeepAttackRequest,
     FireTVRequest,
@@ -209,13 +212,27 @@ def _save_neighbor_host(
     _eng_ingest_asset(ip, os_=os_guess, vendor=vendor)
 
 
-def _save_neighbor_services(ip: str, services: list[dict[str, Any]]) -> None:
+def _save_neighbor_services(
+    ip: str, services: list[dict[str, Any]], *, complete: bool = False
+) -> None:
+    """Persist services for a host.
+
+    Partial sweeps (common ports, auto-scan, recheck) must merge: deleting by
+    IP would erase open ports found by an earlier full-port fingerprint.
+    Only a complete sweep may replace the whole row set.
+    """
     from datetime import UTC, datetime
 
     conn = _neighbor_db()
-    conn.execute("DELETE FROM discovered_services WHERE ip = ?", (ip,))
+    if complete:
+        conn.execute("DELETE FROM discovered_services WHERE ip = ?", (ip,))
     now = datetime.now(UTC).isoformat()
+    # Closed/filtered ports are not services. Persisting them polluted the
+    # asset graph and produced "try default credentials" next moves for ports
+    # that are not even listening.
     for svc in services:
+        if str(svc.get("state") or "open").lower() != "open":
+            continue
         conn.execute(
             "INSERT OR REPLACE INTO discovered_services (ip, port, proto, service, version, product, state, scanned_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -773,6 +790,24 @@ def session_report(fmt: str = "json") -> Any:
             lines.append(
                 "- no techniques observed yet — scan and ingest findings first"
             )
+        lines.append("")
+        try:
+            from services.findings import FindingStore
+
+            lines.append(
+                FindingStore().report_section(scope.get("engagement_id") or "")
+            )
+        except Exception:  # pragma: no cover - reporting must never fail
+            lines.append("## Finding ledger\n\nunavailable in this build\n")
+        if scope.get("engagement_id"):
+            try:
+                from services.attack_plan import AttackPathService
+
+                lines.append(AttackPathService().report_section(scope["engagement_id"]))
+            except Exception:  # pragma: no cover - reporting must never fail
+                lines.append(
+                    "## Attack paths & coverage\n\nunavailable in this build\n"
+                )
         lines.append("")
         lines.append(
             "> Generated for authorized lab use — verify every target was owned before citing it."
@@ -1374,6 +1409,35 @@ def neighbors_scan(background: BackgroundTasks) -> dict[str, Any]:
     return {"job_id": job_id, "status": "running"}
 
 
+def _local_cidr() -> str:
+    """The /24 around this container's first global IPv4 address.
+
+    Discovery used to be pinned to 192.168.1.0/24, which misses bridge
+    networks (172.x), VPNs and lab subnets. Deriving the subnet keeps the
+    button useful anywhere without asking the operator for a CIDR.
+    """
+    import ipaddress
+    import re
+    import subprocess
+
+    try:
+        proc = subprocess.run(  # nosec B603 B607 - fixed argv, no shell
+            ["ip", "-4", "-o", "addr", "show", "scope", "global"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        match = re.search(r"inet (\d+\.\d+\.\d+\.\d+/\d+)", proc.stdout)
+        if match:
+            net = ipaddress.ip_network(match.group(1), strict=False)
+            # A /16 bridge would be 65k ARP probes; /24 is the useful unit.
+            return str(ipaddress.ip_network(f"{net.network_address}/24", strict=False))
+    except Exception:  # pragma: no cover - platform fallback
+        pass
+    return "192.168.1.0/24"
+
+
 def _run_neighbor_discovery(job: dict[str, Any], msf: MsfClient) -> None:
     if job.get("status") == "queued":
         _update(job, status="running", message="discovering neighbors")
@@ -1381,7 +1445,7 @@ def _run_neighbor_discovery(job: dict[str, Any], msf: MsfClient) -> None:
         from services.discovery import NeighborFinder
 
         finder = NeighborFinder(msf)
-        default_cidr = "192.168.1.0/24"
+        default_cidr = _local_cidr()
 
         def _progress(msg: str, pct: float) -> None:
             _update(job, message=msg, progress=pct)
@@ -1485,6 +1549,7 @@ def neighbors_fingerprint(
     Accepts {"ip": "x.x.x.x"} to fingerprint a single host.
     """
     body = req or {}
+    full = bool(body.get("full"))
     ip_filter = (body.get("ip") or "").strip() or None
     if ip_filter:
         stored = _load_neighbor_hosts().get(ip_filter, {})
@@ -1510,11 +1575,13 @@ def neighbors_fingerprint(
     }
     _fingerprint_jobs[job_id] = job
     logger.info("[fingerprint %s] starting: %d host(s)", job_id, len(neighbor_hosts))
-    background.add_task(_run_fingerprint, job, list(neighbor_hosts.values()))
+    background.add_task(_run_fingerprint, job, list(neighbor_hosts.values()), full)
     return {"job_id": job_id, "status": "running"}
 
 
-def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> None:
+def _run_fingerprint(
+    job: dict[str, Any], neighbors: list[dict[str, Any]], full: bool = False
+) -> None:
     if job.get("status") == "queued":
         _update(job, status="running", message="fingerprint starting")
     logger.info("_run_fingerprint starting with %d neighbors", len(neighbors))
@@ -1537,6 +1604,11 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
         for i, ip in enumerate(ips):
             if job.get("status") == "abort_requested":
                 break
+            ports = (
+                "-p-"
+                if full
+                else "22,80,443,445,3389,8080,8443,21,23,25,53,110,143,3306,5432,5900,6379,9200"
+            )
             argv = [
                 "nmap",
                 "-sS",
@@ -1544,17 +1616,32 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
                 "-O",
                 "-T4",
                 "-Pn",
-                "-p",
-                "22,80,443,445,3389,8080,8443,21,23,25,53,110,143,3306,5432,5900,6379,9200",
+                ports if full else "-p",
+                *([] if full else [ports]),
                 "--max-retries",
                 "1",
                 "--host-timeout",
-                "30s",
+                "300s" if full else "30s",
                 "-oX",
                 "-",
                 ip,
             ]
-            result = runner.run_tool("nmap", argv, timeout=150)
+            result = runner.run_tool(
+                "nmap",
+                argv,
+                timeout=600 if full else 150,
+                internal=True,
+                full_output=True,
+            )
+            logger.info(
+                "[fp] %s full=%s status=%s rc=%s stdout=%d stderr=%s",
+                ip,
+                full,
+                result.get("status"),
+                result.get("rc"),
+                len(result.get("stdout") or ""),
+                (result.get("stderr") or "")[:160],
+            )
             parsed = (
                 _parse_nmap_xml(result["stdout"]) if result["status"] == "ok" else []
             )
@@ -1601,7 +1688,7 @@ def _run_fingerprint(job: dict[str, Any], neighbors: list[dict[str, Any]]) -> No
                 os_guess=entry.get("os"),
             )
             if services:
-                _save_neighbor_services(ip, services)
+                _save_neighbor_services(ip, services, complete=full)
 
         _tick(f"fingerprint complete — {len(all_results)} host(s) with open ports", 100)
         logger.info(
@@ -3110,6 +3197,47 @@ def nse_services() -> dict[str, Any]:
     return {"services": covered, "count": len(covered)}
 
 
+@router.get("/intel/formats")
+def intel_formats() -> dict[str, Any]:
+    """Accepted BYO intel shapes (no API keys involved)."""
+    return {
+        "sources": ["auto", "shodan", "censys", "generic"],
+        "notes": "paste your own Shodan/Censys export JSON; hosts outside the engagement scope are skipped",
+    }
+
+
+@router.post("/intel/import")
+def intel_import(body: dict[str, Any]) -> dict[str, Any]:
+    """Import operator-supplied Shodan/Censys JSON as engagement leads."""
+    from routers.engagement import get_store
+    from services.intel_import import ledger, normalize
+
+    engagement_id = str((body or {}).get("engagement_id") or "").strip()
+    if not engagement_id:
+        raise HTTPException(status_code=400, detail="engagement_id required")
+    store = get_store()
+    if not store.get_engagement(engagement_id):
+        raise HTTPException(status_code=404, detail="engagement not found")
+    try:
+        rows = normalize(
+            str((body or {}).get("source") or "auto"), (body or {}).get("data")
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not rows:
+        return {
+            "engagement_id": engagement_id,
+            "rows": 0,
+            "recorded": 0,
+            "skipped_out_of_scope": [],
+        }
+    try:
+        out = ledger(store, engagement_id, rows)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"engagement_id": engagement_id, **out}
+
+
 @router.post("/nikto", response_model=NiktoResult)
 def nikto_scan_api(req: NiktoRequest) -> NiktoResult:
     """Standalone nikto web scan (also runs inside deepattack/autopilot)."""
@@ -3808,6 +3936,78 @@ def run_shard_fuzz(req: ShardFuzzRequest) -> ShardFuzzResult:
     return ShardFuzzResult(**result)
 
 
+@router.get("/corpus")
+def corpus_list() -> dict[str, Any]:
+    """List the shared corpus (newest first)."""
+    from services.corpus import list_entries
+
+    return list_entries()
+
+
+@router.post("/corpus", response_model=CorpusEntry)
+def corpus_add(req: CorpusAddRequest) -> CorpusEntry:
+    """Add one seed (base64 bytes or text); identical bytes dedup."""
+    import base64 as b64lib
+
+    from services.corpus import add_entry
+
+    raw = req.data_b64 if req.data_b64 is not None else req.data
+    if raw is None or (isinstance(raw, str) and not raw):
+        raise HTTPException(status_code=400, detail="data_b64 or data required")
+    try:
+        data = (
+            b64lib.b64decode(raw, validate=True)
+            if req.data_b64 is not None
+            else str(raw).encode("utf-8")
+        )
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=f"bad data: {exc}") from exc
+    try:
+        return CorpusEntry(
+            **add_entry(data, name=req.name, source=req.source, tags=req.tags)
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/corpus/import")
+def corpus_import(req: CorpusImportRequest) -> dict[str, Any]:
+    """Import many seeds; per-item errors are reported, not fatal."""
+    from services.corpus import import_bytes_batch
+
+    if not req.items:
+        raise HTTPException(status_code=400, detail="items required")
+    return import_bytes_batch(req.items, source=req.source)
+
+
+@router.get("/corpus/{sha}")
+def corpus_get(sha: str) -> Any:
+    """Download one raw seed by SHA-256."""
+    from fastapi.responses import Response
+    from services.corpus import read_bytes
+
+    try:
+        data = read_bytes(sha)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if data is None:
+        raise HTTPException(status_code=404, detail="corpus entry not found")
+    return Response(content=data, media_type="application/octet-stream")
+
+
+@router.delete("/corpus/{sha}")
+def corpus_delete(sha: str) -> dict[str, Any]:
+    """Remove one seed and its sidecar."""
+    from services.corpus import delete_entry
+
+    try:
+        if not delete_entry(sha):
+            raise HTTPException(status_code=404, detail="corpus entry not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"deleted": sha}
+
+
 @router.get("/nuclei/templates")
 def nuclei_templates() -> dict[str, Any]:
     """The offline nuclei template bundle (no network fetch)."""
@@ -3979,33 +4179,62 @@ def firetv_recon(req: FireTVRequest) -> FireTVResult:
 @router.post("/firetv/mdns", response_model=FireTVResult)
 def firetv_mdns(req: FireTVRequest) -> FireTVResult:
     """Listen for Fire TV mDNS announcements (no target needed)."""
+    from services import sandbox as sandbox_mode
     from services.firetv import mdns_discover
+    from services.zeroconf_map import persist, sandbox_devices
 
-    out = mdns_discover(queries=req.queries)
+    if sandbox_mode.enabled():
+        devices = sandbox_devices("mdns")
+        out = {"success": True, "devices": devices, "sandbox": True}
+    else:
+        out = mdns_discover(queries=req.queries)
+    persisted: dict[str, Any] = {"recorded": 0, "skipped_out_of_scope": []}
+    if req.engagement_id and out.get("success"):
+        from routers.engagement import get_store
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        persisted = persist(store, req.engagement_id, out.get("devices", []), "mdns")
     ok = bool(out.get("success"))
     return FireTVResult(
         target="multicast",
         action="mdns",
         success=ok,
-        output=f"{len(out.get('devices', []))} device(s)",
-        detail=out,
+        output=f"{len(out.get('devices', []))} device(s), {persisted['recorded']} in ledger",
+        detail={**out, "ledger": persisted},
         error=None if ok else out.get("error"),
     )
 
 
 @router.post("/firetv/ssdp", response_model=FireTVResult)
-def firetv_ssdp() -> FireTVResult:
+def firetv_ssdp(req: FireTVRequest | None = None) -> FireTVResult:
     """UPnP/SSDP discovery sweep (no target needed)."""
+    from services import sandbox as sandbox_mode
     from services.firetv import ssdp_discover
+    from services.zeroconf_map import persist, sandbox_devices
 
-    out = ssdp_discover()
+    engagement_id = (req.engagement_id if req else None) or None
+    if sandbox_mode.enabled():
+        devices = sandbox_devices("ssdp")
+        out = {"success": True, "devices": devices, "sandbox": True}
+    else:
+        out = ssdp_discover()
+    persisted: dict[str, Any] = {"recorded": 0, "skipped_out_of_scope": []}
+    if engagement_id and out.get("success"):
+        from routers.engagement import get_store
+
+        store = get_store()
+        if not store.get_engagement(engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        persisted = persist(store, engagement_id, out.get("devices", []), "ssdp")
     ok = bool(out.get("success"))
     return FireTVResult(
         target="multicast",
         action="ssdp",
         success=ok,
-        output=f"{len(out.get('devices', []))} device(s)",
-        detail=out,
+        output=f"{len(out.get('devices', []))} device(s), {persisted['recorded']} in ledger",
+        detail={**out, "ledger": persisted},
         error=None if ok else out.get("error"),
     )
 
@@ -4659,7 +4888,9 @@ def _run_autopilot(
             "-",
             ip,
         ]
-        result = runner.run_tool("nmap", argv, timeout=15)
+        result = runner.run_tool(
+            "nmap", argv, timeout=15, internal=True, full_output=True
+        )
         parsed = _parse_nmap_xml(result["stdout"]) if result["status"] == "ok" else []
         entry = {}
         for entry in parsed:

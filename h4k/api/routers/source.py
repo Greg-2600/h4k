@@ -47,6 +47,7 @@ from schemas import (
 )
 from services import (
     ai as ai_service,
+    ai_budget,
     ingest,
     merged_report,
     rules as rules_service,
@@ -844,6 +845,17 @@ def _finding_from(req: SourceExploitRequest) -> sast.Finding:
         if rid == req.rule_id:
             return sast.Finding(rid, name, sev, cwe, "", 0, "", desc)
     return sast.Finding(req.rule_id, "Unknown", "info", "CWE-710", "", 0, "", "")
+
+
+@router.get("/ai/budget")
+def ai_budget_status(scope: str = "") -> dict[str, Any]:
+    """Per-scope AI call/token budget snapshot."""
+    return ai_budget.status(scope)
+
+
+@router.post("/ai/budget/reset")
+def ai_budget_reset(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    return ai_budget.reset(str((body or {}).get("scope") or ""))
 
 
 @router.get("/ai/models")

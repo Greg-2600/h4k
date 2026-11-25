@@ -11,6 +11,8 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from services import approval
+
 logger = logging.getLogger("h4k.toolkit")
 
 # web content wordlist (dirb ships a 'common' list; gobuster/ffuf use it)
@@ -98,7 +100,15 @@ class ToolkitRunner:
         """Return list of tools from the given list that are not available."""
         return [t for t in tools if t not in self._available_tools]
 
-    def run_tool(self, tool: str, argv: list[str], timeout: int = 300) -> dict:
+    def run_tool(
+        self,
+        tool: str,
+        argv: list[str],
+        timeout: int = 300,
+        approval_id: str = "",
+        internal: bool = False,
+        full_output: bool = False,
+    ) -> dict:
         """Run an external tool.
 
         Returns {tool, stdout, stderr, rc, elapsed, timed_out, status}. On a
@@ -129,6 +139,40 @@ class ToolkitRunner:
                 "timed_out": False,
                 "status": "sandbox",
             }
+        # Internal, h4k-constructed probes (fingerprinting, NSE suggestions)
+        # are not operator-supplied commands and must not need an approval id;
+        # the gate exists for user-requested toolkit runs.
+        try:
+            if not internal:
+                approval.ApprovalStore().check(
+                    [str(a) for a in argv],
+                    tool=tool,
+                    approval_id=approval_id,
+                    context={"toolkit": tool, "timeout": timeout},
+                )
+        except approval.ApprovalRequired as exc:
+            return {
+                "tool": tool,
+                "stdout": "",
+                "stderr": str(exc),
+                "rc": -1,
+                "elapsed": round(time.time() - started, 2),
+                "timed_out": False,
+                "status": "approval_required",
+                "approval_id": exc.request_id,
+                "approval": exc.decision,
+            }
+        except approval.ApprovalDenied as exc:
+            return {
+                "tool": tool,
+                "stdout": "",
+                "stderr": str(exc),
+                "rc": -1,
+                "elapsed": round(time.time() - started, 2),
+                "timed_out": False,
+                "status": "denied",
+                "approval": exc.decision,
+            }
         try:
             proc = subprocess.run(  # nosec B603 B607 - fixed argv, no shell
                 argv,
@@ -139,7 +183,11 @@ class ToolkitRunner:
             )
             return {
                 "tool": tool,
-                "stdout": (proc.stdout or "")[-4000:],
+                # XML consumers (nmap -oX) need the whole document; the
+                # 4k tail cap is only for human-facing tool output.
+                "stdout": (
+                    (proc.stdout or "") if full_output else (proc.stdout or "")[-4000:]
+                ),
                 "stderr": (proc.stderr or "")[-2000:],
                 "rc": proc.returncode,
                 "elapsed": round(time.time() - started, 2),

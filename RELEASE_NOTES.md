@@ -832,6 +832,18 @@ With `engagement_id` the findings ledger as vulns on the URL host
 (labeled host for offline audits; scope-enforced; CWE-287). Web card
 JWT row + palette; sandbox fully canned.
 
+## Backlog #51 — corpus sync
+
+`GET|POST /api/corpus`, `POST /api/corpus/import` and
+`GET|DELETE /api/corpus/{sha}` expose one content-addressed seed
+store under `<data_dir>/corpus`, so every fuzz run (and the operator)
+shares the same seeds across restarts: identical bytes dedup with tag
+merge, 1 MiB per entry, 500 entries with oldest-evict, strict SHA
+validation, and per-item error reporting on batch import.
+`H4K_DATA_DIR`-aware, so tests stay hermetic with zero sandbox
+special-casing. Fuzz-lab Share-seed row (text or `base64:` bytes) +
+Corpus list + palette.
+
 ## Backlog #42 — cloud metadata SSRF pack
 
 `POST /api/ssrf/probe` substitutes a 10-payload metadata pack (AWS,
@@ -902,6 +914,25 @@ expiry (expired high, <30 days medium), self-signed certs and weak
 protocol/ciphers per host, ledgering each lead as a vuln with
 `engagement_id` (scope-enforced). TLS card inventory row takes a
 comma-separated list. Sandbox returns canned hosts.
+
+## Backlog #19 — mDNS/SSDP persistent map
+
+Sweep results used to die with the response. `services/zeroconf_map.py`
+normalizes mDNS/SSDP devices into assets and records the in-scope ones
+(VLAN printers, TVs, speakers included) so scans, the graph and the
+timeline all see the fleet; out-of-scope addresses are reported, never
+stored. Both endpoints take `engagement_id` and serve canned devices in
+sandbox. Fire TV card sweep buttons.
+
+## Backlog #21 — Shodan/Censys BYO import
+
+No API keys live in this repo, so there is no live Shodan/Censys client.
+`POST /api/intel/import` takes JSON the operator already exported from
+their own account — Shodan host objects (ports, product, `vulns` map),
+Censys hosts (services list), both search envelopes, or a minimal
+generic row — and ledgers assets, services and CVE leads scope-checked
+(out-of-scope reported, never stored). Recon card with source picker +
+JSON textarea; `GET /api/intel/formats` documents the accepted shapes.
 
 ## Backlog #18 — IPv6 discovery
 

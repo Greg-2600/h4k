@@ -86,9 +86,9 @@ def test_html_tags_are_balanced():
 
 
 def test_the_workspace_nav_is_present():
-    """Six kill-chain phases, operator order: Discover → Recon → Exploit → Pivot → Persist → Score."""
+    """Kill-chain phases plus the Operations workspace, in operator order."""
     html = _html()
-    names = ("discover", "recon", "exploit", "pivot", "persist", "score")
+    names = ("discover", "recon", "exploit", "pivot", "persist", "score", "ops")
     for name in names:
         assert f'data-tab="{name}"' in html, f"workspace {name} missing"
     nav = set(re.findall(r'class="ws-btn[^"]*"[^>]*data-tab="([^"]+)"', html))
@@ -293,3 +293,34 @@ def test_responsive_breakpoints_exist():
         "@media (max-width: 640px)",
     ):
         assert needle in css, f"missing breakpoint {needle}"
+
+
+def test_operations_are_native():
+    """No iframe: the Operations panes live in the same document."""
+    html = _html()
+    assert "<iframe" not in html, "Operations must not embed a second UI"
+    for pane in ("labs", "ad", "telemetry", "nightly", "report", "settings"):
+        assert f'data-ops-pane="{pane}"' in html, f"missing pane {pane}"
+    assert 'id="findings-card"' in html
+    assert 'id="approvals-card"' in html
+    assert 'id="paths-card"' in html
+    assert 'id="btn-ops-session-report"' in html
+
+
+def test_operations_inputs_are_labelled():
+    """Every interactive Operations control has an accessible name."""
+    html = _html()
+    for ident in (
+        "lt-target",
+        "lt-count",
+        "iot-host",
+        "ad-dc",
+        "ad-domain",
+        "nt-cron",
+        "fl-title",
+        "key-name",
+        "noise-profile",
+    ):
+        tag = re.search(rf'<\w+[^>]*id="{ident}"[^>]*>', html)
+        assert tag, f"missing {ident}"
+        assert "aria-label=" in tag.group(0) or "<label" in html, ident

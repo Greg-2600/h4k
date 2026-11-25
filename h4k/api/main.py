@@ -16,15 +16,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from routers import (
+    ad as ad_router,
+    approvals as approvals_router,
+    auth as auth_router,
+    automation as automation_router,
+    bloodhound as bloodhound_router,
     engagement as engagement_router,
+    findings as findings_router,
+    lab as lab_router,
     net as net_router,
+    noise as noise_router,
+    sandbox as sandbox_router,
     scan as scan_router,
     source as source_router,
+    telemetry as telemetry_router,
     update as update_router,
 )
+from services import auth as auth_service
 
 # ---------------------------------------------------------------------------
 # Logging: everything goes to stdout (container logs) with timestamps and the
@@ -42,43 +53,6 @@ logging.basicConfig(
 for _noisy in ("urllib3", "httpx"):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 log = logging.getLogger("h4k")
-
-# ---------------------------------------------------------------------------
-# API-key authentication (optional, env-gated)
-# ---------------------------------------------------------------------------
-# When H4K_API_KEY is set, every API request must carry X-API-Key: <key>.
-# When it is unset, authentication is off (solo-operator / test default).
-
-
-async def _auth_middleware(
-    request: Request, call_next: Callable[[Request], Awaitable[Response]]
-) -> Response:
-    from services.auth import api_key as _api_key, is_exempt as _is_exempt
-
-    key = _api_key()
-    if key is None:
-        # auth disabled -- nothing to check
-        return await call_next(request)
-
-    path = request.url.path
-    if _is_exempt(path):
-        return await call_next(request)
-
-    supplied = request.headers.get("x-api-key")
-    if supplied != key:
-        # constant-time comparison to avoid timing leaks
-        from hmac import compare_digest
-
-        if not (supplied is not None and compare_digest(supplied, key)):
-            from fastapi.responses import JSONResponse
-
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "missing or invalid API key (X-API-Key header)"},
-                headers={"WWW-Authenticate": "ApiKey"},
-            )
-    return await call_next(request)
-
 
 # ---------------------------------------------------------------------------
 # Rate limiting middleware (in-memory, per-IP sliding window)
@@ -108,45 +82,165 @@ class _RateLimitStore:
 
 
 _rate_store: _RateLimitStore | None = None
+_auth_limiter: auth_service.RateLimiter | None = None
+_AUTH_CONFIG: auth_service.AuthConfig | None = None
+_AUTH_ENV: tuple[str, ...] = ()
+
+_AUTH_ENV_KEYS = (
+    "H4K_AUTH_ENABLED",
+    "H4K_API_KEYS",
+    "H4K_API_KEYS_FILE",
+    "H4K_API_KEY",
+    "H4K_SESSION_SECRET",
+    "H4K_SESSION_TTL",
+    "H4K_RATE_LIMIT_ANON",
+    "H4K_RATE_LIMIT_AUTHED",
+    "H4K_RATE_LIMIT_OPERATOR",
+    "H4K_RATE_LIMIT_WINDOW",
+    "H4K_OIDC_ISSUER",
+    "H4K_OIDC_CLIENT_ID",
+    "H4K_OIDC_CLIENT_SECRET",
+    "H4K_OIDC_SCOPES",
+    "H4K_OIDC_REDIRECT_URI",
+    "H4K_OIDC_ROLE_CLAIM",
+    "H4K_OIDC_ADMIN_ROLE",
+    "H4K_OIDC_OPERATOR_ROLE",
+    "H4K_OIDC_VERIFY_TLS",
+)
 
 
-async def _rate_limit_middleware(
-    request: Request, call_next: Callable[[Request], Awaitable[Response]]
-) -> Response:
-    global _rate_store
-    if _rate_store is None:
-        _rate_store = _RateLimitStore()
+def _auth_config() -> auth_service.AuthConfig:
+    """Load auth config once per distinct environment (tests flip env vars)."""
+    global _AUTH_CONFIG, _AUTH_ENV
+    fingerprint = tuple(os.environ.get(key, "") for key in _AUTH_ENV_KEYS)
+    if _AUTH_CONFIG is None or fingerprint != _AUTH_ENV:
+        _AUTH_CONFIG = auth_service.load_config()
+        _AUTH_ENV = fingerprint
+    return _AUTH_CONFIG
 
-    # Skip rate limiting for static assets and Swagger docs
-    path = request.url.path
-    if path.startswith("/static") or path in ("/docs", "/redoc", "/openapi.json"):
-        return await call_next(request)
 
-    # Use X-Forwarded-For if behind a proxy, else client IP
+def reset_auth_cache() -> None:
+    """Drop cached auth config (tests/env reloads)."""
+    global _AUTH_CONFIG, _auth_limiter, _rate_store
+    _AUTH_CONFIG = None
+    _auth_limiter = None
+    _rate_store = None
+
+
+def _client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
-    ip = (
+    return (
         forwarded.split(",")[0].strip()
         if forwarded
         else (request.client.host if request.client else "127.0.0.1")
     )
+
+
+def _rate_limited(config: auth_service.AuthConfig, request: Request) -> Response | None:
+    """Apply the right budget for the caller. Returns a 429 or None."""
+    global _rate_store, _auth_limiter
+    path = request.url.path
+    if path.startswith("/static") or path in ("/docs", "/redoc", "/openapi.json"):
+        return None
+    ip = _client_ip(request)
     ip_key = hashlib.sha256(ip.encode()).hexdigest()[:16]
 
-    if not _rate_store.is_allowed(ip_key):
-        # raise HTTPException from raw-ASGI context is NOT rendered by FastAPI's
-        # exception handlers — clients would get a bare 500 — so return the
-        # 429 response directly
+    if not config.enabled:
+        # Backwards-compatible single-operator behaviour: one IP budget.
+        if _rate_store is None:
+            _rate_store = _RateLimitStore()
+        if not _rate_store.is_allowed(ip_key):
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": f"Rate limit exceeded: {_RATE_LIMIT} req/min. Retry after 60s."
+                },
+                headers={
+                    "Retry-After": "60",
+                    "X-RateLimit-Limit": str(_RATE_LIMIT),
+                },
+            )
+        return None
+
+    principal = getattr(request.state, "principal", None)
+    if _auth_limiter is None:
+        _auth_limiter = auth_service.RateLimiter(config.rate_window)
+    bucket = (
+        f"{principal.method}:{principal.subject}"
+        if principal and principal.method != "anonymous"
+        else f"ip:{ip_key}"
+    )
+    decision = _auth_limiter.check(bucket, config.limit_for(principal))
+    if not decision.allowed:
         from fastapi.responses import JSONResponse
 
         return JSONResponse(
             status_code=429,
             content={
-                "detail": f"Rate limit exceeded: {_RATE_LIMIT} req/min. Retry after 60s."
+                "detail": (
+                    f"Rate limit exceeded: {decision.limit} requests per "
+                    f"{int(decision.window)}s."
+                ),
+                "rate_limit": decision.limit,
+                "retry_after": decision.reset_seconds,
             },
-            headers={"Retry-After": "60", "X-RateLimit-Limit": str(_RATE_LIMIT)},
+            headers={
+                "Retry-After": str(decision.reset_seconds),
+                **decision.headers(),
+            },
+        )
+    request.state.rate_decision = decision
+    return None
+
+
+async def _rate_limit_middleware(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Authenticate, authorize, then rate-limit every request.
+
+    With H4K_AUTH_ENABLED unset this is exactly the old per-IP limiter. With
+    auth enabled, a valid API key or OIDC session is required for protected
+    routes, the role is checked against the route class, and the budget follows
+    the principal rather than the network address.
+    """
+    config = _auth_config()
+    if config.enabled:
+        try:
+            principal = auth_service.principal_from_request(request, config)
+            auth_service.enforce(principal, request.method, request.url.path)
+        except auth_service.AuthError as exc:
+            from fastapi.responses import JSONResponse
+
+            headers = {"WWW-Authenticate": exc.challenge or "Bearer"}
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"detail": exc.detail},
+                headers=headers,
+            )
+        request.state.principal = principal
+    else:
+        request.state.principal = auth_service.Principal(
+            subject="anonymous", role="admin", method="disabled"
         )
 
+    limited = _rate_limited(config, request)
+    if limited is not None:
+        return limited
+
     response = await call_next(request)
-    response.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
+    decision = getattr(request.state, "rate_decision", None)
+    if decision is not None:
+        for name, value in decision.headers().items():
+            response.headers[name] = value
+    else:
+        limit = (
+            _RATE_LIMIT
+            if not config.enabled
+            else config.limit_for(request.state.principal)
+        )
+        response.headers["X-RateLimit-Limit"] = str(limit)
     return response
 
 
@@ -333,7 +427,6 @@ All aggressive operations (`do_attack`, `try_default_creds`, toolkit endpoints) 
 )
 
 # Authentication first, then rate limiting.
-app.middleware("http")(_auth_middleware)
 app.middleware("http")(_rate_limit_middleware)
 
 # ---------------------------------------------------------------------------
@@ -362,6 +455,16 @@ app.include_router(source_router.router, tags=["source"])
 app.include_router(update_router.router, tags=["update"])
 app.include_router(net_router.router, tags=["net"])
 app.include_router(engagement_router.router, tags=["engagement"])
+app.include_router(auth_router.router, tags=["auth"])
+app.include_router(approvals_router.router, tags=["approvals"])
+app.include_router(sandbox_router.router, tags=["sandbox"])
+app.include_router(lab_router.router, tags=["lab"])
+app.include_router(ad_router.router, tags=["ad"])
+app.include_router(bloodhound_router.router, tags=["bloodhound"])
+app.include_router(telemetry_router.router, tags=["telemetry"])
+app.include_router(findings_router.router, tags=["findings"])
+app.include_router(automation_router.router, tags=["automation"])
+app.include_router(noise_router.router, tags=["noise"])
 
 # Serve the plain HTML/JS frontend.
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
@@ -370,6 +473,12 @@ app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 @app.get("/", include_in_schema=False)
 async def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
+
+
+@app.get("/ops", include_in_schema=False)
+async def ops_page() -> Response:
+    """Legacy console URL. The console is now native in the dashboard."""
+    return RedirectResponse(url="/?tab=ops", status_code=307)
 
 
 @app.get("/api", include_in_schema=False)

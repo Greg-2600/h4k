@@ -32,7 +32,7 @@ HACKING/                 git root
   AGENTS.md              this file — read me first
   h4k/                   the main platform image
     Dockerfile           debian12 + postgres + tor + metasploit + offensive tools
-    docker-compose.yml   h4k + vulnlab (AI provider is env-configured)
+    docker-compose.yml   h4k + vulnlab + sidecar profiles on h4k-net
     entrypoint.sh        boot: postgres -> msfdb -> tor -> msfrpcd -> uvicorn
     api/                 FastAPI app
       main.py            app + lifespan (starts periodic updater)
@@ -40,7 +40,8 @@ HACKING/                 git root
       routers/           scan.py, source.py, update.py, net.py, engagement.py
       services/          ~30 modules (see below)
     data/                cves.json, creds.json, wordlists, custom_rules.json (runtime)
-    web/                 light dashboard UI (index.html, app.js, style.css)
+    web/                 dashboard + native Operations panes
+                         (index.html, app.js, style.css)
     scripts/             DNS recon bash tools
     README.md            main human doc (PHRACK-style)
   vulnlab/               intentionally-vulnerable fuzzing TARGET (separate container)
@@ -77,6 +78,10 @@ cd vulnlab && docker build -t vulnlab . && \
 cd h4k/api && H4K_SANDBOX=1 H4K_DATA_DIR=/tmp/h4k-demo \
   python3 -m uvicorn main:app --port 3137
 ```
+
+**Operations workspace:** `/` → **Operations** tab (labs, AD, telemetry,
+nightly, report/findings/approvals/paths, settings). Fuzz lives in Exploit.
+`/ops` redirects to `/?tab=ops`; the UI is native (no iframe, no second document).
 
 **Important:** after `docker build -t h4k .`, you must `docker run` (or `compose
 up`) to start the container — building alone does not leave it running. The API
@@ -117,15 +122,17 @@ Host recon/scan:
 - `POST /api/fuzz/shard` (N workers, merged registry)
 - `POST /api/rate_fuzz` (polite throttle probe + ledger)
 - `POST /api/stateful_fuzz` (login → authed-flow fuzz + ledger)
+- `GET|POST /api/corpus`, `POST /api/corpus/import`, `GET|DELETE /api/corpus/{sha}` (shared seed store)
 - `POST /container_surfaces` (read-only), `POST /container_fuzz` + `GET /container_fuzz/{id}` (surface fuzz jobs)
 - `GET|POST /api/fuzz-profiles`, `DELETE /api/fuzz-profiles/{name}` (auth presets; values never listed)
 
 CTF / lab toolkit (opt-in, each explicit):
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
-- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `POST /nikto`, `POST /ssrf/probe` (metadata SSRF pack + ledger), `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /jwt/test` (JWT audit + alg-confusion + ledger), `POST /kubelet/audit` (read-only kubelet exposure audit + ledger), `POST /rbac/audit` (offline K8s RBAC audit + ledger), `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
+- `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `GET /api/intel/formats` + `POST /api/intel/import` (BYO Shodan/Censys JSON, no keys), `POST /nikto`, `POST /ssrf/probe` (metadata SSRF pack + ledger), `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /jwt/test` (JWT audit + alg-confusion + ledger), `POST /kubelet/audit` (read-only kubelet exposure audit + ledger), `POST /rbac/audit` (offline K8s RBAC audit + ledger), `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /kerberos/asrep`, `POST /kerberos/kerberoast` (explicit roast, optional John crack)
 - `POST /firetv/*` (recon, mdns, ssdp, connect, pair, state, shell, keyevent,
-  apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb)
+  apps, pull, screenshot, logcat, install, disconnect — Fire TV / Android TV via adb;
+  mdns/ssdp sweeps persist in-scope hosts as assets with `engagement_id`)
 - `POST /tryLocalRoot_go_bro` (one-shot local-root assessment: userns +
   docker-group tries + host audit, read-only, no password)
 - `POST /api/privesc/suggest` (10-check read-only checklist, sandbox canned)
@@ -210,6 +217,7 @@ Health/diagnostic:
 | `stateful_fuzz.py` | login → authed-flow fuzz with session harvest + ledger |
 | `sanitizer_diff.py` | pasted-report ASan/UBSan/MSan coverage compare + one confirming rebuild |
 | `jwt_tester.py` | offline JWT audit + capped HMAC crack + live alg-confusion vs marker, ledgered, sandbox canned |
+| `corpus.py` | persistent content-addressed shared seed store (dedup, caps, sidecars) |
 | `ssrf_pack.py` | opt-in metadata SSRF probe pack (AWS/GCP/Azure + encoding bypasses) + scope-enforced ledger, sandbox canned |
 | `sca.py` | SBOM (trivy) + osv-scanner SCA + scan_secrets + scan_licenses |
 | `triage.py` | crash -> bug-class/CWE/patch-direction/minimize |
@@ -225,7 +233,9 @@ Health/diagnostic:
 | `privesc_suggest.py` | read-only linPEAS-style checklist (10 checks, pass/fail + fix hints, sandbox canned) |
 | `kev.py` | KEV/EPSS enrichment from a real stamped snapshot + best-effort live refresh |
 | `cert_inventory.py` | TLS cert inventory across hosts (expiry/self-signed/weak, scope-enforced vuln ledger, sandbox canned) |
+| `intel_import.py` | BYO Shodan/Censys JSON normalize → scope-checked asset/vuln ledger (no keys) |
 | `ipv6_discovery.py` | IPv6 NDP table + explicit-CIDR nmap -6 sweep, scope-enforced asset ledger, sandbox canned |
+| `zeroconf_map.py` | mDNS/SSDP sweep normalization + scope-enforced asset ledger, sandbox canned |
 | `tls_fingerprint.py` | active TLS handshake inventory (version/cipher/cert) + exact-match watchlist + heuristic C2 leads, sandbox stand-in |
 | `pdf_report.py` | one-click assessment PDF: reportlab render of the session report (passwords masked) |
 | `loot_vault.py` | masked loot vault: verified creds + flags + shares, redaction + masked md/json export |
@@ -241,6 +251,8 @@ Health/diagnostic:
 | `attack_paths.py` | crown jewels -> scored, evidence-backed attack paths |
 | `flag_paths.py` | foothold -> captured-flag chains (one objective per flag host) |
 | `attck.py` | MITRE ATT&CK technique mapping + defender detection guidance |
+| `sandbox_exec.py` | allowlisted tool execution with rlimits (sidecar-aware) |
+| `attack_plan.py` | objective paths, verified-access edges, coverage gaps |
 | `sandbox.py` | deterministic offline stand-ins for nmap/hydra/Metasploit (demo + CI) |
 | `zap.py` | OWASP ZAP headless web-app scanner via REST |
 | `john.py` | John the Ripper hash cracking (multi-format CTF flow) |
@@ -328,6 +340,17 @@ Full documentation in `docs/` (see `docs/index.md`).
   `neighbors.db` and `engagements.db`). Tests and E2E use a temp dir.
 - **nmap XML parsing splits on `"<host "`** — a canned XML must include
   attributes on the `<host>` element or the parser sees no hosts.
+
+## Convergence notes
+
+- `services/sandbox.py` is origin's deterministic lab mode; `sandbox_exec.py`
+  is the tool executor that talks to the sandbox-runner sidecar.
+- Objectives live in `crown_jewels` with `kind`/`criticality`; the coverage
+  ledger is `coverage`. Old databases migrate on first open.
+- `H4K_API_KEY` still works and maps to an admin principal; the richer
+  `H4K_AUTH_ENABLED`/`H4K_API_KEYS`/OIDC path is the production surface.
+- Sidecars use service DNS (`sandbox-runner:9099`, `h4k:3137`,
+  `bloodhound:8080`, `172.30.0.10` for adlab), not 127.0.0.1.
 
 ## Git / workflow
 

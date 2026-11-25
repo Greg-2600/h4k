@@ -42,6 +42,7 @@
       <button class="ws-btn" data-tab="pivot" data-testid="nav-pivot">Pivot <span class="ws-count" id="ws-count-pivot"></span></button>
       <button class="ws-btn" data-tab="persist" data-testid="nav-persist">Persist <span class="ws-count" id="ws-count-persist"></span></button>
       <button class="ws-btn" data-tab="score" data-testid="nav-score">Score <span class="ws-count" id="ws-count-score"></span></button>
+      <button class="ws-btn" data-tab="ops" data-testid="nav-ops" title="Fuzzing, labs, AD, telemetry, nightly and reports">Operations</button>
     </nav>
 
     <main class="main">
@@ -185,6 +186,22 @@
               <span class="muted" id="smb-status" data-testid="smb-status"></span>
             </div>
             <div id="smb-body" data-testid="smb-body" class="muted">Null-session share inventory for one host you own.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Intel import</h2><span class="spacer"></span><span class="muted">your Shodan/Censys JSON, no keys · opt-in</span></div>
+          <div class="card-body">
+            <div class="row">
+              <select id="intel-source" data-testid="intel-source" title="Export format">
+                <option value="auto" selected>auto</option>
+                <option value="shodan">shodan</option>
+                <option value="censys">censys</option>
+                <option value="generic">generic</option>
+              </select>
+              <button class="btn primary" id="btn-intel-import" data-testid="btn-intel-import">Import</button>
+            </div>
+            <div class="row"><textarea id="intel-json" data-testid="intel-json" class="grow" rows="3" placeholder='[{"host": "10.0.0.5", "port": 22, "service": "ssh"}]'></textarea></div>
+            <div id="intel-body" data-testid="intel-body" class="muted">Paste export JSON — out-of-scope hosts are skipped, never stored.</div>
           </div>
         </div>
         <div class="card">
@@ -432,6 +449,14 @@
             </div>
             <textarea id="sandiff-report" data-testid="sandiff-report" rows="3" class="grow" placeholder="Paste sanitizer output (ASan/UBSan/MSan) — offline compare, nothing is rebuilt"></textarea>
             <div id="sandiff-body" data-testid="sandiff-body" class="muted">ASan vs UBSan vs MSan: who would catch it, blind spots, one confirming rebuild.</div>
+            <div class="row">
+              <input type="text" id="corpus-name" data-testid="corpus-name" value="seed" title="Seed name (content-addressed by hash)" />
+              <input type="text" id="corpus-text" data-testid="corpus-text" class="grow" placeholder="Seed bytes as text (or base64:…)" title="Prefix with base64: for raw bytes" />
+              <button class="btn" id="btn-corpus-add" data-testid="btn-corpus-add">Share seed</button>
+              <button class="btn" id="btn-corpus-list" data-testid="btn-corpus-list">Corpus</button>
+              <span class="muted" id="corpus-status" data-testid="corpus-status"></span>
+            </div>
+            <div class="output" id="corpus-output" data-testid="corpus-output" hidden></div>
           </div>
         </div>
       </section>
@@ -533,6 +558,8 @@
             </div>
             <div class="row">
               <button class="btn" id="btn-ftv-recon" data-testid="btn-ftv-recon">Recon</button>
+              <button class="btn" id="btn-ftv-mdns" data-testid="btn-ftv-mdns">mDNS sweep</button>
+              <button class="btn" id="btn-ftv-ssdp" data-testid="btn-ftv-ssdp">SSDP sweep</button>
               <button class="btn" id="btn-ftv-pair" data-testid="btn-ftv-pair">Pair</button>
               <button class="btn" id="btn-ftv-state" data-testid="btn-ftv-state">State</button>
               <button class="btn" id="btn-ftv-apps" data-testid="btn-ftv-apps">Apps</button>
@@ -638,6 +665,191 @@
         </div>
       </section>
 
+      <!-- OPERATIONS: phases that are not part of the kill chain -->
+      <section class="ws-panel" id="tab-ops" data-tab="ops">
+        <div class="card">
+          <div class="card-head"><h2>Operations</h2><span class="spacer"></span>
+            <div class="row" id="ops-phase-nav">
+              <button class="btn small active" data-ops-phase="labs">Labs</button>
+              <button class="btn small" data-ops-phase="ad">AD</button>
+              <button class="btn small" data-ops-phase="telemetry">Telemetry</button>
+              <button class="btn small" data-ops-phase="nightly">Nightly</button>
+              <button class="btn small" data-ops-phase="report">Report</button>
+              <button class="btn small" data-ops-phase="settings">Settings</button>
+            </div>
+          </div>
+          <div class="card-body">
+
+            <!-- LABS -->
+            <div class="ops-pane active" data-ops-pane="labs">
+              <div class="card inner-card">
+                <div class="card-head"><h2>Lab traffic</h2><span class="spacer"></span><span class="muted" id="lt-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <select id="lt-profile" aria-label="Traffic profile"></select>
+                    <input id="lt-target" class="grow" placeholder="lab target host" aria-label="Traffic target">
+                    <input id="lt-count" value="20" aria-label="Packets">
+                    <input id="lt-rate" value="2" aria-label="Rate per second">
+                    <label class="check-inline"><input type="checkbox" id="lt-public"> allow public</label>
+                    <button class="btn primary" id="btn-lt-start">Generate</button>
+                    <button class="btn" id="btn-lt-stop" hidden>Stop</button>
+                  </div>
+                  <pre class="ops-output" id="lt-output">Benign multi-protocol traffic for detector validation.</pre>
+                </div>
+              </div>
+              <div class="card inner-card">
+                <div class="card-head"><h2>IoT / OT probes</h2><span class="spacer"></span><span class="muted" id="iot-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="iot-host" class="grow" placeholder="device host" aria-label="IoT host">
+                    <select id="iot-protocol" aria-label="Protocol"></select>
+                    <input id="iot-port" placeholder="port" aria-label="Port">
+                    <button class="btn primary" id="btn-iot-probe">Probe</button>
+                    <button class="btn" id="btn-iot-discover">Discover</button>
+                  </div>
+                  <pre class="ops-output" id="iot-output">Read-only probes: MQTT, CoAP, Modbus, BACnet, SSDP, RTSP, SNMP.</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- AD -->
+            <div class="ops-pane" data-ops-pane="ad">
+              <div class="card inner-card">
+                <div class="card-head"><h2>Active Directory</h2><span class="spacer"></span><span class="muted" id="ad-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="ad-dc" class="grow" placeholder="DC IP / host" value="172.30.0.10" aria-label="Domain controller">
+                    <input id="ad-domain" placeholder="REALM" value="LAB.H4K" aria-label="Realm">
+                    <input id="ad-user" placeholder="username" value="Administrator" aria-label="Username">
+                    <input id="ad-pass" type="password" placeholder="password" aria-label="Password">
+                  </div>
+                  <div class="row">
+                    <button class="btn primary" id="btn-ad-policy">Read policy</button>
+                    <button class="btn" id="btn-ad-users">List users</button>
+                    <button class="btn" id="btn-ad-audit">Audit</button>
+                  </div>
+                  <pre class="ops-output" id="ad-output">Read-only by default: policy, users and hygiene audit.</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- TELEMETRY -->
+            <div class="ops-pane" data-ops-pane="telemetry">
+              <div class="card inner-card">
+                <div class="card-head"><h2>Telemetry</h2><span class="spacer"></span><span class="muted" id="tel-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <button class="btn primary" id="btn-tel-refresh">Refresh</button>
+                    <button class="btn" id="btn-tel-simulate">Simulate batch</button>
+                    <button class="btn danger" id="btn-tel-reset">Reset ledger</button>
+                  </div>
+                  <pre class="ops-output" id="tel-summary">No summary yet.</pre>
+                  <pre class="ops-output" id="tel-output"></pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- NIGHTLY -->
+            <div class="ops-pane" data-ops-pane="nightly">
+              <div class="card inner-card">
+                <div class="card-head"><h2>Nightly autopilot</h2><span class="spacer"></span><span class="muted" id="nt-status">idle</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="nt-name" placeholder="schedule name" aria-label="Schedule name">
+                    <input id="nt-cron" value="0 3 * * *" aria-label="Cron">
+                    <input id="nt-tz" value="UTC" aria-label="Timezone">
+                    <button class="btn primary" id="btn-nt-create">Add schedule</button>
+                    <button class="btn" id="btn-nt-refresh">Refresh</button>
+                  </div>
+                  <div class="tbl-wrap"><table class="tbl">
+                    <thead><tr><th>Name</th><th>Cron</th><th>Enabled</th><th></th></tr></thead>
+                    <tbody id="nt-tbody"></tbody>
+                  </table></div>
+                  <pre class="ops-output" id="nt-output"></pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- REPORT -->
+            <div class="ops-pane" data-ops-pane="report">
+              <div class="card inner-card" id="findings-card">
+                <div class="card-head"><h2>Findings ledger</h2><span class="spacer"></span><span class="muted" id="fl-summary">no engagement</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="fl-title" class="grow" placeholder="finding title" aria-label="Finding title">
+                    <select id="fl-severity" aria-label="Severity">
+                      <option>critical</option><option>high</option><option>medium</option><option>low</option><option>info</option>
+                    </select>
+                    <input id="fl-host" placeholder="host" aria-label="Finding host">
+                    <button class="btn primary" id="btn-fl-create">Add finding</button>
+                    <button class="btn" id="btn-fl-refresh">Refresh</button>
+                  </div>
+                  <div class="tbl-wrap"><table class="tbl">
+                    <thead><tr><th>Title</th><th>Host</th><th>Severity</th><th>Status</th></tr></thead>
+                    <tbody id="fl-tbody"></tbody>
+                  </table></div>
+                </div>
+              </div>
+              <div class="card inner-card" id="approvals-card">
+                <div class="card-head"><h2>Approvals</h2><span class="spacer"></span><span class="muted" id="appr-status">pending</span></div>
+                <div class="card-body">
+                  <div class="row"><button class="btn" id="btn-appr-refresh">Refresh</button></div>
+                  <div class="tbl-wrap"><table class="tbl">
+                    <thead><tr><th>Tool</th><th>Argv</th><th></th></tr></thead>
+                    <tbody id="appr-tbody"></tbody>
+                  </table></div>
+                </div>
+              </div>
+              <div class="card inner-card" id="paths-card">
+                <div class="card-head"><h2>Attack paths &amp; coverage</h2><span class="spacer"></span><span class="muted" id="paths-summary">no engagement</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <button class="btn primary" id="btn-paths-run">Evaluate paths</button>
+                    <button class="btn" id="btn-paths-md">Download paths .md</button>
+                    <button class="btn" id="btn-ops-session-report">Session report</button>
+                  </div>
+                  <div class="ops-output" id="paths-body"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SETTINGS -->
+            <div class="ops-pane" data-ops-pane="settings">
+              <div class="card inner-card">
+                <div class="card-head"><h2>API keys</h2><span class="spacer"></span><span class="muted" id="keys-status">auth optional</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <input id="key-name" placeholder="key name" aria-label="Key name">
+                    <select id="key-role" aria-label="Key role"><option>viewer</option><option>operator</option><option>admin</option></select>
+                    <button class="btn primary" id="btn-key-create">Create key</button>
+                    <button class="btn" id="btn-keys-refresh">Refresh</button>
+                  </div>
+                  <div class="tbl-wrap"><table class="tbl">
+                    <thead><tr><th>Name</th><th>Role</th><th></th></tr></thead>
+                    <tbody id="keys-tbody"></tbody>
+                  </table></div>
+                </div>
+              </div>
+              <div class="card inner-card">
+                <div class="card-head"><h2>Limits</h2><span class="spacer"></span><span class="muted" id="noise-status">off</span></div>
+                <div class="card-body">
+                  <div class="row">
+                    <select id="noise-profile" aria-label="Noise profile">
+                      <option value="off">off</option><option value="quiet">quiet</option>
+                      <option value="balanced">balanced</option><option value="aggressive">aggressive</option>
+                    </select>
+                    <button class="btn" id="btn-noise-set">Set profile</button>
+                    <button class="btn" id="btn-ai-budget-reset">Reset AI budget</button>
+                  </div>
+                  <pre class="ops-output" id="limits-output"></pre>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       <aside class="rail" id="ops-rail">
         <div class="card">
           <div class="card-head"><h2>Session</h2><span class="spacer"></span><span class="muted" id="rail-scope" data-testid="rail-scope">no scope</span></div>
@@ -648,6 +860,7 @@
           <div class="card-body"><div id="rail-log" data-testid="rail-log" class="output rail-log"></div></div>
         </div>
       </aside>
+
 
     </main>
 
@@ -672,6 +885,7 @@
         <div class="cmd-item" data-cmd="nuclei" data-tab="recon" data-btn="btn-nuclei"><span>Recon: nuclei CVE scan (offline bundle)</span></div>
         <div class="cmd-item" data-cmd="gobuster" data-tab="recon" data-btn="btn-gobuster"><span>Recon: gobuster content discovery</span></div>
         <div class="cmd-item" data-cmd="smb" data-tab="recon" data-btn="btn-smb-enum"><span>Recon: enumerate SMB shares (read-only)</span></div>
+        <div class="cmd-item" data-cmd="intel" data-tab="recon" data-btn="btn-intel-import"><span>Recon: intel import (BYO Shodan/Censys JSON)</span></div>
         <div class="cmd-item" data-cmd="spider" data-tab="recon" data-btn="btn-spider"><span>Recon: DAST spider crawl (same-origin + auth)</span></div>
         <div class="cmd-item" data-cmd="ssrfprobe" data-tab="recon" data-btn="btn-ssrf-probe"><span>Recon: SSRF metadata pack (opt-in)</span></div>
         <div class="cmd-item" data-cmd="jwttest" data-tab="recon" data-btn="btn-jwt-test"><span>Recon: JWT audit + alg-confusion</span></div>
@@ -679,6 +893,8 @@
         <div class="cmd-item" data-cmd="kev" data-tab="recon" data-btn="btn-kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls" data-tab="recon" data-btn="btn-tls-run"><span>Recon: TLS fingerprint + C2 leads</span></div>
         <div class="cmd-item" data-cmd="cfuzz" data-tab="exploit" data-btn="btn-cf-start"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="corpus" data-tab="exploit" data-btn="btn-corpus-list"><span>Exploit: shared fuzz corpus</span></div>
+        <div class="cmd-item" data-cmd="corpus-add" data-tab="exploit" data-btn="btn-corpus-add"><span>Exploit: share a fuzz seed</span></div>
         <div class="cmd-item" data-cmd="shardfuzz" data-tab="exploit" data-btn="btn-sh-start"><span>Exploit: shard fuzzing (N workers)</span></div>
         <div class="cmd-item" data-cmd="rateprobe" data-tab="exploit" data-btn="btn-rate-start"><span>Exploit: probe rate limits politely</span></div>
         <div class="cmd-item" data-cmd="stfuzz" data-tab="exploit" data-btn="btn-st-start"><span>Exploit: stateful login → fuzz</span></div>
@@ -718,6 +934,8 @@
         <div class="cmd-item" data-cmd="trylocalroot-run" data-tab="pivot" data-btn="btn-trylocalroot-run"><span>Pivot: tryLocalRoot_go_bro</span></div>
         <div class="cmd-item" data-cmd="privesc-suggest" data-tab="pivot" data-btn="btn-privesc-suggest"><span>Pivot: Checklist</span></div>
         <div class="cmd-item" data-cmd="ftv-recon" data-tab="pivot" data-btn="btn-ftv-recon"><span>Pivot: Recon</span></div>
+        <div class="cmd-item" data-cmd="ftv-mdns" data-tab="pivot" data-btn="btn-ftv-mdns"><span>Pivot: mDNS sweep</span></div>
+        <div class="cmd-item" data-cmd="ftv-ssdp" data-tab="pivot" data-btn="btn-ftv-ssdp"><span>Pivot: SSDP sweep</span></div>
         <div class="cmd-item" data-cmd="ftv-pair" data-tab="pivot" data-btn="btn-ftv-pair"><span>Pivot: Pair</span></div>
         <div class="cmd-item" data-cmd="ftv-state" data-tab="pivot" data-btn="btn-ftv-state"><span>Pivot: State</span></div>
         <div class="cmd-item" data-cmd="ftv-apps" data-tab="pivot" data-btn="btn-ftv-apps"><span>Pivot: Apps</span></div>
@@ -739,6 +957,28 @@
         <div class="cmd-item" data-cmd="handoff-layer" data-tab="score" data-btn="btn-handoff-layer"><span>Score: Layer</span></div>
         <div class="cmd-item" data-cmd="handoff-sigma" data-tab="score" data-btn="btn-handoff-sigma"><span>Score: Sigma</span></div>
         <div class="cmd-item" data-cmd="handoff-summary" data-tab="score" data-btn="btn-handoff-summary"><span>Score: Writeup</span></div>
+        <div class="cmd-item" data-cmd="ops-traffic" data-tab="ops" data-btn="btn-lt-start"><span>Operations: generate lab traffic</span></div>
+        <div class="cmd-item" data-cmd="ops-iot" data-tab="ops" data-btn="btn-iot-probe"><span>Operations: probe IoT device</span></div>
+        <div class="cmd-item" data-cmd="ops-ad-policy" data-tab="ops" data-btn="btn-ad-policy"><span>Operations: read AD policy</span></div>
+        <div class="cmd-item" data-cmd="ops-ad-users" data-tab="ops" data-btn="btn-ad-users"><span>Operations: list AD users</span></div>
+        <div class="cmd-item" data-cmd="ops-ad-audit" data-tab="ops" data-btn="btn-ad-audit"><span>Operations: audit AD</span></div>
+        <div class="cmd-item" data-cmd="ops-tel-refresh" data-tab="ops" data-btn="btn-tel-refresh"><span>Operations: telemetry summary</span></div>
+        <div class="cmd-item" data-cmd="ops-tel-sim" data-tab="ops" data-btn="btn-tel-simulate"><span>Operations: simulate telemetry</span></div>
+        <div class="cmd-item" data-cmd="ops-nightly" data-tab="ops" data-btn="btn-nt-create"><span>Operations: add nightly schedule</span></div>
+        <div class="cmd-item" data-cmd="ops-finding" data-tab="ops" data-btn="btn-fl-create"><span>Operations: add finding</span></div>
+        <div class="cmd-item" data-cmd="ops-paths" data-tab="ops" data-btn="btn-paths-run"><span>Operations: evaluate attack paths</span></div>
+        <div class="cmd-item" data-cmd="ops-paths-md" data-tab="ops" data-btn="btn-paths-md"><span>Operations: download paths</span></div>
+        <div class="cmd-item" data-cmd="ops-report" data-tab="ops" data-btn="btn-ops-session-report"><span>Operations: session report</span></div>
+        <div class="cmd-item" data-cmd="ops-key" data-tab="ops" data-btn="btn-key-create"><span>Operations: create API key</span></div>
+        <div class="cmd-item" data-cmd="ops-noise" data-tab="ops" data-btn="btn-noise-set"><span>Operations: set noise profile</span></div>
+        <div class="cmd-item" data-cmd="ops-traffic-stop" data-tab="ops" data-btn="btn-lt-stop"><span>Operations: stop lab traffic</span></div>
+        <div class="cmd-item" data-cmd="ops-iot-disc" data-tab="ops" data-btn="btn-iot-discover"><span>Operations: discover IoT devices</span></div>
+        <div class="cmd-item" data-cmd="ops-tel-reset" data-tab="ops" data-btn="btn-tel-reset"><span>Operations: reset telemetry</span></div>
+        <div class="cmd-item" data-cmd="ops-nt-refresh" data-tab="ops" data-btn="btn-nt-refresh"><span>Operations: refresh schedules</span></div>
+        <div class="cmd-item" data-cmd="ops-fl-refresh" data-tab="ops" data-btn="btn-fl-refresh"><span>Operations: refresh findings</span></div>
+        <div class="cmd-item" data-cmd="ops-appr-refresh" data-tab="ops" data-btn="btn-appr-refresh"><span>Operations: refresh approvals</span></div>
+        <div class="cmd-item" data-cmd="ops-keys-refresh" data-tab="ops" data-btn="btn-keys-refresh"><span>Operations: refresh API keys</span></div>
+        <div class="cmd-item" data-cmd="ops-budget" data-tab="ops" data-btn="btn-ai-budget-reset"><span>Operations: reset AI budget</span></div>
         <div class="cmd-item" data-cmd="session-report" data-tab="score" data-btn="btn-session-report"><span>Score: Download MD</span></div>
         <div class="cmd-item" data-cmd="session-pdf" data-tab="score" data-btn="btn-session-pdf"><span>Score: Download PDF</span></div>
         <div class="cmd-item" data-cmd="sarif-import" data-tab="score" data-btn="btn-sarif-import"><span>Score: Import SARIF</span></div>

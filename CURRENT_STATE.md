@@ -1,6 +1,6 @@
 # h4k — current project state (read this first in a new session)
 
-> Last updated: 2026-11-04 · branch `main` on `git` (public, CI green)
+> Last updated: 2026-11-21 · branch `sync/converge` (origin/main + the local feature set)
 
 This file is a **snapshot of the live project** so a fresh session can pick up
 immediately: what's running, what's committed, how to bring it up, and what's on
@@ -12,11 +12,11 @@ the immediate horizon.
 
 | Item | Status |
 |---|---|
-| Git branch | `main` |
-| Tests | **1367 passing** (offline, mocked Metasploit) + 32 e2e + live-target flow |
+| Git branch | `sync/converge` (converged; promote to `main` when pushed) |
+| Tests | **1806 passing**, 3 skipped, 3 macOS-only env failures (Linux CI green) |
 | Coverage | **~90%** (CI gate 90%) |
-| Linters | black · ruff · isort · flake8 · mypy · bandit all green · pylint ~9.88 |
-| Container | **`h4k`** running, host-networking, UI on `http://127.0.0.1:3137` |
+| Linters | black · ruff · mypy green |
+| Container | **`h4k`** on the `h4k-net` bridge, UI `http://127.0.0.1:3137` (single native page; Operations tab) |
 | Local LLM | Ollama reachable at `127.0.0.1:11434` (30 models); default `qwen2.5:latest` |
 | Branch protection | ruleset `main protection`: PR required + `lint-test` + `e2e` green, no force-push |
 | Dependabot | queue clear (actions bumps merged; lodash fixture ignored; debian 13 deferred) |
@@ -25,6 +25,9 @@ the immediate horizon.
 **The most common gotcha:** `docker build` does **not** leave the container
 running — you must `docker run` (or `docker compose up`). If the UI is unreachable,
 just restart the container (see §3).
+
+The converged tree runs the sidecars as service-DNS peers (sandbox-runner,
+iotlab, telemetry-agent, adlab, BloodHound) instead of host-network processes.
 
 ---
 

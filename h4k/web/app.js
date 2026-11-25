@@ -21,7 +21,7 @@ const state = {
   statusTimer: null,
 };
 
-const TABS = ['discover', 'recon', 'exploit', 'pivot', 'persist', 'score'];
+const TABS = ['discover', 'recon', 'exploit', 'pivot', 'persist', 'score', 'ops'];
 
 /* ---------- http ---------- */
 
@@ -82,7 +82,36 @@ function setTab(tab) {
   if (tab === 'pivot') { loadShells(); loadCredLedger(); }
   if (tab === 'persist') renderPersist();
   if (tab === 'score') { refreshFlags(); renderReportPreview(); refreshWatch(); refreshHandoff(); }
+  if (tab === 'ops') setOpsPhase(state.opsPhase || 'labs');
 }
+
+const OPS_PHASES = ['labs', 'ad', 'telemetry', 'nightly', 'report', 'settings'];
+const opsLoaded = {};
+
+function setOpsPhase(phase) {
+  if (!OPS_PHASES.includes(phase)) phase = 'labs';
+  state.opsPhase = phase;
+  document.querySelectorAll('.ops-pane').forEach((pane) => {
+    pane.classList.toggle('active', pane.dataset.opsPane === phase);
+  });
+  document.querySelectorAll('#ops-phase-nav [data-ops-phase]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.opsPhase === phase);
+  });
+  if (!opsLoaded[phase]) {
+    opsLoaded[phase] = true;
+    const loader = OPS_LOADERS[phase];
+    if (loader) loader();
+  }
+}
+
+const OPS_LOADERS = {
+  labs: opsLoadLabs,
+  telemetry: opsLoadTelemetry,
+  nightly: opsLoadNightly,
+  report: opsLoadReport,
+  settings: opsLoadSettings,
+};
+
 
 function badge(id, n) {
   const el = $(id);
@@ -269,8 +298,8 @@ async function launchScan() {
     const scanId = jobIdOf(res);
     log(`scan ${scanId} → ${target}`, 'info');
     if (state.scanTimer) clearInterval(state.scanTimer);
-    state.scanTimer = setInterval(() => pollJob(scanId, async () => {
-      $('scan-status').textContent = 'done';
+    state.scanTimer = setInterval(() => pollJob(scanId, async (j) => {
+      $('scan-status').textContent = j.cached ? 'done · cached' : 'done';
       refreshStatus(); refreshNextMove();
     }), 2000);
   } catch (e) { log(`scan failed: ${e.message}`, 'error'); }
@@ -282,8 +311,8 @@ async function launchNeighbors() {
     if (!jobIdOf(res)) { log(`neighbors refused: ${res.detail || 'error'}`, 'error'); return; }
     log(`neighbor discovery ${jobIdOf(res)}`, 'info');
     if (state.scanTimer) clearInterval(state.scanTimer);
-    state.scanTimer = setInterval(() => pollJob(jobIdOf(res), async () => {
-      $('scan-status').textContent = 'done';
+    state.scanTimer = setInterval(() => pollJob(jobIdOf(res), async (j) => {
+      $('scan-status').textContent = j.cached ? 'done · cached' : 'done';
       refreshStatus(); refreshNextMove();
     }), 2000);
   } catch (e) { log(`neighbors failed: ${e.message}`, 'error'); }
@@ -360,9 +389,12 @@ async function loadVulns() {
   } catch (e) { log(`vulns load failed: ${e.message}`, 'error'); }
 }
 
-async function startFingerprint() {
+async function startFingerprint(full = false) {
   try {
-    const res = await api('/api/neighbors/fingerprint', { method: 'POST' });
+    const res = await api('/api/neighbors/fingerprint', {
+      method: 'POST',
+      body: full ? { full: true } : {},
+    });
     if (!jobIdOf(res)) { log(`fingerprint refused: ${res.detail || 'error'}`, 'error'); return; }
     log(`fingerprint ${jobIdOf(res)}`, 'info');
     const jobId = jobIdOf(res);
@@ -678,6 +710,29 @@ async function listPresets() {
   } catch (e) { log(`preset list failed: ${e.message}`, 'error'); }
 }
 
+async function corpusAdd() {
+  const raw = $('corpus-text').value;
+  if (!raw.trim()) { log('corpus needs seed bytes', 'warn'); return; }
+  const body = { name: $('corpus-name').value.trim() || 'seed', source: 'ui' };
+  if (raw.startsWith('base64:')) body.data_b64 = raw.slice(7).trim();
+  else body.data = raw;
+  try {
+    const res = await api('/api/corpus', { method: 'POST', body });
+    log(`corpus: ${res.deduped ? 'already shared' : 'shared'} ${res.sha.slice(0, 12)}`, 'success');
+    await corpusList();
+  } catch (e) { log(`corpus add failed: ${e.message}`, 'error'); }
+}
+
+async function corpusList() {
+  try {
+    const res = await api('/api/corpus');
+    $('corpus-output').hidden = false;
+    $('corpus-output').textContent = `${res.count || 0} seed(s), ${res.bytes || 0} bytes\n`
+      + (res.entries || []).slice(0, 20).map((e) => `${e.sha.slice(0, 12)} ${e.size}B ${e.name || ''} [${(e.tags || []).join(',')}]`).join('\n').slice(0, 4000);
+    $('corpus-status').textContent = `${res.count || 0} seed(s)`;
+  } catch (e) { log(`corpus list failed: ${e.message}`, 'error'); }
+}
+
 async function startFuzzing() {
   const btn = $('btn-fz-start');
   if (btn) btn.disabled = true;
@@ -685,9 +740,19 @@ async function startFuzzing() {
   $('fz-output').hidden = false;
   $('fz-output').textContent = 'fuzzing…';
   try {
+    const host = $('fz-host').value.trim() || '127.0.0.1';
+    const port = parseInt($('fz-port').value, 10) || 3138;
     const res = await api('/api/fuzz', {
       method: 'POST',
-      body: { host: $('fz-host').value.trim() || '127.0.0.1', port: parseInt($('fz-port').value, 10) || 3138, iterations: parseInt($('fz-iters').value, 10) || 2000, timeout: parseInt($('fz-timeout').value, 10) || 60 },
+      body: {
+        target: `${host}:${port}`,
+        host,
+        port,
+        scheme: 'http',
+        service: 'http',
+        iterations: parseInt($('fz-iters').value, 10) || 2000,
+        timeout: parseInt($('fz-timeout').value, 10) || 60,
+      },
     });
     if (!jobIdOf(res)) { log(`fuzz refused: ${res.detail || 'error'}`, 'error'); if (btn) btn.disabled = false; return; }
     const jobId = jobIdOf(res);
@@ -1048,6 +1113,22 @@ async function runSmbEnum() {
   } catch (e) { $('smb-body').textContent = `smb enum failed: ${e.message}`; }
 }
 
+async function runIntelImport() {
+  const raw = $('intel-json').value.trim();
+  if (!raw) { log('intel import needs JSON', 'warn'); return; }
+  let data;
+  try { data = JSON.parse(raw); } catch { $('intel-body').textContent = 'invalid JSON — paste an array or object'; return; }
+  const engId = await currentEngagementId();
+  if (!engId) { log('set an active scope first', 'warn'); return; }
+  $('intel-body').textContent = 'importing…';
+  try {
+    const res = await api('/api/intel/import', { method: 'POST', body: { engagement_id: engId, source: $('intel-source').value, data } });
+    $('intel-body').innerHTML = `<div data-testid="intel-result">${esc(`${res.rows || 0} row(s), ${res.recorded || 0} recorded, ${(res.skipped_out_of_scope || []).length} out of scope`)}</div>`;
+    log(`intel import: ${res.recorded || 0} recorded`, 'success');
+    refreshStatus();
+  } catch (e) { $('intel-body').textContent = `intel import failed: ${e.message}`; }
+}
+
 async function runNikto() {
   const target = $('web-target').value.trim();
   if (!target) { log('nikto needs a target', 'warn'); return; }
@@ -1184,6 +1265,21 @@ async function runNuclei() {
 }
 
 /* ---------- pivot: Fire TV via adb ---------- */
+
+async function ftvSweep(kind) {
+  const engId = await currentEngagementId();
+  $('ftv-body').textContent = `${kind} sweep…`;
+  try {
+    const res = await api(`/api/firetv/${kind}`, { method: 'POST', body: { target: '', engagement_id: engId || null } });
+    const detail = res.detail || {};
+    const ledger = detail.ledger || {};
+    const devices = detail.devices || [];
+    $('ftv-body').innerHTML = `<div data-testid="ftv-sweep">${esc(res.output || '')}</div>`
+      + devices.map((d) => `<div data-testid="ftv-device">${esc(d.ip)} <span class="muted">${esc((d.names || []).join(', '))}</span></div>`).join('')
+      + `<div class="muted">${ledger.recorded || 0} in ledger, ${(ledger.skipped_out_of_scope || []).length} out of scope</div>`;
+    log(`firetv ${kind}: ${devices.length} device(s)`, 'success');
+  } catch (e) { $('ftv-body').textContent = `firetv ${kind} failed: ${e.message}`; }
+}
 
 async function ftvRun(action, extra = {}) {
   const target = $('ftv-target').value.trim() || '127.0.0.1';
@@ -2043,6 +2139,367 @@ function toggleTheme() {
   try { localStorage.setItem('h4k-theme', root.dataset.theme); } catch { /* ignore */ }
 }
 
+
+/* ---------- operations workspace (native) ---------- */
+
+function opsEsc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function opsPretty(value) {
+  try { return typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
+  catch (_) { return String(value); }
+}
+
+function opsText(id, text) {
+  const el = $(id);
+  if (el) el.textContent = text;
+}
+
+function opsRender(id, value, label) {
+  opsText(id, (label ? label + '\n' : '') + opsPretty(value));
+}
+
+function opsRows(id, rows, cells) {
+  const body = $(id);
+  if (!body) return;
+  body.innerHTML = '';
+  if (!rows || !rows.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = cells.length;
+    td.className = 'muted';
+    td.textContent = 'none';
+    tr.appendChild(td);
+    body.appendChild(tr);
+    return;
+  }
+  rows.forEach((row) => {
+    const tr = document.createElement('tr');
+    cells.forEach((cell) => {
+      const td = document.createElement('td');
+      if (cell.html) td.innerHTML = cell.html(row);
+      else td.textContent = cell.text(row);
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+}
+
+/* -- labs -- */
+async function opsLoadLabs() {
+  try {
+    const data = await api('/api/lab/traffic/profiles');
+    const profiles = data.profiles || data;
+    const sel = $('lt-profile');
+    if (sel) {
+      const names = Array.isArray(profiles) ? profiles : Object.keys(profiles);
+      sel.innerHTML = '';
+      names.forEach((name) => {
+        const opt = document.createElement('option');
+        opt.value = typeof name === 'string' ? name : name.name;
+        opt.textContent = opt.value;
+        sel.appendChild(opt);
+      });
+    }
+  } catch (e) { opsText('lt-status', e.message); }
+  try {
+    const data = await api('/api/lab/iot/protocols');
+    const protocols = data.protocols || data;
+    const sel = $('iot-protocol');
+    if (sel) {
+      const names = Array.isArray(protocols) ? protocols : Object.keys(protocols);
+      sel.innerHTML = '';
+      const auto = document.createElement('option');
+      auto.value = 'auto';
+      auto.textContent = 'auto';
+      sel.appendChild(auto);
+      names.forEach((name) => {
+        const opt = document.createElement('option');
+        opt.value = typeof name === 'string' ? name : name.name;
+        opt.textContent = opt.value;
+        sel.appendChild(opt);
+      });
+    }
+  } catch (e) { opsText('iot-status', e.message); }
+}
+
+let opsTrafficTimer = null;
+async function opsTrafficStart() {
+  const target = ($('lt-target').value || '').trim();
+  if (!target) { opsText('lt-status', 'target required'); return; }
+  opsText('lt-status', 'starting…');
+  try {
+    const res = await api('/api/lab/traffic/run', {
+      method: 'POST',
+      body: {
+        profile: $('lt-profile').value || 'mixed',
+        target,
+        count: parseInt($('lt-count').value, 10) || 20,
+        rate_per_s: parseFloat($('lt-rate').value) || 2,
+        allow_public: !!$('lt-public').checked,
+      },
+    });
+    if (!res.job_id) { opsRender('lt-output', res, 'traffic error'); opsText('lt-status', 'failed'); return; }
+    $('btn-lt-stop').hidden = false;
+    if (opsTrafficTimer) clearInterval(opsTrafficTimer);
+    opsTrafficTimer = setInterval(async () => {
+      const job = await api(`/api/lab/traffic/${res.job_id}`).catch(() => null);
+      if (!job) return;
+      opsText('lt-status', job.status || 'running');
+      opsRender('lt-output', job, '');
+      if (['done', 'error', 'stopped'].includes(job.status)) {
+        clearInterval(opsTrafficTimer); opsTrafficTimer = null;
+        $('btn-lt-stop').hidden = true;
+      }
+    }, 2000);
+  } catch (e) { opsText('lt-status', e.message); }
+}
+
+async function opsTrafficStop() {
+  const job = (await api('/api/lab/traffic/jobs').catch(() => null));
+  const active = (job && job.jobs || []).find((j) => ['running', 'queued'].includes(j.status));
+  if (active) await api(`/api/lab/traffic/${active.id}/stop`, { method: 'POST' }).catch(() => {});
+  opsText('lt-status', 'stop requested');
+}
+
+async function opsIot(discover) {
+  const host = ($('iot-host').value || '').trim();
+  if (!host) { opsText('iot-status', 'host required'); return; }
+  const body = { host, timeout: 2 };
+  if (!discover) body.protocol = $('iot-protocol').value || 'auto';
+  const port = ($('iot-port').value || '').trim();
+  if (port) body.port = parseInt(port, 10);
+  opsText('iot-status', 'probing…');
+  try {
+    const res = await api(discover ? '/api/lab/iot/discover' : '/api/lab/iot/probe', { method: 'POST', body });
+    opsRender('iot-output', res, discover ? 'discover' : 'probe');
+    opsText('iot-status', res.detail ? 'error' : 'done');
+  } catch (e) { opsText('iot-status', e.message); }
+}
+
+/* -- AD -- */
+async function opsAd(kind) {
+  const body = {
+    dc_ip: ($('ad-dc').value || '').trim(),
+    domain: ($('ad-domain').value || '').trim(),
+    username: ($('ad-user').value || '').trim(),
+    password: $('ad-pass').value || '',
+  };
+  if (kind === 'users') body.limit = 50;
+  if (kind === 'audit') body.include_smb = false;
+  opsText('ad-status', kind + '…');
+  try {
+    const res = await api(`/api/ad/${kind}`, { method: 'POST', body });
+    opsRender('ad-output', res, kind);
+    opsText('ad-status', res.ok === false ? 'error' : 'done');
+  } catch (e) { opsText('ad-status', e.message); }
+}
+
+/* -- telemetry -- */
+async function opsLoadTelemetry() {
+  try {
+    const summary = await api('/api/telemetry/summary');
+    opsRender('tel-summary', summary, 'summary');
+    opsText('tel-status', `${summary.events || 0} events · ${summary.detections || 0} detections`);
+  } catch (e) { opsText('tel-status', e.message); }
+}
+
+async function opsTelemetry(action) {
+  try {
+    if (action === 'simulate') {
+      const res = await api('/api/telemetry/simulate', { method: 'POST' });
+      opsRender('tel-output', res, 'simulated');
+    } else if (action === 'reset') {
+      const res = await api('/api/telemetry/reset', { method: 'POST' });
+      opsRender('tel-output', res, 'reset');
+    }
+    await opsLoadTelemetry();
+  } catch (e) { opsText('tel-status', e.message); }
+}
+
+/* -- nightly -- */
+async function opsLoadNightly() {
+  try {
+    const res = await api('/api/automation/schedules');
+    const schedules = res.schedules || [];
+    opsRows('nt-tbody', schedules, [
+      { text: (r) => r.name || r.id },
+      { text: (r) => r.cron || '' },
+      { text: (r) => (r.enabled ? 'yes' : 'no') },
+      {
+        html: (r) =>
+          `<button class="btn small" data-nt-run="${opsEsc(r.id)}">Run now</button>`,
+      },
+    ]);
+    opsText('nt-status', `${schedules.length} schedule(s)`);
+  } catch (e) { opsText('nt-status', e.message); }
+}
+
+async function opsNightlyRun(id) {
+  try {
+    const res = await api(`/api/automation/schedules/${id}/run`, { method: 'POST' });
+    opsRender('nt-output', res, 'run started');
+    setTimeout(opsLoadNightly, 1500);
+  } catch (e) { opsText('nt-status', e.message); }
+}
+
+async function opsNightlyCreate() {
+  const engagement_id = await currentEngagementId();
+  if (!engagement_id) { opsText('nt-status', 'active scope required'); return; }
+  try {
+    const res = await api('/api/automation/schedules', {
+      method: 'POST',
+      body: {
+        name: $('nt-name').value || 'nightly sweep',
+        cron: $('nt-cron').value || '0 3 * * *',
+        timezone: $('nt-tz').value || 'UTC',
+        engagement_id,
+        enabled: true,
+      },
+    });
+    opsRender('nt-output', res, 'created');
+    await opsLoadNightly();
+  } catch (e) { opsText('nt-status', e.message); }
+}
+
+/* -- report -- */
+async function opsLoadReport() {
+  const eid = await currentEngagementId();
+  try {
+    const res = await api(`/api/findings?limit=25${eid ? `&engagement_id=${eid}` : ''}`);
+    const findings = res.findings || [];
+    opsText('fl-summary', `${findings.length} finding(s)`);
+    opsRows('fl-tbody', findings, [
+      { text: (r) => r.title || '' },
+      { text: (r) => r.host || '' },
+      { text: (r) => r.severity || '' },
+      { text: (r) => r.status || '' },
+    ]);
+  } catch (e) { opsText('fl-summary', e.message); }
+  try {
+    const res = await api('/api/approvals/requests?status=pending');
+    const requests = res.requests || [];
+    opsText('appr-status', `${requests.length} pending`);
+    opsRows('appr-tbody', requests, [
+      { text: (r) => r.tool || '' },
+      { text: (r) => (r.argv || []).join(' ') },
+      {
+        html: (r) =>
+          `<button class="btn small" data-appr-ok="${opsEsc(r.id)}">Approve</button> ` +
+          `<button class="btn small" data-appr-no="${opsEsc(r.id)}">Deny</button>`,
+      },
+    ]);
+  } catch (e) { opsText('appr-status', e.message); }
+  opsPaths();
+}
+
+async function opsFindingCreate() {
+  const eid = await currentEngagementId();
+  if (!eid) { opsText('fl-summary', 'active scope required'); return; }
+  try {
+    await api('/api/findings', {
+      method: 'POST',
+      body: {
+        title: $('fl-title').value || 'Untitled finding',
+        severity: $('fl-severity').value || 'info',
+        host: $('fl-host').value || '',
+        engagement_id: eid,
+        source: 'manual',
+      },
+    });
+    $('fl-title').value = '';
+    await opsLoadReport();
+  } catch (e) { opsText('fl-summary', e.message); }
+}
+
+async function opsApprove(id, approve) {
+  try {
+    await api(`/api/approvals/requests/${id}/${approve ? 'approve' : 'deny'}`, {
+      method: 'POST',
+      body: { decided_by: 'ui' },
+    });
+    await opsLoadReport();
+  } catch (e) { opsText('appr-status', e.message); }
+}
+
+async function opsPaths() {
+  const eid = await currentEngagementId();
+  if (!eid) { opsText('paths-summary', 'no engagement'); return; }
+  try {
+    const res = await api(`/api/engagement/${eid}/paths`);
+    opsText(
+      'paths-summary',
+      `${(res.objectives || []).length} objective(s) · ${(res.paths || []).length} path(s) · ` +
+      `${(res.coverage || []).length} coverage entr(ies)`
+    );
+    const body = $('paths-body');
+    if (body) {
+      const paths = (res.paths || []).slice(0, 5).map((p) =>
+        `<div class="move">${opsEsc(p.hops || 0)} hop(s) → ${opsEsc(p.target || p.objective || '?')} ` +
+        `<span class="muted">${opsEsc((p.nodes || []).join(' → '))}</span></div>`
+      ).join('');
+      body.innerHTML = paths || '<span class="muted">no path to an objective yet</span>';
+    }
+  } catch (e) { opsText('paths-summary', e.message); }
+}
+
+/* -- settings -- */
+async function opsLoadSettings() {
+  try {
+    const res = await api('/api/auth/keys');
+    const keys = res.keys || [];
+    opsText('keys-status', `${keys.length} key(s)`);
+    opsRows('keys-tbody', keys, [
+      { text: (r) => r.name || '' },
+      { text: (r) => r.role || '' },
+      {
+        html: (r) => `<button class="btn small" data-key-del="${opsEsc(r.name)}">Revoke</button>`,
+      },
+    ]);
+  } catch (e) { opsText('keys-status', e.message); }
+  try {
+    const noise = await api('/api/noise/status');
+    $('noise-profile').value = noise.profile || 'off';
+    opsText('noise-status', noise.profile || 'off');
+    opsRender('limits-output', noise, 'noise');
+  } catch (e) { opsText('noise-status', e.message); }
+}
+
+async function opsKeyCreate() {
+  try {
+    const res = await api('/api/auth/keys', {
+      method: 'POST',
+      body: { name: $('key-name').value || 'ui-key', role: $('key-role').value || 'viewer' },
+    });
+    opsRender('limits-output', res, 'key created (copy it now)');
+    await opsLoadSettings();
+  } catch (e) { opsText('keys-status', e.message); }
+}
+
+async function opsSetNoise() {
+  try {
+    const res = await api('/api/noise/profile', {
+      method: 'POST',
+      body: { profile: $('noise-profile').value },
+    });
+    opsText('noise-status', res.profile || $('noise-profile').value);
+    opsRender('limits-output', res, 'noise');
+  } catch (e) { opsText('noise-status', e.message); }
+}
+
+async function opsBudgetReset() {
+  try {
+    const res = await api('/api/source/ai/budget/reset', { method: 'POST', body: {} });
+    opsRender('limits-output', res, 'ai budget reset');
+  } catch (e) { opsText('noise-status', e.message); }
+}
+
 /* ---------- boot ---------- */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2052,6 +2509,10 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch { /* ignore */ }
 
   document.querySelectorAll('.ws-btn').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  const bootParams = new URLSearchParams(location.search);
+  if (bootParams.get('phase')) state.opsPhase = bootParams.get('phase');
+  const bootTab = bootParams.get('tab');
+  setTab(bootTab && TABS.includes(bootTab) ? bootTab : 'discover');
 
   $('scope-select').addEventListener('change', async (e) => {
     const engId = e.target.value || null;
@@ -2074,12 +2535,19 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const parsed = await api('/api/engagement/parse-scope', { method: 'POST', body: { text } });
       if (!parsed.scope || !parsed.scope.length) { status.textContent = 'no valid IPs/CIDRs in that text'; return; }
-      const eng = await api('/api/engagement', { method: 'POST', body: { name, scope: parsed.scope } });
+      const wanted = parsed.scope.slice().sort().join(',');
+      const existing = (await api('/api/engagement')).engagements || [];
+      const match = existing.find(
+        (e) => e.name === name && (e.scope || []).slice().sort().join(',') === wanted
+      );
+      const eng = match || await api('/api/engagement', {
+        method: 'POST', body: { name, scope: parsed.scope },
+      });
       if (!eng.id) { status.textContent = `refused: ${eng.detail || 'error'}`; return; }
       await api('/api/session/scope', { method: 'POST', body: { engagement_id: eng.id } });
       state.engagementId = eng.id;
       status.textContent = '';
-      log(`scope engaged: ${eng.name} (${parsed.scope.join(', ')})`, 'info');
+      log(`${match ? 'scope reused' : 'scope engaged'}: ${eng.name} (${parsed.scope.join(', ')})`, 'info');
       loadScopeSelect();
       refreshStatus(); refreshNextMove();
     } catch (e) { status.textContent = `failed: ${e.message}`; }
@@ -2204,17 +2672,58 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-empty-fpv').addEventListener('click', startFingerprint);
   $('btn-empty-scope').addEventListener('click', () => setTab('discover'));
   $('btn-empty-exploit').addEventListener('click', () => setTab('exploit'));
-  $('btn-full-scan').addEventListener('click', async () => {
-    try {
-      const res = await api('/api/neighbors/fingerprint', { method: 'POST', body: {} });
-      log(jobIdOf(res) ? `full scan ${jobIdOf(res)}` : `full scan refused: ${res.detail}`, jobIdOf(res) ? 'info' : 'error');
-    } catch (e) { log(`full scan failed: ${e.message}`, 'error'); }
+  $('btn-full-scan').addEventListener('click', () => startFingerprint(true));
+  document.querySelectorAll('#ops-phase-nav [data-ops-phase]').forEach((b) => {
+    b.addEventListener('click', () => setOpsPhase(b.dataset.opsPhase));
   });
+  $('btn-lt-start')?.addEventListener('click', opsTrafficStart);
+  $('btn-lt-stop')?.addEventListener('click', opsTrafficStop);
+  $('btn-iot-probe')?.addEventListener('click', () => opsIot(false));
+  $('btn-iot-discover')?.addEventListener('click', () => opsIot(true));
+  $('btn-ad-policy')?.addEventListener('click', () => opsAd('policy'));
+  $('btn-ad-users')?.addEventListener('click', () => opsAd('users'));
+  $('btn-ad-audit')?.addEventListener('click', () => opsAd('audit'));
+  $('btn-tel-refresh')?.addEventListener('click', opsLoadTelemetry);
+  $('btn-tel-simulate')?.addEventListener('click', () => opsTelemetry('simulate'));
+  $('btn-tel-reset')?.addEventListener('click', () => opsTelemetry('reset'));
+  $('btn-nt-create')?.addEventListener('click', opsNightlyCreate);
+  $('btn-nt-refresh')?.addEventListener('click', opsLoadNightly);
+  document.addEventListener('click', (e) => {
+    const run = e.target.closest && e.target.closest('[data-nt-run]');
+    if (run) opsNightlyRun(run.dataset.ntRun);
+    const ok = e.target.closest && e.target.closest('[data-appr-ok]');
+    if (ok) opsApprove(ok.dataset.apprOk, true);
+    const no = e.target.closest && e.target.closest('[data-appr-no]');
+    if (no) opsApprove(no.dataset.apprNo, false);
+    const del = e.target.closest && e.target.closest('[data-key-del]');
+    if (del) {
+      api(`/api/auth/keys/${encodeURIComponent(del.dataset.keyDel)}`, { method: 'DELETE' })
+        .then(opsLoadSettings).catch(() => {});
+    }
+  });
+  $('btn-fl-create')?.addEventListener('click', opsFindingCreate);
+  $('btn-fl-refresh')?.addEventListener('click', opsLoadReport);
+  $('btn-appr-refresh')?.addEventListener('click', opsLoadReport);
+  $('btn-paths-run')?.addEventListener('click', opsPaths);
+  $('btn-paths-md')?.addEventListener('click', async () => {
+    const eid = await currentEngagementId();
+    if (!eid) return;
+    try {
+      const res = await api(`/api/engagement/${eid}/paths/report?fmt=md`);
+      downloadText('h4k-paths.md', res.content || '', 'text/markdown');
+    } catch (e) { opsText('paths-summary', e.message); }
+  });
+  $('btn-ops-session-report')?.addEventListener('click', downloadSessionReport);
+  $('btn-key-create')?.addEventListener('click', opsKeyCreate);
+  $('btn-keys-refresh')?.addEventListener('click', opsLoadSettings);
+  $('btn-noise-set')?.addEventListener('click', opsSetNoise);
+  $('btn-ai-budget-reset')?.addEventListener('click', opsBudgetReset);
   $('btn-nikto').addEventListener('click', runNikto);
   $('btn-suppress').addEventListener('click', runSuppress);
   $('btn-sup-list').addEventListener('click', listSuppressions);
   $('btn-kev').addEventListener('click', runKevCheck);
   $('btn-kev-refresh').addEventListener('click', runKevRefresh);
+  $('btn-intel-import').addEventListener('click', runIntelImport);
   $('btn-tls-run').addEventListener('click', runTlsFingerprint);
   $('btn-tls-inv').addEventListener('click', runTlsInventory);
   $('btn-krb-asrep').addEventListener('click', () => krbRoast('asrep'));
@@ -2255,6 +2764,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-prof-save').addEventListener('click', savePreset);
   $('btn-prof-list').addEventListener('click', listPresets);
   $('btn-sandiff').addEventListener('click', sanitizerDiff);
+  $('btn-corpus-add').addEventListener('click', corpusAdd);
+  $('btn-corpus-list').addEventListener('click', corpusList);
   $('btn-fz-stop').addEventListener('click', async () => { $('btn-fz-stop').hidden = true; $('btn-fz-start').disabled = false; });
   $('btn-cred-targets-refresh').addEventListener('click', loadCredTargets);
   $('btn-launch-passattack').addEventListener('click', () => launchPassAttack());
@@ -2272,6 +2783,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-trylocalroot-run').addEventListener('click', runTryLocalRoot);
   $('btn-privesc-suggest').addEventListener('click', runPrivescSuggest);
   $('btn-ftv-recon').addEventListener('click', () => ftvRun('recon'));
+  $('btn-ftv-mdns').addEventListener('click', () => ftvSweep('mdns'));
+  $('btn-ftv-ssdp').addEventListener('click', () => ftvSweep('ssdp'));
   $('btn-ftv-pair').addEventListener('click', () => {
     const code = $('ftv-code').value.trim();
     if (!code) { log('pair needs the 6-digit on-screen code', 'warn'); return; }
@@ -2425,5 +2938,4 @@ document.addEventListener('DOMContentLoaded', () => {
   loadScopeSelect().then(() => { refreshStatus(); refreshNextMove(); });
   state.statusTimer = setInterval(refreshStatus, 8000);
   log('h4k kill-chain console ready — discover → recon → exploit → pivot → persist → score', 'info');
-  setTab('discover');
 });
