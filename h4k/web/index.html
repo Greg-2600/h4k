@@ -441,6 +441,14 @@
             </div>
             <textarea id="sandiff-report" data-testid="sandiff-report" rows="3" class="grow" placeholder="Paste sanitizer output (ASan/UBSan/MSan) — offline compare, nothing is rebuilt"></textarea>
             <div id="sandiff-body" data-testid="sandiff-body" class="muted">ASan vs UBSan vs MSan: who would catch it, blind spots, one confirming rebuild.</div>
+            <div class="row">
+              <input type="text" id="corpus-name" data-testid="corpus-name" value="seed" title="Seed name (content-addressed by hash)" />
+              <input type="text" id="corpus-text" data-testid="corpus-text" class="grow" placeholder="Seed bytes as text (or base64:…)" title="Prefix with base64: for raw bytes" />
+              <button class="btn" id="btn-corpus-add" data-testid="btn-corpus-add">Share seed</button>
+              <button class="btn" id="btn-corpus-list" data-testid="btn-corpus-list">Corpus</button>
+              <span class="muted" id="corpus-status" data-testid="corpus-status"></span>
+            </div>
+            <div class="output" id="corpus-output" data-testid="corpus-output" hidden></div>
           </div>
         </div>
       </section>
@@ -876,6 +884,8 @@
         <div class="cmd-item" data-cmd="kev" data-tab="recon" data-btn="btn-kev"><span>Recon: KEV/EPSS check</span></div>
         <div class="cmd-item" data-cmd="tls" data-tab="recon" data-btn="btn-tls-run"><span>Recon: TLS fingerprint + C2 leads</span></div>
         <div class="cmd-item" data-cmd="cfuzz" data-tab="exploit" data-btn="btn-cf-start"><span>Exploit: fuzz a container surface</span></div>
+        <div class="cmd-item" data-cmd="corpus" data-tab="exploit" data-btn="btn-corpus-list"><span>Exploit: shared fuzz corpus</span></div>
+        <div class="cmd-item" data-cmd="corpus-add" data-tab="exploit" data-btn="btn-corpus-add"><span>Exploit: share a fuzz seed</span></div>
         <div class="cmd-item" data-cmd="shardfuzz" data-tab="exploit" data-btn="btn-sh-start"><span>Exploit: shard fuzzing (N workers)</span></div>
         <div class="cmd-item" data-cmd="rateprobe" data-tab="exploit" data-btn="btn-rate-start"><span>Exploit: probe rate limits politely</span></div>
         <div class="cmd-item" data-cmd="stfuzz" data-tab="exploit" data-btn="btn-st-start"><span>Exploit: stateful login → fuzz</span></div>

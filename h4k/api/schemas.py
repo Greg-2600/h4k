@@ -1286,3 +1286,29 @@ class FuzzProfile(BaseModel):
     header_count: int = 0
     cookie_count: int = 0
     updated: float = 0.0
+
+
+# ---- Shared corpus ----
+class CorpusAddRequest(BaseModel):
+    """Add one seed to the shared corpus (base64 bytes or plain text)."""
+
+    data_b64: str | None = None
+    data: str | None = None
+    name: str = ""
+    source: str = ""
+    tags: list[str] = Field(default_factory=list)
+
+
+class CorpusEntry(BaseModel):
+    sha: str = ""
+    name: str = ""
+    size: int = 0
+    source: str = ""
+    tags: list[str] = []
+    created: float = 0.0
+    deduped: bool = False
+
+
+class CorpusImportRequest(BaseModel):
+    items: list[dict[str, Any]] = []
+    source: str = ""
