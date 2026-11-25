@@ -903,6 +903,15 @@ protocol/ciphers per host, ledgering each lead as a vuln with
 `engagement_id` (scope-enforced). TLS card inventory row takes a
 comma-separated list. Sandbox returns canned hosts.
 
+## Backlog #19 — mDNS/SSDP persistent map
+
+Sweep results used to die with the response. `services/zeroconf_map.py`
+normalizes mDNS/SSDP devices into assets and records the in-scope ones
+(VLAN printers, TVs, speakers included) so scans, the graph and the
+timeline all see the fleet; out-of-scope addresses are reported, never
+stored. Both endpoints take `engagement_id` and serve canned devices in
+sandbox. Fire TV card sweep buttons.
+
 ## Backlog #18 — IPv6 discovery
 
 `POST /api/net/ipv6/discover` reads the kernel NDP table (`ip -6 neigh`,
