@@ -26,7 +26,7 @@ platform for third parties.
 
 ## 3. Trust boundaries
 
-```
+```text
 ┌───────────────────────────────┐
 │ operator workstation           │  ← trusted
 │  ├─ h4k API (often as root)   │
@@ -80,8 +80,8 @@ data that h4k parses.
 
 ## 7. Review checklist for new features
 
-- [ ] Does it widen what h4k can do without an explicit opt-in?
-- [ ] Does it bypass the scope check?
-- [ ] Does it turn untrusted scan data into execution (shell, SQL, template)?
-- [ ] Does it write secrets somewhere less protected than `0600`?
-- [ ] Does it make the API reachable from a network it was not before?
+* [ ] Does it widen what h4k can do without an explicit opt-in?
+* [ ] Does it bypass the scope check?
+* [ ] Does it turn untrusted scan data into execution (shell, SQL, template)?
+* [ ] Does it write secrets somewhere less protected than `0600`?
+* [ ] Does it make the API reachable from a network it was not before?

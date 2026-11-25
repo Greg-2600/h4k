@@ -60,7 +60,7 @@ toolkit, SAST/SCA, fuzzing or the AI loop.
 
 ## Autopilot refuses to start
 
-```
+```text
 {"detail":"autopilot requires an active engagement scope ..."}
 ```
 

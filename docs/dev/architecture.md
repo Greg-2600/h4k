@@ -2,7 +2,7 @@
 
 How h4k is put together, and why.
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────┐
 │ browser                                                               │
 │  web/index.html + app.js + style.css                                  │
@@ -80,7 +80,7 @@ and the Selenium run get an isolated, disposable data directory.
 
 ### Data flow of a scan
 
-```
+```text
 POST /api/scan
   → ScanRequest validated (pydantic)
   → mode/depth resolved (modes.py)

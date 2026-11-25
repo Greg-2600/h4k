@@ -12,6 +12,7 @@ __pycache__/
 .pytest_cache/
 htmlcov/
 .coverage
+coverage.xml
 .mypy_cache/
 .ruff_cache/
 .pylint.d/

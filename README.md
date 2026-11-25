@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD033 MD041 -->
 <div align="center">
 
 # ⚡ h4k - Intrusion Suite
@@ -8,9 +9,10 @@ Recon your own lab, fuzz the software you run, and ship a responsible-disclosure
 report - all from one container.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![CI](https://github.com/Greg-2600/h4k/actions/workflows/ci.yml/badge.svg)](https://github.com/Greg-2600/h4k/actions)
-![tests: 1367](https://img.shields.io/badge/tests-1367_passing-90%25_coverage-brightgreen)
-![lint: green](https://img.shields.io/badge/lint-black%20%7C%20ruff%20%7C%20mypy%20%7C%20bandit-brightgreen)
+[![CI](https://github.com/Greg-2600/h4k/actions/workflows/ci.yml/badge.svg)](https://github.com/Greg-2600/h4k/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Greg-2600/h4k/actions/workflows/codeql.yml/badge.svg)](https://github.com/Greg-2600/h4k/actions/workflows/codeql.yml)
+[![Security](https://github.com/Greg-2600/h4k/actions/workflows/security.yml/badge.svg)](https://github.com/Greg-2600/h4k/actions/workflows/security.yml)
+[![Qualify](https://github.com/Greg-2600/h4k/actions/workflows/qualify.yml/badge.svg)](https://github.com/Greg-2600/h4k/actions/workflows/qualify.yml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24489255.svg)](https://doi.org/10.5281/zenodo.24489255)
 
 </div>
@@ -67,11 +69,11 @@ docker run -d --name h4k --network host -p 3137:3137 \
 
 > The h4k_data volume keeps your session (discovered hosts, services, findings,
 > credentials) across container rebuilds. Scope choice persists too.
-
+>
 > **Note:** `docker build` alone does **not** leave the container running.
 > You must `docker run` (or `docker compose up`) to start the service.
 
-Open **http://localhost:3137** in your browser.
+Open **<http://localhost:3137>** in your browser.
 
 ### 2. (Optional) Run the fuzzing lab target in its own container
 
@@ -114,7 +116,7 @@ with a live named-action log. Requires the scope. The **Fuzz lab** card points
 at your own lab target (vulnlab container included) for the crash → minimize
 → triage loop.
 
-7. **Fuzz a lab target you own** - start the `vulnlab` container and point the
+1. **Fuzz a lab target you own** - start the `vulnlab` container and point the
    **lab fuzz** at `127.0.0.1:8080`.
 
 > **Every aggressive toggle (creds, exploits, deep toolkit, fuzz) requires an
@@ -125,7 +127,7 @@ at your own lab target (vulnlab container included) for the crash → minimize
 
 ## Real-world workflow: from crash to disclosure
 
-```
+```text
 1. Fuzz a service you own        → anomaly/teardown detected
 2. Minimize the repro            → smallest triggering input
 3. Triage (bug-class + CWE)      → e.g. stack-buffer-overflow / CWE-120
@@ -204,7 +206,7 @@ Watch a live scan run end-to-end:
 
 ## Project layout
 
-```
+```text
 h4k/                   git root
   .venv/                local dev venv (host tooling, NOT in the container)
   AGENTS.md             AI-agent context

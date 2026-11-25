@@ -144,7 +144,6 @@ Two further unique commits should **not** be ported:
 6. Run the full suite and sidecar smoke tests at every step; keep
    `backup/pre-sync-20261121` until the port is pushed.
 
-
 ---
 
 ## Outcome (2026-11-21)
@@ -169,7 +168,6 @@ return 200, sandbox reports `mode=sidecar`, telemetry ingests, adlab policy
 read succeeds. Suite: 1806 passed, 3 skipped; the only 3 failures
 (fuzz-shard RST fixture, two privesc host-tool checks) also fail on
 origin/main on macOS and pass on Linux CI.
-
 
 ## Recon-flow follow-up (2026-11-21)
 

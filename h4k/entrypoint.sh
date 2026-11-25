@@ -35,7 +35,7 @@ runuser -u msf -- bash -lc "msfdb init --db-port ${MSF_DB_PORT}" \
 db_up() {
   (echo > /dev/tcp/127.0.0.1/"${MSF_DB_PORT}") 2>/dev/null
 }
-for i in $(seq 1 30); do
+for _ in $(seq 1 30); do
   if db_up; then
     echo "[h4k] metasploit database is listening on ${MSF_DB_PORT}."
     break
@@ -67,7 +67,7 @@ echo "[h4k] starting msfrpcd on ${MSF_HOST}:${MSF_PORT}..."
 start_msfrpcd
 
 # give msfrpcd a moment to bind
-for i in $(seq 1 20); do
+for _ in $(seq 1 20); do
   if (echo > /dev/tcp/127.0.0.1/"${MSF_PORT}") 2>/dev/null; then
     echo "[h4k] msfrpcd is up."
     break
@@ -106,7 +106,7 @@ else
   done
   sleep 2
   start_msfrpcd
-  for i in $(seq 1 30); do
+  for _ in $(seq 1 30); do
     if db_loaded; then
       echo "[h4k] metasploit database: connected (after restart)"
       break

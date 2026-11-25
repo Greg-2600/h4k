@@ -443,7 +443,7 @@ async function refreshNextMove() {
     if (q) {
       q.innerHTML = moves.map((m, i) => `<div class="move${m.kind === 'attack_path' ? ' hot' : ''}"><span class="kind">${esc(m.kind)}</span><span><span class="title">${esc(m.title)}</span><br /><span class="why">${esc(m.rationale || '')}</span></span><button class="btn small danger" data-move="${i}">fire</button></div>`).join('');
     }
-  } catch (e) { if (list) list.innerHTML = '<span>queue unavailable</span>'; }
+  } catch { if (list) list.innerHTML = '<span>queue unavailable</span>'; }
 }
 
 async function fireMove(m) {
@@ -2155,7 +2155,7 @@ function opsEsc(value) {
 
 function opsPretty(value) {
   try { return typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
-  catch (_) { return String(value); }
+  catch { return String(value); }
 }
 
 function opsText(id, text) {

@@ -1,0 +1,14 @@
+extends: default
+
+rules:
+  # Issue templates, workflows and data fixtures omit the marker by convention.
+  document-start: disable
+  # Wrapped prose and long endpoint lists are intentional in these files.
+  line-length:
+    max: 130
+  # GitHub Actions uses `on:` as a key, not a boolean.
+  truthy:
+    check-keys: false
+  # Inline comments in workflows use a single leading space.
+  comments:
+    min-spaces-from-content: 1

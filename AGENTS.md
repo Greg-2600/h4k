@@ -19,7 +19,7 @@ disclosure scaffolding.
 
 ## Repo layout (top level)
 
-```
+```text
 HACKING/                 git root
   .venv/                 local dev venv (host tooling only; NOT in the container)
   pyproject.toml         linter/test config (black/ruff/isort/flake8/mypy/pylint/bandit)
@@ -106,6 +106,7 @@ Selenium suite.
 ## The API surface (FastAPI, all under /api)
 
 Host recon/scan:
+
 - `POST /scan` `{target, mode, do_dns_recon, do_vuln_scan, try_default_creds, open_sessions, do_attack}`
 - `GET /jobs` `?active=true` (job monitor: merges **all** job families), `GET /jobs/{id}`
 - `GET /report/{id}`, `POST /scan/{id}/abort`
@@ -127,6 +128,7 @@ Host recon/scan:
 - `GET|POST /api/fuzz-profiles`, `DELETE /api/fuzz-profiles/{name}` (auth presets; values never listed)
 
 CTF / lab toolkit (opt-in, each explicit):
+
 - `POST /zap`, `POST /john`, `POST /aircrack`, `POST /tshark/pcap`, `POST /tshark/live`
 - `POST /nmap/nse`, `GET /api/nse/suggest` (offline script picker) + `GET /api/nse/services`, `POST /tls/fingerprint` (handshake inventory + C2 leads) + `POST /tls/inventory` (cert inventory + ledger), `GET /api/intel/formats` + `POST /api/intel/import` (BYO Shodan/Censys JSON, no keys), `POST /nikto`, `POST /ssrf/probe` (metadata SSRF pack + ledger), `POST /nuclei` (+ `GET /nuclei/templates` offline bundle), `POST /gobuster`, `POST /jwt/test` (JWT audit + alg-confusion + ledger), `POST /kubelet/audit` (read-only kubelet exposure audit + ledger), `POST /rbac/audit` (offline K8s RBAC audit + ledger), `POST /container_escape`, `POST /lateral`, `POST /db_interrogate`
 - `POST /kerberos/asrep`, `POST /kerberos/kerberoast` (explicit roast, optional John crack)
@@ -139,6 +141,7 @@ CTF / lab toolkit (opt-in, each explicit):
 - `POST /smb/shares` (read-only share inventory, null session default) + `GET /api/engagement/{id}/shares` (ledger, also in graph payload)
 
 Engagement (persistent memory + cred propagation, engagement router):
+
 - `POST /api/engagement` (declare authorized scope), `GET /api/engagement`, `GET|DELETE /api/engagement/{id}`
 - `POST /api/engagement/parse-scope`
 - `POST /api/engagement/{id}/ingest` (raw report or `{job_id}`) → asset graph
@@ -156,6 +159,7 @@ Engagement (persistent memory + cred propagation, engagement router):
 - `POST /api/engagement/sandbox-seed` (sandbox mode only: seeded demo engagement)
 
 Source analysis (source router):
+
 - `POST /source/scan` (git URL SAST), `POST /source/scan/upload` (zip/tar/tgz)
 - `POST /source/exploit`, `POST /source/exploit/download` (PoC/disclosure skeleton)
 - `POST /source/sca`, `GET /source/sca/git`, `GET /source/sca/sbom` (SCA/SBOM)
@@ -176,9 +180,11 @@ Source analysis (source router):
 - `POST /source/ossfuzz`
 
 Updater:
+
 - `POST /update`, `GET /update/last`, `GET /update/should`
 
 Health/diagnostic:
+
 - `GET /health`
 
 ## Services (api/services/) — quick reference

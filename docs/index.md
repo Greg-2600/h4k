@@ -26,7 +26,7 @@ are new.
 
 ## The 30-second summary
 
-```
+```text
 docker compose up --build          # platform on http://localhost:3137
 ```
 
@@ -50,7 +50,7 @@ Sandbox mode exists for demos, CI and the Selenium suite. See
 
 ## Repository map
 
-```
+```text
 h4k/
 ├── api/          FastAPI app (routers + ~65 services)
 ├── web/          the console (index.html + app.js + style.css)

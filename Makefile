@@ -18,7 +18,12 @@ PYLINT  := .venv/bin/pylint
 MYPY    := .venv/bin/mypy
 BANDIT  := .venv/bin/bandit
 SHELLCHECK := shellcheck
-HADOLINT := hadolint
+HADOLINT_VERSION := 2.12.0
+HADOLINT := .venv/bin/hadolint
+ACTIONLINT_VERSION := 1.7.12
+ACTIONLINT := .venv/bin/actionlint
+MARKDOWNLINT_VERSION := 0.50.1
+ESLINT_VERSION := 9.39.5
 
 # Colour codes
 RED      := \033[0;31m
@@ -32,9 +37,9 @@ OK      := $(GREEN)✓$(RESET)
 ERR     := $(RED)✗$(RESET)
 WARN    := $(YELLOW)⚠$(RESET)
 
-.PHONY: help setup fmt fix lint lint-py lint-c lint-shell lint-docker \
-        test e2e sanity sanity-test coverage build build-no-cache up down ps logs clean \
-        docker-validate
+.PHONY: help setup fmt fix lint lint-py lint-c lint-shell lint-docker lint-yaml \
+        lint-markdown lint-js lint-config test e2e sanity sanity-test coverage build \
+        build-no-cache up down ps logs clean docker-validate
 
 ## ─────────────────────────────────────────────────────────────────────────────
 # Meta
@@ -53,6 +58,7 @@ help:
 	@printf "  make lint-py            Python linting only\n"
 	@printf "  make lint-shell         shell script linting only\n"
 	@printf "  make lint-docker        Dockerfile linting only\n"
+	@printf "  make lint-config        YAML, workflow, Markdown and JS linting\n"
 	@printf "\n"
 	@printf "$(BOLD)Testing$(RESET)\n"
 	@printf "  make test               run full pytest suite (in container, no host exec)\n"
@@ -61,7 +67,7 @@ help:
 	@printf "  make qualify            fresh images + live stack + full feature workout\n"
 	@printf "  make sanity             check a RUNNING deployment end to end\n"
 	@printf "  make sanity-test        same checks, as pytest (needs the stack up)\n"
-	@printf "  make coverage           pytest + coverage report (90%% gate, in container)\n"
+	@printf "  make coverage           pytest + coverage report and XML (90%% floor, in container)\n"
 	@printf "\n"
 	@printf "$(BOLD)Containers$(RESET)\n"
 	@printf "  make build              build h4k + vulnlab images\n"
@@ -103,7 +109,7 @@ fix: $(RUFF)
 # Lint: All languages
 ## ─────────────────────────────────────────────────────────────────────────────
 
-lint: lint-py lint-shell lint-docker
+lint: lint-py lint-shell lint-docker lint-config
 	@printf "$(OK) All linters passed\n"
 
 ## ─────────────────────────────────────────────────────────────────────────────
@@ -133,30 +139,48 @@ lint-py: $(BLACK) $(ISORT) $(RUFF) $(FLAKE8) $(PYLINT) $(MYPY) $(BANDIT)
 
 lint-shell:
 	@printf "$(BOLD)Running shellcheck…$(RESET)\n"
-	@if ! command -v shellcheck > /dev/null 2>&1 && [ ! -x .venv/bin/shellcheck ]; then \
-		printf "  $(WARN) shellcheck not installed (pip install shellcheck-py) — skipping shell linting\n"; \
-	else \
-		SCBIN=shellcheck; command -v shellcheck > /dev/null 2>&1 || SCBIN=.venv/bin/shellcheck; \
-		for f in $(wildcard scripts/*.sh) $(wildcard h4k/scripts/*.sh); do \
-			$$SCBIN --shell=bash --severity=warning "$$f" || { printf "$(ERR) shellcheck failed: $$f\n"; exit 1; }; \
-		done; \
-		printf "  $(OK) shellcheck\n"; \
-	fi
+	@SCBIN=$(SHELLCHECK); command -v $$SCBIN > /dev/null 2>&1 || SCBIN=.venv/bin/shellcheck; \
+		command -v $$SCBIN > /dev/null 2>&1 || { printf "$(ERR) shellcheck not installed\n"; exit 1; }; \
+		find . -type f -name '*.sh' -not -path './.venv/*' -print0 | xargs -0 -r $$SCBIN --shell=bash --severity=warning; \
+		printf "  $(OK) shellcheck\n"
 
 ## ─────────────────────────────────────────────────────────────────────────────
 # Lint: Dockerfiles (hadolint, fetched once into the venv)
 ## ─────────────────────────────────────────────────────────────────────────────
-
-HADOLINT := .venv/bin/hadolint
-HADOLINT_VERSION := 2.12.0
 
 $(HADOLINT):
 	curl -sSfL -o $(HADOLINT) https://github.com/hadolint/hadolint/releases/download/v$(HADOLINT_VERSION)/hadolint-Linux-x86_64 && chmod +x $(HADOLINT)
 
 lint-docker: $(HADOLINT)
 	@printf "$(BOLD)Checking Dockerfiles…$(RESET)\n"
-	$(HADOLINT) h4k/Dockerfile h4k/Dockerfile.test vulnlab/Dockerfile
+	@find . -type f \( -name 'Dockerfile' -o -name 'Dockerfile.*' -o -name 'Dockerfile *' \) -not -path './.venv/*' -print0 | xargs -0 -r $(HADOLINT)
 	@printf "  $(OK) hadolint\n"
+
+## ─────────────────────────────────────────────────────────────────────────────
+# Lint: YAML, workflows, Markdown and JavaScript
+## ─────────────────────────────────────────────────────────────────────────────
+
+$(ACTIONLINT):
+	curl -sSfL -o /tmp/h4k-actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v$(ACTIONLINT_VERSION)/actionlint_$(ACTIONLINT_VERSION)_linux_amd64.tar.gz
+	tar -xzf /tmp/h4k-actionlint.tar.gz -C .venv/bin actionlint
+
+lint-yaml: $(ACTIONLINT)
+	@printf "$(BOLD)Checking YAML and workflows…$(RESET)\n"
+	.venv/bin/yamllint -f parsable $$(git ls-files '*.yml' '*.yaml')
+	$(ACTIONLINT)
+	@printf "  $(OK) yamllint + actionlint\n"
+
+lint-markdown:
+	@printf "$(BOLD)Checking Markdown…$(RESET)\n"
+	npx --yes markdownlint-cli@$(MARKDOWNLINT_VERSION) '**/*.md' --ignore node_modules
+	@printf "  $(OK) markdownlint\n"
+
+lint-js:
+	@printf "$(BOLD)Checking JavaScript…$(RESET)\n"
+	npx --yes eslint@$(ESLINT_VERSION) h4k/web/app.js
+	@printf "  $(OK) eslint\n"
+
+lint-config: lint-yaml lint-markdown lint-js
 
 ## ─────────────────────────────────────────────────────────────────────────────
 # Docker Compose validation
@@ -239,7 +263,7 @@ sanity-test:
 	H4K_LIVE=1 $(PYTEST) tests/test_live_stack.py -v
 
 coverage:
-	$(TEST_DOCKER) bash -c "$(TEST_SETUP) && python -m pytest --ignore=tests/e2e -q -p no:cacheprovider --cov --cov-report=term-missing"
+	$(TEST_DOCKER) bash -c "$(TEST_SETUP) && python -m pytest --ignore=tests/e2e -q -p no:cacheprovider --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=90"
 
 ## ─────────────────────────────────────────────────────────────────────────────
 # Clean

@@ -85,7 +85,7 @@ enforcement (400 for out-of-scope, 404 for unknown engagement, …).
 
 `tests/e2e/` drives a **real browser** against a **real API process**.
 
-```
+```text
 tests/e2e/
 ├── conftest.py                    API subprocess + driver + page fixtures
 ├── helpers.py                     wait_for / click / fill / go_to

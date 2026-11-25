@@ -16,24 +16,63 @@ permissions:
 jobs:
   lint-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: requirements-dev.txt
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
 
       - name: Create venv + install toolchain
         run: make setup
 
-      - name: Lint (black, ruff, isort, flake8, mypy, pylint, bandit)
+      - name: Lint every language (Python, shell, Docker, YAML, workflow, Markdown, JS)
         run: make lint
 
-      - name: Test + coverage gate
+      - name: Test + coverage gate (90 percent floor)
         run: make coverage
+
+      - name: Publish coverage to the job summary
+        if: always()
+        run: |
+          {
+            echo "### Coverage"
+            if [ -f coverage.xml ]; then
+              .venv/bin/python - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("coverage.xml").getroot()
+          total = float(root.get("line-rate", "0")) * 100
+          print(f"**Line coverage:** {total:.2f}% (floor: 90%)")
+          print()
+          print("Lowest covered files:")
+          print()
+          print("| File | Lines |")
+          print("| --- | --- |")
+          rows = sorted(
+              (float(cls.get("line-rate", "0")) * 100, cls.get("filename", ""))
+              for cls in root.iter("class")
+          )
+          for rate, filename in rows[:20]:
+              print(f"| {filename} | {rate:.1f}% |")
+          PY
+            else
+              echo "Coverage XML was not produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore
 
   e2e:
     # Selenium browser suite. Runs the real API in sandbox mode against
@@ -41,16 +80,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: requirements-dev.txt
 
       - name: Install Chrome + chromedriver
-        uses: browser-actions/setup-chrome@v2
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2
         with:
           chrome-version: stable
 

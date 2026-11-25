@@ -68,13 +68,17 @@ If you enable AI triage:
 
 1. Rotate the credential at the target.
 2. Delete the engagement (and therefore its credential rows):
+
    ```sh
    curl -X DELETE http://127.0.0.1:3137/api/engagement/$ID
    ```
+
 3. Purge the session store if needed:
+
    ```sh
    docker volume rm h4k_data
    ```
+
 4. Check your shell history, CI logs and chat transcripts for copies.
 5. If it reached a git repository, treat it as compromised — rewriting
    history does not un-publish it.

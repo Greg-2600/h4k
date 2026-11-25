@@ -47,7 +47,7 @@ docker run --rm vulnlab \
 
 libFuzzer + ASan will report something like:
 
-```
+```text
 ==ERROR: AddressSanitizer: stack-buffer-overflow
 WRITE of size 1 at ... in vulnlab_parse /opt/vulnlab.c:48
 SUMMARY: AddressSanitizer: stack-buffer-overflow /opt/vulnlab.c:48

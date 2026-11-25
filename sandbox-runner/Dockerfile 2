@@ -23,6 +23,6 @@ WORKDIR /home/sandbox
 EXPOSE 9099
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD curl -sf http://127.0.0.1:9099/health || exit 1
+  CMD ["sh", "-c", "curl -sf http://127.0.0.1:9099/health || exit 1"]
 
 ENTRYPOINT ["python3", "/opt/sandbox/runner.py"]

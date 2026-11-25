@@ -165,6 +165,6 @@ the **Container surfaces** card for Docker/kubelet/gRPC targets).
 
 ## Next
 
-- [Concepts](concepts.md) — scope, OPSEC modes, depth, coverage
-- [Workflows](workflows.md) — the full playbooks
-- [Troubleshooting](troubleshooting.md) — when it does not work
+* [Concepts](concepts.md) — scope, OPSEC modes, depth, coverage
+* [Workflows](workflows.md) — the full playbooks
+* [Troubleshooting](troubleshooting.md) — when it does not work

@@ -38,13 +38,13 @@ authorized lab work. It drives **Metasploit** over msfrpcd (MessagePack-RPC),
 and layers modern analysis on top:
 
 - **Host recon & scan** — 3 OPSEC modes (stealth / Tor / overt), `-sV -O` service
-  + OS detection, banner capture, ARP neighbors, DNS/PTR, posture heuristic.
+  - OS detection, banner capture, ARP neighbors, DNS/PTR, posture heuristic.
 - **Vulnerability** — curated local CVE archive (banner-aware), EOL/version
   leads, default-cred archive, ranked recommendations.
 - **Source analysis (SAST)** — upload `.zip/.tar/.tar.gz` or clone a git URL →
   Semgrep (offline mode) + regex heuristics; custom-rule library.
 - **Supply-chain (SCA/SBOM)** — CycloneDX SBOM (trivy) + osv-scanner → known CVEs
-  + secret scan + dependency-graph supply-chain map.
+  - secret scan + dependency-graph supply-chain map.
 - **Fuzzing** — black-box HTTP fuzz + a bundled coverage-guided lab
   (libFuzzer / AFL++ / ASan) in the separate `vulnlab` container.
 - **Triage & PoC** — crash → bug-class/CWE → minimized repro → patch direction →
