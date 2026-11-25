@@ -297,6 +297,7 @@ where network/tooling is involved.
 34. **mDNS/SSDP persistent map** [risk] — sweeps persist as assets. *(was #19; in flight: PR #40)*
   (done: `services/zeroconf_map.py` normalize + scope-enforced asset ledger; `POST /api/firetv/mdns|ssdp` take `engagement_id` + sandbox canned; Fire TV card sweep buttons; unit + e2e `test_zeroconf*`.)
 35. **Shodan/Censys BYO import** [risk] — JSON → leads, no key in repo. *(was #21; in flight: PR #42)*
+  (done: `services/intel_import.py` normalizes Shodan/Censys/generic (+ search envelopes) → scope-checked asset/vuln ledger; `GET /api/intel/formats` + `POST /api/intel/import`; Recon card with JSON textarea + palette; unit + e2e `test_intel*`.)
 36. **CPE auto-correlate** [risk] — banner → CPE → CVE matcher. *(was #22; in flight: PR #43)*
 37. **CVSS v4 re-score** [risk] — override with audit trail. *(was #24; in flight: PR #45)*
 38. **BloodHound ingest** [wow] — SharpHound JSON → graph overlay. *(was #26; in flight: PR #47)*

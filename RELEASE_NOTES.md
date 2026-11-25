@@ -912,6 +912,16 @@ timeline all see the fleet; out-of-scope addresses are reported, never
 stored. Both endpoints take `engagement_id` and serve canned devices in
 sandbox. Fire TV card sweep buttons.
 
+## Backlog #21 — Shodan/Censys BYO import
+
+No API keys live in this repo, so there is no live Shodan/Censys client.
+`POST /api/intel/import` takes JSON the operator already exported from
+their own account — Shodan host objects (ports, product, `vulns` map),
+Censys hosts (services list), both search envelopes, or a minimal
+generic row — and ledgers assets, services and CVE leads scope-checked
+(out-of-scope reported, never stored). Recon card with source picker +
+JSON textarea; `GET /api/intel/formats` documents the accepted shapes.
+
 ## Backlog #18 — IPv6 discovery
 
 `POST /api/net/ipv6/discover` reads the kernel NDP table (`ip -6 neigh`,
