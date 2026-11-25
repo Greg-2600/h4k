@@ -76,7 +76,7 @@ pytest --cov --cov-report=term-missing
 
 Only commit when asked. Small, focused commits with a clear message:
 
-```
+```text
 feat(engagement): crown jewels + attack-path engine
 fix(ui): report preview threw ReferenceError on page switch
 test(e2e): selenium suite for crown jewels and ATT&CK panel

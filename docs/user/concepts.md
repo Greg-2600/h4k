@@ -96,7 +96,7 @@ database holding the thing you actually want. Each has a business **value**
 plausible foothold (a host with known vulns) to a crown jewel, using only
 edges backed by *verified* credential logins. Paths are scored:
 
-```
+```text
 score = crown_value + Σ(vuln severity weight) + 25·hops − 12·(hops−1) + foothold bonus
 ```
 

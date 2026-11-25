@@ -75,7 +75,7 @@ green gate never hides what was waived. Unknown severities count as `medium`
 400, never silent. Container card row + palette (`cigate`); threshold select +
 ignore box + findings JSON textarea; sandbox returns a canned FAIL.
 
-**Version 1.0 · h4k :: Intrusion-Suite**
+### Version 1.0 · h4k :: Intrusion-Suite
 
 A self-contained, containerized security **analysis platform** for authorized lab
 use. It drives the **Metasploit Framework** over its RPC interface and layers a
@@ -92,6 +92,7 @@ root-cause & patching, and responsible-disclosure scaffolding.
 ## 1.1 · What's new since 1.0
 
 **tryLocalRoot_go_bro — one-shot local-root assessment** (`services/privesc.py`)
+
 - `POST /api/tryLocalRoot_go_bro` runs every passwordless local-root path in
   one shot: the userns uid-0 try (`unshare -Urm id`, no sudo, no docker), the
   docker-group read-only try, and the full host audit (SUID, file caps + live
@@ -103,6 +104,7 @@ root-cause & patching, and responsible-disclosure scaffolding.
   `labs/docker-group-to-root/` and `labs/userns-root-no-sudo-no-docker/`.
 
 **Attack paths to crown jewels** (`services/attack_paths.py`)
+
 - Declare objectives — `POST /api/engagement/{id}/crown-jewels` (`host`, `label`,
   `value` 1–100). Scope-enforced like everything else.
 - `GET /api/engagement/{id}/attack-paths` returns scored, evidence-backed paths
@@ -117,6 +119,7 @@ root-cause & patching, and responsible-disclosure scaffolding.
   compute, ranked list, ATT&CK techniques per path).
 
 **ATT&CK mapping + detection guidance** (`services/attck.py`)
+
 - `GET /api/engagement/{id}/attck` maps every finding and verified credential to
   MITRE ATT&CK techniques; each technique carries log sources, event IDs and what
   to look for — the defender's language, not just the attacker's.
@@ -124,6 +127,7 @@ root-cause & patching, and responsible-disclosure scaffolding.
 - New Report-page card: **🛡️ ATT&CK & Detection Guidance**.
 
 **Sandbox mode** (`services/sandbox.py`, `H4K_SANDBOX=1`)
+
 - Deterministic stand-ins for the three external dependencies (nmap, hydra,
   Metasploit). Everything above the tool boundary — API, parsers, store, attack
   paths, UI — stays real. No network, no daemon, no credentials.
@@ -131,6 +135,7 @@ root-cause & patching, and responsible-disclosure scaffolding.
   credentials, 1 crown jewel) for demos and tests.
 
 **Selenium end-to-end suite** (`tests/e2e/`, `make e2e`)
+
 - Headless Chrome drives the real console against a real API in sandbox mode.
 - 20 tests: boot/navigation, scope picker, report preview, crown jewels,
   attack paths, ATT&CK panel, and a full autopilot walk.
@@ -138,7 +143,8 @@ root-cause & patching, and responsible-disclosure scaffolding.
   how the Report page's missing `renderReportPreview()` was found.
 - New CI job runs the browser suite next to lint/tests.
 
-**Bug fixes found by the new suites**
+### Bug fixes found by the new suites
+
 - Report page threw `ReferenceError: renderReportPreview is not defined` on every
   navigation to it (the function was called but never implemented).
 - `GET /api/graph` returned **500** whenever an engagement scope was active:
@@ -150,6 +156,7 @@ root-cause & patching, and responsible-disclosure scaffolding.
   success. Added `apiOrThrow()` and used it on the new endpoints.
 
 **Container boot reliability** (`h4k/entrypoint.sh`, `h4k/docker-compose.yml`)
+
 - The Metasploit database is now started, *waited for*, and **verified over
   RPC** before the API comes up. Previously the RPC daemon could start before
   the postgres cluster was reachable, answer "Database Not Loaded", and
@@ -168,6 +175,7 @@ root-cause & patching, and responsible-disclosure scaffolding.
   costs a handful of RPC calls instead of thousands.
 
 **Capability report** (`services/capabilities.py`, `GET /api/capabilities`)
+
 - Answers the question an operator actually has before a run: *what will work
   here, and what will fail silently?* Installed tools with versions,
   Metasploit reachability **and database state**, the data directory, the
@@ -178,6 +186,7 @@ root-cause & patching, and responsible-disclosure scaffolding.
   `scripts/sanity_check.py` asserts on it.
 
 **Banner-aware CVE matching** (fixes a critical false positive)
+
 - The matcher keyed the version ranges off the CVE's generic product (`ftp`)
   instead of the product actually detected on the wire (`vsftpd`), and when a
   version was known but no range existed it fell through to "vulnerable".
@@ -185,13 +194,15 @@ root-cause & patching, and responsible-disclosure scaffolding.
   CVE. Now: out-of-range versions exclude the CVE, and a match that cannot be
   ruled out is marked `_version_verified: false` instead of being asserted.
 
-**Engagement snapshots + attack-path export**
+### Engagement snapshots + attack-path export
+
 - `GET /api/engagement/{id}/export` → a portable snapshot; `POST .../import`
   merges one back in, scope-checking every host and reporting the ones that
   were skipped.
 - `GET /api/engagement/{id}/attack-paths?fmt=md` → a delivery-note writeup.
 
 **Passive auto-scan on boot** (`services/auto_scan.py`, `GET/POST /api/map*`)
+
 - As soon as the API comes up it detects the local subnet from the default
   route, creates a default `auto-scan` engagement, and runs a recon-only
   pass (ARP discovery, nmap fingerprint, CVE correlation — **no credentials,
@@ -204,7 +215,8 @@ root-cause & patching, and responsible-disclosure scaffolding.
   start building a network and service map looking for vulnerabilities right
   off the bat, passively."
 
-**Job monitor honesty + Recon that actually renders**
+### Job monitor honesty + Recon that actually renders
+
 - Every background runner flips `queued` → `running` up front (guarded so a
   pre-start abort is never clobbered). Previously the monitor read "queued"
   for entire multi-minute runs while progress advanced underneath.
@@ -218,6 +230,7 @@ root-cause & patching, and responsible-disclosure scaffolding.
   adjacency, so real-world OS guesses land in `os_guess`.
 
 **Documentation** (`docs/`)
+
 - New full documentation set: quickstart, concepts, workflows, UI guide,
   safety, troubleshooting, architecture, API reference, service reference, data
   model, testing guide, contributing, release process, threat model, scope
@@ -231,7 +244,7 @@ A browser-based terminal (web UI → FastAPI → Metasploit MessagePack-RPC) plu
 standalone **fuzzing lab** container. It moves from "scan a host" to "analyze the
 software you actually run" — the workflow real security teams use.
 
-```
+```text
 +----------+   HTTP/JSON   +--------------+  MessagePack-RPC  +-----------------+
 | browser  | ------------->|   FastAPI    |------------------>|  msfrpcd         |
 | terminal | (0.0.0.0:3137)|   (api/)     |     55553         |  Metasploit FWDB |
@@ -315,7 +328,6 @@ A per-target scan is stateless and dies with the process. An engagement is not.
   inferred from "these hosts both run ssh" — consistent with D16.
 - **Attempt ledger** — a failed replay is recorded too, so re-running is cheap
   and the attempt count stays a real cost bound (`MAX_ATTEMPTS = 500`).
-
 
 ### 2.4 Software analysis on source you provide
 
@@ -475,7 +487,7 @@ Or `docker compose up --build` (h4k + vulnlab together).
 
 ## 5 · REST surface
 
-```
+```text
 POST  /api/scan                       {target, mode, try_default_creds, do_attack...}
 GET   /api/jobs ?active=true          all job families merged, newest first
 GET   /api/jobs/{id}                  status · progress · log · report
@@ -553,7 +565,7 @@ GET   /api/health
 
 ## 8 · Layout
 
-```
+```text
 Dockerfile · docker-compose.yml     platform image (+ vulnlab service)
 api/
   main.py · schemas.py · app_state.py
@@ -783,6 +795,7 @@ locked crash registry — two workers tripping the same bug report one
 crash. Per-worker errors are recorded, never fatal; output is sorted
 by crash id for stable responses. Bounded (8 workers × 2000 inputs).
 Fuzz-lab row + palette; sandbox fully canned.
+
 ## Backlog #56 — stateful fuzz
 
 `POST /api/stateful_fuzz` logs in fresh every iteration with the
@@ -997,6 +1010,7 @@ curated NSE scripts (16 services; unknown falls back to the generic
 `vuln,default` sweep rather than inventing names). Running stays explicit
 via `POST /api/nmap/nse` — nothing fires on suggest. Recon NSE card:
 Suggest → per-script list → Run. Sandbox refuses to spawn nmap and says so.
+
 ## Backlog #7 — SMB share enumerator
 
 `POST /api/smb/shares` (opt-in, null session default) parses `smbclient -L`
@@ -1012,6 +1026,7 @@ credentials: reuse (same pair on N hosts), weak (short/common heuristic,
 labeled as such), default (pair ships in `data/creds.json`), plus a 0–100
 score. Read-only — nothing is sprayed. Pivot ledger card button + findings;
 sandbox-seeded estate shows reuse on its first load.
+
 ## Backlog #5 — scheduled re-scans + diff-alert digest
 
 Watch config gains `interval` (seconds, 0 = off, max 24 h): the auto-scan
@@ -1030,6 +1045,7 @@ out-of-scope hosts reported not stored). `GET /api/nuclei/templates` exposes
 the 3-template bundle (`h4k/data/nuclei-templates/`: log4shell, struts-rce,
 bluekeep). Sandbox mode returns a canned critical finding so the Recon card +
 palette button and e2e stay hermetic.
+
 ## Backlog #3 — DAST spider + auth crawl
 
 `POST /api/spider` (opt-in) crawls one web surface you own with a

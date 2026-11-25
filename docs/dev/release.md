@@ -31,15 +31,15 @@ release notes.
 
 ## Checklist
 
-- [ ] `make lint` green
-- [ ] `make test` green (coverage ≥ 90%)
-- [ ] `make e2e` green (Selenium)
-- [ ] Version bumped in `h4k/api/main.py`
-- [ ] `RELEASE_NOTES.md` updated (features + design decisions)
-- [ ] `ROADMAP.md` updated (ticks for what shipped)
-- [ ] `docs/` updated where behaviour changed
-- [ ] `AGENTS.md` updated if structure changed
-- [ ] Git tag pushed
+* [ ] `make lint` green
+* [ ] `make test` green (coverage ≥ 90%)
+* [ ] `make e2e` green (Selenium)
+* [ ] Version bumped in `h4k/api/main.py`
+* [ ] `RELEASE_NOTES.md` updated (features + design decisions)
+* [ ] `ROADMAP.md` updated (ticks for what shipped)
+* [ ] `docs/` updated where behaviour changed
+* [ ] `AGENTS.md` updated if structure changed
+* [ ] Git tag pushed
 
 ## Image notes
 

@@ -91,7 +91,7 @@ Transmission ignores tracker peers it can't reach, refuses `x.pe`, prefers
 µTP, and wants a **bencoded (BEP 48)** tracker response. `scripts/torrent_seeder.py`
 and `scripts/torrent_tracker.py` implement exactly that:
 
-```
+```text
 attacker                                  victim (pi.hole)
   tracker  :6883  ── announce ─────────▶  Transmission (9091)
   seeder   :6882  ◀── peer (TCP)  ──────  "give me piece 0"

@@ -199,6 +199,7 @@ curl .../api/session/report?fmt=md       # the disclosure-ready writeup
 ---
 
 ## 8. Source analysis → disclosure
+
 **Goal:** review third-party code you were asked to look at.
 
 ```sh

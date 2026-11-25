@@ -1,0 +1,7 @@
+{
+  // Long prose lines are the established style across the docs and release notes.
+  "MD013": false,
+  // Compact table pipes are used throughout the existing documentation.
+  "MD060": false,
+  "default": true
+}

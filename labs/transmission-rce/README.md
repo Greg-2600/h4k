@@ -21,7 +21,7 @@ chain end to end.
 
 ## The chain
 
-```
+```text
 1. file write   the attacker serves a one-piece .torrent from their own
                 tracker; the daemon fetches it and writes the payload into
                 /downloads/payload.sh

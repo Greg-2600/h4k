@@ -46,33 +46,34 @@ the real action.
 A **Workflow** strip tracks scope → scan → fingerprint → win (click a step
 to jump there). Then: scope summary (what you are allowed to touch),
 target input + mode/depth, Scan, Neighbors (ARP), passive auto-scan state
+
 + toggle. Results flow into Recon.
 
 ### 2. Recon — fingerprint, vulns
 
-* **Services** — fingerprinted open ports with a per-row exploit shortcut.
-* **Likely vulnerable** — banner-aware CVE hits with severity and a fire button.
-* **Web assessment** — nikto scan + gobuster content discovery for one web
++ **Services** — fingerprinted open ports with a per-row exploit shortcut.
++ **Likely vulnerable** — banner-aware CVE hits with severity and a fire button.
++ **Web assessment** — nikto scan + gobuster content discovery for one web
   surface you own.
 
 ### 3. Exploit — win the first shell
 
-* **Attack queue** — ranked next moves from the next-move engine, each with a fire button.
-* **Autopilot** — discovery → fingerprint → CVE → password attacks → exploits. Requires an active scope. Live log + host table.
-* **Password attacks** — services worth trying, driven by verified cred families.
-* **Fuzz lab** — lab-only black-box fuzzing of a service you own, with crash reproduce output.
-* **Container surfaces** — inventory Docker/containerd/kubelet runtimes,
++ **Attack queue** — ranked next moves from the next-move engine, each with a fire button.
++ **Autopilot** — discovery → fingerprint → CVE → password attacks → exploits. Requires an active scope. Live log + host table.
++ **Password attacks** — services worth trying, driven by verified cred families.
++ **Fuzz lab** — lab-only black-box fuzzing of a service you own, with crash reproduce output.
++ **Container surfaces** — inventory Docker/containerd/kubelet runtimes,
   then fuzz one surface you own (job-based, candidates stream in).
 
 ### 4. Pivot — turn one shell into many
 
-* **Shells** — live sessions with a session console. Output is scanned for flag-shaped secrets.
-* **Credential ledger** — verified credentials only. Propagation plan + Execute replays them across in-scope services.
-* **Route map** — local interfaces and routes for pivot planning (read-only).
-* **Interrogate** — enumerate DBs/configs/APIs on a compromised host for flag-shaped strings; container-escape check (read-only detect).
-* **Try local root** — one-shot passwordless assessment (userns uid 0,
++ **Shells** — live sessions with a session console. Output is scanned for flag-shaped secrets.
++ **Credential ledger** — verified credentials only. Propagation plan + Execute replays them across in-scope services.
++ **Route map** — local interfaces and routes for pivot planning (read-only).
++ **Interrogate** — enumerate DBs/configs/APIs on a compromised host for flag-shaped strings; container-escape check (read-only detect).
++ **Try local root** — one-shot passwordless assessment (userns uid 0,
   docker-group read, SUID/caps/gates/CVE posture). Read-only, no password.
-* **Fire TV** — recon / pair / state / apps / screenshot for an Android TV
++ **Fire TV** — recon / pair / state / apps / screenshot for an Android TV
   you own. Pairing needs the on-TV code; shell-class actions need approval
   on the TV.
 
@@ -85,19 +86,19 @@ are how you return.
 
 ### 6. Score — flags, objective, writeup
 
-* **Flags** — captured flags (value, host, auto/manual). Add manually or Scan output (auto-detect in console output).
-* **Crown jewels → attack paths** — declare objectives, Compute paths (or
++ **Flags** — captured flags (value, host, auto/manual). Add manually or Scan output (auto-detect in console output).
++ **Crown jewels → attack paths** — declare objectives, Compute paths (or
   Flag paths for captured flags), read score/hops/vulns.
-* **Blue-team handoff** — Navigator layer, experimental Sigma bundle, and
++ **Blue-team handoff** — Navigator layer, experimental Sigma bundle, and
   defender writeup generated from this engagement's observed techniques.
   Download Layer / Sigma / Writeup; everything is marked tune-before-use.
-* **ATT&CK & detection** — findings mapped to techniques with telemetry.
-* **Lab watch** — estate change history for the active engagement. Every
++ **ATT&CK & detection** — findings mapped to techniques with telemetry.
++ **Lab watch** — estate change history for the active engagement. Every
   auto-scan pass snapshots the in-scope estate and diffs it: new/vanished
   hosts, opened/closed services, changed banners, new/cleared CVE matches.
   Snapshot now baselines the latest finished scan; rescan (or auto-scan) to
   see what moved. Session and merged reports include a Lab watch section.
-* **Report** — machine-generated markdown writeup, Download MD. Includes a
++ **Report** — machine-generated markdown writeup, Download MD. Includes a
   Lab watch section and a Blue-team handoff section (observed techniques).
 
 ---
@@ -122,8 +123,8 @@ container-fuzz (`cfuzz`) · persist · score · theme · clear.
 
 ## Accessibility & responsiveness
 
-* Visible labels on every control; focus outlines preserved.
-* The page never scrolls sideways: cards stack, tables scroll inside their
++ Visible labels on every control; focus outlines preserved.
++ The page never scrolls sideways: cards stack, tables scroll inside their
   card (`.tbl-wrap`), the two-column workspace + rail collapses to one column
   under 900 px, the workspace strip scrolls, and the status bar sheds chrome
   as width shrinks (scope goes full-width ≤900px, pills collapse to dots

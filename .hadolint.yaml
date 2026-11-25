@@ -8,3 +8,5 @@ ignored:
   - DL3018  # apk pinning: same rolling rationale as DL3008 (vulnlab)
   - DL4006  # pipefail: RUN lines are single pipelines ending in explicit cleanup; curl -f fails loudly
   - SC2015  # A && B || C: used only with `|| true`-style guards, no masked status
+  - DL3064  # MSF_PASSWORD is a documented lab default, not a user secret
+  - DL3066  # named sandbox and agent users are created in the image deliberately

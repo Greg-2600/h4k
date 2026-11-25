@@ -17,5 +17,6 @@ flake8
 pylint
 mypy
 bandit
+yamllint
 safety
 shellcheck-py  # provides the `shellcheck` binary; hadolint is fetched by make (see HADOLINT_VERSION)

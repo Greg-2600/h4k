@@ -11,6 +11,6 @@ COPY simulator.py /opt/iotlab/simulator.py
 EXPOSE 1883 502 5683/udp 1900/udp 47808/udp 161/udp 554 8080
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
-  CMD IOT_HEALTH=1 python3 /opt/iotlab/simulator.py | grep -q '"ok"' || exit 1
+  CMD ["sh", "-c", "IOT_HEALTH=1 python3 /opt/iotlab/simulator.py | grep -q ok || exit 1"]
 
 ENTRYPOINT ["python3", "/opt/iotlab/simulator.py"]

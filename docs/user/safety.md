@@ -36,11 +36,13 @@ most jurisdictions (e.g. CFAA in the US, Computer Misuse Act in the UK,
 1. **Get authorization in writing.** A ticket, an email, a signed scope
    document. Note the exact hosts and the window.
 2. **Define the scope in h4k**, not in your head:
+
    ```sh
    curl -X POST http://127.0.0.1:3137/api/engagement \
      -H 'Content-Type: application/json' \
      -d '{"name":"acme red","scope":["10.0.0.0/24"],"notes":"signed SOW-2026-14"}'
    ```
+
 3. **Set the active scope** (the header scope picker or
    `POST /api/session/scope`). With no scope, aggressive actions are refused.
 4. **Know the blast radius of the action you are about to click.** Password
@@ -68,6 +70,7 @@ most jurisdictions (e.g. CFAA in the US, Computer Misuse Act in the UK,
   run**. h4k's PoC skeleton is designed for that.
 * Delete `h4k_data` when the engagement closes if the credentials are no
   longer needed:
+
   ```sh
   docker volume rm h4k_data
   ```

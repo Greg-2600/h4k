@@ -230,7 +230,7 @@ PR #N)* have an open PR implementing exactly that scope — work the
 lowest-numbered item that is neither done nor in flight, and never duplicate
 in-flight work. Deliberately cut as out of scope: mobile triage, themes,
 i18n, QR share, wardrive/SDR/RFID/USB hardware, the air-gapped model bundle,
-#189 rate-limit map (covered by Done #20), #190 batching check (covered by
+\# 189 rate-limit map (covered by Done #20), #190 batching check (covered by
 Done #17). All opt-in where aggressive (D5/D24); sandbox stand-ins required
 where network/tooling is involved.
 

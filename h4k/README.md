@@ -1,4 +1,5 @@
-```
+<!-- markdownlint-disable MD033 MD041 -->
+```text
                  _____
                 |  .  |  ...   h4k :: intrusion-suite :: 3137
                 |___.__|
@@ -14,7 +15,7 @@
  /                           ||  ||
 ```
 
-```
+```text
  HHHHHHHH    AAAA    KKK   KKK
  H          A    A   KKK  KK
  HHHHHHHH  AAAAAAAA  KKKK
@@ -24,7 +25,7 @@
 
 ## h4k :: Intrusion-Suite
 
-```
+```text
 +----------------------------------------------------------------------+
 |  PHRACK 14 (REVISED) -- a window into the wires
 +----------------------------------------------------------------------+
@@ -59,7 +60,7 @@ and the deep toolkit (brute force, web vuln, SQLi) sweep — is **opt-in and off
 by default**. A plain scan only reconnoiters, fingerprints, and advises. You
 flip the switches, on your own lab range, on your own terms.
 
-```
+```text
 +----------------------------------------------------------------------+
 +  AUTHORIZATION IS NOT OPTIONAL.                                       +
 +  Run this suite ONLY against systems you own or hold written         +
@@ -72,7 +73,7 @@ flip the switches, on your own lab range, on your own terms.
 
 ## 1 · The lay of the land
 
-```
+```text
 +----------+    HTTP/JSON    +--------------+   MessagePack-RPC   +-----------------+
 |  browser | --------------> |   FastAPI    | -------------------> |   msfrpcd       |
 | console  |   (web UI on   |   (api/)     |    port 3137:55553   |   Metasploit     |
@@ -114,7 +115,7 @@ through Tor's SOCKS listener — no wrapper re-jiggering needed for the modules.
 
 ## 3 · The pipeline, stage by stage
 
-```
+```text
 target  ─► normalize (ip / cidr / hostname)
    │
    ├─ [DNS recon]      dns_dumpster · sub_domain_lookup · dnstracer · dig       (domain)
@@ -265,7 +266,7 @@ serving the UI on **0.0.0.0:3137**.
 
 ### The REST surface
 
-```
+```text
 POST  /api/scan                      {target, mode, do_dns_recon, do_vuln_scan,
                                       try_default_creds, open_sessions, do_attack}
 GET   /api/jobs/{id}                 status · progress · message · log · report
@@ -300,7 +301,7 @@ target before anything is sent.
 
 The console still accepts shortcuts, and the panes still have buttons:
 
-```
+```text
 h4k ➜ ~ scan 192.168.1.248 overt
 h4k ➜ ~ status
 h4k ➜ ~ clear
@@ -320,7 +321,7 @@ ssh/http/smb/dns) drives the non-Metasploit sweep.
 The repo is kept honest with a full static-analysis stack, wired through
 `make` and `pyproject.toml`:
 
-```
+```text
 make setup      build a .venv with the dev toolchain
 make fmt        black + isort in place
 make fix        ruff --fix
@@ -353,7 +354,7 @@ mocked Metasploit backend — no live daemon needed to run them.
 
 ## 6 · Layout
 
-```
+```text
 Dockerfile          postgres + tor + proxychains + metasploit + api
 entrypoint.sh       boot: pg → msfdb → tor → msfrpcd → uvicorn
 requirements.txt    runtime deps
