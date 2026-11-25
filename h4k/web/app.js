@@ -1090,8 +1090,8 @@ async function runIntelImport() {
     $('intel-body').innerHTML = `<div data-testid="intel-result">${esc(`${res.rows || 0} row(s), ${res.recorded || 0} recorded, ${(res.skipped_out_of_scope || []).length} out of scope`)}</div>`;
     log(`intel import: ${res.recorded || 0} recorded`, 'success');
     refreshStatus();
-  } catch (e) { $('intel-body').textContent = `intel import failed: ${e.message}`; }}
-
+  } catch (e) { $('intel-body').textContent = `intel import failed: ${e.message}`; }
+}
 
 async function runNikto() {
   const target = $('web-target').value.trim();
