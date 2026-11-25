@@ -42,13 +42,28 @@ jobs:
         run: |
           {
             echo "### Coverage"
-            echo '```text'
-            if [ -f .coverage ]; then
-              .venv/bin/coverage report --rcfile=pyproject.toml
+            if [ -f coverage.xml ]; then
+              .venv/bin/python - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("coverage.xml").getroot()
+          total = float(root.get("line-rate", "0")) * 100
+          print(f"**Line coverage:** {total:.2f}% (floor: 90%)")
+          print()
+          print("Lowest covered files:")
+          print()
+          print("| File | Lines |")
+          print("| --- | --- |")
+          rows = sorted(
+              (float(cls.get("line-rate", "0")) * 100, cls.get("filename", ""))
+              for cls in root.iter("class")
+          )
+          for rate, filename in rows[:20]:
+              print(f"| {filename} | {rate:.1f}% |")
+          PY
             else
-              echo "Coverage data was not produced."
+              echo "Coverage XML was not produced."
             fi
-            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage report
