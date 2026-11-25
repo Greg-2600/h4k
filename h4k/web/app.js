@@ -1098,6 +1098,8 @@ async function listSuppressions() {
       ? items.map((s) => `<div data-testid="sup-item"><b>${esc(s.name)}</b> on ${esc(s.host)} — ${esc(s.reason)} <span class="muted">until ${esc(s.expires_at || '—')}</span></div>`).join('')
       : 'no suppressions recorded';
   } catch (e) { $('sup-body').textContent = `list failed: ${e.message}`; }
+}
+
 async function runSmbEnum() {
   const target = $('smb-target').value.trim() || $('target').value.trim();
   if (!target) { log('smb needs a target', 'warn'); return; }
