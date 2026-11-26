@@ -383,7 +383,7 @@ data/users.txt      deep-toolkit username list
 data/passwords.txt  deep-toolkit password list
 web/                term-style UI (html/css/js) + phrack ezine README view
 scripts/            DNS recon bash tools (from the author's toolbox)
-tests/              99 unit + API tests
+tests/              1835 unit + API tests
 ```
 
 ---

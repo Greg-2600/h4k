@@ -151,7 +151,7 @@ flowchart TB
 
     subgraph api["FastAPI (api/)"]
         R["routers/ scan · source · update · net · engagement"]
-        S["services ~65 modules<br/>(pipeline, recon, exploit, CTF tools,<br/>SAST/SCA, fuzzing, AI, Fire TV, container-fuzz)"]
+        S["services 111 modules<br/>(pipeline, recon, exploit, CTF tools,<br/>SAST/SCA, fuzzing, AI, Fire TV, container-fuzz)"]
     end
 
     subgraph msf["Metasploit"]
@@ -215,7 +215,7 @@ h4k/                   git root
   docs/                 full documentation set (user / dev / security / examples)
   Makefile · pyproject.toml   lint/test config
   h4k/                  the main platform image
-    api/                FastAPI app (routers + ~60 services)
+    api/                FastAPI app (15 routers + 111 services)
     web/                kill-chain console (Discover → Recon → Exploit → Pivot → Persist → Score)
     data/               CVE/creds archives + wordlists
     Dockerfile · docker-compose.yml · entrypoint.sh
