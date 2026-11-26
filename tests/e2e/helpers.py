@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import time
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -69,19 +68,32 @@ def rows_of(page, testid):
 
 
 def go_to(page, tab):
-    """Click a top-level workspace button (map | operate | access | loot)."""
+    """Switch workspace tabs and wait until the target panel is rendered.
+
+    A fixed sleep after the nav click is not enough: on a slow or busy
+    runner the click can land before boot has bound the tab handlers (or
+    be reset by boot's own setTab), leaving the panel hidden. Poll for the
+    panel itself and retry the nav click until it actually activates.
+    """
+    selector = f'.ws-btn[data-tab="{tab}"]'
     WebDriverWait(page, 30).until(
-        lambda d: len(d.find_elements(By.CSS_SELECTOR, f'.ws-btn[data-tab="{tab}"]'))
-        > 0
+        lambda d: len(d.find_elements(By.CSS_SELECTOR, selector)) > 0
     )
-    btn = page.find_element(By.CSS_SELECTOR, f'.ws-btn[data-tab="{tab}"]')
     WebDriverWait(page, 30).until(
-        EC.visibility_of_element_located(
-            (By.CSS_SELECTOR, f'.ws-btn[data-tab="{tab}"]')
+        EC.visibility_of_element_located((By.CSS_SELECTOR, selector))
+    )
+
+    def _active(driver):
+        panels = driver.find_elements(
+            By.CSS_SELECTOR, f'.ws-panel[data-tab="{tab}"].active'
         )
-    )
-    btn.click()
-    time.sleep(0.2)
+        if panels and panels[0].is_displayed():
+            return True
+        with contextlib.suppress(Exception):
+            driver.find_element(By.CSS_SELECTOR, selector).click()
+        return False
+
+    WebDriverWait(page, 30).until(_active)
 
 
 def click(page, testid):
