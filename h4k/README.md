@@ -326,7 +326,7 @@ make setup      build a .venv with the dev toolchain
 make fmt        black + isort in place
 make fix        ruff --fix
 make lint       black · ruff · isort · flake8 · mypy · pylint · bandit
-make test       pytest (85 tests)
+make test       pytest (1835 collected)
 make coverage   pytest --cov   (90% gate)
 ```
 
@@ -344,7 +344,7 @@ Current status: **all green.**
   (**CVE-2026-5463**, command injection). It is pinned in the lock/requirements
   and the RPC calls it exposes are only fed internally-constructed arguments.
 
-The tests live in `tests/` (99 passing) and cover the schemas, the OPSEC mode
+The tests live in `tests/` (1835 unit + API collected, plus 79 Selenium e2e) and cover the schemas, the OPSEC mode
 matrix, the CVE matcher (including the CherryPy not-included guard), the
 default-credential archive and attempt flow, recommendation scoring/ranking,
 the pipeline's pure helpers, the attack/toolkit plan, and the HTTP API via a
