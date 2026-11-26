@@ -38,7 +38,7 @@ HACKING/                 git root
       main.py            app + lifespan (starts periodic updater)
       schemas.py         all pydantic models
       routers/           scan.py, source.py, update.py, net.py, engagement.py
-      services/          ~30 modules (see below)
+      services/          111 modules (see below)
     data/                cves.json, creds.json, wordlists, custom_rules.json (runtime)
     web/                 dashboard + native Operations panes
                          (index.html, app.js, style.css)

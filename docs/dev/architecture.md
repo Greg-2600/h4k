@@ -13,7 +13,7 @@ How h4k is put together, and why.
 │ FastAPI (h4k/api)                                                    │
 │  main.py        app, lifespan, rate limiting, static mount            │
 │  routers/       scan · source · update · net · engagement            │
-│  services/      ~65 modules: pipeline, recon, exploit,               │
+│  services/      111 modules: pipeline, recon, exploit,               │
 │                 SCA, fuzzing, AI, Fire TV, container-fuzz …          │
 └───────┬───────────────────────────────┬───────────────────────────────┘
         │ RPC                          │ subprocess

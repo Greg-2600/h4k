@@ -38,8 +38,8 @@ The list this session worked through, and what is still open. Items marked
 | F-4 | **Capability/readiness report** (`/api/capabilities`) + UI badge | **[done]** |
 | F-5 | **Attack-path export** (`?fmt=md`) for delivery notes | **[done]** |
 | F-6 | **Engagement snapshot export/import** (`/export`, `/import`) — portable, scope-checked | **[done]** |
-| F-7 | **Selenium E2E suite** (21 tests) with a sandbox-mode API | **[done]** |
-| F-8 | **Full documentation set** (`docs/`, 18 files) | **[done]** |
+| F-7 | **Selenium E2E suite** (79 tests) with a sandbox-mode API | **[done]** |
+| F-8 | **Full documentation set** (`docs/`, 23 Markdown files) | **[done]** |
 | F-9 | **Sandbox mode** — deterministic, offline, zero-touch mode for demos/CI/E2E | **[done]** |
 | F-10 | **`labs/transmission-rce`** — a lab that demonstrates unauthenticated RPC → file write → RCE | **[done]** |
 | F-11 | **Wordlist management** — list the bundled lists *and* the distro ones (nmap 5 k, seclists, rockyou) so password attacks are not limited to 74 words | partly **[done]** (discovery in `/api/capabilities`; the selector UI is open) |
