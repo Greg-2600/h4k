@@ -47,6 +47,65 @@ def test_digest_empty_state(tmp_path: Any) -> None:
     assert "No estate changes" in md
 
 
+def test_digest_renders_hot_and_cold_snapshots(tmp_path: Any) -> None:
+    store = EngagementStore(tmp_path / "digest-changes.db")
+    eng = _eng(store)
+    store.record_watch_snapshot(
+        eng["id"],
+        {
+            "hosts": [
+                {
+                    "address": "10.0.0.5",
+                    "services": [{"port": 22, "proto": "tcp", "service": "ssh"}],
+                }
+            ],
+            "vulns": [],
+        },
+        source="auto",
+    )
+    store.record_watch_snapshot(
+        eng["id"],
+        {
+            "hosts": [
+                {
+                    "address": "10.0.0.5",
+                    "services": [
+                        {"port": 22, "proto": "tcp", "service": "ssh"},
+                        {"port": 80, "proto": "tcp", "service": "http"},
+                    ],
+                },
+                {"address": "10.0.0.6"},
+            ],
+            "vulns": [
+                {
+                    "host": "10.0.0.6",
+                    "name": "CVE-2021-44228",
+                    "port": 443,
+                    "severity": "high",
+                }
+            ],
+        },
+        source="scheduled",
+    )
+    md = digest_markdown(store, eng["id"])
+    assert md.startswith("# Lab Watch digest")
+    assert "2 snapshot(s), 1 with new attack surface." in md
+    assert "🔴" in md and "⚪" in md
+    assert "- appeared_hosts: 1" in md and "  - 10.0.0.6" in md
+    assert "- new_services: 1" in md
+    assert "- new_vulns: 1" in md and "CVE-2021-44228" in md
+
+
+def test_digest_rejects_unknown_engagement(tmp_path: Any) -> None:
+    store = EngagementStore(tmp_path / "digest-missing.db")
+    try:
+        digest_markdown(store, "does-not-exist")
+    except ValueError as exc:
+        assert "unknown engagement" in str(exc)
+    else:
+        raise AssertionError("unknown engagement must raise")
+
+
 def test_rescan_and_digest_router(tmp_path: Any, monkeypatch: Any) -> None:
     from contextlib import asynccontextmanager
 
