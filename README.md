@@ -240,7 +240,10 @@ make e2e     # Selenium browser suite (headless Chrome)
 make coverage # pytest --cov (90% gate)
 ```
 
-All linters pass and the suite is green. Tests run offline (a mocked Metasploit
+All linters pass and the suite is green. The unit + API suite currently collects
+**1835 tests** (plus **79 Selenium e2e tests**, **1914 total**). Measure it with
+`pytest --collect-only -q --ignore=tests/e2e` (unit + API) or
+`pytest --collect-only -q` (everything). Tests run offline (a mocked Metasploit
 backend powers the API tests - no live daemon needed).
 
 The **Selenium suite** drives a real browser against a real API started in

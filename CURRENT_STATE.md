@@ -1,6 +1,6 @@
 # h4k — current project state (read this first in a new session)
 
-> Last updated: 2026-11-21 · branch `sync/converge` (origin/main + the local feature set)
+> Last updated: 2026-11-25 · branch `main`
 
 This file is a **snapshot of the live project** so a fresh session can pick up
 immediately: what's running, what's committed, how to bring it up, and what's on
@@ -12,8 +12,8 @@ the immediate horizon.
 
 | Item | Status |
 |---|---|
-| Git branch | `sync/converge` (converged; promote to `main` when pushed) |
-| Tests | **1806 passing**, 3 skipped, 3 macOS-only env failures (Linux CI green) |
+| Git branch | `main` |
+| Tests | **1835 collected** unit + API (`pytest --collect-only -q --ignore=tests/e2e`), +79 Selenium e2e (**1914 total**) |
 | Coverage | **~90%** (CI gate 90%) |
 | Linters | black · ruff · mypy green |
 | Container | **`h4k`** on the `h4k-net` bridge, UI `http://127.0.0.1:3137` (single native page; Operations tab) |
@@ -131,7 +131,7 @@ source .venv/bin/activate        # or .venv/bin/<tool>
 make fmt      # black + isort
 make fix      # ruff --fix
 make lint     # black ruff isort flake8 mypy pylint bandit
-make test     # pytest in container, no host exec (1367)
+make test     # pytest in container, no host exec (1835 collected)
 make coverage # pytest --cov
 ```
 
