@@ -36,6 +36,8 @@ from schemas import (
     SourceFinding,
     SourceScanRequest,
     SourceScanResult,
+    SupplyChainPolicyRequest,
+    SupplyChainPolicyResult,
     SupplyChainRequest,
     SupplyChainResult,
     SuppressMatchRequest,
@@ -352,6 +354,60 @@ def supply_chain(req: SupplyChainRequest) -> SupplyChainResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return SupplyChainResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/supply-chain/policy", response_model=SupplyChainPolicyResult)
+def supply_chain_policy(req: SupplyChainPolicyRequest) -> SupplyChainPolicyResult:
+    """License gate + SBOM diff + pin bot over pasted dependency lists (offline).
+
+    `baseline`/`current` accept dependency lists or CycloneDX-style objects with
+    `components`; dependency records carry name/version/ecosystem/license/cves
+    plus optional `latest`/`resolved` versions. Denied/warned licenses and CVEs
+    introduced since the baseline are ledgered as vulns on the labeled host when
+    `engagement_id` is set (scope-enforced). The pin bot only suggests versions
+    the caller supplied and never edits a manifest. Sandbox returns canned data.
+    """
+    from services import sandbox as sandbox_mode
+    from services.supply_chain_policy import analyze, sandbox_result, to_ledger
+
+    if not req.current:
+        raise HTTPException(status_code=400, detail="current dependencies required")
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = analyze(
+                req.baseline,
+                req.current,
+                deny_licenses=req.deny_licenses,
+                warn_licenses=req.warn_licenses,
+                allow_licenses=req.allow_licenses,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, result):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return SupplyChainPolicyResult(
         **{
             **result,
             "ingested": ingested,

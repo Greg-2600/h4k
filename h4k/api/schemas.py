@@ -1229,6 +1229,43 @@ class SupplyChainResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Supply-chain policy: license gate + SBOM diff + pin bot ----
+class SupplyChainPolicyRequest(BaseModel):
+    """License gate + SBOM diff + pin bot over pasted dependency lists.
+
+    `baseline` and `current` accept a dependency list or a CycloneDX-style
+    object with `components`. Each dependency may carry name, version,
+    ecosystem, license(s), cves and an optional `latest`/`resolved` version
+    used only for pin suggestions. `deny_licenses`/`warn_licenses` extend the
+    built-in policy; `allow_licenses` overrides it. `host` labels the ledger.
+    """
+
+    baseline: Any = Field(default_factory=list)
+    current: Any = Field(default_factory=list)
+    deny_licenses: list[str] = Field(default_factory=list)
+    warn_licenses: list[str] = Field(default_factory=list)
+    allow_licenses: list[str] = Field(default_factory=list)
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class SupplyChainPolicyResult(BaseModel):
+    baseline_count: int = 0
+    current_count: int = 0
+    policy: dict[str, list[str]] = Field(default_factory=dict)
+    license_counts: dict[str, int] = Field(default_factory=dict)
+    license_verdicts: list[dict[str, Any]] = []
+    denied: list[dict[str, Any]] = []
+    warned: list[dict[str, Any]] = []
+    diff: dict[str, Any] = Field(default_factory=dict)
+    pin_bot: list[dict[str, Any]] = []
+    pin_count: int = 0
+    limitations: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Secret baseline + allowlist ----
 class SecretsScanRequest(BaseModel):
     """Secret scan with baseline + allowlist noise reduction (offline).
