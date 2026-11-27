@@ -1197,6 +1197,38 @@ class MultilangScanResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Typosquat heuristics + SLSA provenance ingest ----
+class SupplyChainRequest(BaseModel):
+    """Typosquat heuristics + SLSA/build-info provenance ingest (offline).
+
+    `packages` holds names, purls, or {name, ecosystem, version} objects;
+    `provenance` holds SLSA/in-toto statements or plain build-info records.
+    `allowlist` suppresses known-good package names. `host` labels the ledger.
+    """
+
+    packages: list[Any] = Field(default_factory=list)
+    provenance: list[Any] = Field(default_factory=list)
+    allowlist: list[str] = Field(default_factory=list)
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class SupplyChainResult(BaseModel):
+    package_count: int = 0
+    suspicious_count: int = 0
+    packages: list[dict[str, Any]] = []
+    typosquats: list[dict[str, Any]] = []
+    provenance_count: int = 0
+    provenance_complete: int = 0
+    provenance_partial: int = 0
+    provenance_unknown: int = 0
+    provenance: list[dict[str, Any]] = []
+    limitations: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Secret baseline + allowlist ----
 class SecretsScanRequest(BaseModel):
     """Secret scan with baseline + allowlist noise reduction (offline).
