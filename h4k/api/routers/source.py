@@ -46,6 +46,8 @@ from schemas import (
     TriageResult,
     VerifyFixRequest,
     VerifyFixResult,
+    VulnVexRequest,
+    VulnVexResult,
 )
 from services import (
     ai as ai_service,
@@ -350,6 +352,61 @@ def supply_chain(req: SupplyChainRequest) -> SupplyChainResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return SupplyChainResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/vuln-vex", response_model=VulnVexResult)
+def vuln_vex(req: VulnVexRequest) -> VulnVexResult:
+    """Turn vulnerable dependencies into sink paths + VEX statements (offline).
+
+    `dependencies` are SCA findings; `bundle` (=== path === blocks) or `files`
+    hold the sources. A tainted path to a curated vulnerable API makes the
+    component `affected`; no path (or no import) makes it `not_affected` with
+    the reason recorded; a package without a rule is `under_investigation`.
+    Operator `justifications` override the verdict with their reason verbatim.
+    Only affected statements ledger as vulns on the labeled host when
+    `engagement_id` is set (scope-enforced). Sandbox returns canned statements.
+    """
+    from services import sandbox as sandbox_mode
+    from services.taint_pack import parse_bundle
+    from services.vuln_vex import analyze, sandbox_result, to_ledger
+
+    files = list(req.files or [])
+    if req.bundle and req.bundle.strip():
+        files.extend(parse_bundle(req.bundle))
+    if not files:
+        raise HTTPException(status_code=400, detail="bundle or files required")
+    if not req.dependencies:
+        raise HTTPException(status_code=400, detail="dependencies required")
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = analyze(req.dependencies, files, justifications=req.justifications)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, result["statements"]):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return VulnVexResult(
         **{
             **result,
             "ingested": ingested,

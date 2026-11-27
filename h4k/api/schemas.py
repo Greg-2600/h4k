@@ -1139,6 +1139,41 @@ class TaintScanResult(BaseModel):
     skipped_out_of_scope: list[str] = []
 
 
+# ---- Vulnerable-dependency taint + VEX ----
+class VulnVexRequest(BaseModel):
+    """Correlate SCA findings with tainted sink paths and VEX statements.
+
+    `dependencies` holds vulnerable components ({name|purl, version, cve|cves,
+    severity, ...}); `bundle` (=== path === blocks) or `files` holds the
+    sources. `justifications` holds operator not-affected assertions
+    ({cve|package, reason, justification_type?}). All input stays in-process.
+    """
+
+    bundle: str = ""
+    files: list[dict[str, str]] = Field(default_factory=list)
+    dependencies: list[dict[str, Any]] = Field(default_factory=list)
+    justifications: list[dict[str, Any]] = Field(default_factory=list)
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class VulnVexResult(BaseModel):
+    dependencies: int = 0
+    packages: list[str] = []
+    cves: list[str] = []
+    matched_rules: int = 0
+    affected: int = 0
+    not_affected: int = 0
+    under_investigation: int = 0
+    paths: list[dict[str, Any]] = []
+    path_count: int = 0
+    statements: list[dict[str, Any]] = []
+    limitations: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
+
+
 # ---- Multi-lang SAST (Go + Rust) ----
 class MultilangScanRequest(BaseModel):
     """Go+Rust source→sink audit (offline; pasted sources or file list)."""
