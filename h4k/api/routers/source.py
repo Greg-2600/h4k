@@ -20,6 +20,8 @@ from schemas import (
     CustomRuleRequest,
     MultilangScanRequest,
     MultilangScanResult,
+    OsPackageAuditRequest,
+    OsPackageAuditResult,
     ReachabilityRequest,
     ReachabilityResult,
     SanitizerDiffRequest,
@@ -1052,3 +1054,59 @@ def ossfuzz_runner(body: dict[str, Any] | None = None) -> dict[str, Any]:
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return res
+
+
+@router.post("/os-package-audit", response_model=OsPackageAuditResult)
+def os_package_audit(req: OsPackageAuditRequest) -> OsPackageAuditResult:
+    """Audit OS packages + base-image freshness from pasted input (offline).
+
+    `inventory` holds raw dpkg/rpm/apk output; `packages` also accepts
+    name/version strings or {name, version, ecosystem} objects. `image` is
+    pasted Docker/OCI metadata for age/EOL/slim advice. Vulnerable packages
+    and expired/stale base images are ledgered on the labeled host when
+    `engagement_id` is set (scope-enforced). Sandbox returns canned data.
+    """
+    from services import sandbox as sandbox_mode
+    from services.os_package_audit import analyze, sandbox_result, to_ledger
+
+    if not req.packages and not req.inventory.strip() and not req.image:
+        raise HTTPException(
+            status_code=400, detail="packages, inventory or image required"
+        )
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = analyze(
+                req.packages,
+                inventory=req.inventory,
+                image=req.image,
+                fmt=req.format,
+                as_of=req.as_of,
+                max_age_days=req.max_age_days,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, result):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return OsPackageAuditResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )

@@ -1399,3 +1399,40 @@ class CorpusEntry(BaseModel):
 class CorpusImportRequest(BaseModel):
     items: list[dict[str, Any]] = []
     source: str = ""
+
+
+# ---- OS package audit + base-image freshness ----
+class OsPackageAuditRequest(BaseModel):
+    """OS package + base-image audit from pasted, offline inventory.
+
+    `inventory` is raw dpkg/rpm/apk output; `packages` also accepts
+    name/version strings or {name, version, ecosystem} objects. `image` is
+    pasted Docker/OCI image metadata. `as_of` pins the freshness clock.
+    """
+
+    inventory: str = ""
+    packages: list[Any] = Field(default_factory=list)
+    format: str = "auto"
+    image: dict[str, Any] | None = None
+    as_of: str | None = None
+    max_age_days: int = Field(default=365, ge=1, le=3650)
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class OsPackageAuditResult(BaseModel):
+    package_count: int = 0
+    format: str = ""
+    ecosystems: list[str] = []
+    advisory_count: int = 0
+    vulnerable_count: int = 0
+    fixed_count: int = 0
+    unknown_count: int = 0
+    packages: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = []
+    image: dict[str, Any] = {}
+    image_findings: int = 0
+    limitations: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
