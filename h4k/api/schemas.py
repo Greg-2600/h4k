@@ -1473,3 +1473,31 @@ class OsPackageAuditResult(BaseModel):
     sandbox: bool = False
     ingested: int = 0
     skipped_out_of_scope: list[str] = []
+
+
+# ---- Rotation planner + patch-diff verifier + PoC capture ----
+class RemediationPackRequest(BaseModel):
+    """Remediation inputs supplied by the operator, all offline.
+
+    `secrets` holds secret-scan metadata (rule id, label, location, exposure,
+    status) — secret values/code are ignored. `before`/`after` are supplied
+    fuzz result summaries. `flow` is a list of step descriptors to record as
+    a headless PoC step list; nothing is executed.
+    """
+
+    secrets: list[Any] = Field(default_factory=list)
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+    flow: list[Any] = Field(default_factory=list)
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class RemediationPackResult(BaseModel):
+    rotation: dict[str, Any] = {}
+    patch_verification: dict[str, Any] = {}
+    poc_capture: dict[str, Any] = {}
+    limitations: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []

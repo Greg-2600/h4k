@@ -24,6 +24,8 @@ from schemas import (
     OsPackageAuditResult,
     ReachabilityRequest,
     ReachabilityResult,
+    RemediationPackRequest,
+    RemediationPackResult,
     SanitizerDiffRequest,
     SanitizerDiffResult,
     SarifExportRequest,
@@ -1160,6 +1162,59 @@ def os_package_audit(req: OsPackageAuditRequest) -> OsPackageAuditResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return OsPackageAuditResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/remediation-pack", response_model=RemediationPackResult)
+def remediation_pack(req: RemediationPackRequest) -> RemediationPackResult:
+    """Plan secret rotation, verify a patch and record a headless PoC (offline).
+
+    `secrets` carries secret-scan metadata only — values/code are ignored and
+    never echoed or ledgered. `before`/`after` are the operator's supplied
+    fuzz summaries; a fix is verified only when the runs are comparable and
+    the retest has zero crashes. `flow` is recorded as a deterministic step
+    list without a browser or any execution. Actionable rows ledger on the
+    labeled host when `engagement_id` is set (scope-enforced). Sandbox returns
+    canned data.
+    """
+    from services import sandbox as sandbox_mode
+    from services.remediation_pack import analyze, sandbox_result, to_ledger
+
+    if not req.secrets and req.before is None and req.after is None and not req.flow:
+        raise HTTPException(
+            status_code=400, detail="secrets, before/after results or flow required"
+        )
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = analyze(
+                req.secrets, before=req.before, after=req.after, flow=req.flow
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, result):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return RemediationPackResult(
         **{
             **result,
             "ingested": ingested,
