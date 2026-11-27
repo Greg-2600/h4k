@@ -36,6 +36,8 @@ from schemas import (
     SourceFinding,
     SourceScanRequest,
     SourceScanResult,
+    SupplyChainRequest,
+    SupplyChainResult,
     SuppressMatchRequest,
     SuppressMatchResult,
     TaintScanRequest,
@@ -301,6 +303,53 @@ def taint_scan(req: TaintScanRequest) -> TaintScanResult:
                 if entry["host"] not in skipped:
                     skipped.append(entry["host"])
     return TaintScanResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
+
+
+@router.post("/supply-chain", response_model=SupplyChainResult)
+def supply_chain(req: SupplyChainRequest) -> SupplyChainResult:
+    """Typosquat heuristics + SLSA/build-info provenance ingest (offline).
+
+    `packages` are names, purls, or {name, ecosystem, version} objects;
+    `provenance` holds SLSA/in-toto statements or plain build-info records.
+    `allowlist` suppresses known-good package names. Suspicious packages and
+    incomplete provenance are ledgered as vulns on the labeled host when
+    `engagement_id` is set (scope-enforced). Sandbox returns canned data.
+    """
+    from services import sandbox as sandbox_mode
+    from services.supply_chain import analyze, sandbox_result, to_ledger
+
+    if not req.packages and not req.provenance:
+        raise HTTPException(status_code=400, detail="packages or provenance required")
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = analyze(req.packages, req.provenance, allowlist=req.allowlist)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, result):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return SupplyChainResult(
         **{
             **result,
             "ingested": ingested,
