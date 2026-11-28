@@ -6,6 +6,7 @@ import json
 import re
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import urlparse
 
 import pytest
 from services.vuln_intel import (
@@ -25,7 +26,7 @@ def test_bundled_snapshot_is_real_and_well_formed() -> None:
     info = catalog_info()
     assert info["count"] > 50
     assert info["generated"] == "2026-11-28"
-    assert "exploit-db.com" in info["source"]
+    assert urlparse(info["source"]).hostname == "www.exploit-db.com"
     assert "subset" in info["note"]
     ids = [entry["id"] for entry in search_exploits(limit=50)["entries"]]
     assert len(ids) == len(set(ids))
