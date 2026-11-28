@@ -18,6 +18,8 @@ from schemas import (
     CiGateRequest,
     CiGateResult,
     CustomRuleRequest,
+    DisclosurePackRequest,
+    DisclosurePackResult,
     MultilangScanRequest,
     MultilangScanResult,
     OsPackageAuditRequest,
@@ -1221,3 +1223,51 @@ def remediation_pack(req: RemediationPackRequest) -> RemediationPackResult:
             "skipped_out_of_scope": skipped,
         }
     )
+
+
+@router.post("/disclosure-pack", response_model=DisclosurePackResult)
+def disclosure_pack(req: DisclosurePackRequest) -> DisclosurePackResult:
+    """Disclosure timeline + CVSS v3.1 builder + offline CWE browser.
+
+    `reported_at`/`as_of` drive a deterministic 90-day disclosure timeline
+    (extendable via `extension_days`) with reminder dates; `as_of` defaults to
+    `reported_at` so nothing depends on the wall clock. `cvss` accepts a
+    full v3.1/v4.0 `vector` or pickable v3.1 `metrics`; v4.0 scores must be
+    asserted, never guessed. `cwe_query`/`cwe_ids`/`cwe_browse` search the
+    small curated CWE dictionary. Nothing is scheduled, persisted or fetched
+    over the network, and sandbox returns canned data.
+    """
+    from services import sandbox as sandbox_mode
+    from services.disclosure_pack import analyze, sandbox_result
+
+    if not (
+        req.reported_at
+        or req.cvss
+        or req.cwe_query.strip()
+        or req.cwe_ids
+        or req.cwe_browse
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="reported_at, cvss, cwe_query, cwe_ids or cwe_browse required",
+        )
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = analyze(
+                reported_at=req.reported_at,
+                as_of=req.as_of,
+                disclosure_days=req.disclosure_days,
+                extension_days=req.extension_days,
+                vendor=req.vendor,
+                title=req.title,
+                cvss=req.cvss,
+                cwe_query=req.cwe_query,
+                cwe_ids=req.cwe_ids,
+                cwe_browse=req.cwe_browse,
+                cwe_limit=req.cwe_limit,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return DisclosurePackResult(**result)

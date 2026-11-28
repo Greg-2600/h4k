@@ -1501,3 +1501,37 @@ class RemediationPackResult(BaseModel):
     sandbox: bool = False
     ingested: int = 0
     skipped_out_of_scope: list[str] = []
+
+
+# ---- Disclosure tracker + CVSS builder + CWE browser ----
+class DisclosurePackRequest(BaseModel):
+    """Offline disclosure timeline, CVSS vector builder and CWE search.
+
+    `reported_at`/`as_of` are ISO dates; reminders are pure calendar
+    arithmetic and `as_of` defaults to `reported_at`. `cvss` carries either a
+    full `vector` (v3.1 or v4.0) or v3.1 `metrics` plus an optional v4
+    `asserted_score`. `cwe_query` searches the curated dictionary, `cwe_ids`
+    looks entries up by id and
+    `cwe_browse` lists the dictionary.
+    """
+
+    reported_at: str | None = None
+    as_of: str | None = None
+    disclosure_days: int = Field(default=90, ge=1, le=3650)
+    extension_days: int = Field(default=0, ge=0, le=3650)
+    vendor: str = ""
+    title: str = ""
+    cvss: dict[str, Any] | None = None
+    cwe_query: str = ""
+    cwe_ids: list[str] = Field(default_factory=list)
+    cwe_browse: bool = False
+    cwe_limit: int = Field(default=10, ge=1, le=50)
+
+
+class DisclosurePackResult(BaseModel):
+    timeline: dict[str, Any] | None = None
+    cvss: dict[str, Any] | None = None
+    cvss_catalog: list[dict[str, Any]] = []
+    cwe: dict[str, Any] = Field(default_factory=dict)
+    limitations: str = ""
+    sandbox: bool = False
