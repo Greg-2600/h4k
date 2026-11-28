@@ -24,6 +24,8 @@ from schemas import (
     MultilangScanResult,
     OsPackageAuditRequest,
     OsPackageAuditResult,
+    PatchReviewRequest,
+    PatchReviewResult,
     ReachabilityRequest,
     ReachabilityResult,
     RemediationPackRequest,
@@ -1271,3 +1273,61 @@ def disclosure_pack(req: DisclosurePackRequest) -> DisclosurePackResult:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     return DisclosurePackResult(**result)
+
+
+@router.post("/patch-review", response_model=PatchReviewResult)
+def patch_review(req: PatchReviewRequest) -> PatchReviewResult:
+    """Rank patch candidates, generate regression tests and judge false positives.
+
+    `finding` carries the reported weakness (title/cwe/description/language/
+    severity); `patches` is a list of candidate patches and, when empty, the
+    service returns three deterministic direction templates. `evidence` feeds
+    the conservative false-positive judge. Confirmed or likely-true-positive
+    verdicts ledger on the labeled host when `engagement_id` is set
+    (scope-enforced); cleared findings are never ledgered. Nothing calls a
+    model, runs a tool or executes a candidate, and sandbox returns canned data.
+    """
+    from services import sandbox as sandbox_mode
+    from services.patch_review import analyze, sandbox_result, to_ledger
+
+    if not (req.finding or req.patches or req.evidence):
+        raise HTTPException(
+            status_code=400,
+            detail="finding, patches or evidence required",
+        )
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = analyze(
+                finding=req.finding,
+                patches=req.patches,
+                test_language=req.test_language,
+                test_framework=req.test_framework,
+                evidence=req.evidence,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, result):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return PatchReviewResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
