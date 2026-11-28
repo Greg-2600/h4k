@@ -54,6 +54,8 @@ from schemas import (
     TriageResult,
     VerifyFixRequest,
     VerifyFixResult,
+    VulnIntelRequest,
+    VulnIntelResult,
     VulnVexRequest,
     VulnVexResult,
 )
@@ -1271,3 +1273,74 @@ def disclosure_pack(req: DisclosurePackRequest) -> DisclosurePackResult:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     return DisclosurePackResult(**result)
+
+
+@router.post("/vuln-intel", response_model=VulnIntelResult)
+def vuln_intel(req: VulnIntelRequest) -> VulnIntelResult:
+    """Exploit-DB mirror search + Metasploit module delta + tech -> CVE.
+
+    `exploit_query`/`cve`/`platform`/`exploit_type` search the bundled
+    Exploit-DB snapshot. `technologies` accepts WhatWeb/Wappalyzer-style
+    fingerprints and links them to curated CVEs with version awareness.
+    `modules`/`baseline_modules` compare Metasploit module lists offline and
+    name what is new since baseline. Linked CVEs and new mapped modules are
+    ledgered on the labeled host when `engagement_id` is set (scope-enforced).
+    Nothing runs Metasploit, scans a host or contacts Exploit-DB; sandbox
+    returns canned data.
+    """
+    from services import sandbox as sandbox_mode
+    from services.vuln_intel import analyze, sandbox_result, to_ledger
+
+    if not (
+        req.exploit_query.strip()
+        or req.cve.strip()
+        or req.platform.strip()
+        or req.exploit_type.strip()
+        or req.technologies
+        or req.modules
+        or req.baseline_modules
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="exploit query, cve, technologies or modules required",
+        )
+    host = (req.host or "127.0.0.1").strip() or "127.0.0.1"
+    if sandbox_mode.enabled():
+        result = sandbox_result()
+    else:
+        try:
+            result = analyze(
+                exploit_query=req.exploit_query,
+                cve=req.cve,
+                platform=req.platform,
+                etype=req.exploit_type,
+                verified_only=req.verified_only,
+                exploit_limit=req.exploit_limit,
+                technologies=req.technologies,
+                modules=req.modules,
+                baseline_modules=req.baseline_modules,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ingested = 0
+    skipped: list[str] = []
+    if req.engagement_id:
+        from routers.engagement import get_store
+        from services.engagement import ScopeError
+
+        store = get_store()
+        if not store.get_engagement(req.engagement_id):
+            raise HTTPException(status_code=404, detail="engagement not found")
+        for entry in to_ledger(host, result):
+            try:
+                ingested += store.record_vuln(req.engagement_id, entry["host"], entry)
+            except ScopeError:
+                if entry["host"] not in skipped:
+                    skipped.append(entry["host"])
+    return VulnIntelResult(
+        **{
+            **result,
+            "ingested": ingested,
+            "skipped_out_of_scope": skipped,
+        }
+    )
