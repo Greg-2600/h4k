@@ -1535,3 +1535,41 @@ class DisclosurePackResult(BaseModel):
     cwe: dict[str, Any] = Field(default_factory=dict)
     limitations: str = ""
     sandbox: bool = False
+
+
+# ---- Exploit-DB search + MSF delta + technology -> CVE ----
+class VulnIntelRequest(BaseModel):
+    """Offline exploit/CVE intelligence from pasted, operator-supplied input.
+
+    `exploit_query`/`cve`/`platform`/`exploit_type` search the bundled
+    Exploit-DB snapshot. `technologies` accepts WhatWeb/Wappalyzer-style
+    fingerprints (``"nginx 1.18.0"`` or ``{name, version}``) and links them to
+    curated CVEs with version awareness. `modules`/`baseline_modules` are
+    Metasploit module name lists; the delta names what is new since baseline.
+    Linked CVEs and new mapped modules ledger on `host` when `engagement_id`
+    is set (scope-enforced). Nothing runs Metasploit or contacts Exploit-DB.
+    """
+
+    exploit_query: str = ""
+    cve: str = ""
+    platform: str = ""
+    exploit_type: str = ""
+    verified_only: bool = False
+    exploit_limit: int = Field(default=10, ge=1, le=50)
+    technologies: list[Any] = Field(default_factory=list)
+    modules: list[Any] = Field(default_factory=list)
+    baseline_modules: list[Any] | None = None
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class VulnIntelResult(BaseModel):
+    catalog: dict[str, Any] = Field(default_factory=dict)
+    exploits: dict[str, Any] | None = None
+    msf_delta: dict[str, Any] | None = None
+    technologies: list[dict[str, Any]] = []
+    summary: dict[str, Any] = Field(default_factory=dict)
+    limitations: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
