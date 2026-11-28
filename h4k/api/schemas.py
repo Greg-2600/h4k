@@ -1535,3 +1535,37 @@ class DisclosurePackResult(BaseModel):
     cwe: dict[str, Any] = Field(default_factory=dict)
     limitations: str = ""
     sandbox: bool = False
+
+
+# ---- AI-style patch ranking + regression tests + false-positive judge ----
+class PatchReviewRequest(BaseModel):
+    """Offline review inputs supplied by the operator.
+
+    `finding` is a finding dict (title/cwe/description/language/severity).
+    `patches` is a list of candidate patches (``{name, diff|code, ...}``);
+    when empty the service returns three deterministic direction templates.
+    `evidence` holds false-positive signals (reachable, input flow, sanitizer,
+    affected version, runtime confirmation, compensating control). Nothing is
+    executed, fetched or sent to a model.
+    """
+
+    finding: dict[str, Any] | None = None
+    patches: list[Any] = Field(default_factory=list)
+    test_language: str = ""
+    test_framework: str = ""
+    evidence: dict[str, Any] | None = None
+    host: str = "127.0.0.1"
+    engagement_id: str | None = None
+
+
+class PatchReviewResult(BaseModel):
+    finding: dict[str, Any] = Field(default_factory=dict)
+    patches: list[dict[str, Any]] = []
+    recommended: dict[str, Any] | None = None
+    tests: dict[str, Any] | None = None
+    false_positive: dict[str, Any] | None = None
+    summary: dict[str, Any] = Field(default_factory=dict)
+    limitations: str = ""
+    sandbox: bool = False
+    ingested: int = 0
+    skipped_out_of_scope: list[str] = []
